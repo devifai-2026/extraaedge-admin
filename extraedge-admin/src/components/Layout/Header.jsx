@@ -1,16 +1,14 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { colors } from '../../theme/colors'
-import {
-    Search,
-    NotificationsActive,
-    Add,
-    Phone,
-    AccountCircle,
-    ExitToApp,
-    ExpandMore,
-    ArrowDropDown,
-} from '@mui/icons-material'
+import SearchIcon from '@mui/icons-material/Search';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import AddIcon from '@mui/icons-material/Add';
+import PhoneIcon from '@mui/icons-material/Phone';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import ExitToAppIcon from '@mui/icons-material/ExitToApp';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import './Header.css'
 
 function Header() {
@@ -77,7 +75,7 @@ function Header() {
                                 onClick={() => setShowGlobalMenu(!showGlobalMenu)}
                             >
                                 Global Search
-                                <ExpandMore sx={{ fontSize: 18, marginLeft: '4px' }} />
+                                <ExpandMoreIcon sx={{ fontSize: 18, marginLeft: '4px' }} />
                             </button>
                             {showGlobalMenu && (
                                 <div className="global-menu">
@@ -97,29 +95,29 @@ function Header() {
                             placeholder={getPlaceholder()}
                             style={{ color: colors.textDark }}
                         />
-                        <Search className="search-icon" sx={{ fontSize: 20 }} />
+                        <SearchIcon className="search-icon" sx={{ fontSize: 20 }} />
                     </div>
 
                 </div>
                 <div className='sub-container'>
                     <div className="header-actions">
                         <button className="header-btn notification-btn" title="Notifications">
-                            <NotificationsActive sx={{ fontSize: 22 }} />
+                            <NotificationsActiveIcon sx={{ fontSize: 22 }} />
                             <span className="notification-badge">13</span>
                         </button>
 
                         <button className="header-btn add-btn" title="Add">
-                            <Add sx={{ fontSize: 22 }} />
+                            <AddIcon sx={{ fontSize: 22 }} />
                         </button>
 
                         <button className="header-btn phone-btn" title="Phone">
-                            <Phone sx={{ fontSize: 22 }} />
+                            <PhoneIcon sx={{ fontSize: 22 }} />
                         </button>
                     </div>
                     <div style={{display:'flex' , gap:'5px'}}>
                     <div className="timer">{formatTime(timeLeft)}</div>
                        <button className="header-btn user-btn" title="User Profile">
-                            <AccountCircle sx={{ fontSize: 40 }} />
+                            <AccountCircleIcon sx={{ fontSize: 40 }} />
                         </button>
                     </div>
                 </div>

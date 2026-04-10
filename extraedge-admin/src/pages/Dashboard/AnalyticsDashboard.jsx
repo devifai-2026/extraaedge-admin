@@ -1,16 +1,8 @@
-import { Autocomplete, Divider, TextField } from '@mui/material';
+import Autocomplete from '@mui/material/Autocomplete';
+import Divider from '@mui/material/Divider';
+import TextField from '@mui/material/TextField';
 import { colors } from '../../theme/colors';
 import './AnalyticsDashboard.css';
-import {
-    Settings as SettingsIcon,
-    Refresh as RefreshIcon,
-    Share as ShareIcon,
-    CalendarToday as CalendarIcon,
-    InfoOutlined as InfoIcon,
-    TrendingUp as TrendingUpIcon,
-    Download as DownloadIcon,
-    OpenInFull as FullscreenIcon,
-} from '@mui/icons-material';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import DateRangePicker from '../../components/DatePicker/DatePicker';
 import LeadsChart from '../../components/LeadsTimelineReport/LeadsTimelineReport';
@@ -19,6 +11,8 @@ import ProgramWise from '../../components/ProgramWise/TableProgramWise'
 import ChannelSource from '../../components/ChannnelSource/ChannelSource'
 import ProgramStatus from '../../components/programStatus/programStatus';
 import ColdEnquiries from '../../components/ColdEnquiries/coldEnquiries';
+import SettingsIcon from '@mui/icons-material/Settings';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 function AnalyticsDashboard() {
     const Counselors = [
