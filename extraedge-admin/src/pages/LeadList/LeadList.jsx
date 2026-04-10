@@ -11,6 +11,7 @@ import AddIcon from '@mui/icons-material/Add';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 
 import LeadCardContainer from "../../components/LeadCard/LeadCard";
+import AddNewLead from "../../components/AddNewLead/AddNewLead";
 
 
 
@@ -33,7 +34,7 @@ const tabData = [
 
 const LeadList = () => {
     const [value, setValue] = useState(0);
-    const [tab, setTab] = useState(0);
+    const [addLeadOpen, setAddLeadOpen] = useState(false);
     return (
         <div className="lead-list-maincontainer">
             {/* TABS SECTION */}
@@ -129,6 +130,7 @@ const LeadList = () => {
             <div className="fab-container">
                 <Fab
                     size="medium"
+                    onClick={() => setAddLeadOpen(true)}
                     sx={{
                         backgroundColor: "#ff7800",
                         color: "#fff",
@@ -148,6 +150,10 @@ const LeadList = () => {
                     <FileUploadIcon />
                 </Fab>
             </div>
+            <AddNewLead
+                open={addLeadOpen}
+                onClose={() => setAddLeadOpen(false)}
+            />
         </div>
     );
 }
