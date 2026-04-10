@@ -13,7 +13,7 @@ import './Sidebar.css';
 
 const menuItems = [
   { id: 1, label: 'Analytics Dashboard', icon: DashboardIcon, path: '/dashboard' },
-  { id: 2, label: 'Lead Manager', icon: PeopleAltIcon, path: '/lead-manager' },
+  { id: 2, label: 'Lead Manager', icon: PeopleAltIcon, path: '/leadlist' },
   { id: 3, label: 'Raw Data Manager', icon: FolderIcon, path: '/raw-data-manager' },
   { id: 4, label: 'WhatsApp Chat', icon: WhatsAppIcon, path: '/whatsapp-chat', badge: '12' },
   { id: 5, label: 'Follow-ups Manager', icon: CalendarTodayIcon, path: '/followups-manager' },

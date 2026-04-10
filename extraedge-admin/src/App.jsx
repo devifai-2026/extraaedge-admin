@@ -4,6 +4,7 @@ import Layout from './components/Layout/Layout'
 import AnalyticsDashboard from './pages/Dashboard/AnalyticsDashboard'
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute'
 import './App.css'
+import LeadList from './pages/LeadList/LeadList'
 
 function App() {
   return (
@@ -19,6 +20,17 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <AnalyticsDashboard />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/leadlist"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <LeadList />
               </Layout>
             </ProtectedRoute>
           }

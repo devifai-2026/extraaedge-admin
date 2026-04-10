@@ -1,0 +1,9 @@
+.lead-list-maincontainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.lead-list-bottomcontainer {
+  flex-shrink: 0;
+}
