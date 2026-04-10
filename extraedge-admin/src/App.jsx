@@ -1,12 +1,31 @@
-﻿import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+﻿import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './components/Login/Login'
+import Layout from './components/Layout/Layout'
+import AnalyticsDashboard from './pages/Dashboard/AnalyticsDashboard'
+import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute'
 import './App.css'
 
 function App() {
   return (
     <Router>
       <Routes>
+        {/* Public Routes */}
         <Route path="/" element={<Login />} />
+
+        {/* Protected Routes with Layout */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <AnalyticsDashboard />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Catch-all - redirect to dashboard for authenticated users, login otherwise */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>
   )

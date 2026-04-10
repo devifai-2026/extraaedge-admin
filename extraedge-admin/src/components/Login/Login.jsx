@@ -1,10 +1,12 @@
 // import '../styles/Login.css'
 import './Login.css'
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { colors } from '../../theme/colors'
 
 function Login() {
   const [currentSlide, setCurrentSlide] = useState(0)
+  const navigate = useNavigate()
 
   const slides = [
     {
@@ -46,6 +48,13 @@ function Login() {
   const handleSubmit = (e) => {
     e.preventDefault()
     console.log('Login submitted')
+    
+    // Set authentication token (in a real app, this would come from the backend)
+    localStorage.setItem('token', 'user_auth_token_' + Date.now())
+    localStorage.setItem('user', JSON.stringify({ email: 'counsellor4@speedupinfotech.com' }))
+    
+    // Navigate to dashboard
+    navigate('/dashboard')
   }
 
   return (

@@ -1,0 +1,168 @@
+import React, { useState } from "react";
+import {
+  Box,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  IconButton
+} from "@mui/material";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import DownloadIcon from "@mui/icons-material/Download";
+
+const data = [
+  {
+    program: "MERN Stack Training and Certification",
+    total: 3,
+    cold: 1,
+    new: 1,
+    visited: 1
+  },
+  {
+    program: "Python Full Stack Training",
+    total: 1,
+    cold: 0,
+    new: 1,
+    visited: 0
+  },
+  {
+    program: "Data Science Training",
+    total: 1,
+    cold: 1,
+    new: 0,
+    visited: 0
+  },
+  {
+    program: "Data Analyst Training",
+    total: 4,
+    cold: 2,
+    new: 2,
+    visited: 0
+  },
+  {
+    program: "Yet to decide",
+    total: 2,
+    cold: 0,
+    new: 2,
+    visited: 0
+  }
+];
+
+export default function LeadToggleTable() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{backgroundColor:'#ffffff' , padding:"10px" , borderRadius:"8px" , border:"1px solid #ddd"}}>
+      
+      <div style={{display:'flex', justifyContent:'space-between' , alignItems:'center' , marginBottom:'10px'}}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <Typography variant="h6" fontWeight="bold">
+            Program Vs Lead Status Analysis [MD-114]
+          </Typography>
+          <InfoOutlinedIcon fontSize="small" color="action" />
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <RefreshIcon color="warning" />
+          <Typography variant="body2">
+            Last synced: 06:16 PM
+          </Typography>
+          <IconButton size="small">
+            <DownloadIcon />
+          </IconButton>
+        </div>
+      </div>
+
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            {/* Top Header */}
+            <TableRow>
+              <TableCell />
+              <TableCell />
+
+              <TableCell
+                colSpan={open ? 3 : 1}
+                align="center"
+                sx={{
+                  backgroundColor: "#6b6b6b",
+                  color: "#fff",
+                  fontWeight: "bold"
+                }}
+              >
+                <Box display="flex" alignItems="center" justifyContent="center">
+                  Lead
+                  <IconButton
+                    size="small"
+                    onClick={() => setOpen(!open)}
+                    sx={{ color: "#fff", ml: 1 }}
+                  >
+                    {open ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+                  </IconButton>
+                </Box>
+              </TableCell>
+            </TableRow>
+
+            {/* Column Headers */}
+            <TableRow sx={{ backgroundColor: "#6b6b6b" }}>
+              <TableCell sx={{ color: "#fff" }}>Program</TableCell>
+              <TableCell sx={{ color: "#fff" }}>Total</TableCell>
+
+              {open ? (
+                <>
+                  <TableCell sx={{ color: "#fff" }}>Cold</TableCell>
+                  <TableCell sx={{ color: "#fff" }}>New</TableCell>
+                  <TableCell sx={{ color: "#fff" }}>Visited</TableCell>
+                </>
+              ) : (
+                <TableCell sx={{ color: "#fff" }}>Total</TableCell>
+              )}
+            </TableRow>
+          </TableHead>
+
+          <TableBody>
+            {data.map((row, index) => (
+              <TableRow key={index}>
+                <TableCell>{row.program}</TableCell>
+                <TableCell>{row.total}</TableCell>
+
+                {open ? (
+                  <>
+                    <TableCell>{row.cold}</TableCell>
+                    <TableCell>{row.new}</TableCell>
+                    <TableCell>{row.visited}</TableCell>
+                  </>
+                ) : (
+                  <TableCell>{row.total}</TableCell>
+                )}
+              </TableRow>
+            ))}
+
+            {/* Total Row */}
+            <TableRow>
+              <TableCell sx={{ fontWeight: "bold" }}>Total</TableCell>
+              <TableCell sx={{ fontWeight: "bold" }}>11</TableCell>
+
+              {open ? (
+                <>
+                  <TableCell sx={{ fontWeight: "bold" }}>4</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>6</TableCell>
+                  <TableCell sx={{ fontWeight: "bold" }}>1</TableCell>
+                </>
+              ) : (
+                <TableCell sx={{ fontWeight: "bold" }}>11</TableCell>
+              )}
+            </TableRow>
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </div>
+  );
+}
