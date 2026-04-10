@@ -16,8 +16,8 @@
   margin-left: 280px;
   padding: 30px;
   background-color: #f9f9f9;
-  overflow-y: auto;
-  min-height: calc(100vh - 70px);
+  overflow: hidden;
+  height: calc(100vh - 70px);
 }
 
 /* Responsive design */

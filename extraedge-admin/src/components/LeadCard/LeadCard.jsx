@@ -31,6 +31,7 @@ const LEadCardDataArray = [
         phone: "9665948342",
         status: "09-Visited",
         subStatus: "Will join soon",
+        value: "Untouched",
         personal: {
             program: "Data Analyst Training and Certification",
             country: "India",
@@ -61,6 +62,7 @@ const LEadCardDataArray = [
         name: "Aarav Singh",
         phone: "9876543210",
         status: "08-Interested",
+         value: "Untouchedss",
         subStatus: "Awaiting confirmation",
         personal: {
             program: "Advanced Python Development",
@@ -92,6 +94,7 @@ const LEadCardDataArray = [
         name: "Sneha Desai",
         phone: "9123456789",
         status: "10-Enrolled",
+         value: "",
         subStatus: "Active student",
         personal: {
             program: "Full Stack Web Development",
@@ -123,6 +126,7 @@ const LEadCardDataArray = [
         name: "Rohit Verma",
         phone: "9555666777",
         status: "05-Qualified",
+         value: "Untouched",
         subStatus: "Negotiation phase",
         personal: {
             program: "Data Science with ML",
@@ -154,6 +158,7 @@ const LEadCardDataArray = [
         name: "Priya Nair",
         phone: "9888999000",
         status: "07-Requirement Match",
+         value: "",
         subStatus: "Needs demo",
         personal: {
             program: "UI/UX Design Bootcamp",
@@ -255,9 +260,11 @@ const LeadCard = ({ lead }) => {
                 </div>
 
                 {/* UNTOUCHED BADGE */}
-                <div className="untouched-badge">
-                    Untouched <span className="untouched-dot" />
-                </div>
+                {lead.value && (
+                    <div className="untouched-badge">
+                        {lead.value} <span className="untouched-dot" />
+                    </div>
+                )}
 
             </div>
 

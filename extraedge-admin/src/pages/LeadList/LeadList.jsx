@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Tabs, Tab, Box, IconButton } from "@mui/material";
+import { Tabs, Tab, Box, IconButton, Fab } from "@mui/material";
 import './LeadList.css';
 import SwapVertIcon from "@mui/icons-material/SwapVert";
 import GroupIcon from "@mui/icons-material/Group";
@@ -7,6 +7,8 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import ViewListIcon from "@mui/icons-material/ViewList";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import AddIcon from '@mui/icons-material/Add';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
 
 import LeadCardContainer from "../../components/LeadCard/LeadCard";
 
@@ -34,51 +36,46 @@ const LeadList = () => {
     const [tab, setTab] = useState(0);
     return (
         <div className="lead-list-maincontainer">
-            <div className="lead-list-maincontainer">
+            {/* TABS SECTION */}
+            <div className="lead-list-tabs" style={{ padding: "0 12px" }}>
 
-                {/* INNER WRAPPER (important) */}
-                <div style={{ padding: "0 12px" }}>
+                <Tabs
+                    value={value}
+                    onChange={(e, newValue) => setValue(newValue)}
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    TabIndicatorProps={{ style: { display: "none" } }}
+                >
+                    {tabData.map((tab, index) => (
+                        <Tab
+                            key={index}
+                            label={`${tab.label} (${tab.count})`}
+                            sx={{
+                                textTransform: "none",
+                                minHeight: "36px",
+                                fontSize: "13px",
+                                borderRadius: "4px",
+                                marginRight: "6px",
+                                padding: "6px 12px",
+                                backgroundColor: value === index ? "#ff7800" : "transparent",
+                                color: value === index ? "#fff" : "#7d7d7d",
+                                "&:hover": {
+                                    backgroundColor: value === index ? "#ff7800" : "#e0e0e0",
+                                },
+                            }}
+                        />
+                    ))}
+                </Tabs>
 
-                    <Tabs
-                        value={value}
-                        onChange={(e, newValue) => setValue(newValue)}
-                        variant="scrollable"
-                        scrollButtons="auto"
-                        TabIndicatorProps={{ style: { display: "none" } }}
-                    >
-                        {tabData.map((tab, index) => (
-                            <Tab
-                                key={index}
-                                label={`${tab.label} (${tab.count})`}
-                                sx={{
-                                    textTransform: "none",
-                                    minHeight: "36px",
-                                    fontSize: "13px",
-                                    borderRadius: "4px",
-                                    marginRight: "6px",
-                                    padding: "6px 12px",
-                                    backgroundColor: value === index ? "#ff7800" : "transparent",
-                                    color: value === index ? "#fff" : "#7d7d7d",
-                                    "&:hover": {
-                                        backgroundColor: value === index ? "#ff7800" : "#e0e0e0",
-                                    },
-                                }}
-                            />
-                        ))}
-                    </Tabs>
-
-                    {/* Divider aligned perfectly */}
-                    <div
-                        style={{
-                            width: "100%",
-                            height: "1px",
-                            backgroundColor: "#ff7800",
-                            marginTop: "6px",
-                        }}
-                    />
-
-                </div>
-
+                {/* Divider aligned perfectly */}
+                <div
+                    style={{
+                        width: "100%",
+                        height: "1px",
+                        backgroundColor: "#ff7800",
+                        marginTop: "6px",
+                    }}
+                />
 
             </div>
 
@@ -124,8 +121,32 @@ const LeadList = () => {
                     </Box>
                 </div>
             </div>
-            <div>
+            <div className="lead-card-scroll-area">
                 <LeadCardContainer />
+            </div>
+
+            {/* Floating Action Buttons */}
+            <div className="fab-container">
+                <Fab
+                    size="medium"
+                    sx={{
+                        backgroundColor: "#ff7800",
+                        color: "#fff",
+                        "&:hover": { backgroundColor: "#e66a00" },
+                    }}
+                >
+                    <AddIcon />
+                </Fab>
+                <Fab
+                    size="medium"
+                    sx={{
+                        backgroundColor: "#ff7800",
+                        color: "#fff",
+                        "&:hover": { backgroundColor: "#e66a00" },
+                    }}
+                >
+                    <FileUploadIcon />
+                </Fab>
             </div>
         </div>
     );
