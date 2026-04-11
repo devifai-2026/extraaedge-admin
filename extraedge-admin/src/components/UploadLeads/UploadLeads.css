@@ -1,0 +1,286 @@
+.upload-leads-dialog .MuiDialog-paper {
+    border-radius: 8px;
+    max-width: 720px;
+    width: 100%;
+}
+
+.upload-leads-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #fff3e6;
+    padding: 14px 20px !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: #333;
+}
+
+.upload-leads-close-btn {
+    color: #333 !important;
+}
+
+/* Stepper */
+.upload-leads-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 40px 16px;
+}
+
+.upload-leads-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+}
+
+.upload-leads-step-circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid #ccc;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: #ccc;
+    z-index: 1;
+}
+
+.upload-leads-step-circle.active {
+    border-color: #2e7d32;
+    color: #2e7d32;
+}
+
+.upload-leads-step-circle.completed {
+    border-color: #2e7d32;
+    background-color: #2e7d32;
+    color: #fff;
+}
+
+.upload-leads-step-label {
+    margin-top: 6px;
+    font-size: 13px;
+    color: #666;
+    font-weight: 500;
+    text-align: center;
+}
+
+.upload-leads-step-label.active {
+    color: #333;
+    font-weight: 600;
+}
+
+.upload-leads-step-connector {
+    flex: 1;
+    height: 3px;
+    background: #ccc;
+    margin: 0 -10px;
+    align-self: flex-start;
+    margin-top: 14px;
+}
+
+.upload-leads-step-connector.completed {
+    background: #2e7d32;
+}
+
+/* Content */
+.upload-leads-content {
+    padding: 20px 24px !important;
+    min-height: 320px;
+}
+
+/* Step 1: Map Fields */
+.upload-leads-instructions {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    background: #fafafa;
+}
+
+.upload-leads-instructions-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.upload-leads-instructions-header .info-icon {
+    color: #666;
+    margin-top: 2px;
+}
+
+.upload-leads-instructions-header p {
+    margin: 0;
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+}
+
+.upload-leads-instructions ul {
+    margin: 8px 0 4px 20px;
+    padding: 0;
+    font-size: 13px;
+    color: #555;
+}
+
+.upload-leads-instructions ul li {
+    margin-bottom: 6px;
+}
+
+.upload-leads-read-more {
+    color: #ff7800;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    margin-left: 20px;
+}
+
+.upload-leads-status-section h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.upload-leads-status-section p {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 16px;
+}
+
+.upload-leads-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.upload-leads-field-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 6px;
+}
+
+.upload-leads-field-label .required {
+    color: #d32f2f;
+    margin-left: 2px;
+}
+
+.upload-leads-checkboxes {
+    display: flex;
+    gap: 24px;
+    margin-top: 8px;
+}
+
+.upload-leads-checkboxes label {
+    font-size: 13px;
+    color: #555;
+}
+
+/* Step 2: Upload File */
+.upload-leads-file-section h4 {
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.upload-leads-file-section .download-icon {
+    color: #ff7800;
+    cursor: pointer;
+    font-size: 20px;
+}
+
+.upload-leads-upload-btn {
+    border: 1px solid #ff7800 !important;
+    color: #ff7800 !important;
+    text-transform: none !important;
+    font-weight: 500 !important;
+    padding: 6px 20px !important;
+}
+
+/* Step 3: Validate File */
+.upload-leads-mapping-header {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 16px;
+}
+
+.upload-leads-mapping-columns {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+}
+
+.upload-leads-mapping-columns span:first-child {
+    flex: 1;
+}
+
+.upload-leads-mapping-columns span:last-child {
+    flex: 1;
+}
+
+.upload-leads-mapping-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 12px;
+}
+
+.upload-leads-mapping-row .sheet-field {
+    flex: 1;
+    font-size: 14px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.upload-leads-mapping-row .sheet-field .arrow {
+    color: #999;
+    font-size: 18px;
+}
+
+.upload-leads-mapping-row .crm-field {
+    flex: 1;
+}
+
+/* Actions */
+.upload-leads-actions {
+    padding: 12px 24px !important;
+    border-top: 1px solid #eee;
+    justify-content: flex-end !important;
+    gap: 12px;
+}
+
+.upload-leads-cancel-btn {
+    border-color: #ff7800 !important;
+    color: #ff7800 !important;
+    text-transform: none !important;
+    padding: 6px 28px !important;
+    border-radius: 4px !important;
+}
+
+.upload-leads-next-btn {
+    background-color: #ff7800 !important;
+    color: #fff !important;
+    text-transform: none !important;
+    padding: 6px 28px !important;
+    border-radius: 4px !important;
+}
+
+.upload-leads-next-btn:hover {
+    background-color: #e66a00 !important;
+}

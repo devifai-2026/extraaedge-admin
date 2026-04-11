@@ -1,0 +1,145 @@
+.failed-leads-container {
+  font-family: "Segoe UI", sans-serif;
+}
+
+.failed-leads-container h2 {
+  font-size: 22px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 4px 0;
+}
+.failed-leads-title{
+    font-size: 22px;
+    font-weight: 600;
+    color: #333;
+    display: flex;
+}
+.failed-leads-title-underline {
+  height: 1px;
+  background: linear-gradient(to right, #ff7800, #ff4500);
+  border: none;
+  margin: 0 0 20px 0;
+  border-radius: 1px;
+}
+
+.failed-leads-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.failed-leads-table thead {
+  background-color: #fff5ee;
+}
+
+.failed-leads-table thead th {
+  padding: 14px 12px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #ff7800;
+  white-space: nowrap;
+}
+
+.failed-leads-table tbody tr {
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.15s;
+}
+
+.failed-leads-table tbody tr:hover {
+  background-color: #fef8f4;
+}
+
+.failed-leads-table tbody td {
+  padding: 12px;
+  font-size: 13px;
+  color: #444;
+  vertical-align: middle;
+}
+
+.failed-leads-table tbody td .editable-input {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: #333;
+  background: #fff;
+  width: 100%;
+  max-width: 200px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.failed-leads-table tbody td .editable-input:focus {
+  border-color: #ff7800;
+  box-shadow: 0 0 0 2px rgba(255, 120, 0, 0.15);
+}
+
+.failed-leads-table tbody td .action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 20px;
+  transition: transform 0.15s;
+}
+
+.failed-leads-table tbody td .action-btn:hover {
+  transform: scale(1.15);
+}
+
+.failed-leads-error {
+  color: #c0392b;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Pagination */
+.failed-leads-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 24px;
+}
+
+.failed-leads-pagination button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.failed-leads-pagination button:hover:not(:disabled) {
+  background: #f5f5f5;
+}
+
+.failed-leads-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.failed-leads-pagination button.active {
+  background: #3366cc;
+  color: #fff;
+  border-color: #3366cc;
+}
+
+.failed-leads-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #ff7800;
+}

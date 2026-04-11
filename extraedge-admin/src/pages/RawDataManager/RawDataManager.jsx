@@ -1,47 +1,32 @@
 import React, { useState } from "react";
 import { Tabs, Tab, Box, IconButton, Fab } from "@mui/material";
-import './LeadList.css';
+import './RawDataManager.css';
 import SwapVertIcon from "@mui/icons-material/SwapVert";
 import GroupIcon from "@mui/icons-material/Group";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ViewListIcon from "@mui/icons-material/ViewList";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import AddIcon from '@mui/icons-material/Add';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
-
-import LeadCardContainer from "../../components/LeadCard/LeadCard";
-import AddNewLead from "../../components/AddNewLead/AddNewLead";
-import UploadLeads from "../../components/UploadLeads/UploadLeads";
-import './LeadList.css';
-
-
+import noLeadsImg from '../../assets/no-leads.svg';
+import UploadLeads from '../../components/UploadLeads/UploadLeads';
 
 const tabData = [
-    { label: "All", count: 1359 },
-    { label: "New", count: 6 },
-    { label: "Ringing / Not Reachable", count: 0 },
-    { label: "Followup", count: 108 },
-    { label: "Demo Scheduled", count: 1 },
-    { label: "Engaged Leads", count: 27 },
-    { label: "Prospect", count: 1 },
-    { label: "Demo Attended", count: 1 },
-    { label: "Scheduled Visit", count: 0 },
-    { label: "Visited", count: 5 },
-    { label: "Enrolled", count: 59 },
-    { label: "Junk", count: 163 },
-    { label: "Cold", count: 988 },
-    { label: "Re-enquired", count: 1 },
+    { label: "All", count: 13 },
+    { label: "Cold", count: 6 },
+    { label: "Mobile Verified", count: 4 },
+    { label: "Email Verified", count: 1 },
+    { label: "Both Verified", count: 1 },
+    { label: "Warm", count: 1 },
+
 ];
 
-const LeadList = () => {
+function RawDataManager() {
     const [value, setValue] = useState(0);
-    const [addLeadOpen, setAddLeadOpen] = useState(false);
-    const [uploadLeadOpen, setUploadLeadOpen] = useState(false);
+    const [uploadOpen, setUploadOpen] = useState(false);
     return (
-        <div className="lead-list-maincontainer">
-            {/* TABS SECTION */}
-            <div className="lead-list-tabs" style={{ padding: "0 12px" }}>
+        <div className="raw-data-manager-maincontainer">
+            <div className="raw-data-manager-tabs" >
 
                 <Tabs
                     value={value}
@@ -72,24 +57,15 @@ const LeadList = () => {
                 </Tabs>
 
                 {/* Divider aligned perfectly */}
-                <div className="lead-card-divider"></div>
-                    
+                <div className="raw-data-manager-divider"></div>
+
+
+
 
             </div>
 
-
-            <div className="lead-list-bottomcontainer">
-                <div
-                    style={{
-                        width: "100%",
-                        height: "56px",
-                        
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        px: 2,
-                    }}
-                >
+            <div className="raw-data-manager-bottomcontainer">
+                <div className="raw-data-manager-bottomcontainer-content">
                     {/* Left Icon */}
                     <IconButton size="small">
                         <SwapVertIcon sx={{ color: "#ff6d00" }} />
@@ -119,26 +95,21 @@ const LeadList = () => {
                     </Box>
                 </div>
             </div>
-            <div className="lead-card-scroll-area">
-                <LeadCardContainer />
+
+            {/* Empty State */}
+            <div className="raw-data-manager-empty-state">
+                <img src={noLeadsImg} alt="No leads found" width={180} />
+                <h3 className="raw-data-manager-empty-title">No leads found</h3>
+                <p className="raw-data-manager-empty-subtitle">
+                    It looks like there are no leads in the list yet
+                </p>
             </div>
 
-            {/* Floating Action Buttons */}
-            <div className="fab-container">
+            {/* Upload FAB */}
+            <div className="raw-data-manager-fab">
                 <Fab
                     size="medium"
-                    onClick={() => setAddLeadOpen(true)}
-                    sx={{
-                        backgroundColor: "#ff7800",
-                        color: "#fff",
-                        "&:hover": { backgroundColor: "#e66a00" },
-                    }}
-                >
-                    <AddIcon />
-                </Fab>
-                <Fab
-                    size="medium"
-                    onClick={() => setUploadLeadOpen(true)}
+                    onClick={() => setUploadOpen(true)}
                     sx={{
                         backgroundColor: "#ff7800",
                         color: "#fff",
@@ -148,17 +119,10 @@ const LeadList = () => {
                     <FileUploadIcon />
                 </Fab>
             </div>
-            <AddNewLead
-                open={addLeadOpen}
-                onClose={() => setAddLeadOpen(false)}
-            />
-            <UploadLeads
-                open={uploadLeadOpen}
-                onClose={() => setUploadLeadOpen(false)}
-            />
+
+            <UploadLeads open={uploadOpen} onClose={() => setUploadOpen(false)} />
         </div>
     );
 }
 
-export default LeadList;
-
+export default RawDataManager;

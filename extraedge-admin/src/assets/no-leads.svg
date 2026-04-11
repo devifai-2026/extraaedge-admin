@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="160" viewBox="0 0 200 160" fill="none">
+  <!-- Background cards -->
+  <rect x="30" y="50" width="140" height="36" rx="6" fill="#fce4cc" stroke="#f5c89a" stroke-width="1"/>
+  <rect x="38" y="60" width="50" height="6" rx="3" fill="#e0c4a8"/>
+  <rect x="38" y="70" width="35" height="6" rx="3" fill="#e0c4a8"/>
+  <rect x="100" y="60" width="20" height="6" rx="3" fill="#e0c4a8"/>
+  <rect x="124" y="60" width="14" height="6" rx="3" fill="#e0c4a8"/>
+  <rect x="142" y="60" width="14" height="6" rx="3" fill="#e0c4a8"/>
+
+  <rect x="30" y="90" width="140" height="36" rx="6" fill="#fce4cc" stroke="#f5c89a" stroke-width="1"/>
+  <rect x="38" y="100" width="50" height="6" rx="3" fill="#e0c4a8"/>
+  <rect x="38" y="110" width="35" height="6" rx="3" fill="#e0c4a8"/>
+  <rect x="100" y="100" width="20" height="6" rx="3" fill="#e0c4a8"/>
+  <rect x="124" y="100" width="14" height="6" rx="3" fill="#e0c4a8"/>
+
+  <!-- Magnifying glass -->
+  <circle cx="145" cy="95" r="28" fill="white" stroke="#888" stroke-width="4"/>
+  <line x1="165" y1="115" x2="180" y2="132" stroke="#888" stroke-width="6" stroke-linecap="round"/>
+  <!-- Sad face -->
+  <circle cx="137" cy="92" r="3" fill="#999"/>
+  <circle cx="153" cy="92" r="3" fill="#999"/>
+  <path d="M135 103 Q145 96 155 103" stroke="#999" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Sparkles -->
+  <path d="M60 35 L62 40 L64 35 L62 30 Z" fill="#ff7800"/>
+  <path d="M85 25 L86 28 L87 25 L86 22 Z" fill="#ffb74d" opacity="0.6"/>
+  <path d="M50 75 L51 78 L52 75 L51 72 Z" fill="#ffb74d" opacity="0.5"/>
+  <path d="M75 120 L76 123 L77 120 L76 117 Z" fill="#ff7800" opacity="0.5"/>
+</svg>

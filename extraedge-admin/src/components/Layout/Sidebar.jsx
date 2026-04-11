@@ -14,10 +14,10 @@ import './Sidebar.css';
 const menuItems = [
   { id: 1, label: 'Analytics Dashboard', icon: DashboardIcon, path: '/dashboard' },
   { id: 2, label: 'Lead Manager', icon: PeopleAltIcon, path: '/leadlist' },
-  { id: 3, label: 'Raw Data Manager', icon: FolderIcon, path: '/raw-data-manager' },
+  { id: 3, label: 'Raw Data Manager', icon: FolderIcon, path: '/rawdata' },
   { id: 4, label: 'WhatsApp Chat', icon: WhatsAppIcon, path: '/whatsapp-chat', badge: '12' },
   { id: 5, label: 'Follow-ups Manager', icon: CalendarTodayIcon, path: '/followups-manager' },
-  { id: 6, label: 'Upload Failed Leads', icon: UploadFileIcon, path: '/upload-failed-leads' },
+  { id: 6, label: 'Upload Failed Leads', icon: UploadFileIcon, path: '/failedleads' },
   { id: 7, label: 'Bulk Action Stage', icon: SettingsIcon, path: '/bulk-action-stage' },
 ];
 

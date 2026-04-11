@@ -19,7 +19,13 @@
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none; /* Firefox */
 }
+.lead-card-divider{
+    width: 100%;
+    height: 1px;
+    background-color: #ff7800;
+    margin-top: 6px;
 
+}
 /* Hide scrollbar for a cleaner Facebook-like look */
 .lead-card-scroll-area::-webkit-scrollbar {
   width: 0;

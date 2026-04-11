@@ -5,6 +5,8 @@ import AnalyticsDashboard from './pages/Dashboard/AnalyticsDashboard'
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute'
 import './App.css'
 import LeadList from './pages/LeadList/LeadList'
+import RawDataManager from './pages/RawDataManager/RawDataManager'
+import FailedLeads from './pages/FailedLeads/FailedLeads'
 
 function App() {
   return (
@@ -31,6 +33,28 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <LeadList />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/rawdata"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <RawDataManager />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/failedleads"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <FailedLeads />
               </Layout>
             </ProtectedRoute>
           }
