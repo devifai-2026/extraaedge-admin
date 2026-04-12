@@ -1,0 +1,63 @@
+.raw-data-manager-maincontainer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.raw-data-manager-tabs {
+    flex-shrink: 0;
+    padding: 0 12px;
+}
+
+.raw-data-manager-divider {
+    width: 100%;
+    height: 1px;
+    background-color: #ff7800;
+    margin-top: 6px;
+
+}
+
+.raw-data-manager-bottomcontainer {
+    flex-shrink: 0;
+}
+
+.raw-data-manager-bottomcontainer-content {
+    width: 100%;
+    height: 56px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding-left: 16px;
+    padding-right: 16px;
+}
+
+.raw-data-manager-empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+}
+
+.raw-data-manager-empty-title {
+    margin: 16px 0 4px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+}
+
+.raw-data-manager-empty-subtitle {
+    margin: 0;
+    font-size: 14px;
+    color: #999;
+}
+
+.raw-data-manager-fab {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1000;
+}

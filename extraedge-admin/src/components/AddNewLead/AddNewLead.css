@@ -1,0 +1,141 @@
+.add-lead-dialog {
+    border-radius: 12px !important;
+    max-height: 90vh;
+}
+
+.add-lead-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600 !important;
+    font-size: 18px !important;
+    padding: 16px 24px !important;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.add-lead-close-btn {
+    color: #666 !important;
+}
+
+.add-lead-tabs-wrapper {
+    padding: 12px 24px 0;
+}
+
+.add-lead-tabs-wrapper .MuiTabs-root {
+    min-height: 40px;
+}
+
+.add-lead-tab {
+    text-transform: none !important;
+    font-size: 13px !important;
+    min-height: 36px !important;
+    padding: 6px 16px !important;
+    border-radius: 20px !important;
+    margin-right: 8px !important;
+    color: #666 !important;
+    border: 1px solid #e0e0e0 !important;
+}
+
+.add-lead-tab.active {
+    background-color: #ff7800 !important;
+    color: #fff !important;
+    border-color: #ff7800 !important;
+}
+
+.add-lead-content {
+    padding: 16px 24px !important;
+}
+
+.add-lead-mandatory-toggle {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+}
+
+.add-lead-mandatory-toggle .MuiFormControlLabel-label {
+    font-size: 13px;
+    color: #666;
+}
+
+.add-lead-section-title {
+    font-weight: 600;
+    font-size: 15px;
+    color: #333;
+    margin-bottom: 16px;
+    margin-top: 8px;
+}
+
+.add-lead-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.add-lead-form-grid .MuiOutlinedInput-root {
+    border-radius: 6px;
+}
+
+.add-lead-form-grid .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+    border-color: #ff7800;
+}
+
+.add-lead-form-grid .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+    border-color: #ff7800;
+}
+
+.add-lead-form-grid .MuiInputLabel-root.Mui-focused {
+    color: #ff7800;
+}
+
+.add-lead-remarks {
+    margin-bottom: 8px;
+}
+
+.add-lead-remarks .MuiOutlinedInput-root {
+    border-radius: 6px;
+}
+
+.add-lead-remarks .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+    border-color: #ff7800;
+}
+
+.add-lead-remarks .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+    border-color: #ff7800;
+}
+
+.add-lead-remarks .MuiInputLabel-root.Mui-focused {
+    color: #ff7800;
+}
+
+.add-lead-actions {
+    padding: 12px 24px 20px !important;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.add-lead-cancel-btn {
+    text-transform: none !important;
+    color: #ff7800 !important;
+    border-color: #ff7800 !important;
+    border-radius: 6px !important;
+    padding: 6px 28px !important;
+}
+
+.add-lead-cancel-btn:hover {
+    background-color: #fff3e6 !important;
+    border-color: #ff7800 !important;
+}
+
+.add-lead-add-btn {
+    text-transform: none !important;
+    background-color: #ff7800 !important;
+    color: #fff !important;
+    border-radius: 6px !important;
+    padding: 6px 36px !important;
+}
+
+.add-lead-add-btn:hover {
+    background-color: #e66a00 !important;
+}
