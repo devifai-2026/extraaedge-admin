@@ -1,0 +1,394 @@
+.card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  background: #fff;
+  position: relative;
+  width: 97%
+}
+
+/* HEADER */
+.card-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  background: #fafafa;
+  gap: 12px;
+  border-bottom: 1px solid #eee;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+}
+
+.card-checkbox {
+  padding: 0 !important;
+  flex-shrink: 0;
+}
+
+.left {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-width: 120px;
+}
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.name {
+  font-weight: 600 !important;
+  font-size: 14px !important;
+}
+
+.name-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.name-badge.orange {
+  background: #f57c00;
+}
+
+.name-badge.green {
+  background: #4caf50;
+}
+
+.phone {
+  font-size: 12px !important;
+  color: #777;
+}
+
+/* STATUS */
+.status {
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.status-chip {
+  background: #444 !important;
+  color: #fff !important;
+  font-size: 11px !important;
+  height: 22px !important;
+  border: 1px solid #555 !important;
+}
+
+.sub-status {
+  display: block;
+  font-size: 11px;
+  color: #777;
+  margin-top: 2px;
+}
+
+/* COMMUNICATION STATS */
+.comm-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.stat-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+  color: #555;
+}
+
+.stat-icon {
+  font-size: 16px !important;
+  color: #888;
+}
+
+/* HEADER DIVIDER */
+.header-divider {
+  width: 1px;
+  height: 30px;
+  background: #ccc;
+  flex-shrink: 0;
+}
+
+/* ACTIVITY ICONS */
+.activity-icons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.activity-badge .MuiBadge-badge {
+  font-size: 9px;
+  min-width: 16px;
+  height: 16px;
+}
+
+.activity-icon {
+  font-size: 20px !important;
+  color: #555;
+}
+
+.view-all {
+  font-size: 12px;
+  color: #f57c00;
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* ACTIONS */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  /* margin-left: auto;
+  flex-shrink: 0; */
+}
+
+.action-btn {
+  color: #ff6d00 !important;
+}
+
+.action-btn.whatsapp {
+  color: #4caf50 !important;
+}
+
+/* UNTOUCHED BADGE */
+.untouched-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: #e65100;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 0 8px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.untouched-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  display: inline-block;
+}
+
+/* TABS */
+.tabs {
+  padding: 0 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.tabs .MuiTab-root {
+  text-transform: none !important;
+  font-size: 13px !important;
+  min-height: 40px !important;
+  padding: 8px 16px !important;
+  font-weight: 500 !important;
+}
+
+.tabs .MuiTabs-indicator {
+  background-color: #1976d2 !important;
+  height: 3px !important;
+}
+
+/* CONTENT */
+.content-wrapper {
+ display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f4f4f4;
+  padding: 20px 24px;
+  border-radius: 6px;
+}
+
+.content {
+  width: 100%;
+}
+
+.content-chevron {
+  margin-left: 20px;
+  display: flex;
+  align-items: center;
+  color: #ff6b00;
+  cursor: pointer;
+}
+
+.content-chevron svg {
+  font-size: 28px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  column-gap: 80px;   /* controls horizontal spacing */
+  row-gap: 28px;      /* controls vertical spacing */
+}
+
+/* ROW = 4 COLUMN GRID */
+.row {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 20px;
+}
+
+.row:last-child {
+  margin-bottom: 0;
+}
+
+/* FIELD */
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.field-label {
+  font-size: 11px;
+  color: #888;
+  font-weight: 600;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+}
+
+.field-value {
+  font-size: 14px;
+  color: #222;
+}
+
+.label {
+  font-size: 11px;
+  color: #e65100;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.value {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  color: #333;
+}
+
+/* SOURCE TABLE */
+.source-table {
+  width: 100%;
+}
+
+.table-header {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  padding: 12px 0;
+  /* background: #fff; */
+  /* border-bottom: 2px solid #ddd; */
+  font-weight: 600;
+  font-size: 12px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid #eee;
+  align-items: center;
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.table-cell {
+  font-size: 14px;
+  color: #333;
+}
+
+.table-cell a {
+  color: #1976d2;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* FOLLOWUP DETAILS */
+.followup-container {
+  display: flex;
+  gap: 60px;
+}
+
+.followup-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.followup-label {
+  font-size: 11px;
+  color: #e65100;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.followup-value {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.5;
+}
+
+.followup-value.followup-remarks {
+  max-width: 500px;
+  color: #555;
+}
+
+/* LEAD CARDS CONTAINER - SCROLLABLE */
+.lead-cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+
+
+/* Custom Scrollbar Styling */
+.lead-cards-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.lead-cards-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.lead-cards-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+  transition: background 0.3s ease;
+}
+
+.lead-cards-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+
