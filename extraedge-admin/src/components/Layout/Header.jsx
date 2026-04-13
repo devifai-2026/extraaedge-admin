@@ -17,7 +17,13 @@ import {
     Divider,
     Typography,
     Box,
-    Avatar
+    Avatar,
+    Popover,
+    List,
+    ListItem,
+    ListItemText,
+    Button,
+    Badge,
 } from "@mui/material";
 
 function Header() {
@@ -35,12 +41,14 @@ function Header() {
 
     // Notification dropdown state
     const [showNotifications, setShowNotifications] = useState(false)
+    const [anchorNotification, setAnchorNotification] = useState(null)
 
     // Quick Add modal state
     const [showQuickAdd, setShowQuickAdd] = useState(false)
 
     // Recent Calls dropdown state
     const [showRecentCalls, setShowRecentCalls] = useState(false)
+    const [anchorRecentCalls, setAnchorRecentCalls] = useState(null)
     const [anchorEl, setAnchorEl] = useState(null);
     const openUserMenu = Boolean(anchorEl);
 
@@ -143,32 +151,73 @@ function Header() {
                             <button
                                 className="header-btn notification-btn"
                                 title="Notifications"
-                                onClick={() => setShowNotifications(!showNotifications)}
+                                onClick={(e) => setAnchorNotification(e.currentTarget)}
                             >
-                                <NotificationsActiveIcon sx={{ fontSize: 22, color: colors.primary }} />
-                                <span className="notification-badge">{followUps.length}</span>
+                                <Badge badgeContent={followUps.length} color="error">
+                                    <NotificationsActiveIcon sx={{ fontSize: 22, color: colors.primary }} />
+                                </Badge>
                             </button>
-                            {showNotifications && (
-                                <div className="notification-dropdown">
-                                    <div className="notification-arrow" />
-                                    <div className="notification-header">
+                            <Popover
+                                open={Boolean(anchorNotification)}
+                                anchorEl={anchorNotification}
+                                onClose={() => setAnchorNotification(null)}
+                                anchorOrigin={{
+                                    vertical: 'bottom',
+                                    horizontal: 'right',
+                                }}
+                                transformOrigin={{
+                                    vertical: 'top',
+                                    horizontal: 'right',
+                                }}
+                            >
+                                <Box sx={{ width: 360, maxHeight: 400 }}>
+                                    <Box sx={{ 
+                                        px: 2, 
+                                        py: 1.5, 
+                                        borderBottom: `1px solid ${colors.borderGrey}`,
+                                        fontWeight: 600,
+                                        fontSize: 15
+                                    }}>
                                         Follow ups ({followUps.length})
-                                    </div>
-                                    <div className="notification-list">
+                                    </Box>
+                                    <List sx={{ maxHeight: 350, overflow: 'auto' }}>
                                         {followUps.map((item, index) => (
-                                            <div key={index} className="notification-item">
-                                                <div className="notification-item-top">
-                                                    <span className="notification-name">{item.name}:</span>
-                                                    <span className="notification-action">Add Follow Up</span>
-                                                </div>
-                                                <div className="notification-time">
-                                                    {item.date} &middot; {item.ago}
-                                                </div>
-                                            </div>
+                                            <ListItem 
+                                                key={index}
+                                                sx={{
+                                                    py: 1.5,
+                                                    px: 2,
+                                                    borderBottom: `1px solid ${colors.borderGrey}`,
+                                                    '&:last-child': {
+                                                        borderBottom: 'none'
+                                                    },
+                                                    '&:hover': {
+                                                        backgroundColor: colors.inputGrey
+                                                    }
+                                                }}
+                                            >
+                                                <ListItemText
+                                                    primary={
+                                                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                                            <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+                                                                {item.name}
+                                                            </Typography>
+                                                            <Typography sx={{ fontSize: 13, color: colors.midGrey }}>
+                                                                Add Follow Up
+                                                            </Typography>
+                                                        </Box>
+                                                    }
+                                                    secondary={
+                                                        <Typography sx={{ fontSize: 12, color: colors.midGrey }}>
+                                                            {item.date} &middot; {item.ago}
+                                                        </Typography>
+                                                    }
+                                                />
+                                            </ListItem>
                                         ))}
-                                    </div>
-                                </div>
-                            )}
+                                    </List>
+                                </Box>
+                            </Popover>
                         </div>
 
                         <button className="header-btn add-btn" title="Add" onClick={() => setShowQuickAdd(true)}>
@@ -179,27 +228,66 @@ function Header() {
                             <button
                                 className="header-btn phone-btn"
                                 title="Phone"
-                                onClick={() => setShowRecentCalls(!showRecentCalls)}
+                                onClick={(e) => setAnchorRecentCalls(e.currentTarget)}
                             >
                                 <PhoneIcon sx={{ fontSize: 22, color: colors.primary }} />
                             </button>
-                            {showRecentCalls && (
-                                <div className="recent-calls-dropdown">
-                                    <div className="recent-calls-arrow" />
-                                    <div className="recent-calls-header">
+                            <Popover
+                                open={Boolean(anchorRecentCalls)}
+                                anchorEl={anchorRecentCalls}
+                                onClose={() => setAnchorRecentCalls(null)}
+                                anchorOrigin={{
+                                    vertical: 'bottom',
+                                    horizontal: 'right',
+                                }}
+                                transformOrigin={{
+                                    vertical: 'top',
+                                    horizontal: 'right',
+                                }}
+                            >
+                                <Box sx={{ width: 320 }}>
+                                    <Box sx={{ 
+                                        px: 2, 
+                                        py: 1.5, 
+                                        borderBottom: `1px solid ${colors.borderGrey}`,
+                                        fontWeight: 600,
+                                        fontSize: 15
+                                    }}>
                                         Recent Calls
-                                    </div>
-                                    <div className="recent-calls-body">
-                                        <div className="recent-calls-empty">
-                                            <div className="recent-calls-bell">
-                                                <NotificationsActiveIcon sx={{ fontSize: 64, color: '#e0e0e0' }} />
-                                                <span className="recent-calls-badge">0</span>
-                                            </div>
-                                            <p className="recent-calls-text">You have no recent calls!</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                                    </Box>
+                                    <Box sx={{ 
+                                        p: 3, 
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: 2
+                                    }}>
+                                        <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                                            <NotificationsActiveIcon sx={{ fontSize: 64, color: '#e0e0e0' }} />
+                                            <Box sx={{
+                                                position: 'absolute',
+                                                top: 2,
+                                                right: -4,
+                                                backgroundColor: colors.primary,
+                                                color: colors.white,
+                                                borderRadius: '50%',
+                                                width: '20px',
+                                                height: '20px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '11px',
+                                                fontWeight: 'bold',
+                                            }}>
+                                                0
+                                            </Box>
+                                        </Box>
+                                        <Typography sx={{ fontSize: 14, color: colors.midGrey }}>
+                                            You have no recent calls!
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            </Popover>
                         </div>
                     </div>
                     <div style={{ display: 'flex', gap: '5px' }}>
