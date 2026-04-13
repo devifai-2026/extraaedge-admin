@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
@@ -8,6 +9,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import { colors } from '../../theme/colors';
+import RaiseTicketModal from './RaiseTicketModal';
 import './Sidebar.css';
 
 const menuItems = [
@@ -21,27 +23,32 @@ const menuItems = [
 ];
 
 const bottomMenuItems = [
-  { id: 8, label: 'Raise a Ticket', icon: SupportAgentIcon, path: '/raise-ticket' },
+  { id: 8, label: 'Raise a Ticket', icon: SupportAgentIcon, action: 'modal' },
 ];
 
 function Sidebar({ collapsed = false }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [ticketModalOpen, setTicketModalOpen] = useState(false);
 
-  const handleMenuClick = (path) => {
-    navigate(path);
+  const handleMenuClick = (item) => {
+    if (item.action === 'modal') {
+      setTicketModalOpen(true);
+    } else {
+      navigate(item.path);
+    }
   };
 
   const renderMenuItems = (items) => (
     <ul className="menu-list">
       {items.map((item) => {
         const IconComponent = item.icon;
-        const isActive = location.pathname === item.path;
+        const isActive = !item.action && location.pathname === item.path;
         return (
           <li key={item.id}>
             <button
               className={`menu-item ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`}
-              onClick={() => handleMenuClick(item.path)}
+              onClick={() => handleMenuClick(item)}
               style={{
                 backgroundColor: isActive ? colors.primary : 'transparent',
                 color: isActive ? colors.white : colors.textDark,
@@ -62,13 +69,16 @@ function Sidebar({ collapsed = false }) {
   );
 
   return (
-    <div
-      className={`sidebar ${collapsed ? 'sidebar-mini' : ''}`}
-      style={{ backgroundColor: colors.white, borderRight: `1px solid ${colors.borderGrey}` }}
-    >
-      <div className="sidebar-top">{renderMenuItems(menuItems)}</div>
-      <div className="sidebar-bottom">{renderMenuItems(bottomMenuItems)}</div>
-    </div>
+    <>
+      <div
+        className={`sidebar ${collapsed ? 'sidebar-mini' : ''}`}
+        style={{ backgroundColor: colors.white, borderRight: `1px solid ${colors.borderGrey}` }}
+      >
+        <div className="sidebar-top">{renderMenuItems(menuItems)}</div>
+        <div className="sidebar-bottom">{renderMenuItems(bottomMenuItems)}</div>
+      </div>
+      <RaiseTicketModal open={ticketModalOpen} onClose={() => setTicketModalOpen(false)} />
+    </>
   );
 }
 
