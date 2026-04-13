@@ -31,6 +31,9 @@ function Header() {
     // Quick Add modal state
     const [showQuickAdd, setShowQuickAdd] = useState(false)
 
+    // Recent Calls dropdown state
+    const [showRecentCalls, setShowRecentCalls] = useState(false)
+
     // Sample follow-up data
     const followUps = [
         { name: 'DAWARE RAHUL KIRAN', date: 'Apr 9, 2026 11:00 PM', ago: '4 days ago' },
@@ -154,9 +157,32 @@ function Header() {
                             <AddIcon sx={{ fontSize: 22 , color: colors.primary }} />
                         </button>
 
-                        <button className="header-btn phone-btn" title="Phone">
-                            <PhoneIcon sx={{ fontSize: 22 , color: colors.primary }} />
-                        </button>
+                        <div className="recent-calls-wrapper">
+                            <button
+                                className="header-btn phone-btn"
+                                title="Phone"
+                                onClick={() => setShowRecentCalls(!showRecentCalls)}
+                            >
+                                <PhoneIcon sx={{ fontSize: 22, color: colors.primary }} />
+                            </button>
+                            {showRecentCalls && (
+                                <div className="recent-calls-dropdown">
+                                    <div className="recent-calls-arrow" />
+                                    <div className="recent-calls-header">
+                                        Recent Calls
+                                    </div>
+                                    <div className="recent-calls-body">
+                                        <div className="recent-calls-empty">
+                                            <div className="recent-calls-bell">
+                                                <NotificationsActiveIcon sx={{ fontSize: 64, color: '#e0e0e0' }} />
+                                                <span className="recent-calls-badge">0</span>
+                                            </div>
+                                            <p className="recent-calls-text">You have no recent calls!</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                     <div style={{display:'flex' , gap:'5px'}}>
                     <div className="timer">{formatTime(timeLeft)}</div>
