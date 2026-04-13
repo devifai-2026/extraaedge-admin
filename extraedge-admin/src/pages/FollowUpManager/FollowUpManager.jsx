@@ -139,8 +139,8 @@ const followupLeads = [
 
 const TABS = [
   { key: "all", label: "All" },
-  { key: "done", label: "Done Followups", color: "#27AE60" },
-  { key: "missed", label: "Missed Followups", color: "#E74C3C" },
+  { key: "done", label: "Done Followups", color: colors.success },
+  { key: "missed", label: "Missed Followups", color: colors.error },
   { key: "planned", label: "Planned Followups", color: colors.primary },
 ];
 
@@ -304,7 +304,7 @@ function FollowUpManager() {
               className={`followup-tab ${activeTab === tab.key ? "active" : ""}`}
               onClick={() => setActiveTab(tab.key)}
               style={{
-                color: tab.color || (activeTab === tab.key ? colors.primary : "#555"),
+                color: tab.color || (activeTab === tab.key ? colors.primary : colors.textSecondary),
                 borderBottom: activeTab === tab.key ? `2px solid ${tab.color || colors.primary}` : "2px solid transparent",
               }}
             >
@@ -411,7 +411,7 @@ function FollowupLeadCard({ lead }) {
           <IconButton size="small" className="action-btn">📞</IconButton>
           <IconButton size="small" className="action-btn">💬</IconButton>
           <IconButton size="small" className="action-btn">✉️</IconButton>
-          <IconButton size="small" className="action-btn" style={{ color: "#4caf50" }}>
+          <IconButton size="small" className="action-btn" style={{ color: colors.success }}>
             <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="wa" width={18} height={18} />
           </IconButton>
           <IconButton size="small" className="action-btn">⋮</IconButton>

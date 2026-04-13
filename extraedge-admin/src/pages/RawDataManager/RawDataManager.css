@@ -12,9 +12,8 @@
 .raw-data-manager-divider {
     width: 100%;
     height: 1px;
-    background-color: #ff7800;
+    background-color: var(--primary);
     margin-top: 6px;
-
 }
 
 .raw-data-manager-bottomcontainer {
@@ -24,11 +23,9 @@
 .raw-data-manager-bottomcontainer-content {
     width: 100%;
     height: 56px;
-
     display: flex;
     align-items: center;
     justify-content: space-between;
-
     padding-left: 16px;
     padding-right: 16px;
 }
@@ -46,13 +43,13 @@
     margin: 16px 0 4px;
     font-size: 18px;
     font-weight: 600;
-    color: #333;
+    color: var(--dark-grey);
 }
 
 .raw-data-manager-empty-subtitle {
     margin: 0;
     font-size: 14px;
-    color: #999;
+    color: var(--mid-grey);
 }
 
 .raw-data-manager-fab {

@@ -1,0 +1,204 @@
+.wa-container {
+  padding: 20px;
+  background-color: var(--input-grey);
+  min-height: 100vh;
+}
+
+.wa-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.wa-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--dark-grey);
+  margin: 0;
+}
+
+.wa-header-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wa-header-icon {
+  color: var(--primary) !important;
+}
+
+.wa-badge-icon {
+  position: relative !important;
+}
+
+.wa-notification-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: var(--primary);
+  color: var(--white);
+  font-size: 10px;
+  font-weight: 600;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Card Styles */
+.wa-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.wa-card {
+  background: var(--white);
+  border: 1px solid var(--border-grey);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.wa-card-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  gap: 20px;
+}
+
+.wa-card-left {
+  min-width: 200px;
+}
+
+.wa-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dark-grey);
+}
+
+.wa-card-phone {
+  font-size: 13px;
+  color: var(--text-grey);
+  margin-top: 2px;
+}
+
+/* Stage Badge */
+.wa-card-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 120px;
+}
+
+.wa-stage-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 3px;
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.wa-sub-stage {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  border: 1px solid var(--border-grey);
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+/* Action Links */
+.wa-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  justify-content: center;
+}
+
+.wa-action-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--primary);
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.wa-action-link:hover {
+  text-decoration: underline;
+}
+
+.wa-action-icon {
+  font-size: 18px !important;
+  color: var(--primary);
+}
+
+.wa-action-divider {
+  color: var(--border-grey);
+  font-size: 16px;
+}
+
+/* Card Icons */
+.wa-card-icons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wa-icon-btn {
+  color: var(--primary) !important;
+}
+
+.wa-expand-btn {
+  color: var(--text-grey) !important;
+  margin-left: 8px !important;
+}
+
+/* Expanded Details */
+.wa-card-details {
+  border-top: 1px solid var(--border-grey);
+  padding: 20px 24px;
+  background: var(--white);
+}
+
+.wa-details-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px 40px;
+}
+
+.wa-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wa-detail-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.wa-detail-value {
+  font-size: 13px;
+  color: var(--dark-grey);
+  font-weight: 400;
+}
+
+/* Pagination */
+.wa-pagination {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}

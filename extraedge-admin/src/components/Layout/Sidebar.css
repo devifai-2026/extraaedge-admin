@@ -42,7 +42,7 @@
 }
 
 .menu-item:hover {
-  background-color: #f0f0f0 !important;
+  background-color: var(--hover-grey) !important;
 }
 
 .menu-item.active {
@@ -67,8 +67,8 @@
 }
 
 .badge {
-  background-color: #10b981;
-  color: white;
+  background-color: var(--success);
+  color: var(--white);
   padding: 2px 8px;
   border-radius: 12px;
   font-size: 12px;
@@ -86,12 +86,12 @@
 }
 
 .sidebar::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--scroll-grey);
   border-radius: 3px;
 }
 
 .sidebar::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background: var(--mid-grey);
 }
 
 /* Collapsed / Mini sidebar */

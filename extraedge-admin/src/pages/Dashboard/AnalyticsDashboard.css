@@ -13,15 +13,13 @@
   gap: 10px;
 }
 
-
-
 .card_analytics {
   width: 272px;
   height: 180px;
-  background-color: #2f4154;
+  background-color: var(--bg-dark);
   border-radius: 10px;
   padding: 16px;
-  color: #fff;
+  color: var(--white);
   font-family: sans-serif;
   margin: 10px;
 }
@@ -36,7 +34,7 @@
 .title_analytics {
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: var(--white);
 }
 
 .icon_analytics {
@@ -45,11 +43,9 @@
 }
 
 .badge_analytics {
-  
   display: flex;
   padding: 4px 8px;
   border-radius: 6px;
-  
   margin-bottom: 12px;
 }
 
@@ -70,7 +66,6 @@
 .content_analytics:hover {
    background-color: rgba(255, 255, 255, 0.3);
 }
-
 
 .label_analytics {
   opacity: 0.8;
