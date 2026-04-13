@@ -35,8 +35,8 @@ function AnalyticsDashboard() {
                 <div className='first-container-rightside-contain'>
                     <button className="dashboard-button">Dashboard Index</button>
                     <Divider orientation="vertical" />
-                    <SettingsIcon sx={{ fontSize: 35 }} />
-                    <RefreshIcon sx={{ fontSize: 35 }} />
+                    <SettingsIcon sx={{ fontSize: 35 , color: colors.primary }} />
+                    <RefreshIcon sx={{ fontSize: 35 , color: colors.primary }} />
                 </div>
             </div>
             <Divider />

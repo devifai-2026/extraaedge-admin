@@ -47,13 +47,13 @@ export default function PerfectDonutLayout() {
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <RefreshIcon sx={{ fontSize: 18, color: colors.primary, cursor: "pointer" }} />
-          <Typography sx={{ color: colors.textGrey, fontSize: 12 }}>
+          <Typography sx={{ color: colors.primary, fontSize: 12 }}>
             Last synced: 07:32 PM
           </Typography>
-          <IconButton size="small">
+          <IconButton size="small" sx={{ color: colors.primary }}>
             <DownloadIcon sx={{ fontSize: 18 }} />
           </IconButton>
-          <IconButton size="small">
+          <IconButton size="small" sx={{ color: colors.primary }}>
             <OpenInFullIcon sx={{ fontSize: 16 }} />
           </IconButton>
         </Box>

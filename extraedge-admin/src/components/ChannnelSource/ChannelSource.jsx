@@ -65,11 +65,11 @@ export default function ChannelExpandableTable() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <RefreshIcon color="warning" />
-          <Typography variant="body2">
+          <RefreshIcon sx={{ color: colors.primary }} />
+          <Typography variant="body2" sx={{ color: colors.primary }}>
             Last synced: 06:16 PM
           </Typography>
-          <IconButton size="small">
+          <IconButton size="small" sx={{ color: colors.primary }}>
             <DownloadIcon />
           </IconButton>
         </div>
@@ -78,7 +78,7 @@ export default function ChannelExpandableTable() {
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
-            <TableRow sx={{ backgroundColor: colors.darkGrey }}>
+            <TableRow sx={{ backgroundColor: colors.primary }}>
               <TableCell sx={{ color: colors.white }}>Primary Channel</TableCell>
               <TableCell sx={{ color: colors.white }}>Total Leads</TableCell>
               <TableCell sx={{ color: colors.white }}>Enrolled Leads</TableCell>
