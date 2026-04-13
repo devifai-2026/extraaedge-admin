@@ -94,6 +94,21 @@
   background: #999;
 }
 
+/* Collapsed / Mini sidebar */
+.sidebar.sidebar-mini {
+  width: 56px;
+}
+
+.sidebar-mini .menu-item {
+  padding: 14px 0;
+  justify-content: center;
+}
+
+.sidebar-mini .menu-item.active {
+  border-left: 4px solid currentColor;
+  padding-left: 0;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .sidebar {

@@ -20,6 +20,11 @@
   height: calc(100vh - 70px);
 }
 
+/* Collapsed sidebar layout */
+.layout-content.sidebar-collapsed {
+  margin-left: 56px;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .layout-container {
