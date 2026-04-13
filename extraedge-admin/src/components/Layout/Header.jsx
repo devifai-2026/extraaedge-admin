@@ -11,6 +11,14 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import QuickAdd from '../QuickAdd/QuickAdd'
 import './Header.css'
+import {
+    Menu,
+    MenuItem,
+    Divider,
+    Typography,
+    Box,
+    Avatar
+} from "@mui/material";
 
 function Header() {
     const navigate = useNavigate()
@@ -33,6 +41,8 @@ function Header() {
 
     // Recent Calls dropdown state
     const [showRecentCalls, setShowRecentCalls] = useState(false)
+    const [anchorEl, setAnchorEl] = useState(null);
+    const openUserMenu = Boolean(anchorEl);
 
     // Sample follow-up data
     const followUps = [
@@ -72,6 +82,14 @@ function Header() {
             : 'Search by Application Name, Email Id or WhatsApp #'
     }
 
+    const handleUserClick = (event) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleUserClose = () => {
+        setAnchorEl(null);
+    };
+
     return (
         <header
             className="header"
@@ -83,7 +101,7 @@ function Header() {
             {/* Brand & Timer Section */}
             <div className="header-brand">
                 <span className="brand-text">SPEEDUP INNOVATION</span>
-                
+
             </div>
 
             <div className='main-container'>
@@ -154,7 +172,7 @@ function Header() {
                         </div>
 
                         <button className="header-btn add-btn" title="Add" onClick={() => setShowQuickAdd(true)}>
-                            <AddIcon sx={{ fontSize: 22 , color: colors.primary }} />
+                            <AddIcon sx={{ fontSize: 22, color: colors.primary }} />
                         </button>
 
                         <div className="recent-calls-wrapper">
@@ -184,11 +202,96 @@ function Header() {
                             )}
                         </div>
                     </div>
-                    <div style={{display:'flex' , gap:'5px'}}>
-                    <div className="timer">{formatTime(timeLeft)}</div>
-                       <button className="header-btn user-btn" title="User Profile">
-                            <AccountCircleIcon sx={{ fontSize: 40 }} />
-                        </button>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                        <div className="timer">{formatTime(timeLeft)}</div>
+                        <div>
+                            {/* USER BUTTON */}
+                            <button
+                                className="header-btn user-btn"
+                                onClick={handleUserClick}
+                            >
+                                <AccountCircleIcon sx={{ fontSize: 40 }} />
+                            </button>
+
+                            {/* USER MENU */}
+                            <Menu
+                                anchorEl={anchorEl}
+                                open={openUserMenu}
+                                onClose={handleUserClose}
+                                anchorOrigin={{
+                                    vertical: "bottom",
+                                    horizontal: "right",
+                                }}
+                                transformOrigin={{
+                                    vertical: "top",
+                                    horizontal: "right",
+                                }}
+                                PaperProps={{
+                                    elevation: 4,
+                                    sx: {
+                                        mt: 1.5,
+                                        width: 270,
+                                        borderRadius: "10px",
+                                        overflow: "visible",
+                                        boxShadow: "0px 4px 20px rgba(0,0,0,0.15)",
+
+                                        // 🔥 Arrow
+                                        "&::before": {
+                                            content: '""',
+                                            display: "block",
+                                            position: "absolute",
+                                            top: 0,
+                                            right: 20,
+                                            width: 10,
+                                            height: 10,
+                                            bgcolor: "background.paper",
+                                            transform: "translateY(-50%) rotate(45deg)",
+                                            zIndex: 0,
+                                            borderLeft: "1px solid #e0e0e0",
+                                            borderTop: "1px solid #e0e0e0",
+                                        },
+                                    },
+                                }}
+                            >
+                                {/* USER INFO */}
+                                <Box sx={{ px: 2, py: 1.5, display: "flex", gap: 1 }}>
+                                    <Avatar sx={{ width: 40, height: 40 }} />
+                                    <Box>
+                                        <Typography fontWeight={600} fontSize={14}>
+                                            Divya Nair
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            counselor4@speedupinfotech.com
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            8669012416
+                                        </Typography>
+                                    </Box>
+                                </Box>
+
+                                <Divider />
+
+                                {/* OPTION */}
+                                <MenuItem onClick={handleUserClose}>
+                                    Request a feature
+                                </MenuItem>
+
+                                {/* LOGOUT */}
+                                <MenuItem
+                                    onClick={() => {
+                                        handleUserClose();
+                                        handleLogout();
+                                    }}
+                                    sx={{
+                                        justifyContent: "flex-end",
+                                        color: "#ff5722",
+                                        fontWeight: 500,
+                                    }}
+                                >
+                                    Log out
+                                </MenuItem>
+                            </Menu>
+                        </div>
                     </div>
                 </div>
 
