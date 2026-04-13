@@ -216,6 +216,7 @@ const DateRangePicker = ({ onApply, primaryColor = colors.primary }) => {
         variant="contained"
         onClick={() => setIsOpen(true)}
         style={{height: "54px"}}
+        className="dashboard-button-date-picker"
       >
         Select Date Range
       </Button>

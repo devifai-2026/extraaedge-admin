@@ -69,11 +69,11 @@ export default function LeadToggleTable() {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <RefreshIcon color="warning" />
-          <Typography variant="body2">
+          <RefreshIcon sx={{ color: colors.primary }} />
+          <Typography variant="body2" sx={{ color: colors.primary }}>
             Last synced: 06:16 PM
           </Typography>
-          <IconButton size="small">
+          <IconButton size="small" sx={{ color: colors.primary }}>
             <DownloadIcon />
           </IconButton>
         </div>
@@ -91,7 +91,7 @@ export default function LeadToggleTable() {
                 colSpan={open ? 3 : 1}
                 align="center"
                 sx={{
-                  backgroundColor: colors.darkGrey,
+                  backgroundColor: colors.primary,
                   color: colors.white,
                   fontWeight: "bold"
                 }}
@@ -110,7 +110,7 @@ export default function LeadToggleTable() {
             </TableRow>
 
             {/* Column Headers */}
-            <TableRow sx={{ backgroundColor: colors.darkGrey }}>
+            <TableRow sx={{ backgroundColor: colors.primary }}>
               <TableCell sx={{ color: colors.white }}>Program</TableCell>
               <TableCell sx={{ color: colors.white }}>Total</TableCell>
 

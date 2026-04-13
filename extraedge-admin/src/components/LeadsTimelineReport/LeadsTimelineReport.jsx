@@ -53,7 +53,7 @@ const styles = {
   },
   sync: {
     fontSize: "12px",
-    color: colors.textSecondary,
+    color: colors.primary,
   },
   legend: {
     display: "flex",
