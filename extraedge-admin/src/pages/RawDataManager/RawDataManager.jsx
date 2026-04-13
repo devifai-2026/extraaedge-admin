@@ -1,16 +1,12 @@
 import React, { useState } from "react";
 import { Tabs, Tab, Box, IconButton, Fab } from "@mui/material";
 import './RawDataManager.css';
-import SwapVertIcon from "@mui/icons-material/SwapVert";
-import GroupIcon from "@mui/icons-material/Group";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import ViewListIcon from "@mui/icons-material/ViewList";
-import FilterAltIcon from "@mui/icons-material/FilterAlt";
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import noLeadsImg from '../../assets/no-leads.svg';
 import UploadLeads from '../../components/UploadLeads/UploadLeads';
 import { colors } from '../../theme/colors';
+import FiltersOptions from "../../components/FiltersOptions/FiltersOptions";
 
 const tabData = [
     { label: "All", count: 13 },
@@ -66,37 +62,9 @@ function RawDataManager() {
 
             </div>
 
-            <div className="raw-data-manager-bottomcontainer">
-                <div className="raw-data-manager-bottomcontainer-content">
-                    {/* Left Icon */}
-                    <IconButton size="small">
-                        <SwapVertIcon sx={{ color: colors.primary }} />
-                    </IconButton>
+            <FiltersOptions />
 
-                    {/* Right Icons */}
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        <IconButton size="small">
-                            <GroupIcon sx={{ color: colors.primary }} />
-                        </IconButton>
-
-                        <IconButton size="small">
-                            <WhatsAppIcon sx={{ color: colors.primary }} />
-                        </IconButton>
-
-                        <IconButton size="small">
-                            <RefreshIcon sx={{ color: colors.primary }} />
-                        </IconButton>
-
-                        <IconButton size="small">
-                            <ViewListIcon sx={{ color: colors.primary }} />
-                        </IconButton>
-
-                        <IconButton size="small">
-                            <FilterAltIcon sx={{ color: colors.primary }} />
-                        </IconButton>
-                    </Box>
-                </div>
-            </div>
+            
 
             {/* Empty State */}
             <div className="raw-data-manager-empty-state">
