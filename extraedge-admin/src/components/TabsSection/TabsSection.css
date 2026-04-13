@@ -1,0 +1,39 @@
+.lead-list-tabs {
+  padding: 0 12px;
+}
+
+/* Target MUI Tab root */
+.custom-tab {
+  text-transform: none !important;
+  min-height: 36px !important;
+  font-size: 13px !important;
+  border-radius: 4px !important;
+  margin-right: 6px !important;
+  padding: 6px 12px !important;
+
+  background-color: transparent !important;
+  color: #6b7280 !important; /* colors.textGrey */
+}
+
+/* Active tab */
+.custom-tab.active {
+  background-color: var(--primary) !important; /* colors.primary */
+  color: #ffffff !important; /* colors.white */
+}
+
+/* Hover */
+.custom-tab:hover {
+  background-color: #e5e7eb !important; /* colors.borderGrey */
+}
+
+/* Active hover */
+.custom-tab.active:hover {
+   background-color: #e5e7eb !important;
+}
+
+/* Divider */
+.lead-card-divider {
+  height: 1px;
+  background-color: #e5e7eb;
+  margin-top: 8px;
+}
