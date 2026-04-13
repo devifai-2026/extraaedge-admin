@@ -7,6 +7,8 @@ import './App.css'
 import LeadList from './pages/LeadList/LeadList'
 import RawDataManager from './pages/RawDataManager/RawDataManager'
 import FailedLeads from './pages/FailedLeads/FailedLeads'
+import BulkUploadList from './pages/BulkUplodList/BulkUploadList'
+import FollowUpManager from './pages/FollowUpManager/FollowUpManager'
 
 function App() {
   return (
@@ -55,6 +57,28 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <FailedLeads />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/bulkuploadlist"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <BulkUploadList />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/followupmanager"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <FollowUpManager />
               </Layout>
             </ProtectedRoute>
           }

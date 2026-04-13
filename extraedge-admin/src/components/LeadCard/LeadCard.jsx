@@ -373,4 +373,5 @@ const LeadCardContainer = () => {
   );
 };
 
+export { LeadCard, LEadCardDataArray };
 export default LeadCardContainer;
