@@ -102,16 +102,16 @@ function Header() {
                 <div className='sub-container'>
                     <div className="header-actions">
                         <button className="header-btn notification-btn" title="Notifications">
-                            <NotificationsActiveIcon sx={{ fontSize: 22 }} />
+                            <NotificationsActiveIcon sx={{ fontSize: 22 , color: colors.primary }} />
                             <span className="notification-badge">13</span>
                         </button>
 
                         <button className="header-btn add-btn" title="Add">
-                            <AddIcon sx={{ fontSize: 22 }} />
+                            <AddIcon sx={{ fontSize: 22 , color: colors.primary }} />
                         </button>
 
                         <button className="header-btn phone-btn" title="Phone">
-                            <PhoneIcon sx={{ fontSize: 22 }} />
+                            <PhoneIcon sx={{ fontSize: 22 , color: colors.primary }} />
                         </button>
                     </div>
                     <div style={{display:'flex' , gap:'5px'}}>

@@ -34,7 +34,7 @@ const styles = {
     },
     sync: {
         fontSize: "12px",
-        color: colors.textSecondary,
+        color: colors.primary,
     },
     total: {
         margin: "10px 0",
@@ -57,6 +57,7 @@ const styles = {
     icon: {
         cursor: "pointer",
         fontSize: "18px",
+        color: colors.primary,
     },
 };
 
