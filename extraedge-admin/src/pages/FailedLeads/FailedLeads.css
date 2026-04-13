@@ -32,7 +32,8 @@
 }
 
 .failed-leads-table thead {
-  background-color: var(--primary-light);
+  background-color: var(--primary);
+  color: var(--white);
 }
 
 .failed-leads-table thead th {

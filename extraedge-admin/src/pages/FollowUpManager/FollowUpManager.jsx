@@ -5,6 +5,14 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import CallIcon from "@mui/icons-material/Call";
+import ChatIcon from "@mui/icons-material/Chat";
+import MailOutlineIcon from "@mui/icons-material/MailOutlined";
+import SmsIcon from "@mui/icons-material/Sms";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import WhatsAppIcon from "@mui/icons-material/WhatsApp";
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { LeadCard } from "../../components/LeadCard/LeadCard";
 import { colors } from "../../theme/colors";
 import "./FollowUpManager.css";
@@ -192,7 +200,9 @@ function FollowupCalendar({ selectedDate, onDateSelect, eventDates }) {
   return (
     <div className="followup-calendar">
       <div className="calendar-title">
-        <span className="calendar-icon">📅</span>
+        <span className="calendar-icon">
+          <CalendarMonthIcon />
+        </span>
         Followup Calendar
       </div>
       <div className="calendar-nav">
@@ -388,10 +398,10 @@ function FollowupLeadCard({ lead }) {
 
         <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
           <div className="comm-stats">
-            <span className="stat-item">📞 0</span>
-            <span className="stat-item">💬 0</span>
-            <span className="stat-item">✉️ 0</span>
-            <span className="stat-item">📱 11</span>
+            <span className="stat-item"><CallIcon className="stat-icon" /> 0</span>
+            <span className="stat-item"><ChatIcon className="stat-icon" /> 0</span>
+            <span className="stat-item"><MailOutlineIcon className="stat-icon" /> 0</span>
+            <span className="stat-item"><SmsIcon className="stat-icon" /> 11</span>
           </div>
 
           <div className="header-divider" />
@@ -408,14 +418,14 @@ function FollowupLeadCard({ lead }) {
         </div>
 
         <div className="actions">
-          <IconButton size="small" className="action-btn">📞</IconButton>
-          <IconButton size="small" className="action-btn">💬</IconButton>
-          <IconButton size="small" className="action-btn">✉️</IconButton>
+          <IconButton size="small" className="action-btn"><CallIcon /></IconButton>
+          <IconButton size="small" className="action-btn"><ChatIcon /></IconButton>
+          <IconButton size="small" className="action-btn"><MailOutlineIcon /></IconButton>
           <IconButton size="small" className="action-btn" style={{ color: colors.success }}>
-            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="wa" width={18} height={18} />
+            <WhatsAppIcon />
           </IconButton>
-          <IconButton size="small" className="action-btn">⋮</IconButton>
-          <IconButton size="small" className="action-btn">▲</IconButton>
+          <IconButton size="small" className="action-btn"><MoreVertIcon /></IconButton>
+          <IconButton size="small" className="action-btn"><ExpandLessIcon /></IconButton>
         </div>
       </div>
 
