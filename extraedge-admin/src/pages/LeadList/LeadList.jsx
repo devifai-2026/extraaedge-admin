@@ -13,6 +13,7 @@ import FileUploadIcon from '@mui/icons-material/FileUpload';
 import LeadCardContainer from "../../components/LeadCard/LeadCard";
 import AddNewLead from "../../components/AddNewLead/AddNewLead";
 import UploadLeads from "../../components/UploadLeads/UploadLeads";
+import { colors } from "../../theme/colors";
 import './LeadList.css';
 
 
@@ -61,10 +62,10 @@ const LeadList = () => {
                                 borderRadius: "4px",
                                 marginRight: "6px",
                                 padding: "6px 12px",
-                                backgroundColor: value === index ? "#ff7800" : "transparent",
-                                color: value === index ? "#fff" : "#7d7d7d",
+                                backgroundColor: value === index ? colors.primary : "transparent",
+                                color: value === index ? colors.white : colors.textGrey,
                                 "&:hover": {
-                                    backgroundColor: value === index ? "#ff7800" : "#e0e0e0",
+                                    backgroundColor: value === index ? colors.primary : colors.borderGrey,
                                 },
                             }}
                         />
@@ -92,29 +93,29 @@ const LeadList = () => {
                 >
                     {/* Left Icon */}
                     <IconButton size="small">
-                        <SwapVertIcon sx={{ color: "#ff6d00" }} />
+                        <SwapVertIcon sx={{ color: colors.primary }} />
                     </IconButton>
 
                     {/* Right Icons */}
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         <IconButton size="small">
-                            <GroupIcon sx={{ color: "#ff6d00" }} />
+                            <GroupIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
                         <IconButton size="small">
-                            <WhatsAppIcon sx={{ color: "#ff6d00" }} />
+                            <WhatsAppIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
                         <IconButton size="small">
-                            <RefreshIcon sx={{ color: "#ff6d00" }} />
+                            <RefreshIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
                         <IconButton size="small">
-                            <ViewListIcon sx={{ color: "#ff6d00" }} />
+                            <ViewListIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
                         <IconButton size="small">
-                            <FilterAltIcon sx={{ color: "#ff6d00" }} />
+                            <FilterAltIcon sx={{ color: colors.primary }} />
                         </IconButton>
                     </Box>
                 </div>
@@ -129,9 +130,9 @@ const LeadList = () => {
                     size="medium"
                     onClick={() => setAddLeadOpen(true)}
                     sx={{
-                        backgroundColor: "#ff7800",
-                        color: "#fff",
-                        "&:hover": { backgroundColor: "#e66a00" },
+                        backgroundColor: colors.primary,
+                        color: colors.white,
+                        "&:hover": { backgroundColor: colors.primaryDark },
                     }}
                 >
                     <AddIcon />
@@ -140,9 +141,9 @@ const LeadList = () => {
                     size="medium"
                     onClick={() => setUploadLeadOpen(true)}
                     sx={{
-                        backgroundColor: "#ff7800",
-                        color: "#fff",
-                        "&:hover": { backgroundColor: "#e66a00" },
+                        backgroundColor: colors.primary,
+                        color: colors.white,
+                        "&:hover": { backgroundColor: colors.primaryDark },
                     }}
                 >
                     <FileUploadIcon />

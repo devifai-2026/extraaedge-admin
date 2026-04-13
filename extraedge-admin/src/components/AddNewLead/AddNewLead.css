@@ -10,11 +10,11 @@
     font-weight: 600 !important;
     font-size: 18px !important;
     padding: 16px 24px !important;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border-grey);
 }
 
 .add-lead-close-btn {
-    color: #666 !important;
+    color: var(--text-secondary) !important;
 }
 
 .add-lead-tabs-wrapper {
@@ -32,14 +32,14 @@
     padding: 6px 16px !important;
     border-radius: 20px !important;
     margin-right: 8px !important;
-    color: #666 !important;
-    border: 1px solid #e0e0e0 !important;
+    color: var(--text-secondary) !important;
+    border: 1px solid var(--border-grey) !important;
 }
 
 .add-lead-tab.active {
-    background-color: #ff7800 !important;
-    color: #fff !important;
-    border-color: #ff7800 !important;
+    background-color: var(--primary) !important;
+    color: var(--white) !important;
+    border-color: var(--primary) !important;
 }
 
 .add-lead-content {
@@ -54,13 +54,13 @@
 
 .add-lead-mandatory-toggle .MuiFormControlLabel-label {
     font-size: 13px;
-    color: #666;
+    color: var(--text-secondary);
 }
 
 .add-lead-section-title {
     font-weight: 600;
     font-size: 15px;
-    color: #333;
+    color: var(--dark-grey);
     margin-bottom: 16px;
     margin-top: 8px;
 }
@@ -77,15 +77,15 @@
 }
 
 .add-lead-form-grid .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
-    border-color: #ff7800;
+    border-color: var(--primary);
 }
 
 .add-lead-form-grid .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
-    border-color: #ff7800;
+    border-color: var(--primary);
 }
 
 .add-lead-form-grid .MuiInputLabel-root.Mui-focused {
-    color: #ff7800;
+    color: var(--primary);
 }
 
 .add-lead-remarks {
@@ -97,15 +97,15 @@
 }
 
 .add-lead-remarks .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
-    border-color: #ff7800;
+    border-color: var(--primary);
 }
 
 .add-lead-remarks .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
-    border-color: #ff7800;
+    border-color: var(--primary);
 }
 
 .add-lead-remarks .MuiInputLabel-root.Mui-focused {
-    color: #ff7800;
+    color: var(--primary);
 }
 
 .add-lead-actions {
@@ -117,25 +117,25 @@
 
 .add-lead-cancel-btn {
     text-transform: none !important;
-    color: #ff7800 !important;
-    border-color: #ff7800 !important;
+    color: var(--primary) !important;
+    border-color: var(--primary) !important;
     border-radius: 6px !important;
     padding: 6px 28px !important;
 }
 
 .add-lead-cancel-btn:hover {
-    background-color: #fff3e6 !important;
-    border-color: #ff7800 !important;
+    background-color: var(--primary-light) !important;
+    border-color: var(--primary) !important;
 }
 
 .add-lead-add-btn {
     text-transform: none !important;
-    background-color: #ff7800 !important;
-    color: #fff !important;
+    background-color: var(--primary) !important;
+    color: var(--white) !important;
     border-radius: 6px !important;
     padding: 6px 36px !important;
 }
 
 .add-lead-add-btn:hover {
-    background-color: #e66a00 !important;
+    background-color: var(--primary-dark) !important;
 }

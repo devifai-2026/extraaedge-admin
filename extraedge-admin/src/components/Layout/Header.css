@@ -9,7 +9,7 @@
     right: 0;
     z-index: 99;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    background-color: #fff;
+    background-color: var(--white);
 }
 
 /* Brand & Timer */
@@ -23,24 +23,22 @@
 .brand-text {
     font-weight: 700;
     font-size: 18px;
-    color: #ff6b35;
+    color: var(--primary);
     letter-spacing: 0.5px;
 }
 
 .main-container {
     display: flex;
     width: 87%;
-    /* justify-content: space-between; */
 }
 
 .timer {
     font-family: monospace;
     font-size: 18px;
     font-weight: 600;
-    /* background-color: #f5f5f5; */
     padding: 4px 12px;
     border-radius: 20px;
-    color: #333;
+    color: var(--dark-grey);
 }
 
 .sub-container {
@@ -56,21 +54,21 @@
     flex: 1;
     max-width: 545px;
     margin-right: 30px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border-grey);
     border-radius: 6px;
-    background-color: #f5f5f5;
+    background-color: var(--input-grey);
     transition: border-color 0.3s ease;
 }
 
 .header-search-wrapper:focus-within {
-    border-color: #ff6b35;
-    background-color: #fafafa;
+    border-color: var(--primary);
+    background-color: var(--bg-card);
 }
 
 /* Global Search Dropdown (attached to left of search bar) */
 .global-search-dropdown {
     position: relative;
-    border-right: 1px solid #e0e0e0;
+    border-right: 1px solid var(--border-grey);
 }
 
 .global-search-btn {
@@ -79,7 +77,7 @@
     padding: 10px 16px;
     font-size: 14px;
     font-weight: 500;
-    color: #333;
+    color: var(--dark-grey);
     display: flex;
     align-items: center;
     cursor: pointer;
@@ -89,7 +87,7 @@
 }
 
 .global-search-btn:hover {
-    background-color: #eaeaea;
+    background-color: var(--hover-grey);
 }
 
 .global-menu {
@@ -97,8 +95,8 @@
     top: 100%;
     left: 0;
     margin-top: 4px;
-    background: white;
-    border: 1px solid #e0e0e0;
+    background: var(--white);
+    border: 1px solid var(--border-grey);
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     min-width: 150px;
@@ -110,12 +108,12 @@
     padding: 10px 16px;
     font-size: 14px;
     cursor: pointer;
-    color: #333;
+    color: var(--dark-grey);
     transition: background 0.2s;
 }
 
 .menu-item:hover {
-    background-color: #f5f5f5;
+    background-color: var(--input-grey);
 }
 
 /* Search Input Wrapper */
@@ -128,7 +126,7 @@
 
 .search-icon {
     margin-right: 8px;
-    color: #999;
+    color: var(--mid-grey);
     display: flex;
     align-items: center;
 }
@@ -139,12 +137,12 @@
     outline: none;
     flex: 1;
     font-size: 14px;
-    color: #333;
+    color: var(--dark-grey);
     font-family: inherit;
 }
 
 .search-input::placeholder {
-    color: #999;
+    color: var(--mid-grey);
 }
 
 /* Search Context Dropdown (right side of input) */
@@ -158,7 +156,7 @@
     border: none;
     cursor: pointer;
     padding: 0 4px;
-    color: #666;
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     height: 100%;
@@ -169,8 +167,8 @@
     top: 100%;
     right: 0;
     margin-top: 8px;
-    background: white;
-    border: 1px solid #e0e0e0;
+    background: var(--white);
+    border: 1px solid var(--border-grey);
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     min-width: 140px;
@@ -182,17 +180,17 @@
     padding: 10px 16px;
     font-size: 14px;
     cursor: pointer;
-    color: #333;
+    color: var(--dark-grey);
     transition: background 0.2s;
 }
 
 .context-option:hover {
-    background-color: #f5f5f5;
+    background-color: var(--input-grey);
 }
 
 .context-option.active {
-    background-color: #ff6b35;
-    color: white;
+    background-color: var(--primary);
+    color: var(--white);
 }
 
 /* Right Action Icons */
@@ -228,7 +226,7 @@
 }
 
 .header-btn:hover {
-    background-color: #f0f0f0;
+    background-color: var(--hover-grey);
 }
 
 .notification-btn {
@@ -239,8 +237,8 @@
     position: absolute;
     top: -8px;
     right: -8px;
-    background-color: #ef5350;
-    color: white;
+    background-color: var(--primary);
+    color: var(--white);
     border-radius: 50%;
     width: 20px;
     height: 20px;

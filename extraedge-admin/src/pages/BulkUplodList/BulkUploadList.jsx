@@ -14,6 +14,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
 import "./BulkUploadList.css";
 import noLeadsImg from "../../assets/no-leads.svg";
+import { colors } from "../../theme/colors";
 
 const BulkUploadList = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -42,10 +43,10 @@ const BulkUploadList = () => {
               borderRadius: "4px",
               marginRight: "6px",
               padding: "6px 16px",
-              backgroundColor: activeTab === 0 ? "#ff7800" : "transparent",
-              color: activeTab === 0 ? "#fff !important" : "#7d7d7d",
+              backgroundColor: activeTab === 0 ? colors.primary : "transparent",
+              color: activeTab === 0 ? `${colors.white} !important` : colors.textGrey,
               "&:hover": {
-                backgroundColor: activeTab === 0 ? "#ff7800" : "#e0e0e0",
+                backgroundColor: activeTab === 0 ? colors.primary : colors.borderGrey,
               },
             }}
           />
@@ -58,10 +59,10 @@ const BulkUploadList = () => {
               fontWeight: 600,
               borderRadius: "4px",
               padding: "6px 16px",
-              backgroundColor: activeTab === 1 ? "#ff7800" : "transparent",
-              color: activeTab === 1 ? "#fff !important" : "#7d7d7d",
+              backgroundColor: activeTab === 1 ? colors.primary : "transparent",
+              color: activeTab === 1 ? `${colors.white} !important` : colors.textGrey,
               "&:hover": {
-                backgroundColor: activeTab === 1 ? "#ff7800" : "#e0e0e0",
+                backgroundColor: activeTab === 1 ? colors.primary : colors.borderGrey,
               },
             }}
           />
@@ -72,7 +73,7 @@ const BulkUploadList = () => {
       <div className="bulk-upload-toolbar">
         <div className="toolbar-left">
           <IconButton size="small">
-            <RefreshIcon sx={{ color: "#ff7800" }} />
+            <RefreshIcon sx={{ color: colors.primary }} />
           </IconButton>
         </div>
 
@@ -92,15 +93,15 @@ const BulkUploadList = () => {
                   height: "36px",
                   borderRadius: "4px 0 0 4px",
                   "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#e0e0e0",
+                    borderColor: colors.borderGrey,
                     borderRight: "none",
                   },
                   "&:hover .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#bdbdbd",
+                    borderColor: colors.scrollGrey,
                     borderRight: "none",
                   },
                   "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#ff7800",
+                    borderColor: colors.primary,
                     borderRight: "none",
                     borderWidth: "1px",
                   },
@@ -126,7 +127,7 @@ const BulkUploadList = () => {
                   flex: 1,
                 }}
               />
-              <IconButton size="small" sx={{ color: "#666" }}>
+              <IconButton size="small" sx={{ color: colors.textSecondary }}>
                 <SearchIcon fontSize="small" />
               </IconButton>
             </div>
@@ -159,13 +160,13 @@ const BulkUploadList = () => {
                   minWidth: "160px",
                   borderRadius: "4px",
                   "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#e0e0e0",
+                    borderColor: colors.borderGrey,
                   },
                   "&:hover .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#bdbdbd",
+                    borderColor: colors.scrollGrey,
                   },
                   "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "#ff7800",
+                    borderColor: colors.primary,
                     borderWidth: "1px",
                   },
                 }}

@@ -1,27 +1,43 @@
 :root {
-  /* Global Color Theme - Import from theme/colors.js for JS usage */
-  --primary: #FF6B35;
-  --black: #1A1A1A;
+  /* Global Color Theme - Keep in sync with theme/colors.js */
+  --primary: #E53935;
+  --primary-dark: #C62828;
+  --primary-light: #FFEBEE;
+
+  --black: #000000;
   --white: #FFFFFF;
-  --dark-bg: #3E3B52;
-  --light-gray: #F5F5F5;
-  --border-gray: #E0E0E0;
-  --text-dark: #1A1A1A;
+
+  --input-grey: #F5F5F5;
+  --text-grey: #757575;
+  --border-grey: #E0E0E0;
+  --dark-grey: #333333;
+  --mid-grey: #999999;
+  --hover-grey: #F0F0F0;
+  --scroll-grey: #CCCCCC;
+
+  --text-dark: #000000;
   --text-light: #FFFFFF;
-  --text-muted: #666666;
-  --accent-red: #E74C3C;
-  --success: #27AE60;
-  --error: #C0392B;
+  --text-muted: #757575;
+  --text-secondary: #666666;
+
+  --success: #2E7D32;
+  --error: #C62828;
   --warning: #F39C12;
+  --info: #1976D2;
+
+  --bg-white: #FFFFFF;
+  --bg-light: #F5F5F5;
+  --bg-card: #FAFAFA;
+  --bg-dark: #3E3B52;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
   font: 16px/1.5 var(--sans);
-  color-scheme: light dark;
+  color-scheme: light;
   color: var(--text-dark);
-  background: var(--dark-bg);
+  background: var(--bg-light);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -41,20 +57,13 @@ body {
 }
 
 body {
-  background-color: var(--dark-bg);
-}
-}
-
-body {
   margin: 0;
+  background-color: var(--bg-light);
 }
 
 #root {
-  width: 1126px;
   max-width: 100%;
   margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
   min-height: 100svh;
   display: flex;
   flex-direction: column;
@@ -65,7 +74,7 @@ h1,
 h2 {
   font-family: var(--heading);
   font-weight: 500;
-  color: var(--text-h);
+  color: var(--text-dark);
 }
 
 h1 {
@@ -77,6 +86,7 @@ h1 {
     margin: 20px 0;
   }
 }
+
 h2 {
   font-size: 24px;
   line-height: 118%;
@@ -86,21 +96,17 @@ h2 {
     font-size: 20px;
   }
 }
+
 p {
   margin: 0;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
 code {
+  font-family: var(--mono);
   font-size: 15px;
   line-height: 135%;
   padding: 4px 8px;
-  background: var(--code-bg);
+  border-radius: 4px;
+  color: var(--text-dark);
+  background: var(--input-grey);
 }

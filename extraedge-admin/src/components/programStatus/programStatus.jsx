@@ -14,6 +14,7 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
+import { colors } from "../../theme/colors";
 
 const data = [
   {
@@ -57,7 +58,7 @@ export default function LeadToggleTable() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div style={{backgroundColor:'#ffffff' , padding:"10px" , borderRadius:"8px" , border:"1px solid #ddd"}}>
+    <div style={{backgroundColor: colors.white , padding:"10px" , borderRadius:"8px" , border:`1px solid ${colors.borderGrey}`}}>
       
       <div style={{display:'flex', justifyContent:'space-between' , alignItems:'center' , marginBottom:'10px'}}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -90,8 +91,8 @@ export default function LeadToggleTable() {
                 colSpan={open ? 3 : 1}
                 align="center"
                 sx={{
-                  backgroundColor: "#6b6b6b",
-                  color: "#fff",
+                  backgroundColor: colors.darkGrey,
+                  color: colors.white,
                   fontWeight: "bold"
                 }}
               >
@@ -100,7 +101,7 @@ export default function LeadToggleTable() {
                   <IconButton
                     size="small"
                     onClick={() => setOpen(!open)}
-                    sx={{ color: "#fff", ml: 1 }}
+                    sx={{ color: colors.white, ml: 1 }}
                   >
                     {open ? <ChevronLeftIcon /> : <ChevronRightIcon />}
                   </IconButton>
@@ -109,18 +110,18 @@ export default function LeadToggleTable() {
             </TableRow>
 
             {/* Column Headers */}
-            <TableRow sx={{ backgroundColor: "#6b6b6b" }}>
-              <TableCell sx={{ color: "#fff" }}>Program</TableCell>
-              <TableCell sx={{ color: "#fff" }}>Total</TableCell>
+            <TableRow sx={{ backgroundColor: colors.darkGrey }}>
+              <TableCell sx={{ color: colors.white }}>Program</TableCell>
+              <TableCell sx={{ color: colors.white }}>Total</TableCell>
 
               {open ? (
                 <>
-                  <TableCell sx={{ color: "#fff" }}>Cold</TableCell>
-                  <TableCell sx={{ color: "#fff" }}>New</TableCell>
-                  <TableCell sx={{ color: "#fff" }}>Visited</TableCell>
+                  <TableCell sx={{ color: colors.white }}>Cold</TableCell>
+                  <TableCell sx={{ color: colors.white }}>New</TableCell>
+                  <TableCell sx={{ color: colors.white }}>Visited</TableCell>
                 </>
               ) : (
-                <TableCell sx={{ color: "#fff" }}>Total</TableCell>
+                <TableCell sx={{ color: colors.white }}>Total</TableCell>
               )}
             </TableRow>
           </TableHead>

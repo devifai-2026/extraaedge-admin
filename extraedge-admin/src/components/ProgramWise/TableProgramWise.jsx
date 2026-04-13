@@ -12,6 +12,7 @@ import IconButton from "@mui/material/IconButton";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
+import { colors } from "../../theme/colors";
 
 const data = [
   {
@@ -53,7 +54,7 @@ const total = {
 
 export default function ProgramTable() {
   return (
-    <div style={{backgroundColor:'#ffffff' , padding:"10px" , borderRadius:"8px" , border:"1px solid #ddd"}}>
+    <div style={{backgroundColor: colors.white , padding:"10px" , borderRadius:"8px" , border:`1px solid ${colors.borderGrey}`}}>
       {/* Header */}
       <div style={{display:'flex', justifyContent:'space-between' , alignItems:'center' , marginBottom:'10px'}}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -78,17 +79,17 @@ export default function ProgramTable() {
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
-            <TableRow sx={{ backgroundColor: "#6b6b6b" }}>
-              <TableCell sx={{ color: "#fff", fontWeight: "bold" }}>
+            <TableRow sx={{ backgroundColor: colors.darkGrey }}>
+              <TableCell sx={{ color: colors.white, fontWeight: "bold" }}>
                 Program
               </TableCell>
-              <TableCell sx={{ color: "#fff", fontWeight: "bold" }}>
+              <TableCell sx={{ color: colors.white, fontWeight: "bold" }}>
                 Total Leads
               </TableCell>
-              <TableCell sx={{ color: "#fff", fontWeight: "bold" }}>
+              <TableCell sx={{ color: colors.white, fontWeight: "bold" }}>
                 Enrolled Leads
               </TableCell>
-              <TableCell sx={{ color: "#fff", fontWeight: "bold" }}>
+              <TableCell sx={{ color: colors.white, fontWeight: "bold" }}>
                 Lead To Enrolled Leads %
               </TableCell>
             </TableRow>
@@ -100,11 +101,11 @@ export default function ProgramTable() {
                 key={index}
                 sx={{
                   backgroundColor: row.highlight
-                    ? "#f4a261"
+                    ? colors.primaryLight
                     : "inherit",
                   cursor: "pointer",
                   "&:hover": {
-                    backgroundColor: "#f0f0f0",
+                    backgroundColor: colors.hoverGrey,
                   },
                 }}
               >
@@ -120,7 +121,7 @@ export default function ProgramTable() {
               sx={{
                 cursor: "pointer",
                 "&:hover": {
-                  backgroundColor: "#f0f0f0",
+                  backgroundColor: colors.hoverGrey,
                 },
               }}
             >

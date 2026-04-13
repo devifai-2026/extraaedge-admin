@@ -9,6 +9,7 @@ import DialogContentText from "@mui/material/DialogContentText";
 import DialogActions from "@mui/material/DialogActions";
 import Button from "@mui/material/Button";
 import "./FailedLeads.css";
+import { colors } from "../../theme/colors";
 
 const initialLeads = [
   {
@@ -258,14 +259,14 @@ function FailedLeads() {
                   title="Add lead"
                   onClick={() => handleAdd(lead.id)}
                 >
-                  <AddCircleIcon sx={{ color: "#ff7800" }} />
+                  <AddCircleIcon sx={{ color: colors.primary }} />
                 </IconButton>
                 <IconButton
                   size="small"
                   title="Delete lead"
                   onClick={() => handleDeleteClick(lead.id)}
                 >
-                  <DeleteIcon sx={{ color: "#ff7800" }} />
+                  <DeleteIcon sx={{ color: colors.primary }} />
                 </IconButton>
               </td>
             </tr>
