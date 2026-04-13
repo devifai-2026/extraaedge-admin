@@ -40,6 +40,7 @@ function RawDataManager() {
                         <Tab
                             key={index}
                             label={`${tab.label} (${tab.count})`}
+                            className={`custom-tab-button ${value === index ? "active" : ""}`}
                             sx={{
                                 textTransform: "none",
                                 minHeight: "36px",

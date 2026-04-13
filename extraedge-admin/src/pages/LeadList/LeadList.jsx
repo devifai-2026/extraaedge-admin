@@ -15,69 +15,20 @@ import AddNewLead from "../../components/AddNewLead/AddNewLead";
 import UploadLeads from "../../components/UploadLeads/UploadLeads";
 import { colors } from "../../theme/colors";
 import './LeadList.css';
+import TabsSection from "../../components/TabsSection/TabsSection";
 
 
 
-const tabData = [
-    { label: "All", count: 1359 },
-    { label: "New", count: 6 },
-    { label: "Ringing / Not Reachable", count: 0 },
-    { label: "Followup", count: 108 },
-    { label: "Demo Scheduled", count: 1 },
-    { label: "Engaged Leads", count: 27 },
-    { label: "Prospect", count: 1 },
-    { label: "Demo Attended", count: 1 },
-    { label: "Scheduled Visit", count: 0 },
-    { label: "Visited", count: 5 },
-    { label: "Enrolled", count: 59 },
-    { label: "Junk", count: 163 },
-    { label: "Cold", count: 988 },
-    { label: "Re-enquired", count: 1 },
-];
+
 
 const LeadList = () => {
-    const [value, setValue] = useState(0);
+    
     const [addLeadOpen, setAddLeadOpen] = useState(false);
     const [uploadLeadOpen, setUploadLeadOpen] = useState(false);
     return (
         <div className="lead-list-maincontainer">
-            {/* TABS SECTION */}
-            <div className="lead-list-tabs" style={{ padding: "0 12px" }}>
-
-                <Tabs
-                    value={value}
-                    onChange={(e, newValue) => setValue(newValue)}
-                    variant="scrollable"
-                    scrollButtons="auto"
-                    TabIndicatorProps={{ style: { display: "none" } }}
-                >
-                    {tabData.map((tab, index) => (
-                        <Tab
-                            key={index}
-                            label={`${tab.label} (${tab.count})`}
-                            sx={{
-                                textTransform: "none",
-                                minHeight: "36px",
-                                fontSize: "13px",
-                                borderRadius: "4px",
-                                marginRight: "6px",
-                                padding: "6px 12px",
-                                backgroundColor: value === index ? colors.primary : "transparent",
-                                color: value === index ? colors.white : colors.textGrey,
-                                "&:hover": {
-                                    backgroundColor: value === index ? colors.primary : colors.borderGrey,
-                                },
-                            }}
-                        />
-                    ))}
-                </Tabs>
-
-                {/* Divider aligned perfectly */}
-                <div className="lead-card-divider"></div>
-                    
-
-            </div>
-
+            
+            <TabsSection />
 
             <div className="lead-list-bottomcontainer">
                 <div

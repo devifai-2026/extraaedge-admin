@@ -58,3 +58,32 @@
     right: 24px;
     z-index: 1000;
 }
+
+
+.custom-tab-button {
+ text-transform: none !important;
+  min-height: 36px !important;
+  font-size: 13px !important;
+  border-radius: 4px !important;
+  margin-right: 6px !important;
+  padding: 6px 12px !important;
+
+  background-color: transparent !important;
+  color: #6b7280 !important; /* colors.textGrey */
+}
+
+/* Active state */
+.custom-tab-button.active {
+   background-color: var(--primary) !important; /* colors.primary */
+  color: #ffffff !important; /* colors.white */
+}
+
+/* Hover state */
+.custom-tab-button:hover {
+   background-color: #e5e7eb !important; /* colors.borderGrey */
+}
+
+/* Hover when active */
+.custom-tab-button.active:hover {
+  background-color: var(--primary);
+}
