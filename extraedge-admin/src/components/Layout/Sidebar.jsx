@@ -2,7 +2,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import FolderIcon from '@mui/icons-material/Folder';
-import ChatIcon from '@mui/icons-material/Chat';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -16,16 +15,16 @@ const menuItems = [
   { id: 2, label: 'Lead Manager', icon: PeopleAltIcon, path: '/leadlist' },
   { id: 3, label: 'Raw Data Manager', icon: FolderIcon, path: '/rawdata' },
   { id: 4, label: 'WhatsApp Chat', icon: WhatsAppIcon, path: '/whatsapp-chat', badge: '12' },
-  { id: 5, label: 'Follow-ups Manager', icon: CalendarTodayIcon, path: '/followups-manager' },
+  { id: 5, label: 'Follow-ups Manager', icon: CalendarTodayIcon, path: '/followupmanager' },
   { id: 6, label: 'Upload Failed Leads', icon: UploadFileIcon, path: '/failedleads' },
-  { id: 7, label: 'Bulk Action Stage', icon: SettingsIcon, path: '/bulk-action-stage' },
+  { id: 7, label: 'Bulk Action Stage', icon: SettingsIcon, path: '/bulkuploadlist' },
 ];
 
 const bottomMenuItems = [
   { id: 8, label: 'Raise a Ticket', icon: SupportAgentIcon, path: '/raise-ticket' },
 ];
 
-function Sidebar() {
+function Sidebar({ collapsed = false }) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -41,18 +40,20 @@ function Sidebar() {
         return (
           <li key={item.id}>
             <button
-              className={`menu-item ${isActive ? 'active' : ''}`}
+              className={`menu-item ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`}
               onClick={() => handleMenuClick(item.path)}
               style={{
                 backgroundColor: isActive ? colors.primary : 'transparent',
                 color: isActive ? colors.white : colors.textDark,
+                justifyContent: collapsed ? 'center' : 'flex-start',
               }}
+              title={collapsed ? item.label : ''}
             >
               <span className="menu-icon">
                 <IconComponent />
               </span>
-              <span className="menu-label">{item.label}</span>
-              {item.badge && <span className="badge">{item.badge}</span>}
+              {!collapsed && <span className="menu-label">{item.label}</span>}
+              {!collapsed && item.badge && <span className="badge">{item.badge}</span>}
             </button>
           </li>
         );
@@ -62,7 +63,7 @@ function Sidebar() {
 
   return (
     <div
-      className="sidebar"
+      className={`sidebar ${collapsed ? 'sidebar-mini' : ''}`}
       style={{ backgroundColor: colors.white, borderRight: `1px solid ${colors.borderGray}` }}
     >
       <div className="sidebar-top">{renderMenuItems(menuItems)}</div>
