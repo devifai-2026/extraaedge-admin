@@ -57,7 +57,7 @@ function Header() {
             className="header"
             style={{
                 backgroundColor: colors.white,
-                borderBottom: `1px solid ${colors.borderGray}`,
+                borderBottom: `1px solid ${colors.borderGrey}`,
             }}
         >
             {/* Brand & Timer Section */}

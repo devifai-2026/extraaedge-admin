@@ -6,7 +6,7 @@
 
 .bulk-upload-tabs {
   padding: 8px 12px 0;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border-grey);
 }
 
 .bulk-upload-toolbar {
@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--hover-grey);
 }
 
 .toolbar-left {
@@ -36,7 +36,7 @@
 .search-input-wrapper {
   display: flex;
   align-items: center;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-grey);
   border-left: none;
   border-radius: 0 4px 4px 0;
   height: 36px;
@@ -44,7 +44,7 @@
 }
 
 .search-input-wrapper:hover {
-  border-color: #bdbdbd;
+  border-color: var(--scroll-grey);
 }
 
 .user-select-wrapper {
@@ -78,12 +78,12 @@
 .empty-state-title {
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--dark-grey);
   margin: 0 0 8px;
 }
 
 .empty-state-subtitle {
   font-size: 14px;
-  color: #999;
+  color: var(--mid-grey);
   margin: 0;
 }

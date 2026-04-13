@@ -14,7 +14,7 @@ const menuItems = [
   { id: 1, label: 'Analytics Dashboard', icon: DashboardIcon, path: '/dashboard' },
   { id: 2, label: 'Lead Manager', icon: PeopleAltIcon, path: '/leadlist' },
   { id: 3, label: 'Raw Data Manager', icon: FolderIcon, path: '/rawdata' },
-  { id: 4, label: 'WhatsApp Chat', icon: WhatsAppIcon, path: '/whatsapp-chat', badge: '12' },
+  { id: 4, label: 'WhatsApp Chat', icon: WhatsAppIcon, path: '/whatsapplist', badge: '12' },
   { id: 5, label: 'Follow-ups Manager', icon: CalendarTodayIcon, path: '/followupmanager' },
   { id: 6, label: 'Upload Failed Leads', icon: UploadFileIcon, path: '/failedleads' },
   { id: 7, label: 'Bulk Action Stage', icon: SettingsIcon, path: '/bulkuploadlist' },
@@ -64,7 +64,7 @@ function Sidebar({ collapsed = false }) {
   return (
     <div
       className={`sidebar ${collapsed ? 'sidebar-mini' : ''}`}
-      style={{ backgroundColor: colors.white, borderRight: `1px solid ${colors.borderGray}` }}
+      style={{ backgroundColor: colors.white, borderRight: `1px solid ${colors.borderGrey}` }}
     >
       <div className="sidebar-top">{renderMenuItems(menuItems)}</div>
       <div className="sidebar-bottom">{renderMenuItems(bottomMenuItems)}</div>

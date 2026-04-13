@@ -15,6 +15,7 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
+import { colors } from "../../theme/colors";
 
 const data = [
   {
@@ -51,7 +52,7 @@ export default function ChannelExpandableTable() {
   };
 
   return (
-    <div style={{backgroundColor:'#ffffff' , padding:"10px" , borderRadius:"8px" , border:"1px solid #ddd"}}>
+    <div style={{backgroundColor: colors.white , padding:"10px" , borderRadius:"8px" , border:`1px solid ${colors.borderGrey}`}}>
       {/* <Typography variant="h6" fontWeight="bold" mb={2}>
         Channel-Source wise Conversion Analysis
       </Typography> */}
@@ -77,11 +78,11 @@ export default function ChannelExpandableTable() {
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
-            <TableRow sx={{ backgroundColor: "#6b6b6b" }}>
-              <TableCell sx={{ color: "#fff" }}>Primary Channel</TableCell>
-              <TableCell sx={{ color: "#fff" }}>Total Leads</TableCell>
-              <TableCell sx={{ color: "#fff" }}>Enrolled Leads</TableCell>
-              <TableCell sx={{ color: "#fff" }}>
+            <TableRow sx={{ backgroundColor: colors.darkGrey }}>
+              <TableCell sx={{ color: colors.white }}>Primary Channel</TableCell>
+              <TableCell sx={{ color: colors.white }}>Total Leads</TableCell>
+              <TableCell sx={{ color: colors.white }}>Enrolled Leads</TableCell>
+              <TableCell sx={{ color: colors.white }}>
                 Lead To Enrolled Leads %
               </TableCell>
             </TableRow>
@@ -95,7 +96,7 @@ export default function ChannelExpandableTable() {
                 <TableRow
                   sx={{
                     backgroundColor: openRows[row.id]
-                      ? "#f4a261"
+                      ? colors.primaryLight
                       : "inherit"
                   }}
                 >
@@ -128,7 +129,7 @@ export default function ChannelExpandableTable() {
                           {row.children.map((child, i) => (
                             <TableRow
                               key={i}
-                              sx={{ backgroundColor: "#fbe3cf" }}
+                              sx={{ backgroundColor: colors.primaryLight }}
                             >
                               <TableCell sx={{ pl: 6 }}>
                                 {child.name}

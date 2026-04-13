@@ -10,6 +10,7 @@ import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import noLeadsImg from '../../assets/no-leads.svg';
 import UploadLeads from '../../components/UploadLeads/UploadLeads';
+import { colors } from '../../theme/colors';
 
 const tabData = [
     { label: "All", count: 13 },
@@ -46,10 +47,10 @@ function RawDataManager() {
                                 borderRadius: "4px",
                                 marginRight: "6px",
                                 padding: "6px 12px",
-                                backgroundColor: value === index ? "#ff7800" : "transparent",
-                                color: value === index ? "#fff" : "#7d7d7d",
+                                backgroundColor: value === index ? colors.primary : "transparent",
+                                color: value === index ? colors.white : colors.textGrey,
                                 "&:hover": {
-                                    backgroundColor: value === index ? "#ff7800" : "#e0e0e0",
+                                    backgroundColor: value === index ? colors.primary : colors.borderGrey,
                                 },
                             }}
                         />
@@ -68,29 +69,29 @@ function RawDataManager() {
                 <div className="raw-data-manager-bottomcontainer-content">
                     {/* Left Icon */}
                     <IconButton size="small">
-                        <SwapVertIcon sx={{ color: "#ff6d00" }} />
+                        <SwapVertIcon sx={{ color: colors.primary }} />
                     </IconButton>
 
                     {/* Right Icons */}
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         <IconButton size="small">
-                            <GroupIcon sx={{ color: "#ff6d00" }} />
+                            <GroupIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
                         <IconButton size="small">
-                            <WhatsAppIcon sx={{ color: "#ff6d00" }} />
+                            <WhatsAppIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
                         <IconButton size="small">
-                            <RefreshIcon sx={{ color: "#ff6d00" }} />
+                            <RefreshIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
                         <IconButton size="small">
-                            <ViewListIcon sx={{ color: "#ff6d00" }} />
+                            <ViewListIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
                         <IconButton size="small">
-                            <FilterAltIcon sx={{ color: "#ff6d00" }} />
+                            <FilterAltIcon sx={{ color: colors.primary }} />
                         </IconButton>
                     </Box>
                 </div>
@@ -111,9 +112,9 @@ function RawDataManager() {
                     size="medium"
                     onClick={() => setUploadOpen(true)}
                     sx={{
-                        backgroundColor: "#ff7800",
-                        color: "#fff",
-                        "&:hover": { backgroundColor: "#e66a00" },
+                        backgroundColor: colors.primary,
+                        color: colors.white,
+                        "&:hover": { backgroundColor: colors.primaryDark },
                     }}
                 >
                     <FileUploadIcon />

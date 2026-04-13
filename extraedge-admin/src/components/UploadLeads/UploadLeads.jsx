@@ -16,6 +16,7 @@ import CheckIcon from "@mui/icons-material/Check";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import "./UploadLeads.css";
+import { colors } from "../../theme/colors";
 
 const channelOptions = ["Offline", "Online", "Direct", "Facebook", "Google Ads", "LinkedIn", "Email Campaign"];
 const sourceOptions = ["Direct Walkin", "Website", "Social Media", "Professional Network", "Newsletter", "Referral"];
@@ -280,7 +281,7 @@ const UploadLeads = ({ open, onClose }) => {
                 Upload File
             </Button>
             {uploadedFile && (
-                <p style={{ marginTop: 12, fontSize: 13, color: "#555" }}>
+                <p style={{ marginTop: 12, fontSize: 13, color: colors.textSecondary }}>
                     Selected: {uploadedFile.name}
                 </p>
             )}
@@ -319,7 +320,7 @@ const UploadLeads = ({ open, onClose }) => {
                 </div>
             ))}
             {sheetFields.length === 0 && (
-                <p style={{ color: "#999", fontSize: 13 }}>
+                <p style={{ color: colors.midGrey, fontSize: 13 }}>
                     No file uploaded yet. Please go back and upload a CSV file.
                 </p>
             )}

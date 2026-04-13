@@ -11,6 +11,7 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DownloadIcon from "@mui/icons-material/Download";
 import OpenInFullIcon from "@mui/icons-material/OpenInFull";
+import { colors } from "../../theme/colors";
 
 const data = [
   { date: "2025-03-31", lead: 75 },
@@ -25,10 +26,10 @@ const data = [
 ];
 const styles = {
   card: {
-    background: "#fff",
+    background: colors.white,
     borderRadius: "8px",
     padding: "16px",
-    border: "1px solid #ddd",
+    border: `1px solid ${colors.borderGrey}`,
   },
   header: {
     display: "flex",
@@ -48,11 +49,11 @@ const styles = {
   icon: {
     fontSize: "18px",
     cursor: "pointer",
-    color: "#f97316",
+    color: colors.primary,
   },
   sync: {
     fontSize: "12px",
-    color: "#666",
+    color: colors.textSecondary,
   },
   legend: {
     display: "flex",
@@ -65,7 +66,7 @@ const styles = {
   legendBox: {
     width: "12px",
     height: "12px",
-    backgroundColor: "#f97316",
+    backgroundColor: colors.primary,
   },
 };
 
@@ -91,14 +92,14 @@ const LeadsChart = () => {
       {/* Chart */}
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data}>
-          <CartesianGrid stroke="#e0e0e0" />
+          <CartesianGrid stroke={colors.borderGrey} />
           <XAxis dataKey="date" />
           <YAxis />
           <Tooltip />
           <Line
             type="monotone"
             dataKey="lead"
-            stroke="#f97316"
+            stroke={colors.primary}
             strokeWidth={2}
             dot={{ r: 3 }}
           />
