@@ -8,6 +8,7 @@ import {
     Checkbox,
     Badge,
 } from "@mui/material";
+import { Menu, MenuItem } from "@mui/material";
 
 import CallIcon from "@mui/icons-material/Call";
 import ChatIcon from "@mui/icons-material/Chat";
@@ -26,6 +27,7 @@ import { colors } from '../../theme/colors';
 import WhatsappModal from "../WhatsApp/WhatsApp"
 import EmailDrawer from "../EmailDrawer/EmailDrawer";
 import CallModal from "../CallModal/CallModal";
+import VideoCallModal from "../VideoCall/VideoCall";
 
 import "./LeadCard.css";
 
@@ -198,6 +200,18 @@ const LeadCard = ({ lead }) => {
     const [isExpanded, setIsExpanded] = useState(true);
     const [openEmail, setOpenEmail] = useState(false);
     const [openCall, setOpenCall] = useState(false);
+    const [openVideo, setOpenVideo] = useState(false);
+    const [anchorEl, setAnchorEl] = useState(null);
+
+    const openMenu = Boolean(anchorEl);
+
+    const handleMenuClick = (event) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleMenuClose = () => {
+        setAnchorEl(null);
+    };
 
     // if (!lead) return null;
 
@@ -258,7 +272,13 @@ const LeadCard = ({ lead }) => {
 
                 {/* ACTION ICONS */}
                 <div className="actions">
-                    <IconButton size="small" className="action-btn"><VideoCallIcon /></IconButton>
+                    <IconButton
+                        size="small"
+                        className="action-btn"
+                        onClick={() => setOpenVideo(true)}
+                    >
+                        <VideoCallIcon />
+                    </IconButton>
                     <IconButton
                         size="small"
                         className="action-btn"
@@ -266,7 +286,7 @@ const LeadCard = ({ lead }) => {
                     >
                         <CallIcon />
                     </IconButton>
-                    
+
                     <IconButton size="small" className="action-btn"><SmsIcon /></IconButton>
                     <IconButton
                         size="small"
@@ -278,7 +298,13 @@ const LeadCard = ({ lead }) => {
                     <IconButton size="small" className="action-btn whatsapp" onClick={() => setOpenWhatsapp(true)}>
                         <WhatsAppIcon sx={{ color: colors.primary }} />
                     </IconButton>
-                    <IconButton size="small" className="action-btn"><MoreVertIcon /></IconButton>
+                    <IconButton
+                        size="small"
+                        className="action-btn"
+                        onClick={handleMenuClick}
+                    >
+                        <MoreVertIcon />
+                    </IconButton>
                     <IconButton
                         size="small"
                         className="action-btn"
@@ -402,6 +428,31 @@ const LeadCard = ({ lead }) => {
                 onClose={() => setOpenCall(false)}
                 lead={lead}
             />
+
+            <VideoCallModal
+                open={openVideo}
+                onClose={() => setOpenVideo(false)}
+                lead={lead}
+            />
+
+            <Menu
+                anchorEl={anchorEl}
+                open={openMenu}
+                onClose={handleMenuClose}
+                anchorOrigin={{
+                    vertical: "bottom",
+                    horizontal: "right",
+                }}
+                transformOrigin={{
+                    vertical: "top",
+                    horizontal: "right",
+                }}
+            >
+                <MenuItem onClick={handleMenuClose}>Edit Lead</MenuItem>
+                <MenuItem onClick={handleMenuClose}>Refer Leads</MenuItem>
+                <MenuItem onClick={handleMenuClose}>Add Follow Up</MenuItem>
+                <MenuItem onClick={handleMenuClose}>Add Note</MenuItem>
+            </Menu>
         </div>
 
     );
