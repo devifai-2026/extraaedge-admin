@@ -15,6 +15,7 @@ import EmailIcon from "@mui/icons-material/Email";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import MailOutlineIcon from "@mui/icons-material/MailOutlined";
+import VideoCallIcon from '@mui/icons-material/VideoCall';
 import SmsIcon from "@mui/icons-material/Sms";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
@@ -24,6 +25,7 @@ import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { colors } from '../../theme/colors';
 import WhatsappModal from "../WhatsApp/WhatsApp"
 import EmailDrawer from "../EmailDrawer/EmailDrawer";
+import CallModal from "../CallModal/CallModal";
 
 import "./LeadCard.css";
 
@@ -195,6 +197,7 @@ const LeadCard = ({ lead }) => {
     const [openWhatsapp, setOpenWhatsapp] = useState(false);
     const [isExpanded, setIsExpanded] = useState(true);
     const [openEmail, setOpenEmail] = useState(false);
+    const [openCall, setOpenCall] = useState(false);
 
     // if (!lead) return null;
 
@@ -255,9 +258,15 @@ const LeadCard = ({ lead }) => {
 
                 {/* ACTION ICONS */}
                 <div className="actions">
-                    <IconButton size="small" className="action-btn"><MailOutlineIcon /></IconButton>
-                    <IconButton size="small" className="action-btn"><CallIcon /></IconButton>
-                    <IconButton size="small" className="action-btn"><ChatIcon /></IconButton>
+                    <IconButton size="small" className="action-btn"><VideoCallIcon /></IconButton>
+                    <IconButton
+                        size="small"
+                        className="action-btn"
+                        onClick={() => setOpenCall(true)}
+                    >
+                        <CallIcon />
+                    </IconButton>
+                    
                     <IconButton size="small" className="action-btn"><SmsIcon /></IconButton>
                     <IconButton
                         size="small"
@@ -385,6 +394,12 @@ const LeadCard = ({ lead }) => {
             <EmailDrawer
                 open={openEmail}
                 onClose={() => setOpenEmail(false)}
+                lead={lead}
+            />
+
+            <CallModal
+                open={openCall}
+                onClose={() => setOpenCall(false)}
                 lead={lead}
             />
         </div>
