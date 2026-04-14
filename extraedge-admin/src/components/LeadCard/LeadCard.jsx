@@ -23,6 +23,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { colors } from '../../theme/colors';
 import WhatsappModal from "../WhatsApp/WhatsApp"
+import EmailDrawer from "../EmailDrawer/EmailDrawer";
 
 import "./LeadCard.css";
 
@@ -193,6 +194,7 @@ const LeadCard = ({ lead }) => {
     const [tab, setTab] = useState(0);
     const [openWhatsapp, setOpenWhatsapp] = useState(false);
     const [isExpanded, setIsExpanded] = useState(true);
+    const [openEmail, setOpenEmail] = useState(false);
 
     // if (!lead) return null;
 
@@ -257,7 +259,13 @@ const LeadCard = ({ lead }) => {
                     <IconButton size="small" className="action-btn"><CallIcon /></IconButton>
                     <IconButton size="small" className="action-btn"><ChatIcon /></IconButton>
                     <IconButton size="small" className="action-btn"><SmsIcon /></IconButton>
-                    <IconButton size="small" className="action-btn"><EmailIcon /></IconButton>
+                    <IconButton
+                        size="small"
+                        className="action-btn"
+                        onClick={() => setOpenEmail(true)}
+                    >
+                        <EmailIcon />
+                    </IconButton>
                     <IconButton size="small" className="action-btn whatsapp" onClick={() => setOpenWhatsapp(true)}>
                         <WhatsAppIcon sx={{ color: colors.primary }} />
                     </IconButton>
@@ -372,6 +380,12 @@ const LeadCard = ({ lead }) => {
             <WhatsappModal
                 open={openWhatsapp}
                 onClose={() => setOpenWhatsapp(false)}
+            />
+
+            <EmailDrawer
+                open={openEmail}
+                onClose={() => setOpenEmail(false)}
+                lead={lead}
             />
         </div>
 
