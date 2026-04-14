@@ -13,6 +13,7 @@ import TableCell from "@mui/material/TableCell";
 import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
+import { Drawer } from "@mui/material";
 
 import {
     Box,
@@ -38,6 +39,7 @@ const FiltersOptions = () => {
     const [openWhatsapp, setOpenWhatsapp] = useState(false);
     const [openSort, setOpenSort] = useState(false);
     const [anchorEl, setAnchorEl] = useState(null);
+    const [openListDrawer, setOpenListDrawer] = useState(false);
 
     const handleRefresh = () => {
         window.location.reload();
@@ -74,7 +76,7 @@ const FiltersOptions = () => {
                             <RefreshIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
-                        <IconButton size="small">
+                        <IconButton size="small" onClick={() => setOpenListDrawer(true)}>
                             <ViewListIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
@@ -303,6 +305,71 @@ const FiltersOptions = () => {
                     </div>
                 </div>
             </Menu>
+
+            {/* ================= LIST DRAWER ================= */}
+
+            <Drawer
+                anchor="right"
+                open={openListDrawer}
+                onClose={() => setOpenListDrawer(false)}
+            >
+                <Box
+                    sx={{
+                        width: 320,
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                    }}
+                >
+                    {/* HEADER */}
+                    <Box
+                        sx={{
+                            p: 2,
+                            borderBottom: "1px solid #ddd",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            fontWeight: 600
+                        }}
+                    >
+                        Saved List
+                        <span
+                            style={{ cursor: "pointer" }}
+                            onClick={() => setOpenListDrawer(false)}
+                        >
+                            ✕
+                        </span>
+                    </Box>
+
+                    {/* CONTENT */}
+                    <Box sx={{ p: 2, flex: 1 }}>
+                        <Typography fontSize={13} mb={1}>
+                            Select Saved List
+                        </Typography>
+
+                        <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="Select Option"
+                        />
+                    </Box>
+
+                    {/* FOOTER */}
+                    <Box
+                        sx={{
+                            p: 2,
+                            borderTop: "1px solid #ddd",
+                            display: "flex",
+                            justifyContent: "space-between"
+                        }}
+                    >
+                        <Button variant="outlined">Reset</Button>
+                        <Button variant="contained" sx={{ background: "#f36f21" }}>
+                            Load List
+                        </Button>
+                    </Box>
+                </Box>
+            </Drawer>
         </>
     );
 };
