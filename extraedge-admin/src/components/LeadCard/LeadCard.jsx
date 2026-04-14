@@ -21,6 +21,8 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import GroupIcon from "@mui/icons-material/Group";
 import PersonIcon from "@mui/icons-material/Person";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import { colors } from '../../theme/colors';
+import WhatsappModal from "../WhatsApp/WhatsApp"
 
 import "./LeadCard.css";
 
@@ -62,7 +64,7 @@ const LEadCardDataArray = [
         name: "Aarav Singh",
         phone: "9876543210",
         status: "08-Interested",
-         value: "Untouchedss",
+        value: "Untouchedss",
         subStatus: "Awaiting confirmation",
         personal: {
             program: "Advanced Python Development",
@@ -94,7 +96,7 @@ const LEadCardDataArray = [
         name: "Sneha Desai",
         phone: "9123456789",
         status: "10-Enrolled",
-         value: "",
+        value: "",
         subStatus: "Active student",
         personal: {
             program: "Full Stack Web Development",
@@ -126,7 +128,7 @@ const LEadCardDataArray = [
         name: "Rohit Verma",
         phone: "9555666777",
         status: "05-Qualified",
-         value: "Untouched",
+        value: "Untouched",
         subStatus: "Negotiation phase",
         personal: {
             program: "Data Science with ML",
@@ -158,7 +160,7 @@ const LEadCardDataArray = [
         name: "Priya Nair",
         phone: "9888999000",
         status: "07-Requirement Match",
-         value: "",
+        value: "",
         subStatus: "Needs demo",
         personal: {
             program: "UI/UX Design Bootcamp",
@@ -189,6 +191,7 @@ const LEadCardDataArray = [
 
 const LeadCard = ({ lead }) => {
     const [tab, setTab] = useState(0);
+     const [openWhatsapp, setOpenWhatsapp] = useState(false);
 
     // if (!lead) return null;
 
@@ -254,7 +257,9 @@ const LeadCard = ({ lead }) => {
                     <IconButton size="small" className="action-btn"><ChatIcon /></IconButton>
                     <IconButton size="small" className="action-btn"><SmsIcon /></IconButton>
                     <IconButton size="small" className="action-btn"><EmailIcon /></IconButton>
-                    <IconButton size="small" className="action-btn whatsapp"><WhatsAppIcon /></IconButton>
+                    <IconButton size="small" className="action-btn whatsapp" onClick={() => setOpenWhatsapp(true)}>
+                        <WhatsAppIcon sx={{ color: colors.primary }} />
+                    </IconButton>
                     <IconButton size="small" className="action-btn"><MoreVertIcon /></IconButton>
                     <IconButton size="small" className="action-btn"><ExpandLessIcon /></IconButton>
                 </div>
@@ -352,25 +357,30 @@ const LeadCard = ({ lead }) => {
                     </div>
                 </div>
             )}
+            <WhatsappModal
+                open={openWhatsapp}
+                onClose={() => setOpenWhatsapp(false)}
+            />
         </div>
+        
     );
 };
 
 const Field = ({ label, value }) => (
-  <div className="field">
-    <span className="field-label">{label}</span>
-    <span className="field-value">{value || "-"}</span>
-  </div>
+    <div className="field">
+        <span className="field-label">{label}</span>
+        <span className="field-value">{value || "-"}</span>
+    </div>
 );
 
 const LeadCardContainer = () => {
-  return (
-    <div className="lead-cards-container">
-      {LEadCardDataArray.map((lead) => (
-        <LeadCard key={lead.id} lead={lead} />
-      ))}
-    </div>
-  );
+    return (
+        <div className="lead-cards-container">
+            {LEadCardDataArray.map((lead) => (
+                <LeadCard key={lead.id} lead={lead} />
+            ))}
+        </div>
+    );
 };
 
 export { LeadCard, LEadCardDataArray };
