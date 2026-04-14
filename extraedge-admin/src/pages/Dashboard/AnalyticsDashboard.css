@@ -88,3 +88,15 @@
 .value_analytics {
   font-weight: 600;
 }
+
+.modal-header-dashboard{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+  background-color: var(--primary) !important;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+

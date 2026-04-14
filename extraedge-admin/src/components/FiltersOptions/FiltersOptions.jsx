@@ -89,7 +89,7 @@ const FiltersOptions = () => {
 
             {/* ================= ASSIGN MODAL ================= */}
             <Dialog open={openAssign} onClose={() => setOpenAssign(false)} maxWidth="xs" fullWidth>
-                <DialogTitle sx={{ background: "#e6d6cc", fontWeight: 600 }}>
+                <DialogTitle className='assignmodel-filter' >
                     Refer Leads/Applications
                 </DialogTitle>
 
@@ -104,7 +104,7 @@ const FiltersOptions = () => {
 
                 <DialogActions>
                     <Button onClick={() => setOpenAssign(false)}>Cancel</Button>
-                    <Button variant="contained" sx={{ background: "#f36f21" }}>
+                    <Button variant="contained" className='assign-btn-filter' >
                         Assign
                     </Button>
                 </DialogActions>
@@ -119,11 +119,8 @@ const FiltersOptions = () => {
             >
                 {/* HEADER */}
                 <DialogTitle
-                    sx={{
-                        background: "#d6c8bd",
-                        fontWeight: 600,
-                        fontSize: "18px"
-                    }}
+                   
+                    className='whatsApp-filters'
                 >
                     WhatsApp Chat
                 </DialogTitle>
@@ -145,13 +142,13 @@ const FiltersOptions = () => {
 
                     <TableContainer
                         sx={{
-                            border: "1px solid #ddd",
+                            border: "1px solid #f87474",
                             borderRadius: "6px",
                             mb: 2
                         }}
                     >
                         <Table size="small">
-                            <TableHead sx={{ background: "#f3e8e2" }}>
+                            <TableHead className='tablehead-whatapp-filters'>
                                 <TableRow>
                                     <TableCell></TableCell>
                                     <TableCell align="center">Used</TableCell>
@@ -255,10 +252,8 @@ const FiltersOptions = () => {
 
                     <Button
                         variant="contained"
-                        sx={{
-                            background: "#f4a57a",
-                            "&:hover": { background: "#e89063" }
-                        }}
+                        
+                        className="whatsApp-filters-send-btn"
                     >
                         SEND WHATSAPP
                     </Button>
