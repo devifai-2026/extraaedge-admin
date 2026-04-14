@@ -191,7 +191,8 @@ const LEadCardDataArray = [
 
 const LeadCard = ({ lead }) => {
     const [tab, setTab] = useState(0);
-     const [openWhatsapp, setOpenWhatsapp] = useState(false);
+    const [openWhatsapp, setOpenWhatsapp] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(true);
 
     // if (!lead) return null;
 
@@ -261,7 +262,13 @@ const LeadCard = ({ lead }) => {
                         <WhatsAppIcon sx={{ color: colors.primary }} />
                     </IconButton>
                     <IconButton size="small" className="action-btn"><MoreVertIcon /></IconButton>
-                    <IconButton size="small" className="action-btn"><ExpandLessIcon /></IconButton>
+                    <IconButton
+                        size="small"
+                        className="action-btn"
+                        onClick={() => setIsExpanded(!isExpanded)}
+                    >
+                        {isExpanded ? <ExpandLessIcon /> : <ChevronRightIcon />}
+                    </IconButton>
                 </div>
 
                 {/* UNTOUCHED BADGE */}
@@ -272,97 +279,102 @@ const LeadCard = ({ lead }) => {
                 )}
 
             </div>
-
-            {/* TABS */}
-            <div className="tabs">
-                <Tabs value={tab} onChange={(e, v) => setTab(v)}>
-                    <Tab label="Personal Details" />
-                    <Tab label="Source Details" />
-                    <Tab label="Followup Details" />
-                </Tabs>
-            </div>
-
-            {/* CONTENT */}
-            {tab === 0 && (
-                <div className="content-wrapper">
-                    <div className="content">
-
-                        <div className="grid">
-                            <Field label="PROGRAM" value={lead.personal.program} />
-                            <Field label="COUNTRY" value={lead.personal.country} />
-                            <Field label="STATE" value={lead.personal.state} />
-                            <Field label="DISTRICT" value={lead.personal.district} />
-
-                            <Field label="CITY" value={lead.personal.city} />
-                            <Field label="LEAD ADDED ON" value={lead.personal.leadAddedOn} />
-                            <Field label="LAST UPDATED ON" value={lead.personal.lastUpdatedOn} />
-                            <Field label="PREVIOUS LEAD OWNER" value={lead.personal.previousLeadOwner} />
-
-                            <Field label="CURRENT LEAD OWNER" value={lead.personal.currentLeadOwner} />
-                            <Field label="LEAD AGE" value={lead.personal.leadAge} />
-                        </div>
-
+            {isExpanded && (
+                <>
+                    {/* TABS */}
+                    <div className="tabs">
+                        <Tabs value={tab} onChange={(e, v) => setTab(v)}>
+                            <Tab label="Personal Details" />
+                            <Tab label="Source Details" />
+                            <Tab label="Followup Details" />
+                        </Tabs>
                     </div>
 
-                    <div className="content-chevron">
-                        <ChevronRightIcon />
-                    </div>
-                </div>
-            )}
+                    {/* CONTENT */}
+                    {tab === 0 && (
+                        <div className="content-wrapper">
+                            <div className="content">
 
-            {tab === 1 && (
-                <div className="content-wrapper">
-                    <div className="content">
-                        <div className="source-table">
-                            <div className="table-header">
-                                <div className="table-cell">CHANNEL</div>
-                                <div className="table-cell">SOURCE</div>
-                                <div className="table-cell">CAMPAIGN</div>
-                                <div className="table-cell">MEDIUM</div>
-                            </div>
-                            {lead.source.map((item, index) => (
-                                <div key={index} className="table-row">
-                                    <div className="table-cell">{item.channel}</div>
-                                    <div className="table-cell">{item.source}</div>
-                                    <div className="table-cell">{item.campaign}</div>
-                                    <div className="table-cell">{item.medium || "-"}</div>
+                                <div className="grid">
+                                    <Field label="PROGRAM" value={lead.personal.program} />
+                                    <Field label="COUNTRY" value={lead.personal.country} />
+                                    <Field label="STATE" value={lead.personal.state} />
+                                    <Field label="DISTRICT" value={lead.personal.district} />
+
+                                    <Field label="CITY" value={lead.personal.city} />
+                                    <Field label="LEAD ADDED ON" value={lead.personal.leadAddedOn} />
+                                    <Field label="LAST UPDATED ON" value={lead.personal.lastUpdatedOn} />
+                                    <Field label="PREVIOUS LEAD OWNER" value={lead.personal.previousLeadOwner} />
+
+                                    <Field label="CURRENT LEAD OWNER" value={lead.personal.currentLeadOwner} />
+                                    <Field label="LEAD AGE" value={lead.personal.leadAge} />
                                 </div>
-                            ))}
-                        </div>
-                    </div>
 
-                    <div className="content-chevron">
-                        <ChevronRightIcon />
-                    </div>
-                </div>
-            )}
-
-            {tab === 2 && (
-                <div className="content-wrapper">
-                    <div className="content">
-                        <div className="followup-container">
-                            <div className="followup-section">
-                                <div className="followup-label">FOLLOWUP SCHEDULED ON</div>
-                                <div className="followup-value">{lead.followup.scheduledOn}</div>
                             </div>
-                            <div className="followup-section">
-                                <div className="followup-label">FOLLOWUP REMARKS</div>
-                                <div className="followup-value followup-remarks">{lead.followup.remarks}</div>
+
+                            <div className="content-chevron">
+                                <ChevronRightIcon />
                             </div>
                         </div>
-                    </div>
+                    )}
 
-                    <div className="content-chevron">
-                        <ChevronRightIcon />
-                    </div>
-                </div>
+                    {tab === 1 && (
+                        <div className="content-wrapper">
+                            <div className="content">
+                                <div className="source-table">
+                                    <div className="table-header">
+                                        <div className="table-cell">CHANNEL</div>
+                                        <div className="table-cell">SOURCE</div>
+                                        <div className="table-cell">CAMPAIGN</div>
+                                        <div className="table-cell">MEDIUM</div>
+                                    </div>
+                                    {lead.source.map((item, index) => (
+                                        <div key={index} className="table-row">
+                                            <div className="table-cell">{item.channel}</div>
+                                            <div className="table-cell">{item.source}</div>
+                                            <div className="table-cell">{item.campaign}</div>
+                                            <div className="table-cell">{item.medium || "-"}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="content-chevron">
+                                <ChevronRightIcon />
+                            </div>
+                        </div>
+                    )}
+
+                    {tab === 2 && (
+                        <div className="content-wrapper">
+                            <div className="content">
+                                <div className="followup-container">
+                                    <div className="followup-section">
+                                        <div className="followup-label">FOLLOWUP SCHEDULED ON</div>
+                                        <div className="followup-value">{lead.followup.scheduledOn}</div>
+                                    </div>
+                                    <div className="followup-section">
+                                        <div className="followup-label">FOLLOWUP REMARKS</div>
+                                        <div className="followup-value followup-remarks">{lead.followup.remarks}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="content-chevron">
+                                <ChevronRightIcon />
+                            </div>
+                        </div>
+                    )}
+                </>
+
+
             )}
             <WhatsappModal
                 open={openWhatsapp}
                 onClose={() => setOpenWhatsapp(false)}
             />
         </div>
-        
+
     );
 };
 
