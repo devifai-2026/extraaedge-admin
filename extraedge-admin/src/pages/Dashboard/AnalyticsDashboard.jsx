@@ -194,16 +194,8 @@ function AnalyticsDashboard() {
                 >
                     {/* Header */}
                     <Box
-                        sx={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            padding: "16px 20px",
-                            borderBottom: "1px solid #eee",
-                            backgroundColor: "#f5e9df",
-                            borderTopLeftRadius: "8px",
-                            borderTopRightRadius: "8px",
-                        }}
+                        className="modal-header-dashboard"
+                        
                     >
                         <Typography sx={{ fontSize: "18px", fontWeight: 500 }}>
                             Scheduled Report List

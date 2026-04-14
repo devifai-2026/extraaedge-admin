@@ -26,3 +26,35 @@
 .sort-item {
   font-size: 13px;
 }
+
+.assignmodel-filter{
+  font-weight: 600;
+   background-color: var(--primary) !important;
+   color: var(--white) !important;
+}
+
+.assign-btn-filter{
+  background-color: var(--primary) !important;
+  color: var(--white) !important;
+}
+
+.whatsApp-filters{
+  font-weight: 600;
+   background-color: var(--primary);
+  color: var(--white);
+  font-size: 18px;
+}
+
+.tablehead-whatapp-filters{
+  background-color: var(--primary) !important;
+  color: var(--white) !important;
+}
+
+.whatsApp-filters-send-btn{
+  background-color: var(--primary) !important;
+  color: var(--white) !important;
+}
+
+.whatsApp-filters-send-btn :hover{
+  background-color: var(--primaryLight) !important;
+}
