@@ -222,7 +222,7 @@ const DateRangePicker = ({ onApply, primaryColor = colors.primary }) => {
       </Button>
 
       <Dialog open={isOpen} onClose={() => setIsOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Select Date Range</DialogTitle>
+        <DialogTitle className='dialogtitle-Datepicker'>Select Date Range</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           {calendarContent}
         </DialogContent>
