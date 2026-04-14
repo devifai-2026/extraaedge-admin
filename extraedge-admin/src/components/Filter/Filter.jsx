@@ -16,6 +16,7 @@ import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import SearchIcon from "@mui/icons-material/Search";
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import { colors } from "../../theme/colors";
 
 
 /* ================= COMMON INPUT STYLE ================= */
@@ -81,13 +82,17 @@ const FilterLeadsModal = ({ open, onClose }) => {
         <Dialog open={open} onClose={onClose} maxWidth="xl" fullWidth>
 
             {/* HEADER */}
-            <Box sx={{
-                background: "#e6d5c9",
-                px: 2,
-                py: 1.5,
-                display: "flex",
-                justifyContent: "space-between"
-            }}>
+            <Box
+                className="FilterLeadsModal-Header"
+                sx={{
+                    backgroundColor: "var(--primary)", 
+                    color: "var(--white)",
+                    px: 2,
+                    py: 1.5,
+                    display: "flex",
+                    justifyContent: "space-between"
+                }}
+            >
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <FilterAltIcon />
                     <Typography fontWeight={600}>Filter Leads</Typography>
@@ -133,7 +138,7 @@ const FilterLeadsModal = ({ open, onClose }) => {
                                 gap: 1,
                                 p: 1,
                                 cursor: "pointer",
-                                background: activeSection === item ? "#e6d5c9" : ""
+                                background: activeSection === item ? "var(--primary);" : ""
                             }}
                         >
                             <input type="checkbox" />
@@ -276,7 +281,7 @@ const FilterLeadsModal = ({ open, onClose }) => {
                 borderTop: "1px solid #eee"
             }}>
                 <Button variant="outlined">Reset</Button>
-                <Button variant="contained" sx={{ background: "#f36f21" }}>
+                <Button variant="contained" sx={{ background:colors.primary }}>
                     Apply Filter
                 </Button>
             </Box>
