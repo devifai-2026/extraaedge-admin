@@ -63,6 +63,11 @@ function AnalyticsDashboard() {
     const handleOpenModal = () => setOpenModal(true);
     const handleCloseModal = () => setOpenModal(false);
 
+    const [openFilterModal, setOpenFilterModal] = useState(false);
+
+    const handleOpenFilter = () => setOpenFilterModal(true);
+    const handleCloseFilter = () => setOpenFilterModal(false);
+
     // Sample data for the summary modal - replace with your actual data
     const summaryData = [
         { title: 'Total Leads', value: '11', change: '+2 vs last week' },
@@ -99,7 +104,10 @@ function AnalyticsDashboard() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', marginTop: '10px' }}>
                 <div>
-                    <FilterAltIcon sx={{ fontSize: 30, color: colors.primary }} />
+                    <FilterAltIcon
+                        sx={{ fontSize: 30, color: colors.primary, cursor: "pointer" }}
+                        onClick={handleOpenFilter}
+                    />
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <div>
@@ -120,7 +128,7 @@ function AnalyticsDashboard() {
                 <div className='card_analytics'>
                     <div className='header_analytics'>
                         <span className='title_analytics'>Lead Summary</span>
-                        <RefreshIcon className='icon_analytics' />
+                        <RefreshIcon className='icon_analytics' onClick={handleRefresh} />
                     </div>
                     <div className='badge_analytics'><span className='badge_content'>11</span></div>
                     <div className='content_analytics'>
@@ -131,7 +139,7 @@ function AnalyticsDashboard() {
                 <div className='card_analytics'>
                     <div className='header_analytics'>
                         <span className='title_analytics'>Communication Summary</span>
-                        <RefreshIcon className='icon_analytics' />
+                        <RefreshIcon className='icon_analytics' onClick={handleRefresh} />
                     </div>
                     <div className='content_analytics'>
                         <span className='label_analytics'>Email Consumed</span>
@@ -167,6 +175,7 @@ function AnalyticsDashboard() {
                 <ColdEnquiries />
             </div>
 
+            {/* SummarizeIcon model */}
             <Modal open={openModal} onClose={handleCloseModal}>
                 <Box
                     sx={{
@@ -252,6 +261,139 @@ function AnalyticsDashboard() {
                         <Typography sx={{ fontSize: "14px" }}>
                             Try searching something else.
                         </Typography>
+                    </Box>
+                </Box>
+            </Modal>
+
+            {/* Filter Modal */}
+
+            <Modal open={openFilterModal} onClose={handleCloseFilter}>
+                <Box
+                    sx={{
+                        position: "absolute",
+                        top: "50%",
+                        left: "34%",
+                        transform: "translate(-50%, -50%)",
+                        width: "700px",
+                        bgcolor: "#fff",
+                        borderRadius: "8px",
+                        boxShadow: 24,
+                        display: "flex",
+                        flexDirection: "column",
+                    }}
+                >
+                    {/* Header */}
+                    <Box
+                        sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "12px 16px",
+                            borderBottom: "1px solid #eee",
+                        }}
+                    >
+                        <Typography sx={{ fontWeight: 500 }}>
+                            Create Filter
+                        </Typography>
+
+                        <CloseIcon
+                            sx={{ cursor: "pointer" }}
+                            onClick={handleCloseFilter}
+                        />
+                    </Box>
+
+                    {/* Sub Header */}
+                    <Box sx={{ padding: "10px 16px", borderBottom: "1px solid #eee", fontSize: "14px", color: "#666" }}>
+                        No filter is selected.
+                    </Box>
+
+                    {/* Body */}
+                    <Box sx={{ flex: 1, display: "flex" }}>
+
+                        {/* LEFT SIDE */}
+                        <Box
+                            sx={{
+                                width: "40%",
+                                borderRight: "1px solid #eee",
+                                overflowY: "auto",
+                                padding: "10px",
+                            }}
+                        >
+                            {[
+                                "Channel",
+                                "Primary Source",
+                                "Source",
+                                "Campaign",
+                                "Medium",
+                                "Lead Category",
+                                "Stage",
+                                "Sub-Stage",
+                                "Program",
+                                "Lead Stage",
+                                "Lead Sub-Stage",
+                                "Country",
+                                "State",
+                                "District",
+                                "City",
+                            ].map((item, index) => (
+                                <Box
+                                    key={index}
+                                    sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "8px",
+                                        padding: "6px 4px",
+                                    }}
+                                >
+                                    <input type="checkbox" />
+                                    <Typography sx={{ fontSize: "14px" }}>{item}</Typography>
+                                </Box>
+                            ))}
+                        </Box>
+
+                        {/* RIGHT SIDE */}
+                        <Box
+                            sx={{
+                                flex: 1,
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "center",
+                                color: "#888",
+                                fontSize: "14px",
+                            }}
+                        >
+                            Please select filters and click apply.
+                        </Box>
+                    </Box>
+
+                    {/* Footer */}
+                    <Box
+                        sx={{
+                            display: "flex",
+                            justifyContent: "flex-end",
+                            gap: "10px",
+                            padding: "10px 16px",
+                            borderTop: "1px solid #eee",
+                        }}
+                    >
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            sx={{ textTransform: "none" }}
+                        >
+                            RESET
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            size="small"
+                            sx={{
+                                textTransform: "none",
+                                backgroundColor: colors.primary,
+                            }}
+                        >
+                            APPLY
+                        </Button>
                     </Box>
                 </Box>
             </Modal>
