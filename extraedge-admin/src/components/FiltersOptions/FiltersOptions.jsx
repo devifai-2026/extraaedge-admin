@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { colors } from '../../theme/colors';
-
+import './FiltersOptions.css';
 import SwapVertIcon from "@mui/icons-material/SwapVert";
 import GroupIcon from "@mui/icons-material/Group";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -29,18 +29,33 @@ import {
     Radio,
     TextField
 } from "@mui/material";
+import { Popover, MenuItem, ListItemIcon, ListItemText, } from "@mui/material";
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import { Menu } from "@mui/material";
 
 const FiltersOptions = () => {
     const [openAssign, setOpenAssign] = useState(false);
     const [openWhatsapp, setOpenWhatsapp] = useState(false);
+    const [openSort, setOpenSort] = useState(false);
+    const [anchorEl, setAnchorEl] = useState(null);
+
+    const handleRefresh = () => {
+        window.location.reload();
+    };
 
     return (
         <>
             <div className="raw-data-manager-bottomcontainer">
                 <div className="raw-data-manager-bottomcontainer-content">
 
-                    <IconButton size="small">
-                        <SwapVertIcon sx={{ color: colors.primary }} />
+                    <IconButton
+                        size="small"
+                        onClick={(e) => {
+                            setAnchorEl(e.currentTarget);
+                            setOpenSort(true);
+                        }}
+                    >
+                        <SwapVertIcon sx={{ color: colors.primary, cursor: "pointer" }} />
                     </IconButton>
 
                     <Box sx={{ display: "flex", gap: 1 }}>
@@ -55,7 +70,7 @@ const FiltersOptions = () => {
                             <WhatsAppIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
-                        <IconButton size="small">
+                        <IconButton size="small" onClick={handleRefresh}>
                             <RefreshIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
@@ -247,6 +262,47 @@ const FiltersOptions = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+
+            {/* ================= SORT POPOVER ================= */}
+
+            <Menu
+                open={openSort}
+                anchorEl={anchorEl}
+                onClose={() => setOpenSort(false)}
+                anchorOrigin={{
+                    vertical: "bottom",
+                    horizontal: "left",
+                }}
+            >
+                <div className="sort-modal">
+                    <p className="sort-title">No sorting applied to this list.</p>
+
+                    <div className="sort-header">
+                        Select a field to sort by ▲
+                    </div>
+
+                    <div className="sort-list">
+                        {[
+                            "Added On",
+                            "Engagement Score",
+                            "Last Updated On",
+                            "Followup Scheduled On",
+                            "Re-enquiry Date",
+                            "Lead Score",
+                            "Automated Update Date",
+                            "Referred To Update Date",
+                        ].map((item, index) => (
+                            <MenuItem key={index} className="sort-item">
+                                <ListItemIcon>
+                                    <CalendarTodayIcon fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText primary={item} />
+                            </MenuItem>
+                        ))}
+                    </div>
+                </div>
+            </Menu>
         </>
     );
 };
