@@ -13,7 +13,7 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import { LeadCard } from "../../components/LeadCard/LeadCard";
+import LeadCard from "../../components/LeadCard/LeadCard";
 import { colors } from "../../theme/colors";
 import "./FollowUpManager.css";
 
@@ -354,7 +354,7 @@ function FollowUpManager() {
             </div>
           ) : (
             filteredLeads.map((lead) => (
-              <FollowupLeadCard key={lead.id} lead={lead} />
+              <LeadCard key={lead.id} lead={lead} />
             ))
           )}
         </div>
@@ -368,154 +368,6 @@ function FollowUpManager() {
           eventDates={eventDates}
         />
       </div>
-    </div>
-  );
-}
-
-// Wrapper around LeadCard that defaults to Followup Details tab
-function FollowupLeadCard({ lead }) {
-  const [tab, setTab] = useState(0);
-
-  const tabs = [
-    { label: "Followup Details", key: "followup" },
-    { label: "Personal Details", key: "personal" },
-    { label: "Source Details", key: "source" },
-  ];
-
-  return (
-    <div className="card followup-card">
-      {/* HEADER - reuse LeadCard header structure */}
-      <div className="card-header">
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <input type="checkbox" className="followup-checkbox" />
-          <div className="left">
-            <div className="name-row">
-              <span className="name">{lead.name}</span>
-            </div>
-            <span className="phone">{lead.phone}</span>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          <div className="comm-stats">
-            <span className="stat-item"><CallIcon className="stat-icon" /> 0</span>
-            <span className="stat-item"><ChatIcon className="stat-icon" /> 0</span>
-            <span className="stat-item"><MailOutlineIcon className="stat-icon" /> 0</span>
-            <span className="stat-item"><SmsIcon className="stat-icon" /> 11</span>
-          </div>
-
-          <div className="header-divider" />
-
-          <div className="activity-icons">
-            <span className="activity-count">
-              <span className="activity-number">19</span>
-            </span>
-            <span className="activity-count error">
-              <span className="activity-number">0</span>
-            </span>
-            <span className="view-all">View all</span>
-          </div>
-        </div>
-
-        <div className="actions">
-          <IconButton size="small" className="action-btn"><CallIcon /></IconButton>
-          <IconButton size="small" className="action-btn"><ChatIcon /></IconButton>
-          <IconButton size="small" className="action-btn"><MailOutlineIcon /></IconButton>
-          <IconButton size="small" className="action-btn" style={{ color: colors.success }}>
-            <WhatsAppIcon />
-          </IconButton>
-          <IconButton size="small" className="action-btn"><MoreVertIcon /></IconButton>
-          <IconButton size="small" className="action-btn"><ExpandLessIcon /></IconButton>
-        </div>
-      </div>
-
-      {/* TABS */}
-      <div className="tabs followup-tabs-inner">
-        {tabs.map((t, i) => (
-          <button
-            key={t.key}
-            className={`followup-detail-tab ${tab === i ? "active" : ""}`}
-            onClick={() => setTab(i)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* CONTENT */}
-      {tab === 0 && (
-        <div className="content-wrapper">
-          <div className="content">
-            <div className="followup-details-grid">
-              <div className="followup-section">
-                <div className="followup-label">STAGE</div>
-                <div className="followup-value stage-value">{lead.followup.stage || "-"}</div>
-              </div>
-              <div className="followup-section">
-                <div className="followup-label">SUB-STAGE</div>
-                <div className="followup-value">{lead.followup.subStage || "-"}</div>
-              </div>
-              <div className="followup-section">
-                <div className="followup-label">FOLLOWUP SCHEDULED ON</div>
-                <div className="followup-value">{lead.followup.scheduledOn || "-"}</div>
-              </div>
-              <div className="followup-section">
-                <div className="followup-label">FOLLOWUP REMARKS</div>
-                <div className="followup-value followup-remarks">
-                  <a href="#" className="remarks-link">{lead.followup.remarks || "-"}</a>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="content-chevron">
-            <ChevronRightIcon style={{ color: colors.primary, fontSize: 28 }} />
-          </div>
-        </div>
-      )}
-
-      {tab === 1 && (
-        <div className="content-wrapper">
-          <div className="content">
-            <div className="grid">
-              {Object.entries(lead.personal).map(([key, value]) => (
-                <div key={key} className="field">
-                  <span className="field-label">{key.replace(/([A-Z])/g, " $1").toUpperCase()}</span>
-                  <span className="field-value">{value || "-"}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="content-chevron">
-            <ChevronRightIcon style={{ color: colors.primary, fontSize: 28 }} />
-          </div>
-        </div>
-      )}
-
-      {tab === 2 && (
-        <div className="content-wrapper">
-          <div className="content">
-            <div className="source-table">
-              <div className="table-header">
-                <div className="table-cell">CHANNEL</div>
-                <div className="table-cell">SOURCE</div>
-                <div className="table-cell">CAMPAIGN</div>
-                <div className="table-cell">MEDIUM</div>
-              </div>
-              {lead.source.map((item, index) => (
-                <div key={index} className="table-row">
-                  <div className="table-cell">{item.channel}</div>
-                  <div className="table-cell">{item.source}</div>
-                  <div className="table-cell">{item.campaign}</div>
-                  <div className="table-cell">{item.medium || "-"}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="content-chevron">
-            <ChevronRightIcon style={{ color: colors.primary, fontSize: 28 }} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
