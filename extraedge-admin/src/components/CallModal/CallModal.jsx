@@ -18,14 +18,15 @@ const CallModal = ({ open, onClose, lead }) => {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      
+
       {/* HEADER */}
       <DialogTitle
         sx={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          background: "#d9ccc5",
+          backgroundColor: "var(--primary)",
+          color: "var(--white)",
           fontWeight: 600
         }}
       >
