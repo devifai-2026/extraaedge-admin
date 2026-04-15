@@ -60,7 +60,7 @@ function Login() {
   return (
     <div 
       className="login-container"
-      style={{ backgroundColor: colors.darkBg }}
+      style={{ backgroundColor: colors.bgDark }}
     >
       {/* Left Section - Carousel */}
       <div className="login-left">
@@ -119,8 +119,8 @@ function Login() {
                 placeholder="counsellor4@speedupinfotech.com"
                 defaultValue="counsellor4@speedupinfotech.com"
                 style={{
-                  borderColor: colors.borderGray,
-                  backgroundColor: colors.lightGray,
+                  borderColor: colors.borderGrey,
+                  backgroundColor: colors.inputGrey,
                   color: colors.textDark
                 }}
               />
@@ -136,8 +136,8 @@ function Login() {
                   placeholder="••••••••••"
                   defaultValue="••••••••"
                   style={{
-                    borderColor: colors.borderGray,
-                    backgroundColor: colors.lightGray,
+                    borderColor: colors.borderGrey,
+                    backgroundColor: colors.inputGrey,
                     color: colors.textDark
                   }}
                 />

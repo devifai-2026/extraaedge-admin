@@ -1,15 +1,12 @@
 import React, { useState } from "react";
 import { Tabs, Tab, Box, IconButton, Fab } from "@mui/material";
 import './RawDataManager.css';
-import SwapVertIcon from "@mui/icons-material/SwapVert";
-import GroupIcon from "@mui/icons-material/Group";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import ViewListIcon from "@mui/icons-material/ViewList";
-import FilterAltIcon from "@mui/icons-material/FilterAlt";
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import noLeadsImg from '../../assets/no-leads.svg';
 import UploadLeads from '../../components/UploadLeads/UploadLeads';
+import { colors } from '../../theme/colors';
+import FiltersOptions from "../../components/FiltersOptions/FiltersOptions";
 
 const tabData = [
     { label: "All", count: 13 },
@@ -39,6 +36,7 @@ function RawDataManager() {
                         <Tab
                             key={index}
                             label={`${tab.label} (${tab.count})`}
+                            className={`custom-tab-button ${value === index ? "active" : ""}`}
                             sx={{
                                 textTransform: "none",
                                 minHeight: "36px",
@@ -46,10 +44,10 @@ function RawDataManager() {
                                 borderRadius: "4px",
                                 marginRight: "6px",
                                 padding: "6px 12px",
-                                backgroundColor: value === index ? "#ff7800" : "transparent",
-                                color: value === index ? "#fff" : "#7d7d7d",
+                                backgroundColor: value === index ? colors.primary : "transparent",
+                                color: value === index ? colors.white : colors.textGrey,
                                 "&:hover": {
-                                    backgroundColor: value === index ? "#ff7800" : "#e0e0e0",
+                                    backgroundColor: value === index ? colors.primary : colors.borderGrey,
                                 },
                             }}
                         />
@@ -64,37 +62,9 @@ function RawDataManager() {
 
             </div>
 
-            <div className="raw-data-manager-bottomcontainer">
-                <div className="raw-data-manager-bottomcontainer-content">
-                    {/* Left Icon */}
-                    <IconButton size="small">
-                        <SwapVertIcon sx={{ color: "#ff6d00" }} />
-                    </IconButton>
+            <FiltersOptions />
 
-                    {/* Right Icons */}
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        <IconButton size="small">
-                            <GroupIcon sx={{ color: "#ff6d00" }} />
-                        </IconButton>
-
-                        <IconButton size="small">
-                            <WhatsAppIcon sx={{ color: "#ff6d00" }} />
-                        </IconButton>
-
-                        <IconButton size="small">
-                            <RefreshIcon sx={{ color: "#ff6d00" }} />
-                        </IconButton>
-
-                        <IconButton size="small">
-                            <ViewListIcon sx={{ color: "#ff6d00" }} />
-                        </IconButton>
-
-                        <IconButton size="small">
-                            <FilterAltIcon sx={{ color: "#ff6d00" }} />
-                        </IconButton>
-                    </Box>
-                </div>
-            </div>
+            
 
             {/* Empty State */}
             <div className="raw-data-manager-empty-state">
@@ -111,9 +81,9 @@ function RawDataManager() {
                     size="medium"
                     onClick={() => setUploadOpen(true)}
                     sx={{
-                        backgroundColor: "#ff7800",
-                        color: "#fff",
-                        "&:hover": { backgroundColor: "#e66a00" },
+                        backgroundColor: colors.primary,
+                        color: colors.white,
+                        "&:hover": { backgroundColor: colors.primaryDark },
                     }}
                 >
                     <FileUploadIcon />

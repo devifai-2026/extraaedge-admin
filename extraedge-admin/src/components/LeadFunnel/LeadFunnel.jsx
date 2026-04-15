@@ -9,17 +9,18 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DownloadIcon from "@mui/icons-material/Download";
 import OpenInFullIcon from "@mui/icons-material/OpenInFull";
+import { colors } from "../../theme/colors";
 
 const data = [
-    { name: "New", value: 6, fill: "#f47c2c" },
-    { name: "Cold", value: 4, fill: "#e6d85c" },
-    { name: "Visited", value: 1, fill: "#63b7a6" },
+    { name: "New", value: 6, fill: colors.primary },
+    { name: "Cold", value: 4, fill: colors.warning },
+    { name: "Visited", value: 1, fill: colors.success },
 ];
 
 const styles = {
     card: {
-        background: "#fff",
-        border: "1px solid #ddd",
+        background: colors.white,
+        border: `1px solid ${colors.borderGrey}`,
         borderRadius: "8px",
         padding: "16px",
     },
@@ -33,7 +34,7 @@ const styles = {
     },
     sync: {
         fontSize: "12px",
-        color: "#666",
+        color: colors.primary,
     },
     total: {
         margin: "10px 0",
@@ -56,6 +57,7 @@ const styles = {
     icon: {
         cursor: "pointer",
         fontSize: "18px",
+        color: colors.primary,
     },
 };
 
@@ -78,7 +80,7 @@ const LeadFunnel = () => {
                 <FunnelChart>
                     <Tooltip />
                     <Funnel dataKey="value" data={data} isAnimationActive>
-                        <LabelList position="center" fill="#000" stroke="none" />
+                        <LabelList position="center" fill={colors.black} stroke="none" />
                     </Funnel>
                 </FunnelChart>
             </ResponsiveContainer>

@@ -1,0 +1,53 @@
+.wa-modal {
+  padding: 0 !important;
+}
+
+.wa-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--primary);
+  color: var(--white);
+  padding: 12px 16px;
+}
+
+.wa-tabs {
+  padding: 10px 16px;
+}
+
+.section-title {
+  margin: 16px;
+  font-weight: 600;
+}
+
+.wa-table {
+  width: 95%;
+  margin: 0 auto;
+  border-collapse: collapse;
+}
+
+.wa-table th,
+.wa-table td {
+  border: 1px solid #ddd;
+  padding: 10px;
+  font-size: 14px;
+}
+
+.radio-group {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  padding: 0 16px;
+}
+
+.wa-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px;
+}
+
+.submit-btn {
+  background-color: var(--primary) !important;
+  color: var(--white) !important;
+}
