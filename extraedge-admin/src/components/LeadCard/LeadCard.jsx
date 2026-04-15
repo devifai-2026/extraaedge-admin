@@ -8,6 +8,7 @@ import {
     Checkbox,
     Badge,
 } from "@mui/material";
+import { Menu, MenuItem } from "@mui/material";
 
 import CallIcon from "@mui/icons-material/Call";
 import ChatIcon from "@mui/icons-material/Chat";
@@ -15,12 +16,23 @@ import EmailIcon from "@mui/icons-material/Email";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import MailOutlineIcon from "@mui/icons-material/MailOutlined";
+import VideoCallIcon from '@mui/icons-material/VideoCall';
 import SmsIcon from "@mui/icons-material/Sms";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import GroupIcon from "@mui/icons-material/Group";
 import PersonIcon from "@mui/icons-material/Person";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import { colors } from '../../theme/colors';
+import WhatsappModal from "../WhatsApp/WhatsApp"
+import EmailDrawer from "../EmailDrawer/EmailDrawer";
+import CallModal from "../CallModal/CallModal";
+import VideoCallModal from "../VideoCall/VideoCall";
+import ViewTimelineModal from "../ViewTimelineModal/ViewTimelineModal";
+import AddNewLead from "../AddNewLead/AddNewLead";
+import ReferLeadsDrawer from "../ReferLeadsDrawer/ReferLeadsDrawer";
+import AddFollowUpDrawer from "../AddFollowUpDrawer/AddFollowUpDrawer";
+import AddNoteDrawer from "../AddNoteDrawer/AddNoteDrawer";
 
 import "./LeadCard.css";
 
@@ -62,7 +74,7 @@ const LEadCardDataArray = [
         name: "Aarav Singh",
         phone: "9876543210",
         status: "08-Interested",
-         value: "Untouchedss",
+        value: "Untouchedss",
         subStatus: "Awaiting confirmation",
         personal: {
             program: "Advanced Python Development",
@@ -94,7 +106,7 @@ const LEadCardDataArray = [
         name: "Sneha Desai",
         phone: "9123456789",
         status: "10-Enrolled",
-         value: "",
+        value: "",
         subStatus: "Active student",
         personal: {
             program: "Full Stack Web Development",
@@ -126,7 +138,7 @@ const LEadCardDataArray = [
         name: "Rohit Verma",
         phone: "9555666777",
         status: "05-Qualified",
-         value: "Untouched",
+        value: "Untouched",
         subStatus: "Negotiation phase",
         personal: {
             program: "Data Science with ML",
@@ -158,7 +170,7 @@ const LEadCardDataArray = [
         name: "Priya Nair",
         phone: "9888999000",
         status: "07-Requirement Match",
-         value: "",
+        value: "",
         subStatus: "Needs demo",
         personal: {
             program: "UI/UX Design Bootcamp",
@@ -189,6 +201,27 @@ const LEadCardDataArray = [
 
 const LeadCard = ({ lead }) => {
     const [tab, setTab] = useState(0);
+    const [openWhatsapp, setOpenWhatsapp] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(true);
+    const [openEmail, setOpenEmail] = useState(false);
+    const [openCall, setOpenCall] = useState(false);
+    const [openVideo, setOpenVideo] = useState(false);
+    const [openTimeline, setOpenTimeline] = useState(false);
+    const [openEditLead, setOpenEditLead] = useState(false);
+    const [openReferLeads, setOpenReferLeads] = useState(false);
+    const [openFollowUp, setOpenFollowUp] = useState(false);
+    const [openAddNote, setOpenAddNote] = useState(false);
+    const [anchorEl, setAnchorEl] = useState(null);
+
+    const openMenu = Boolean(anchorEl);
+
+    const handleMenuClick = (event) => {
+        setAnchorEl(event.currentTarget);
+    };
+
+    const handleMenuClose = () => {
+        setAnchorEl(null);
+    };
 
     // if (!lead) return null;
 
@@ -223,8 +256,8 @@ const LeadCard = ({ lead }) => {
                     <div className="comm-stats">
                         <span className="stat-item"><CallIcon className="stat-icon" /> 0</span>
                         <span className="stat-item"><ChatIcon className="stat-icon" /> 0</span>
-                        <span className="stat-item"><EmailIcon className="stat-icon" /> 0</span>
-                        <span className="stat-item"><SmsIcon className="stat-icon" /> 27</span>
+                        <span className="stat-item" onClick={() => setOpenTimeline(true)} style={{ cursor: "pointer" }}><EmailIcon className="stat-icon" /> 0</span>
+                        <span className="stat-item" onClick={() => setOpenTimeline(true)} style={{ cursor: "pointer" }}><SmsIcon className="stat-icon" /> 27</span>
                     </div>
 
                     {/* DIVIDER */}
@@ -232,16 +265,16 @@ const LeadCard = ({ lead }) => {
 
                     {/* ACTIVITY ICONS */}
                     <div className="activity-icons">
-                        <Badge badgeContent={36} color="default" className="activity-badge">
+                        <Badge badgeContent={36} color="default" className="activity-badge" onClick={() => setOpenTimeline(true)} style={{ cursor: "pointer" }}>
                             <GroupIcon className="activity-icon" />
                         </Badge>
-                        <Badge badgeContent={0} color="error" overlap="circular" className="activity-badge">
+                        <Badge badgeContent={1} color="error" overlap="circular" className="activity-badge" onClick={() => setOpenTimeline(true)} style={{ cursor: "pointer" }}>
                             <PersonIcon className="activity-icon" />
                         </Badge>
-                        <Badge badgeContent={0} color="success" overlap="circular" className="activity-badge">
-                            <SwapHorizIcon className="activity-icon" />
+                        <Badge badgeContent={1} color="success" overlap="circular" className="activity-badge" onClick={() => setOpenTimeline(true)} style={{ cursor: "pointer" }}>
+                            <PersonIcon className="activity-icon" />
                         </Badge>
-                        <span className="view-all">View all</span>
+                        <span className="view-all" onClick={() => setOpenTimeline(true)} style={{ cursor: "pointer" }}>View all</span>
                     </div>
                 </div>
 
@@ -249,14 +282,46 @@ const LeadCard = ({ lead }) => {
 
                 {/* ACTION ICONS */}
                 <div className="actions">
-                    <IconButton size="small" className="action-btn"><MailOutlineIcon /></IconButton>
-                    <IconButton size="small" className="action-btn"><CallIcon /></IconButton>
-                    <IconButton size="small" className="action-btn"><ChatIcon /></IconButton>
+                    <IconButton
+                        size="small"
+                        className="action-btn"
+                        onClick={() => setOpenVideo(true)}
+                    >
+                        <VideoCallIcon />
+                    </IconButton>
+                    <IconButton
+                        size="small"
+                        className="action-btn"
+                        onClick={() => setOpenCall(true)}
+                    >
+                        <CallIcon />
+                    </IconButton>
+
                     <IconButton size="small" className="action-btn"><SmsIcon /></IconButton>
-                    <IconButton size="small" className="action-btn"><EmailIcon /></IconButton>
-                    <IconButton size="small" className="action-btn whatsapp"><WhatsAppIcon /></IconButton>
-                    <IconButton size="small" className="action-btn"><MoreVertIcon /></IconButton>
-                    <IconButton size="small" className="action-btn"><ExpandLessIcon /></IconButton>
+                    <IconButton
+                        size="small"
+                        className="action-btn"
+                        onClick={() => setOpenEmail(true)}
+                    >
+                        <EmailIcon />
+                    </IconButton>
+                    <IconButton size="small" className="action-btn whatsapp" onClick={() => setOpenWhatsapp(true)}>
+                        <WhatsAppIcon sx={{ color: colors.primary }} />
+                    </IconButton>
+                    <IconButton
+                        size="small"
+                        className="action-btn"
+                        onClick={handleMenuClick}
+                    >
+                        <MoreVertIcon />
+                    </IconButton>
+                    <IconButton
+                        size="small"
+                        className="action-btn"
+                        onClick={() => setIsExpanded(!isExpanded)}
+                    >
+                        {isExpanded ? <ExpandLessIcon /> : <ChevronRightIcon />}
+                    </IconButton>
                 </div>
 
                 {/* UNTOUCHED BADGE */}
@@ -267,110 +332,188 @@ const LeadCard = ({ lead }) => {
                 )}
 
             </div>
-
-            {/* TABS */}
-            <div className="tabs">
-                <Tabs value={tab} onChange={(e, v) => setTab(v)}>
-                    <Tab label="Personal Details" />
-                    <Tab label="Source Details" />
-                    <Tab label="Followup Details" />
-                </Tabs>
-            </div>
-
-            {/* CONTENT */}
-            {tab === 0 && (
-                <div className="content-wrapper">
-                    <div className="content">
-
-                        <div className="grid">
-                            <Field label="PROGRAM" value={lead.personal.program} />
-                            <Field label="COUNTRY" value={lead.personal.country} />
-                            <Field label="STATE" value={lead.personal.state} />
-                            <Field label="DISTRICT" value={lead.personal.district} />
-
-                            <Field label="CITY" value={lead.personal.city} />
-                            <Field label="LEAD ADDED ON" value={lead.personal.leadAddedOn} />
-                            <Field label="LAST UPDATED ON" value={lead.personal.lastUpdatedOn} />
-                            <Field label="PREVIOUS LEAD OWNER" value={lead.personal.previousLeadOwner} />
-
-                            <Field label="CURRENT LEAD OWNER" value={lead.personal.currentLeadOwner} />
-                            <Field label="LEAD AGE" value={lead.personal.leadAge} />
-                        </div>
-
+            {isExpanded && (
+                <>
+                    {/* TABS */}
+                    <div className="tabs">
+                        <Tabs value={tab} onChange={(e, v) => setTab(v)}>
+                            <Tab label="Personal Details" />
+                            <Tab label="Source Details" />
+                            <Tab label="Followup Details" />
+                        </Tabs>
                     </div>
 
-                    <div className="content-chevron">
-                        <ChevronRightIcon />
-                    </div>
-                </div>
-            )}
+                    {/* CONTENT */}
+                    {tab === 0 && (
+                        <div className="content-wrapper">
+                            <div className="content">
 
-            {tab === 1 && (
-                <div className="content-wrapper">
-                    <div className="content">
-                        <div className="source-table">
-                            <div className="table-header">
-                                <div className="table-cell">CHANNEL</div>
-                                <div className="table-cell">SOURCE</div>
-                                <div className="table-cell">CAMPAIGN</div>
-                                <div className="table-cell">MEDIUM</div>
-                            </div>
-                            {lead.source.map((item, index) => (
-                                <div key={index} className="table-row">
-                                    <div className="table-cell">{item.channel}</div>
-                                    <div className="table-cell">{item.source}</div>
-                                    <div className="table-cell">{item.campaign}</div>
-                                    <div className="table-cell">{item.medium || "-"}</div>
+                                <div className="grid">
+                                    <Field label="PROGRAM" value={lead.personal.program} />
+                                    <Field label="COUNTRY" value={lead.personal.country} />
+                                    <Field label="STATE" value={lead.personal.state} />
+                                    <Field label="DISTRICT" value={lead.personal.district} />
+
+                                    <Field label="CITY" value={lead.personal.city} />
+                                    <Field label="LEAD ADDED ON" value={lead.personal.leadAddedOn} />
+                                    <Field label="LAST UPDATED ON" value={lead.personal.lastUpdatedOn} />
+                                    <Field label="PREVIOUS LEAD OWNER" value={lead.personal.previousLeadOwner} />
+
+                                    <Field label="CURRENT LEAD OWNER" value={lead.personal.currentLeadOwner} />
+                                    <Field label="LEAD AGE" value={lead.personal.leadAge} />
                                 </div>
-                            ))}
-                        </div>
-                    </div>
 
-                    <div className="content-chevron">
-                        <ChevronRightIcon />
-                    </div>
-                </div>
-            )}
-
-            {tab === 2 && (
-                <div className="content-wrapper">
-                    <div className="content">
-                        <div className="followup-container">
-                            <div className="followup-section">
-                                <div className="followup-label">FOLLOWUP SCHEDULED ON</div>
-                                <div className="followup-value">{lead.followup.scheduledOn}</div>
                             </div>
-                            <div className="followup-section">
-                                <div className="followup-label">FOLLOWUP REMARKS</div>
-                                <div className="followup-value followup-remarks">{lead.followup.remarks}</div>
+
+                            <div className="content-chevron">
+                                <ChevronRightIcon />
                             </div>
                         </div>
-                    </div>
+                    )}
 
-                    <div className="content-chevron">
-                        <ChevronRightIcon />
-                    </div>
-                </div>
+                    {tab === 1 && (
+                        <div className="content-wrapper">
+                            <div className="content">
+                                <div className="source-table">
+                                    <div className="table-header">
+                                        <div className="table-cell">CHANNEL</div>
+                                        <div className="table-cell">SOURCE</div>
+                                        <div className="table-cell">CAMPAIGN</div>
+                                        <div className="table-cell">MEDIUM</div>
+                                    </div>
+                                    {lead.source.map((item, index) => (
+                                        <div key={index} className="table-row">
+                                            <div className="table-cell">{item.channel}</div>
+                                            <div className="table-cell">{item.source}</div>
+                                            <div className="table-cell">{item.campaign}</div>
+                                            <div className="table-cell">{item.medium || "-"}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="content-chevron">
+                                <ChevronRightIcon />
+                            </div>
+                        </div>
+                    )}
+
+                    {tab === 2 && (
+                        <div className="content-wrapper">
+                            <div className="content">
+                                <div className="followup-container">
+                                    <div className="followup-section">
+                                        <div className="followup-label">FOLLOWUP SCHEDULED ON</div>
+                                        <div className="followup-value">{lead.followup.scheduledOn}</div>
+                                    </div>
+                                    <div className="followup-section">
+                                        <div className="followup-label">FOLLOWUP REMARKS</div>
+                                        <div className="followup-value followup-remarks">{lead.followup.remarks}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="content-chevron">
+                                <ChevronRightIcon />
+                            </div>
+                        </div>
+                    )}
+                </>
+
+
             )}
+            <WhatsappModal
+                open={openWhatsapp}
+                onClose={() => setOpenWhatsapp(false)}
+            />
+
+            <EmailDrawer
+                open={openEmail}
+                onClose={() => setOpenEmail(false)}
+                lead={lead}
+            />
+
+            <CallModal
+                open={openCall}
+                onClose={() => setOpenCall(false)}
+                lead={lead}
+            />
+
+            <VideoCallModal
+                open={openVideo}
+                onClose={() => setOpenVideo(false)}
+                lead={lead}
+            />
+
+            <ViewTimelineModal
+                open={openTimeline}
+                onClose={() => setOpenTimeline(false)}
+                lead={lead}
+            />
+
+            <AddNewLead
+                open={openEditLead}
+                onClose={() => setOpenEditLead(false)}
+                leadData={lead}
+            />
+
+            <ReferLeadsDrawer
+                open={openReferLeads}
+                onClose={() => setOpenReferLeads(false)}
+                lead={lead}
+            />
+
+            <AddFollowUpDrawer
+                open={openFollowUp}
+                onClose={() => setOpenFollowUp(false)}
+                lead={lead}
+            />
+
+            <AddNoteDrawer
+                open={openAddNote}
+                onClose={() => setOpenAddNote(false)}
+                lead={lead}
+            />
+
+            <Menu
+                anchorEl={anchorEl}
+                open={openMenu}
+                onClose={handleMenuClose}
+                anchorOrigin={{
+                    vertical: "bottom",
+                    horizontal: "right",
+                }}
+                transformOrigin={{
+                    vertical: "top",
+                    horizontal: "right",
+                }}
+            >
+                <MenuItem onClick={() => { handleMenuClose(); setOpenEditLead(true); }}>Edit Lead</MenuItem>
+                <MenuItem onClick={() => { handleMenuClose(); setOpenReferLeads(true); }}>Refer Leads</MenuItem>
+                <MenuItem onClick={() => { handleMenuClose(); setOpenFollowUp(true); }}>Add Follow Up</MenuItem>
+                <MenuItem onClick={() => { handleMenuClose(); setOpenAddNote(true); }}>Add Note</MenuItem>
+            </Menu>
         </div>
+
     );
 };
 
 const Field = ({ label, value }) => (
-  <div className="field">
-    <span className="field-label">{label}</span>
-    <span className="field-value">{value || "-"}</span>
-  </div>
+    <div className="field">
+        <span className="field-label">{label}</span>
+        <span className="field-value">{value || "-"}</span>
+    </div>
 );
 
 const LeadCardContainer = () => {
-  return (
-    <div className="lead-cards-container">
-      {LEadCardDataArray.map((lead) => (
-        <LeadCard key={lead.id} lead={lead} />
-      ))}
-    </div>
-  );
+    return (
+        <div className="lead-cards-container">
+            {LEadCardDataArray.map((lead) => (
+                <LeadCard key={lead.id} lead={lead} />
+            ))}
+        </div>
+    );
 };
 
+export { LeadCard, LEadCardDataArray };
 export default LeadCardContainer;

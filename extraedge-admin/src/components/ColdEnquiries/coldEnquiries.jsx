@@ -12,6 +12,7 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
 import OpenInFullIcon from "@mui/icons-material/OpenInFull";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import { colors } from "../../theme/colors";
 
 const data = [
   { name: "Not Interested, got job", value: 4 }
@@ -23,10 +24,10 @@ export default function PerfectDonutLayout() {
   return (
     <Box
       sx={{
-        border: "1px solid #e0e0e0",
+        border: `1px solid ${colors.borderGrey}`,
         borderRadius: 1,
         p: 2,
-        bgcolor: "#fff",
+        bgcolor: colors.white,
       }}
     >
       {/* Header Row */}
@@ -42,17 +43,17 @@ export default function PerfectDonutLayout() {
           <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
             Top Reasons for Cold Enquiries - (Lead List) [MD-123]
           </Typography>
-          <InfoOutlinedIcon sx={{ fontSize: 16, color: "#999" }} />
+          <InfoOutlinedIcon sx={{ fontSize: 16, color: colors.midGrey }} />
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <RefreshIcon sx={{ fontSize: 18, color: "#ef6c00", cursor: "pointer" }} />
-          <Typography sx={{ color: "#888", fontSize: 12 }}>
+          <RefreshIcon sx={{ fontSize: 18, color: colors.primary, cursor: "pointer" }} />
+          <Typography sx={{ color: colors.primary, fontSize: 12 }}>
             Last synced: 07:32 PM
           </Typography>
-          <IconButton size="small">
+          <IconButton size="small" sx={{ color: colors.primary }}>
             <DownloadIcon sx={{ fontSize: 18 }} />
           </IconButton>
-          <IconButton size="small">
+          <IconButton size="small" sx={{ color: colors.primary }}>
             <OpenInFullIcon sx={{ fontSize: 16 }} />
           </IconButton>
         </Box>
@@ -98,7 +99,7 @@ export default function PerfectDonutLayout() {
                   endAngle={-270}
                 >
                   {data.map((_entry, index) => (
-                    <Cell key={index} fill="#ED7D31" />
+                    <Cell key={index} fill={colors.primary} />
                   ))}
                 </Pie>
               </PieChart>
@@ -130,7 +131,7 @@ export default function PerfectDonutLayout() {
                 sx={{
                   width: 12,
                   height: 12,
-                  bgcolor: "#ED7D31",
+                  bgcolor: colors.primary,
                   flexShrink: 0,
                 }}
               />

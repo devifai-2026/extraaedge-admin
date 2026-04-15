@@ -11,6 +11,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import { colors } from '../../theme/colors';
 import {
   addDays,
   subDays,
@@ -27,7 +28,7 @@ import {
   endOfMonth,
 } from 'date-fns';
 
-const DateRangePicker = ({ onApply, primaryColor = '#1976d2' }) => {
+const DateRangePicker = ({ onApply, primaryColor = colors.primary }) => {
   const today = startOfToday();
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
@@ -161,10 +162,10 @@ const DateRangePicker = ({ onApply, primaryColor = '#1976d2' }) => {
                     backgroundColor: isEdge
                       ? primaryColor
                       : isSelected
-                      ? '#e3f2fd'
+                      ? colors.primaryLight
                       : 'transparent',
-                    color: isEdge ? 'white' : isCurrentMonth ? 'inherit' : '#ccc',
-                    '&:hover': { backgroundColor: '#f0f0f0' },
+                    color: isEdge ? colors.white : isCurrentMonth ? 'inherit' : colors.scrollGrey,
+                    '&:hover': { backgroundColor: colors.hoverGrey },
                   }}
                 >
                   {format(day, 'd')}
@@ -215,12 +216,13 @@ const DateRangePicker = ({ onApply, primaryColor = '#1976d2' }) => {
         variant="contained"
         onClick={() => setIsOpen(true)}
         style={{height: "54px"}}
+        className="dashboard-button-date-picker"
       >
         Select Date Range
       </Button>
 
       <Dialog open={isOpen} onClose={() => setIsOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Select Date Range</DialogTitle>
+        <DialogTitle className='dialogtitle-Datepicker'>Select Date Range</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           {calendarContent}
         </DialogContent>

@@ -14,10 +14,17 @@
 .layout-content {
   flex: 1;
   margin-left: 280px;
-  padding: 30px;
-  background-color: #f9f9f9;
+  padding-top: 30px;
+  padding-left: 30px;
+  padding-right: 10px;
+  background-color: var(--bg-light);
   overflow-y: auto;
   height: calc(100vh - 70px);
+}
+
+/* Collapsed sidebar layout */
+.layout-content.sidebar-collapsed {
+  margin-left: 56px;
 }
 
 /* Responsive design */
@@ -42,10 +49,10 @@
 }
 
 .layout-content::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--scroll-grey);
   border-radius: 4px;
 }
 
 .layout-content::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background: var(--mid-grey);
 }
