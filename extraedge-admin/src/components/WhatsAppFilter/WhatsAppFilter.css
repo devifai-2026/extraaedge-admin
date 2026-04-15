@@ -1,0 +1,84 @@
+.filter-modal {
+  width: 360px;
+  padding: 0 !important;
+}
+
+/* Header */
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #e9ddd3;
+  padding: 10px 16px;
+  font-weight: 500;
+}
+
+.filter-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Section */
+.filter-section {
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.filter-label {
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+/* Chip */
+.filter-chip {
+  background: #e5e7eb;
+  padding: 6px 10px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip-close {
+  cursor: pointer;
+}
+
+/* Radio */
+.radio-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* Session */
+.session-grid {
+  display: flex;
+  gap: 12px;
+}
+
+.input-label {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.time-input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  background: #f3f4f6;
+}
+
+/* Footer */
+.filter-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.apply-btn {
+  background-color: #f97316 !important;
+  color: white !important;
+}
