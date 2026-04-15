@@ -17,6 +17,9 @@ import "./WhatAppsList.css";
 import { colors } from "../../theme/colors";
 import AddNewLead from "../../components/AddNewLead/AddNewLead";
 import WhatsAppFilterModel from "../../components/WhatsAppFilter/WhatsAppFilter";
+import WhatsAppUsageModal from "../../components/WhatsAppUsageModal/WhatsAppUsageModal";
+import EmailDrawer from "../../components/EmailDrawer/EmailDrawer";
+import WhatsAppSendModal from "../../components/WhatsAppSendModal/WhatsAppSendModal";
 
 const whatsAppLeads = [
   {
@@ -111,6 +114,33 @@ const whatsAppLeads = [
   },
 ];
 
+const waUsageData = [
+  {
+    label: "Monthly Business Initiated Messages",
+    used: 0,
+    available: 3000,
+    total: 3000,
+  },
+  {
+    label: "Daily Business Initiated Messages",
+    used: 0,
+    available: 100,
+    total: 100,
+  },
+  {
+    label: "Monthly Session Messages",
+    used: 0,
+    available: 6000,
+    total: 6000,
+  },
+  {
+    label: "Daily Session Messages",
+    used: 0,
+    available: 200,
+    total: 200,
+  },
+];
+
 const getStageColor = (stage) => {
   if (stage.includes("Junk")) return colors.darkGrey;
   if (stage.includes("Cold")) return colors.darkGrey;
@@ -120,6 +150,8 @@ const getStageColor = (stage) => {
 
 const WhatsAppCard = ({ lead, onOpenLead }) => {
   const [expanded, setExpanded] = useState(false);
+  const [openEmail, setOpenEmail] = useState(false);
+  const [openWA, setOpenWA] = useState(false);
 
   return (
     <div className="wa-card">
@@ -155,11 +187,19 @@ const WhatsAppCard = ({ lead, onOpenLead }) => {
           <IconButton size="small" className="wa-icon-btn">
             <CallIcon />
           </IconButton>
-          <IconButton size="small" className="wa-icon-btn">
+          <IconButton
+            size="small"
+            className="wa-icon-btn"
+            onClick={() => setOpenEmail(true)}
+          >
             <MailOutlineIcon />
           </IconButton>
-          <IconButton size="small" className="wa-icon-btn">
-            <PhoneIcon />
+          <IconButton
+            size="small"
+            className="wa-icon-btn"
+            onClick={() => setOpenWA(true)}
+          >
+            <WhatsAppIcon />
           </IconButton>
         </div>
 
@@ -170,6 +210,33 @@ const WhatsAppCard = ({ lead, onOpenLead }) => {
         >
           {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
         </IconButton>
+
+        <EmailDrawer
+          open={openEmail}
+          onClose={() => setOpenEmail(false)}
+          lead={lead}
+        />
+
+        <WhatsAppSendModal
+          open={openWA}
+          onClose={() => setOpenWA(false)}
+          data={{
+            lead: lead,              // 👈 current card lead
+            usage: waUsageData,      // 👈 your existing data
+            templates: [
+              {
+                id: 1,
+                name: "Welcome Template",
+                message: `Hi ${lead.name}, welcome to our service!`
+              },
+              {
+                id: 2,
+                name: "Follow-up Template",
+                message: `Hi ${lead.name}, just following up with you.`
+              }
+            ]
+          }}
+        />
       </div>
 
       {expanded && (
@@ -247,6 +314,7 @@ const WhatsAppList = () => {
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
+  const [waModalOpen, setWaModalOpen] = useState(false);
 
   const handleFilterClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -268,6 +336,10 @@ const WhatsAppList = () => {
     setSelectedLead(null);
   };
 
+  const handleRefresh = () => {
+    window.location.reload();
+  };
+
   return (
     <div className="wa-container">
       <div className="wa-header">
@@ -280,11 +352,15 @@ const WhatsAppList = () => {
           >
             <FilterAltIcon />
           </IconButton>
-          <IconButton size="small" className="wa-header-icon wa-badge-icon">
+          <IconButton
+            size="small"
+            className="wa-header-icon wa-badge-icon"
+            onClick={() => setWaModalOpen(true)}
+          >
             <WhatsAppIcon />
             <span className="wa-notification-badge">3</span>
           </IconButton>
-          <IconButton size="small" className="wa-header-icon">
+          <IconButton size="small" className="wa-header-icon" onClick={handleRefresh}>
             <RefreshIcon />
           </IconButton>
         </div>
@@ -329,6 +405,12 @@ const WhatsAppList = () => {
         anchorEl={anchorEl}
         open={open}
         onClose={handleCloseFilter}
+      />
+
+      <WhatsAppUsageModal
+        open={waModalOpen}
+        onClose={() => setWaModalOpen(false)}
+        data={waUsageData}
       />
     </div>
   );
