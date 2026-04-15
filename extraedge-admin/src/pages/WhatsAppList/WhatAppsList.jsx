@@ -15,6 +15,7 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import "./WhatAppsList.css";
 import { colors } from "../../theme/colors";
+import AddNewLead from "../../components/AddNewLead/AddNewLead";
 
 const whatsAppLeads = [
   {
@@ -116,7 +117,7 @@ const getStageColor = (stage) => {
   return colors.darkGrey;
 };
 
-const WhatsAppCard = ({ lead }) => {
+const WhatsAppCard = ({ lead, onOpenLead }) => {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -138,7 +139,7 @@ const WhatsAppCard = ({ lead }) => {
         </div>
 
         <div className="wa-card-actions">
-          <span className="wa-action-link">
+          <span className="wa-action-link" onClick={() => onOpenLead(lead)} style={{ cursor: "pointer" }}>
             <OpenInNewIcon className="wa-action-icon" />
             Open Lead
           </span>
@@ -242,6 +243,18 @@ const WhatsAppCard = ({ lead }) => {
 
 const WhatsAppList = () => {
   const [page, setPage] = useState(1);
+  const [editLeadOpen, setEditLeadOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState(null);
+
+  const handleOpenLead = (lead) => {
+    setSelectedLead(lead);
+    setEditLeadOpen(true);
+  };
+
+  const handleEditLeadClose = () => {
+    setEditLeadOpen(false);
+    setSelectedLead(null);
+  };
 
   return (
     <div className="wa-container">
@@ -263,7 +276,7 @@ const WhatsAppList = () => {
 
       <div className="wa-cards-list">
         {whatsAppLeads.map((lead) => (
-          <WhatsAppCard key={lead.id} lead={lead} />
+          <WhatsAppCard key={lead.id} lead={lead} onOpenLead={handleOpenLead} />
         ))}
       </div>
 
@@ -289,6 +302,12 @@ const WhatsAppList = () => {
           }}
         />
       </div>
+
+      <AddNewLead
+        open={editLeadOpen}
+        onClose={handleEditLeadClose}
+        leadData={selectedLead}
+      />
     </div>
   );
 };
