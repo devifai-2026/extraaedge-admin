@@ -126,23 +126,25 @@ const AddNewLead = ({ open, onClose, leadData }) => {
 
     React.useEffect(() => {
         if (open && leadData) {
+            const sourceData = Array.isArray(leadData.source) ? leadData.source[0] : null;
             setFormData({
                 ...initialFormData,
                 applicantName: leadData.name || "",
                 whatsappNumber: leadData.phone || "",
-                stage: leadData.stage || "01-New",
-                subStage: leadData.subStageFull || leadData.subStage || "Not Called",
-                source: leadData.source || "",
-                program: leadData.program || "",
+                stage: leadData.status || leadData.stage || "01-New",
+                subStage: leadData.subStatus || leadData.subStage || "Not Called",
+                program: leadData.personal?.program || leadData.program || "",
+                country: leadData.personal?.country || leadData.country || "India",
+                state: leadData.personal?.state || leadData.state || "",
+                district: leadData.personal?.district || leadData.district || "",
+                city: leadData.personal?.city || leadData.city || "",
+                channel: sourceData?.channel || leadData.channel || "",
+                source: sourceData?.source || leadData.source || "",
+                campaign: sourceData?.campaign || leadData.campaign || "",
+                medium: sourceData?.medium || leadData.medium || "",
                 closureRemarks: leadData.closureRemarks || "",
                 remarks: leadData.remarks || "",
-                channel: leadData.channel || "",
-                campaign: leadData.campaign || "",
-                medium: leadData.medium || "",
                 gender: leadData.gender || "",
-                country: leadData.country || "India",
-                state: leadData.state || "",
-                city: leadData.city || "",
                 emailId: leadData.emailId || "",
             });
             setActiveTab(0);

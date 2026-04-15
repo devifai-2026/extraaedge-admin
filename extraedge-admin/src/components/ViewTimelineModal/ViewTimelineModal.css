@@ -25,9 +25,49 @@
   overflow-y: auto;
 }
 
+/* Date Filter */
+.timeline-date-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.date-range-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+}
+
+.date-range-icon {
+  font-size: 16px !important;
+  color: #999;
+}
+
+.reload-btn {
+  color: #e67e22 !important;
+}
+
+.show-inactive-link {
+  color: #e67e22;
+  font-size: 13px;
+  cursor: pointer;
+  margin-bottom: 16px;
+  text-align: right;
+}
+
 .timeline-date {
   font-weight: 600;
   margin-bottom: 16px;
+  border-bottom: 2px solid #e67e22;
+  display: inline-block;
+  padding-bottom: 4px;
 }
 
 .timeline-items {
@@ -88,6 +128,85 @@
   width: 65%;
   padding: 16px;
   overflow-y: auto;
+}
+
+/* Filter Chips Bar */
+.filter-chips-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.filter-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-chip {
+  border: 1px solid #e67e22 !important;
+  color: #e67e22 !important;
+  background: #fff !important;
+  font-size: 12px !important;
+}
+
+.filter-chip .MuiChip-deleteIcon {
+  color: #e67e22 !important;
+  font-size: 16px !important;
+}
+
+/* Activity Filter + Sort Bar */
+.activity-filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.activity-filter-dropdown {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.activity-filter-arrow {
+  font-size: 18px !important;
+  color: #666;
+}
+
+.sort-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: #e67e22;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.sort-text {
+  color: #e67e22;
+}
+
+.sort-icons {
+  display: flex;
+  flex-direction: column;
+}
+
+.sort-icon {
+  font-size: 14px !important;
+  color: #ccc;
+  margin: -4px 0;
+}
+
+.sort-icon.active {
+  color: #e67e22;
 }
 
 /* Date Group Header */
