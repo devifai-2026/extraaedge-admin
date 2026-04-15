@@ -8,7 +8,6 @@ import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import CallIcon from "@mui/icons-material/Call";
 import MailOutlineIcon from "@mui/icons-material/MailOutlined";
-import PhoneIcon from "@mui/icons-material/Phone";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -20,6 +19,7 @@ import WhatsAppFilterModel from "../../components/WhatsAppFilter/WhatsAppFilter"
 import WhatsAppUsageModal from "../../components/WhatsAppUsageModal/WhatsAppUsageModal";
 import EmailDrawer from "../../components/EmailDrawer/EmailDrawer";
 import WhatsAppSendModal from "../../components/WhatsAppSendModal/WhatsAppSendModal";
+import ViewTimelineModal from "../../components/ViewTimelineModal/ViewTimelineModal";
 
 const whatsAppLeads = [
   {
@@ -148,7 +148,7 @@ const getStageColor = (stage) => {
   return colors.darkGrey;
 };
 
-const WhatsAppCard = ({ lead, onOpenLead }) => {
+const WhatsAppCard = ({ lead, onOpenLead, onOpenTimeline }) => {
   const [expanded, setExpanded] = useState(false);
   const [openEmail, setOpenEmail] = useState(false);
   const [openWA, setOpenWA] = useState(false);
@@ -172,12 +172,23 @@ const WhatsAppCard = ({ lead, onOpenLead }) => {
         </div>
 
         <div className="wa-card-actions">
-          <span className="wa-action-link" onClick={() => onOpenLead(lead)} style={{ cursor: "pointer" }}>
+          <span
+            className="wa-action-link"
+            onClick={() => onOpenLead(lead)}
+            style={{ cursor: "pointer" }}
+          >
             <OpenInNewIcon className="wa-action-icon" />
             Open Lead
           </span>
+
           <span className="wa-action-divider">|</span>
-          <span className="wa-action-link">
+
+          {/* ✅ FIXED CLICK */}
+          <span
+            className="wa-action-link"
+            onClick={() => onOpenTimeline(lead)}
+            style={{ cursor: "pointer" }}
+          >
             <VisibilityIcon className="wa-action-icon" />
             View All Timeline
           </span>
@@ -187,6 +198,7 @@ const WhatsAppCard = ({ lead, onOpenLead }) => {
           <IconButton size="small" className="wa-icon-btn">
             <CallIcon />
           </IconButton>
+
           <IconButton
             size="small"
             className="wa-icon-btn"
@@ -194,6 +206,7 @@ const WhatsAppCard = ({ lead, onOpenLead }) => {
           >
             <MailOutlineIcon />
           </IconButton>
+
           <IconButton
             size="small"
             className="wa-icon-btn"
@@ -221,8 +234,8 @@ const WhatsAppCard = ({ lead, onOpenLead }) => {
           open={openWA}
           onClose={() => setOpenWA(false)}
           data={{
-            lead: lead,              // 👈 current card lead
-            usage: waUsageData,      // 👈 your existing data
+            lead,
+            usage: waUsageData,
             templates: [
               {
                 id: 1,
@@ -309,12 +322,17 @@ const WhatsAppCard = ({ lead, onOpenLead }) => {
   );
 };
 
+
 const WhatsAppList = () => {
   const [page, setPage] = useState(1);
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [waModalOpen, setWaModalOpen] = useState(false);
+
+
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [timelineLead, setTimelineLead] = useState(null);
 
   const handleFilterClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -331,13 +349,14 @@ const WhatsAppList = () => {
     setEditLeadOpen(true);
   };
 
-  const handleEditLeadClose = () => {
-    setEditLeadOpen(false);
-    setSelectedLead(null);
-  };
-
   const handleRefresh = () => {
     window.location.reload();
+  };
+
+  // ✅ NEW HANDLER
+  const handleOpenTimeline = (lead) => {
+    setTimelineLead(lead);
+    setTimelineOpen(true);
   };
 
   return (
@@ -345,18 +364,18 @@ const WhatsAppList = () => {
       <div className="wa-header">
         <h2 className="wa-title">WhatsApp Chat</h2>
         <div className="wa-header-icons">
-          <IconButton
-            size="small"
-            className="wa-header-icon"
-            onClick={handleFilterClick}
+          <IconButton 
+          size="small" 
+          className="wa-header-icon"
+          onClick={handleFilterClick}
           >
             <FilterAltIcon />
           </IconButton>
           <IconButton
-            size="small"
-            className="wa-header-icon wa-badge-icon"
-            onClick={() => setWaModalOpen(true)}
-          >
+           size="small" 
+           className="wa-header-icon wa-badge-icon"
+           onClick={() => setWaModalOpen(true)}
+           >
             <WhatsAppIcon />
             <span className="wa-notification-badge">3</span>
           </IconButton>
@@ -368,7 +387,12 @@ const WhatsAppList = () => {
 
       <div className="wa-cards-list">
         {whatsAppLeads.map((lead) => (
-          <WhatsAppCard key={lead.id} lead={lead} onOpenLead={handleOpenLead} />
+          <WhatsAppCard
+            key={lead.id}
+            lead={lead}
+            onOpenLead={handleOpenLead}
+            onOpenTimeline={handleOpenTimeline}   // ✅ PASSING PROP
+          />
         ))}
       </div>
 
@@ -378,26 +402,13 @@ const WhatsAppList = () => {
           page={page}
           onChange={(e, value) => setPage(value)}
           shape="rounded"
-          siblingCount={3}
-          boundaryCount={1}
-          sx={{
-            "& .MuiPaginationItem-root": {
-              color: colors.textSecondary,
-              fontSize: "14px",
-              minWidth: "32px",
-              height: "32px",
-            },
-            "& .Mui-selected": {
-              backgroundColor: `${colors.primary} !important`,
-              color: `${colors.white} !important`,
-            },
-          }}
         />
       </div>
 
+      {/* Existing Modals */}
       <AddNewLead
         open={editLeadOpen}
-        onClose={handleEditLeadClose}
+        onClose={() => setEditLeadOpen(false)}
         leadData={selectedLead}
       />
 
@@ -411,6 +422,13 @@ const WhatsAppList = () => {
         open={waModalOpen}
         onClose={() => setWaModalOpen(false)}
         data={waUsageData}
+      />
+
+      {/* ✅ NEW TIMELINE MODAL */}
+      <ViewTimelineModal
+        open={timelineOpen}
+        onClose={() => setTimelineOpen(false)}
+        lead={timelineLead}
       />
     </div>
   );
