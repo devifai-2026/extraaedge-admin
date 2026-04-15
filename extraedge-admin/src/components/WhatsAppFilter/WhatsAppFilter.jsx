@@ -8,6 +8,8 @@ import {
   ClickAwayListener
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import FilterListIcon from "@mui/icons-material/FilterList";
+import CancelIcon from "@mui/icons-material/Cancel";
 import "./WhatsAppFilter.css";
 
 const WhatsAppFilterModel = ({ anchorEl, open, onClose }) => {
@@ -19,7 +21,7 @@ const WhatsAppFilterModel = ({ anchorEl, open, onClose }) => {
           {/* Header */}
           <div className="filter-header">
             <div className="filter-title">
-              <span className="filter-icon">⏳</span>
+              <FilterListIcon className="filter-icon" fontSize="small" />
               Filter
             </div>
             <IconButton size="small" onClick={onClose}>
@@ -32,7 +34,7 @@ const WhatsAppFilterModel = ({ anchorEl, open, onClose }) => {
             <div className="filter-label">Select Counselor</div>
             <div className="filter-chip">
               Divya Nair
-              <span className="chip-close">×</span>
+              <CancelIcon className="chip-close" fontSize="small" />
             </div>
           </div>
 
