@@ -30,6 +30,9 @@ import CallModal from "../CallModal/CallModal";
 import VideoCallModal from "../VideoCall/VideoCall";
 import ViewTimelineModal from "../ViewTimelineModal/ViewTimelineModal";
 import AddNewLead from "../AddNewLead/AddNewLead";
+import ReferLeadsDrawer from "../ReferLeadsDrawer/ReferLeadsDrawer";
+import AddFollowUpDrawer from "../AddFollowUpDrawer/AddFollowUpDrawer";
+import AddNoteDrawer from "../AddNoteDrawer/AddNoteDrawer";
 
 import "./LeadCard.css";
 
@@ -205,6 +208,9 @@ const LeadCard = ({ lead }) => {
     const [openVideo, setOpenVideo] = useState(false);
     const [openTimeline, setOpenTimeline] = useState(false);
     const [openEditLead, setOpenEditLead] = useState(false);
+    const [openReferLeads, setOpenReferLeads] = useState(false);
+    const [openFollowUp, setOpenFollowUp] = useState(false);
+    const [openAddNote, setOpenAddNote] = useState(false);
     const [anchorEl, setAnchorEl] = useState(null);
 
     const openMenu = Boolean(anchorEl);
@@ -451,6 +457,24 @@ const LeadCard = ({ lead }) => {
                 leadData={lead}
             />
 
+            <ReferLeadsDrawer
+                open={openReferLeads}
+                onClose={() => setOpenReferLeads(false)}
+                lead={lead}
+            />
+
+            <AddFollowUpDrawer
+                open={openFollowUp}
+                onClose={() => setOpenFollowUp(false)}
+                lead={lead}
+            />
+
+            <AddNoteDrawer
+                open={openAddNote}
+                onClose={() => setOpenAddNote(false)}
+                lead={lead}
+            />
+
             <Menu
                 anchorEl={anchorEl}
                 open={openMenu}
@@ -465,9 +489,9 @@ const LeadCard = ({ lead }) => {
                 }}
             >
                 <MenuItem onClick={() => { handleMenuClose(); setOpenEditLead(true); }}>Edit Lead</MenuItem>
-                <MenuItem onClick={handleMenuClose}>Refer Leads</MenuItem>
-                <MenuItem onClick={handleMenuClose}>Add Follow Up</MenuItem>
-                <MenuItem onClick={handleMenuClose}>Add Note</MenuItem>
+                <MenuItem onClick={() => { handleMenuClose(); setOpenReferLeads(true); }}>Refer Leads</MenuItem>
+                <MenuItem onClick={() => { handleMenuClose(); setOpenFollowUp(true); }}>Add Follow Up</MenuItem>
+                <MenuItem onClick={() => { handleMenuClose(); setOpenAddNote(true); }}>Add Note</MenuItem>
             </Menu>
         </div>
 
