@@ -11,16 +11,36 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { colors } from "../../theme/colors";
+import EditIcon from "@mui/icons-material/Edit";
 
 const VideoCallModal = ({ open, onClose, lead }) => {
     const [tab, setTab] = React.useState(0);
     const [sendEmail, setSendEmail] = React.useState(true);
     const [sendSMS, setSendSMS] = React.useState(false);
 
-    const smsText = `Hello ${lead?.name || ""}, Divya Nair from Speedup Infotech, Pune is inviting you for the video conferencing call kindly click on link to join https://videocall.extraedge.com/31495669%20-%20Counselling%20Room%20of%20Divya. Contact Divya Nair counsellor4@speedupinfotech.com 8669012416`;
+    // ✅ EDIT STATE
+    const [isEditing, setIsEditing] = React.useState(false);
+
+    const [emailContent, setEmailContent] = React.useState({
+        subject: "VIDEO CALL INVITE",
+        body: `Dear ${lead?.name || "User"},
+
+Thank you for showing interest in our institute.
+
+Divya Nair is inviting you for the video counselling call.
+Kindly click on below link to join the call.
+
+In case you are facing any trouble or having any admission-related queries,
+feel free to reach out between 09:00 AM to 6:00 PM (Mon–Sat).
+
+Regards,
+Team`
+    });
+
+    const smsText = `Hello ${lead?.name || ""}, Divya Nair from Speedup Infotech, Pune is inviting you for the video conferencing call kindly click on link to join https://videocall.extraedge.com/31495669`;
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(tab === 0 ? "Email Invite" : smsText);
+        navigator.clipboard.writeText(tab === 0 ? emailContent.body : smsText);
     };
 
     return (
@@ -32,7 +52,7 @@ const VideoCallModal = ({ open, onClose, lead }) => {
                     justifyContent: "space-between",
                     alignItems: "center",
                     backgroundColor: "var(--primary)",
-                    color: "var(--white)",
+                    color: "#fff",
                 }}
             >
                 Send Video Conferencing Invite
@@ -85,7 +105,7 @@ const VideoCallModal = ({ open, onClose, lead }) => {
                     <Tab label="SMS" />
                 </Tabs>
 
-                {/* EMAIL PREVIEW */}
+                {/* ================= EMAIL ================= */}
                 {tab === 0 && (
                     <div
                         style={{
@@ -94,9 +114,41 @@ const VideoCallModal = ({ open, onClose, lead }) => {
                             marginTop: "10px",
                             maxHeight: "400px",
                             overflowY: "auto",
-                            background: "#fafafa"
+                            background: "#fafafa",
+                            position: "relative"
                         }}
                     >
+                        {/* ✏️ EDIT BUTTON */}
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => setIsEditing(!isEditing)}
+                            style={{
+                                position: "absolute",
+                                top: "10px",
+                                right: "10px",
+                                textTransform: "none",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "5px",
+                                background: "var(--primary)",
+                                color:"var(--white)"
+                            }}
+                        >
+                            {isEditing ? (
+                                <>
+                                    <CloseIcon fontSize="small" sx={{ background:colors.primary }} />
+                                    Cancel
+                                </>
+                            ) : (
+                                <>
+                                    <EditIcon fontSize="small" sx={{ background:colors.primary }}/>
+                                    Edit
+                                </>
+                            )}
+                        </Button>
+
+                        {/* LOGO */}
                         <div style={{ textAlign: "center", marginBottom: "10px" }}>
                             <img
                                 src="https://via.placeholder.com/200x60?text=LOGO"
@@ -104,45 +156,69 @@ const VideoCallModal = ({ open, onClose, lead }) => {
                             />
                         </div>
 
+                        {/* SUBJECT */}
                         <div
                             style={{
                                 background: colors.primary,
-                                color: colors.white,
+                                color: "#fff",
                                 padding: "10px",
                                 textAlign: "center",
                                 fontWeight: 600
                             }}
                         >
-                            VIDEO CALL INVITE
+                            {isEditing ? (
+                                <input
+                                    value={emailContent.subject}
+                                    onChange={(e) =>
+                                        setEmailContent({ ...emailContent, subject: e.target.value })
+                                    }
+                                    style={{
+                                        width: "100%",
+                                        border: "none",
+                                        outline: "none",
+                                        textAlign: "center",
+                                        fontWeight: 600
+                                    }}
+                                />
+                            ) : (
+                                emailContent.subject
+                            )}
                         </div>
 
-                        <p style={{ paddingTop: "15px" }}>Dear {lead?.name || "User"},</p>
+                        {/* BODY */}
+                        {isEditing ? (
+                            <textarea
+                                value={emailContent.body}
+                                onChange={(e) =>
+                                    setEmailContent({ ...emailContent, body: e.target.value })
+                                }
+                                style={{
+                                    width: "100%",
+                                    height: "200px",
+                                    marginTop: "15px",
+                                    border: "1px solid #ddd",
+                                    padding: "10px",
+                                    fontSize: "14px"
+                                }}
+                            />
+                        ) : (
+                            <div style={{ marginTop: "15px", whiteSpace: "pre-line" }}>
+                                {emailContent.body}
+                            </div>
+                        )}
 
-                        <p style={{paddingBottom:"10px"}}>Thank you for showing interest in our institute.</p>
-
-                        <p style={{paddingBottom:"10px"}}>
-                            Divya Nair is inviting you for the video counselling call.
-                            Kindly click on below link to join the call.
-                        </p>
-
-                        <div style={{ textAlign: "center", margin: "20px 0" }}>
-                            <Button variant="contained" color="error">
-                                CLICK HERE TO JOIN CALL
-                            </Button>
-                        </div>
-
-                        <p style={{paddingBottom:"10px"}}>
-                            In case you are facing any trouble or having any admission-related queries,
-                            feel free to reach out between 09:00 AM to 6:00 PM (Mon–Sat).
-                        </p>
-
-                        <p>
-                            Regards,<br />Team
-                        </p>
+                        {/* CTA BUTTON */}
+                        {!isEditing && (
+                            <div style={{ textAlign: "center", margin: "20px 0" }}>
+                                <Button variant="contained" color="error">
+                                    CLICK HERE TO JOIN CALL
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 )}
 
-                {/* SMS PREVIEW */}
+                {/* ================= SMS ================= */}
                 {tab === 1 && (
                     <div
                         style={{
@@ -163,7 +239,6 @@ const VideoCallModal = ({ open, onClose, lead }) => {
                                 background: "transparent",
                                 fontSize: "14px",
                                 lineHeight: "1.5",
-                                color: "#333",
                             }}
                             defaultValue={smsText}
                         />
@@ -187,7 +262,7 @@ const VideoCallModal = ({ open, onClose, lead }) => {
                         variant="contained"
                         sx={{
                             backgroundColor: colors.primary,
-                            color: colors.white
+                            color: "#fff"
                         }}
                     >
                         Start Call

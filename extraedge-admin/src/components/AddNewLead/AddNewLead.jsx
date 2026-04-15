@@ -21,6 +21,7 @@ import "./AddNewLead.css";
 
 const programOptions = [
     "Data Analyst Training And Certification",
+    "Data Science Training And Certification",
     "Advanced Python Development",
     "Full Stack Web Development",
     "Data Science with ML",
@@ -40,6 +41,8 @@ const stageOptions = [
     "08-Interested",
     "09-Visited",
     "10-Enrolled",
+    "11-Junk",
+    "12-Cold",
 ];
 
 const subStageOptions = [
@@ -48,6 +51,9 @@ const subStageOptions = [
     "Will join soon",
     "Negotiation phase",
     "Needs demo",
+    "Not Eligible",
+    "Not Interested",
+    "Asked to call back",
 ];
 
 const channelOptions = ["Offline", "Online", "Direct", "Facebook", "Google Ads", "LinkedIn", "Email Campaign"];
@@ -90,6 +96,7 @@ const initialFormData = {
     gender: "",
     stage: "01-New",
     subStage: "Not Called",
+    closureRemarks: "",
     remarks: "",
     // Family & Address Details
     fatherFullName: "",
@@ -111,10 +118,39 @@ const initialFormData = {
     medium: "",
 };
 
-const AddNewLead = ({ open, onClose }) => {
+const AddNewLead = ({ open, onClose, leadData }) => {
+    const isEditMode = Boolean(leadData);
     const [activeTab, setActiveTab] = useState(0);
     const [mandatoryOnly, setMandatoryOnly] = useState(false);
     const [formData, setFormData] = useState(initialFormData);
+
+    React.useEffect(() => {
+        if (open && leadData) {
+            setFormData({
+                ...initialFormData,
+                applicantName: leadData.name || "",
+                whatsappNumber: leadData.phone || "",
+                stage: leadData.stage || "01-New",
+                subStage: leadData.subStageFull || leadData.subStage || "Not Called",
+                source: leadData.source || "",
+                program: leadData.program || "",
+                closureRemarks: leadData.closureRemarks || "",
+                remarks: leadData.remarks || "",
+                channel: leadData.channel || "",
+                campaign: leadData.campaign || "",
+                medium: leadData.medium || "",
+                gender: leadData.gender || "",
+                country: leadData.country || "India",
+                state: leadData.state || "",
+                city: leadData.city || "",
+                emailId: leadData.emailId || "",
+            });
+            setActiveTab(0);
+        } else if (open && !leadData) {
+            setFormData(initialFormData);
+            setActiveTab(0);
+        }
+    }, [open, leadData]);
 
     const handleChange = (field) => (e) => {
         setFormData((prev) => ({ ...prev, [field]: e.target.value }));
@@ -138,7 +174,7 @@ const AddNewLead = ({ open, onClose }) => {
             PaperProps={{ className: "add-lead-dialog" }}
         >
             <DialogTitle className="add-lead-title">
-                Add New Lead
+                {isEditMode ? `Edit Lead ${leadData.name}` : "Add New Lead"}
                 <IconButton onClick={handleCancel} className="add-lead-close-btn">
                     <CloseIcon />
                 </IconButton>
@@ -394,7 +430,18 @@ const AddNewLead = ({ open, onClose }) => {
                             </FormControl>
                         </div>
 
-                        <div className="add-lead-remarks">
+                        <div className="add-lead-form-grid">
+                            {isEditMode && (
+                                <TextField
+                                    label="Closure Remarks"
+                                    placeholder="Closure Remarks"
+                                    required
+                                    size="small"
+                                    value={formData.closureRemarks}
+                                    onChange={handleChange("closureRemarks")}
+                                    fullWidth
+                                />
+                            )}
                             <TextField
                                 label="Remarks"
                                 placeholder="Remarks"
@@ -650,7 +697,7 @@ const AddNewLead = ({ open, onClose }) => {
                     onClick={handleAdd}
                     className="add-lead-add-btn"
                 >
-                    Add
+                    {isEditMode ? "Update" : "Add"}
                 </Button>
             </DialogActions>
         </Dialog>
