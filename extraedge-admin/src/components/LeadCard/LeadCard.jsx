@@ -28,6 +28,8 @@ import WhatsappModal from "../WhatsApp/WhatsApp"
 import EmailDrawer from "../EmailDrawer/EmailDrawer";
 import CallModal from "../CallModal/CallModal";
 import VideoCallModal from "../VideoCall/VideoCall";
+import ViewTimelineModal from "../ViewTimelineModal/ViewTimelineModal";
+import AddNewLead from "../AddNewLead/AddNewLead";
 
 import "./LeadCard.css";
 
@@ -201,6 +203,8 @@ const LeadCard = ({ lead }) => {
     const [openEmail, setOpenEmail] = useState(false);
     const [openCall, setOpenCall] = useState(false);
     const [openVideo, setOpenVideo] = useState(false);
+    const [openTimeline, setOpenTimeline] = useState(false);
+    const [openEditLead, setOpenEditLead] = useState(false);
     const [anchorEl, setAnchorEl] = useState(null);
 
     const openMenu = Boolean(anchorEl);
@@ -246,8 +250,8 @@ const LeadCard = ({ lead }) => {
                     <div className="comm-stats">
                         <span className="stat-item"><CallIcon className="stat-icon" /> 0</span>
                         <span className="stat-item"><ChatIcon className="stat-icon" /> 0</span>
-                        <span className="stat-item"><EmailIcon className="stat-icon" /> 0</span>
-                        <span className="stat-item"><SmsIcon className="stat-icon" /> 27</span>
+                        <span className="stat-item" onClick={() => setOpenTimeline(true)} style={{ cursor: "pointer" }}><EmailIcon className="stat-icon" /> 0</span>
+                        <span className="stat-item" onClick={() => setOpenTimeline(true)} style={{ cursor: "pointer" }}><SmsIcon className="stat-icon" /> 27</span>
                     </div>
 
                     {/* DIVIDER */}
@@ -255,16 +259,16 @@ const LeadCard = ({ lead }) => {
 
                     {/* ACTIVITY ICONS */}
                     <div className="activity-icons">
-                        <Badge badgeContent={36} color="default" className="activity-badge">
+                        <Badge badgeContent={36} color="default" className="activity-badge" onClick={() => setOpenTimeline(true)} style={{ cursor: "pointer" }}>
                             <GroupIcon className="activity-icon" />
                         </Badge>
-                        <Badge badgeContent={0} color="error" overlap="circular" className="activity-badge">
+                        <Badge badgeContent={1} color="error" overlap="circular" className="activity-badge" onClick={() => setOpenTimeline(true)} style={{ cursor: "pointer" }}>
                             <PersonIcon className="activity-icon" />
                         </Badge>
-                        <Badge badgeContent={0} color="success" overlap="circular" className="activity-badge">
-                            <SwapHorizIcon className="activity-icon" />
+                        <Badge badgeContent={1} color="success" overlap="circular" className="activity-badge" onClick={() => setOpenTimeline(true)} style={{ cursor: "pointer" }}>
+                            <PersonIcon className="activity-icon" />
                         </Badge>
-                        <span className="view-all">View all</span>
+                        <span className="view-all" onClick={() => setOpenTimeline(true)} style={{ cursor: "pointer" }}>View all</span>
                     </div>
                 </div>
 
@@ -435,6 +439,18 @@ const LeadCard = ({ lead }) => {
                 lead={lead}
             />
 
+            <ViewTimelineModal
+                open={openTimeline}
+                onClose={() => setOpenTimeline(false)}
+                lead={lead}
+            />
+
+            <AddNewLead
+                open={openEditLead}
+                onClose={() => setOpenEditLead(false)}
+                leadData={lead}
+            />
+
             <Menu
                 anchorEl={anchorEl}
                 open={openMenu}
@@ -448,7 +464,7 @@ const LeadCard = ({ lead }) => {
                     horizontal: "right",
                 }}
             >
-                <MenuItem onClick={handleMenuClose}>Edit Lead</MenuItem>
+                <MenuItem onClick={() => { handleMenuClose(); setOpenEditLead(true); }}>Edit Lead</MenuItem>
                 <MenuItem onClick={handleMenuClose}>Refer Leads</MenuItem>
                 <MenuItem onClick={handleMenuClose}>Add Follow Up</MenuItem>
                 <MenuItem onClick={handleMenuClose}>Add Note</MenuItem>

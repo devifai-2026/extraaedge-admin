@@ -14,10 +14,27 @@ import PersonOutlineIcon from "@mui/icons-material/PersonOutlined";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import KeyboardArrowDownOutlinedIcon from "@mui/icons-material/KeyboardArrowDownOutlined";
 import "./ViewTimelineModal.css";
+
+const activityFilters = [
+  "Lead Activity",
+  "Counselor Activity",
+  "Lead History",
+  "Lead Status Journey",
+];
 
 const ViewTimelineModal = ({ open, onClose, lead }) => {
   const [dateExpanded, setDateExpanded] = useState(true);
+  const [activeFilters, setActiveFilters] = useState([...activityFilters]);
+  const [sortOrder, setSortOrder] = useState("newest");
+
+  const handleRemoveFilter = (filter) => {
+    setActiveFilters((prev) => prev.filter((f) => f !== filter));
+  };
 
   if (!lead) return null;
 
@@ -38,6 +55,18 @@ const ViewTimelineModal = ({ open, onClose, lead }) => {
 
           {/* LEFT SIDE */}
           <div className="timeline-left">
+            {/* Date Filter Bar */}
+            <div className="timeline-date-filter">
+              <div className="date-range-picker">
+                <span className="date-range-text">Mar 20, 2026 - Apr 15, 2026</span>
+                <CalendarTodayIcon className="date-range-icon" />
+              </div>
+              <IconButton size="small" className="reload-btn">
+                <RefreshIcon fontSize="small" />
+              </IconButton>
+            </div>
+            <div className="show-inactive-link">Show Inactive Dates</div>
+
             <div className="timeline-date">20 Mar 26</div>
 
             <div className="timeline-items">
@@ -99,6 +128,52 @@ const ViewTimelineModal = ({ open, onClose, lead }) => {
 
           {/* RIGHT SIDE */}
           <div className="timeline-right">
+
+            {/* Filter Chips Bar */}
+            <div className="filter-chips-bar">
+              <div className="filter-chips-list">
+                {activeFilters.map((filter) => (
+                  <Chip
+                    key={filter}
+                    label={filter}
+                    size="small"
+                    onDelete={() => handleRemoveFilter(filter)}
+                    className="filter-chip"
+                  />
+                ))}
+              </div>
+              <IconButton size="small">
+                <KeyboardArrowDownOutlinedIcon fontSize="small" />
+              </IconButton>
+            </div>
+
+            {/* Activity Filter + Sort */}
+            <div className="activity-filter-bar">
+              <div className="activity-filter-dropdown">
+                <span className="activity-filter-text">Activity Filter</span>
+                <KeyboardArrowDownOutlinedIcon className="activity-filter-arrow" />
+              </div>
+              <div
+                className="sort-toggle"
+                onClick={() =>
+                  setSortOrder((prev) =>
+                    prev === "newest" ? "oldest" : "newest"
+                  )
+                }
+              >
+                <span className="sort-text">
+                  {sortOrder === "newest" ? "Newest" : "Oldest"}
+                </span>
+                <div className="sort-icons">
+                  <ArrowDownwardIcon
+                    className={`sort-icon ${sortOrder === "newest" ? "active" : ""}`}
+                  />
+                  <ArrowUpwardIcon
+                    className={`sort-icon ${sortOrder === "oldest" ? "active" : ""}`}
+                  />
+                </div>
+              </div>
+            </div>
 
             {/* Date Group Header */}
             <div
