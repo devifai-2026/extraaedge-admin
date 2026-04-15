@@ -16,6 +16,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import "./WhatAppsList.css";
 import { colors } from "../../theme/colors";
 import AddNewLead from "../../components/AddNewLead/AddNewLead";
+import WhatsAppFilterModel from "../../components/WhatsAppFilter/WhatsAppFilter";
 
 const whatsAppLeads = [
   {
@@ -245,6 +246,17 @@ const WhatsAppList = () => {
   const [page, setPage] = useState(1);
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
+  const [anchorEl, setAnchorEl] = useState(null);
+
+  const handleFilterClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleCloseFilter = () => {
+    setAnchorEl(null);
+  };
+
+  const open = Boolean(anchorEl);
 
   const handleOpenLead = (lead) => {
     setSelectedLead(lead);
@@ -261,7 +273,11 @@ const WhatsAppList = () => {
       <div className="wa-header">
         <h2 className="wa-title">WhatsApp Chat</h2>
         <div className="wa-header-icons">
-          <IconButton size="small" className="wa-header-icon">
+          <IconButton
+            size="small"
+            className="wa-header-icon"
+            onClick={handleFilterClick}
+          >
             <FilterAltIcon />
           </IconButton>
           <IconButton size="small" className="wa-header-icon wa-badge-icon">
@@ -307,6 +323,12 @@ const WhatsAppList = () => {
         open={editLeadOpen}
         onClose={handleEditLeadClose}
         leadData={selectedLead}
+      />
+
+      <WhatsAppFilterModel
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleCloseFilter}
       />
     </div>
   );
