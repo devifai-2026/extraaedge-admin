@@ -1,5 +1,19 @@
 .dashboard-button {
   padding: 10px;
+  background-color: var(--primary) !important; /* colors.primary */
+  color: #ffffff !important; /* colors.white */
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dashboard-button-date-picker{
+  padding: 10px;
+  background-color: var(--primary) !important; /* colors.primary */
+  color: #ffffff !important; /* colors.white */
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
 .first-container {
@@ -13,15 +27,13 @@
   gap: 10px;
 }
 
-
-
 .card_analytics {
   width: 272px;
   height: 180px;
-  background-color: #2f4154;
+  background-color: var(--primary) !important;
   border-radius: 10px;
   padding: 16px;
-  color: #fff;
+  color: var(--white);
   font-family: sans-serif;
   margin: 10px;
 }
@@ -36,7 +48,7 @@
 .title_analytics {
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: var(--white);
 }
 
 .icon_analytics {
@@ -45,11 +57,9 @@
 }
 
 .badge_analytics {
-  
   display: flex;
   padding: 4px 8px;
   border-radius: 6px;
-  
   margin-bottom: 12px;
 }
 
@@ -71,7 +81,6 @@
    background-color: rgba(255, 255, 255, 0.3);
 }
 
-
 .label_analytics {
   opacity: 0.8;
 }
@@ -79,3 +88,15 @@
 .value_analytics {
   font-weight: 600;
 }
+
+.modal-header-dashboard{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+  background-color: var(--primary) !important;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+

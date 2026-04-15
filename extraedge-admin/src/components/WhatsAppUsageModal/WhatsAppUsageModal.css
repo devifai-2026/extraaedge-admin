@@ -1,0 +1,74 @@
+.wa-usage-modal {
+  padding: 0 !important;
+  width: 720px;
+  border-radius: 8px;
+}
+
+/* HEADER */
+.wa-usage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  font-weight: 600;
+  font-size: 18px;
+  background-color: var(--primary);
+  color: var(--white);
+}
+
+/* TABLE WRAPPER */
+.wa-usage-table {
+  padding: 16px;
+}
+
+/* TITLE */
+.wa-table-title {
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #444;
+}
+
+/* TABLE */
+.wa-usage-table table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #d6d6d6;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* HEADER ROW */
+.wa-usage-table thead th {
+  background: #e9ded5;
+  padding: 10px;
+  font-weight: 500;
+  font-size: 14px;
+  text-align: center;
+  border-bottom: 1px solid #d6d6d6;
+}
+
+/* FIRST HEADER CELL */
+.wa-usage-table thead th:first-child {
+  text-align: left;
+}
+
+/* BODY */
+.wa-usage-table tbody td {
+  padding: 12px 10px;
+  font-size: 14px;
+  border-bottom: 1px solid #e0e0e0;
+  text-align: center;
+}
+
+/* FIRST COLUMN */
+.wa-first-col {
+  text-align: left !important;
+  background: #efe3d9;
+  font-weight: 500;
+}
+
+/* REMOVE LAST BORDER */
+.wa-usage-table tbody tr:last-child td {
+  border-bottom: none;
+}
