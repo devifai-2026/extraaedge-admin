@@ -8,6 +8,7 @@ import {
   InputAdornment,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import { colors } from "../../theme/colors";
 
 import EmailTemplates from "../../components/EmailTemplates/EmailTemplates";
 import SMSTemplates from "../../components/SMSTemplates/SMSTemplates";
@@ -33,6 +34,11 @@ const Settings = () => {
                 key={i}
                 label={t}
                 className={tab === i ? "active-tab-settings" : "tab-settings"}
+                sx={
+                  tab === i
+                    ? { backgroundColor: colors.primary, color: colors.white }
+                    : { color: colors.darkGrey }
+                }
               />
             )
           )}
@@ -46,6 +52,7 @@ const Settings = () => {
             size="small"
             placeholder="Enter Template Name"
             className="search-box-settings"
+            sx={{ background: colors.white }}
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
