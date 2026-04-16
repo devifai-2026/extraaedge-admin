@@ -13,6 +13,8 @@ import WhatsAppList from './pages/WhatsAppList/WhatAppsList'
 import BulkMarketingCampaign from './pages/BulkMarketingCampaign/BulkMarketingCampaign'
 import DripMarketingCampaign from './pages/DripMarketingCampaign/DripMarketingCampaign'
 import Remarketing from './pages/Remarketing/Remarketing'
+import WorkflowAutomation from './pages/AutomationWorkflow/AutomationWorkflow'
+import ConnectedAccounts from './pages/ConnectedAccounts/ConnectedAccounts'
 
 function App() {
   return (
@@ -70,6 +72,16 @@ function App() {
         <Route
           path="/remarketing"
           element={<ProtectedRoute><Layout><Remarketing /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/automations"
+          element={<ProtectedRoute><Layout><WorkflowAutomation /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/connectedaccounts"
+          element={<ProtectedRoute><Layout><ConnectedAccounts /></Layout></ProtectedRoute>}
         />
 
         {/* Catch-all - redirect to dashboard for authenticated users, login otherwise */}
