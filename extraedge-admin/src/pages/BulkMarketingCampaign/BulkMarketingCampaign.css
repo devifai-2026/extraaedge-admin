@@ -256,3 +256,6 @@
   color: #fff;
   font-weight: 600;
 }
+.bulk-delivery-row--four {
+  grid-template-columns: repeat(4, 1fr);
+}

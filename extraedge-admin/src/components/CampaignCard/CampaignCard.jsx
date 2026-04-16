@@ -106,6 +106,46 @@ const BulkCampaignCard = ({ item }) => {
             ))}
           </div>
 
+          {/* User Response Status tab content */}
+          {activeTab === "response" && (
+            <div className="bulk-processing-section">
+              <p className="bulk-note">
+                <InfoOutlinedIcon sx={{ fontSize: 16, marginRight: "4px", verticalAlign: "middle" }} />
+                Note that the Email and WA responses need more time to process. The responses will continue to be updated as more students open, click email or see WA messages.
+              </p>
+
+              {/* Email response row */}
+              <div className="bulk-delivery-row bulk-delivery-row--four">
+                <div className="bulk-delivery-item">
+                  <span className="bulk-stat-label">EMAIL DELIVERED &amp; OPENED</span>
+                  <p className="bulk-stat-value">{item.stats?.emailDeliveredOpened ?? 0}</p>
+                </div>
+                <div className="bulk-delivery-item">
+                  <span className="bulk-stat-label">EMAIL DELIVERED &amp; CLICKED</span>
+                  <p className="bulk-stat-value">{item.stats?.emailDeliveredClicked ?? 0}</p>
+                </div>
+                <div className="bulk-delivery-item">
+                  <span className="bulk-stat-label">EMAIL DROPPED</span>
+                  <p className="bulk-stat-value">{item.stats?.emailDropped ?? 0}</p>
+                </div>
+                <div className="bulk-delivery-item">
+                  <span className="bulk-stat-label">EMAIL BOUNCED</span>
+                  <p className="bulk-stat-value">{item.stats?.emailBounced ?? 0}</p>
+                </div>
+              </div>
+
+              <div className="bulk-delivery-divider" />
+
+              {/* WhatsApp response row */}
+              <div className="bulk-delivery-row">
+                <div className="bulk-delivery-item">
+                  <span className="bulk-stat-label">WHATSAPP DELIVERED &amp; SEEN</span>
+                  <p className="bulk-stat-value">{item.stats?.waDeliveredSeen ?? 0}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Processing tab content */}
           {activeTab === "processing" && (
             <div className="bulk-processing-section">
