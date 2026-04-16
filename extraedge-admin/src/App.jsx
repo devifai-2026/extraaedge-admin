@@ -15,6 +15,7 @@ import DripMarketingCampaign from './pages/DripMarketingCampaign/DripMarketingCa
 import Remarketing from './pages/Remarketing/Remarketing'
 import WorkflowAutomation from './pages/AutomationWorkflow/AutomationWorkflow'
 import ConnectedAccounts from './pages/ConnectedAccounts/ConnectedAccounts'
+import Settings from './pages/Settings/Settings'
 
 function App() {
   return (
@@ -82,6 +83,11 @@ function App() {
         <Route
           path="/connectedaccounts"
           element={<ProtectedRoute><Layout><ConnectedAccounts /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/settings"
+          element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>}
         />
 
         {/* Catch-all - redirect to dashboard for authenticated users, login otherwise */}

@@ -1,0 +1,20 @@
+.table-container-sms-templates{
+    background: #fff;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.table-header-sms-templates{
+    background-color: var(--primary);
+}
+
+.fab-sms-templates{
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background-color: var(--primary);
+    color: var(--white);
+    padding: 14px;
+    border-radius: 50%;
+    cursor: pointer;
+}

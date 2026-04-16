@@ -1,0 +1,16 @@
+.assignment-container-rules{
+     background-color: var(--primary);
+  padding: 20px;
+}
+
+.top-actions-rules{
+    display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.empty-state-rules{
+    text-align: center;
+  margin-top: 80px;
+  color: #888;
+}
