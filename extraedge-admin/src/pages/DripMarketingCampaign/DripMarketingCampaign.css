@@ -10,13 +10,13 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-  border-bottom: 3px solid #f37021;
+  border-bottom: 3px solid var(--primary);
   margin-bottom: 24px;
 }
 
 .drip-tab-active {
-  background: #f37021;
-  color: #fff;
+  background: var(--primary);
+  color: var(--white);
   padding: 10px 18px;
   border-radius: 4px 4px 0 0;
   font-size: 14px;
@@ -27,8 +27,8 @@
 /* Filter Button */
 .filter-btn {
   text-transform: none !important;
-  border-color: #f37021 !important;
-  color: #f37021 !important;
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
 }
 
 /* Table */
@@ -64,6 +64,6 @@
   position: fixed !important;
   bottom: 30px;
   right: 30px;
-  background-color: #f37021 !important;
-  color: white !important;
+  background: var(--primary) !important;
+  color: var(--white) !important;
 }

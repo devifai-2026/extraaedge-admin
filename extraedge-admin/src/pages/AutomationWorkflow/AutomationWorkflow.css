@@ -1,0 +1,21 @@
+.automation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 16px;
+    border-bottom: 3px solid var(--primary);
+}
+
+.automation-tab-active {
+    background: var(--primary);
+    color: var(--white);
+    padding: 10px 18px;
+    border-radius: 4px 4px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.automation-header .filter-btn {
+    margin-bottom: 8px;
+}

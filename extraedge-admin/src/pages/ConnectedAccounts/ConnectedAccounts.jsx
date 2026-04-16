@@ -10,6 +10,7 @@ import {
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import { colors } from "../../theme/colors";
 
 const integrations = [
   {
@@ -47,7 +48,7 @@ const IntegrationPartners = () => {
       <Box sx={{ mb: 3 }}>
         <Typography
           variant="h6"
-          sx={{ color: "#f37021", fontWeight: 600 }}
+          sx={{ color: colors.primary, fontWeight: 600 }}
         >
           Our Integration Partners
         </Typography>
@@ -115,7 +116,7 @@ const IntegrationPartners = () => {
                 {item.description && (
                   <Typography
                     variant="body2"
-                    sx={{ mt: 2, color: "#555", px: 2 }}
+                    sx={{ mt: 2, color: colors.textGrey, px: 2 }}
                   >
                     {item.description}
                   </Typography>
@@ -127,12 +128,12 @@ const IntegrationPartners = () => {
                     variant="contained"
                     sx={{
                       mt: 2,
-                      backgroundColor: "#f37021",
+                      backgroundColor: colors.primary,
                       textTransform: "none",
                       borderRadius: "6px",
                       px: 3,
                       "&:hover": {
-                        backgroundColor: "#d95f14"
+                        backgroundColor: colors.primaryDark
                       }
                     }}
                   >

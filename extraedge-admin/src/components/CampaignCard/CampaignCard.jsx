@@ -6,6 +6,7 @@ import GroupIcon from "@mui/icons-material/Group";
 import StopCircleOutlinedIcon from "@mui/icons-material/StopCircleOutlined";
 import PersonAddAltIcon from "@mui/icons-material/PersonAddAlt";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import { colors } from "../../theme/colors";
 
 const BulkCampaignCard = ({ item }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -52,9 +53,9 @@ const BulkCampaignCard = ({ item }) => {
         <div className="bulk-col-actions">
           <p className="bulk-label">ACTIONS</p>
           <div className="bulk-row-actions">
-            <GroupIcon sx={{ color: "#f37021", fontSize: 22, cursor: "pointer" }} />
-            <StopCircleOutlinedIcon sx={{ color: "#f37021", fontSize: 22, cursor: "pointer" }} />
-            <PersonAddAltIcon sx={{ color: "#f37021", fontSize: 22, cursor: "pointer" }} />
+            <GroupIcon sx={{ color: colors.primary, fontSize: 22, cursor: "pointer" }} />
+            <StopCircleOutlinedIcon sx={{ color: colors.primary, fontSize: 22, cursor: "pointer" }} />
+            <PersonAddAltIcon sx={{ color: colors.primary, fontSize: 22, cursor: "pointer" }} />
             <IconButton size="small" onClick={() => setIsOpen((prev) => !prev)}>
               {isOpen ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
             </IconButton>

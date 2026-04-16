@@ -2,6 +2,7 @@ import React from "react";
 import { Fab } from "@mui/material";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
 import "./Remarketing.css";
+import { colors } from "../../theme/colors";
 
 const Remarketing = () => {
   return (
@@ -21,7 +22,7 @@ const Remarketing = () => {
 
       {/* Floating Button */}
       <Fab className="fb-fab">
-        <MyLocationIcon />
+        <MyLocationIcon sx={{ color: colors.white }}/>
       </Fab>
 
     </div>
