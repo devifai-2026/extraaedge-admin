@@ -1,6 +1,6 @@
 .tpi-container {
   padding: 20px 24px;
-  background-color: #f5f5f5;
+  background-color: var(--white);
   min-height: 100vh;
 }
 
@@ -13,7 +13,7 @@
 
 .tpi-divider {
   height: 2px;
-  background-color: #f37021;
+  background-color: var(--primary);
   margin-bottom: 20px;
 }
 
@@ -70,7 +70,7 @@
 
 .tpi-view-toggle {
   display: flex;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--white);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -82,19 +82,19 @@
   width: 36px;
   height: 36px;
   border: none;
-  background: #fff;
+  background: var(--white);
   cursor: pointer;
   color: #666;
   padding: 0;
 }
 
 .tpi-view-btn.active {
-  background: #f37021;
-  color: #fff;
+  background: var(--primary);
+  color: var(--white);
 }
 
 .tpi-view-btn:not(.active):hover {
-  background: #f5f5f5;
+  background: var(--white);
 }
 
 .tpi-refresh-btn {
@@ -102,17 +102,17 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--white);
   border-radius: 6px;
-  background: #fff;
-  color: #333;
+  background: var(--primary);
+  color: var(--white);
   font-size: 13px;
   cursor: pointer;
   font-weight: 500;
 }
 
 .tpi-refresh-btn:hover {
-  background: #f9f9f9;
+  background: var(--primary-dark);
 }
 
 .tpi-add-btn {
@@ -122,20 +122,20 @@
   padding: 8px 18px;
   border: none;
   border-radius: 6px;
-  background: #f37021;
-  color: #fff;
+  background: var(--primary);
+  color: var(--white);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .tpi-add-btn:hover {
-  background: #d95f14;
+  background: var(--primary-dark);
 }
 
 /* Empty State */
 .tpi-empty-state {
-  background: #fff;
+  background: var(--white);
   border-radius: 12px;
   padding: 60px 20px;
   display: flex;
