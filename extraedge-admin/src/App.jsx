@@ -11,6 +11,8 @@ import BulkUploadList from './pages/BulkUplodList/BulkUploadList'
 import FollowUpManager from './pages/FollowUpManager/FollowUpManager'
 import WhatsAppList from './pages/WhatsAppList/WhatAppsList'
 import BulkMarketingCampaign from './pages/BulkMarketingCampaign/BulkMarketingCampaign'
+import DripMarketingCampaign from './pages/DripMarketingCampaign/DripMarketingCampaign'
+import Remarketing from './pages/Remarketing/Remarketing'
 
 function App() {
   return (
@@ -56,8 +58,18 @@ function App() {
         />
 
         <Route
-          path="/bulkMarketingCampaign"
+          path="/bulkmarketingcampaign"
           element={<ProtectedRoute><Layout><BulkMarketingCampaign /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/dripmarketingcampaign"
+          element={<ProtectedRoute><Layout><DripMarketingCampaign /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/remarketing"
+          element={<ProtectedRoute><Layout><Remarketing /></Layout></ProtectedRoute>}
         />
 
         {/* Catch-all - redirect to dashboard for authenticated users, login otherwise */}
