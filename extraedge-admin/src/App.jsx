@@ -16,6 +16,7 @@ import Remarketing from './pages/Remarketing/Remarketing'
 import WorkflowAutomation from './pages/AutomationWorkflow/AutomationWorkflow'
 import ConnectedAccounts from './pages/ConnectedAccounts/ConnectedAccounts'
 import Settings from './pages/Settings/Settings'
+import ThirdPartyIntegration from './pages/ThirdPartyIntegration/ThirdPartyIntegration'
 
 function App() {
   return (
@@ -88,6 +89,11 @@ function App() {
         <Route
           path="/settings"
           element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>}
+        />
+
+         <Route
+          path="/thirdpartyintegration"
+          element={<ProtectedRoute><Layout><ThirdPartyIntegration /></Layout></ProtectedRoute>}
         />
 
         {/* Catch-all - redirect to dashboard for authenticated users, login otherwise */}
