@@ -10,6 +10,7 @@ import FailedLeads from './pages/FailedLeads/FailedLeads'
 import BulkUploadList from './pages/BulkUplodList/BulkUploadList'
 import FollowUpManager from './pages/FollowUpManager/FollowUpManager'
 import WhatsAppList from './pages/WhatsAppList/WhatAppsList'
+import BulkMarketingCampaign from './pages/BulkMarketingCampaign/BulkMarketingCampaign'
 
 function App() {
   return (
@@ -21,79 +22,42 @@ function App() {
         {/* Protected Routes with Layout */}
         <Route
           path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <AnalyticsDashboard />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<ProtectedRoute><Layout><AnalyticsDashboard /></Layout></ProtectedRoute>}
         />
 
         <Route
           path="/leadlist"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <LeadList />
-              </Layout>
-            </ProtectedRoute>
-          }
+           element={<ProtectedRoute><Layout><LeadList /></Layout></ProtectedRoute>}
         />
 
         <Route
           path="/rawdata"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <RawDataManager />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<ProtectedRoute><Layout><RawDataManager /></Layout></ProtectedRoute>}
         />
 
         <Route
           path="/failedleads"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <FailedLeads />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<ProtectedRoute><Layout><FailedLeads /></Layout></ProtectedRoute>}
         />
 
         <Route
           path="/bulkuploadlist"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <BulkUploadList />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<ProtectedRoute><Layout><BulkUploadList /></Layout></ProtectedRoute>}
         />
 
         <Route
           path="/followupmanager"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <FollowUpManager />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<ProtectedRoute><Layout><FollowUpManager /></Layout></ProtectedRoute>}
         />
 
         <Route
           path="/whatsapplist"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <WhatsAppList />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<ProtectedRoute><Layout><WhatsAppList /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/bulkMarketingCampaign"
+          element={<ProtectedRoute><Layout><BulkMarketingCampaign /></Layout></ProtectedRoute>}
         />
 
         {/* Catch-all - redirect to dashboard for authenticated users, login otherwise */}

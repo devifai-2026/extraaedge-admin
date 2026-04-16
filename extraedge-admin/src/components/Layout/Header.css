@@ -117,7 +117,7 @@
 }
 
 /* Search Input Wrapper */
-.search-input-wrapper {
+.search-input-wrapper-header {
     display: flex;
     align-items: center;
     flex: 1;
