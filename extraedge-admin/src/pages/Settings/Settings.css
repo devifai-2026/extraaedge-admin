@@ -1,0 +1,27 @@
+.page-container-Settings{
+     padding: 20px;
+}
+
+.tabs-header-settings {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.tab-settings {
+  text-transform: none !important;
+  color: #666 !important;
+}
+
+.active-tab-settings {
+  background: #f37021 !important;
+  color: #fff !important;
+  border-radius: 6px;
+  text-transform: none !important;
+}
+
+.search-box-settings {
+  width: 250px;
+  background: #fff;
+}
