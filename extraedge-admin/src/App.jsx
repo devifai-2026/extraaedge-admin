@@ -17,6 +17,7 @@ import WorkflowAutomation from './pages/AutomationWorkflow/AutomationWorkflow'
 import ConnectedAccounts from './pages/ConnectedAccounts/ConnectedAccounts'
 import Settings from './pages/Settings/Settings'
 import ThirdPartyIntegration from './pages/ThirdPartyIntegration/ThirdPartyIntegration'
+import AdvancedSettings from './pages/AdvancedSettings/AdvancedSettings'
 
 function App() {
   return (
@@ -33,7 +34,7 @@ function App() {
 
         <Route
           path="/leadlist"
-           element={<ProtectedRoute><Layout><LeadList /></Layout></ProtectedRoute>}
+          element={<ProtectedRoute><Layout><LeadList /></Layout></ProtectedRoute>}
         />
 
         <Route
@@ -91,9 +92,14 @@ function App() {
           element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>}
         />
 
-         <Route
+        <Route
           path="/thirdpartyintegration"
           element={<ProtectedRoute><Layout><ThirdPartyIntegration /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/advancedsettings"
+          element={<ProtectedRoute><Layout><AdvancedSettings /></Layout></ProtectedRoute>}
         />
 
         {/* Catch-all - redirect to dashboard for authenticated users, login otherwise */}
