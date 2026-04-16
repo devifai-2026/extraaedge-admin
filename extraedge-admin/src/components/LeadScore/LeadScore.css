@@ -1,4 +1,55 @@
-.accordion-container-lead-score{
-    background-color: var(--primary);
-  padding: 10px;
+.lead-score-container {
+  margin-top: 10px;
+}
+
+.lead-score-sub-tabs {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 20px;
+  padding: 4px 0;
+}
+
+.lead-score-sub-tab {
+  font-size: 14px;
+  color: #666;
+  cursor: pointer;
+  padding-bottom: 4px;
+  text-decoration: none;
+}
+
+.lead-score-sub-tab.active {
+  color: #1a73e8;
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+.lead-score-sub-tab:hover {
+  color: #1a73e8;
+}
+
+.accordion-container-lead-score {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.accordion-item-lead-score {
+  border: 1px solid #e0e0e0 !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  background-color: #fff !important;
+}
+
+.accordion-item-lead-score::before {
+  display: none !important;
+}
+
+.accordion-item-lead-score .MuiAccordionSummary-root {
+  min-height: 52px;
+  padding: 0 20px;
+}
+
+.accordion-item-lead-score .MuiTypography-root {
+  font-size: 14px;
+  color: #333;
 }
