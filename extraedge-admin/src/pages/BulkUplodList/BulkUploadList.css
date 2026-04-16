@@ -32,11 +32,11 @@
 
 .bulk-tab-active {
   background: var(--primary);
-  color: #fff;
+  color: var(--white);
 }
 
 .bulk-tab-active:hover {
-  color: #fff;
+  color: var(--white);
 }
 
 /* Toolbar */

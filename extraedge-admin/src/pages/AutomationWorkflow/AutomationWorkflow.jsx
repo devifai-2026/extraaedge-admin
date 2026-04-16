@@ -18,6 +18,8 @@ import {
 import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import AddIcon from "@mui/icons-material/Add";
+import { colors } from "../../theme/colors";
+import "./AutomationWorkflow.css";
 
 const rowsData = [
   {
@@ -76,23 +78,27 @@ const AutomationWorkflows = () => {
     <Box sx={{ p: 3, background: "#f6f6f6", minHeight: "100vh" }}>
       {/* Header */}
       <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 2
-        }}
+        
+        className="automation-header"
       >
-        <Typography variant="h5" fontWeight={600}>
+        {/* <Typography variant="h5" fontWeight={600}>
           Automation Workflows
-        </Typography>
+        </Typography> */}
+        <div className="automation-tab-active">Automation Workflows</div>
 
         <Button
           variant="outlined"
+          className="filter-btn"
           startIcon={<FilterAltOutlinedIcon />}
           sx={{
             textTransform: "none",
-            borderRadius: "8px"
+            borderRadius: "8px",
+            color: colors.primary,
+            borderColor: colors.primary,
+            "&:hover": {
+              backgroundColor: colors.primaryDark,
+              borderColor: colors.primaryDark
+            }
           }}
         >
           Filter
@@ -103,7 +109,7 @@ const AutomationWorkflows = () => {
       <Paper elevation={0} sx={{ borderRadius: "10px", overflow: "hidden" }}>
         <Table>
           <TableHead>
-            <TableRow sx={{ background: "#e7dbd2" }}>
+            <TableRow sx={{ background: colors.primary , color: colors.white }}> 
               <TableCell><b>WORKFLOW NAME</b></TableCell>
               <TableCell><b>WORKFLOW CATEGORY</b></TableCell>
               <TableCell><b>CREATED BY</b></TableCell>
@@ -157,7 +163,9 @@ const AutomationWorkflows = () => {
         sx={{
           position: "fixed",
           bottom: 30,
-          right: 30
+          right: 30,
+          backgroundColor: colors.primary,
+          "&:hover": { backgroundColor: colors.primaryDark }
         }}
       >
         <AddIcon />
