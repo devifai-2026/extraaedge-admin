@@ -1,27 +1,48 @@
-.page-container-Settings{
-     padding: 20px;
+.page-container-Settings {
+  padding: 20px;
 }
 
 .tabs-header-settings {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
+  border-bottom: 3px solid #f37021;
+  margin-bottom: 0;
+}
+
+.tabs-header-settings .MuiTabs-root {
+  min-height: auto;
 }
 
 .tab-settings {
   text-transform: none !important;
-  color: #666 !important;
+  color: #333 !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  min-height: 40px !important;
+  padding: 8px 20px !important;
 }
 
 .active-tab-settings {
   background: #f37021 !important;
   color: #fff !important;
-  border-radius: 6px;
   text-transform: none !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  min-height: 40px !important;
+  padding: 8px 20px !important;
+  border-radius: 4px 4px 0 0;
+}
+
+.search-row-settings {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+  margin-bottom: 16px;
 }
 
 .search-box-settings {
-  width: 250px;
+  width: 260px;
   background: #fff;
+}
+
+.search-box-settings .MuiOutlinedInput-root {
+  border-radius: 4px;
 }
