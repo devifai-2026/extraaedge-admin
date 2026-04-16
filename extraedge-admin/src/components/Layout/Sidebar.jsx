@@ -33,7 +33,7 @@ const menuItems = [
   { id: 11, label: 'Workflow Automation', icon: AutoModeIcon, path: '/automations' },
   { id: 12, label: 'Connected Accounts', icon: AccountTreeIcon, path: '/connectedaccounts' },
   { id: 13, label: 'Basic Settings', icon: SettingsIcon, path: '/settings' },
-  { id: 14, label: 'Advanced Settings', icon: SettingsSuggestIcon, path: '/bulkuplosadlist' },
+  { id: 14, label: 'Advanced Settings', icon: SettingsSuggestIcon, path: '/advancedsettings' },
   { id: 15, label: 'Third Party Integration', icon: IntegrationInstructionsIcon, path: '/thirdpartyintegration' },
 ];
 
