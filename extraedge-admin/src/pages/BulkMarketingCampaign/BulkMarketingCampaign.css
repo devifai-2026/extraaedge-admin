@@ -10,13 +10,13 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  border-bottom: 3px solid #f37021;
+  border-bottom: 3px solid var(--primary);
   margin-bottom: 24px;
 }
 
 .bulk-tab-active {
-  background: #f37021;
-  color: #fff;
+  background: var(--primary);
+  color: var(--white);
   padding: 10px 18px;
   border-radius: 4px 4px 0 0;
   font-size: 14px;

@@ -16,6 +16,7 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import AddIcon from "@mui/icons-material/Add";
 import "./DripMarketingCampaign.css";
+import { colors } from "../../theme/colors";
 
 const data = [
     {
@@ -133,7 +134,7 @@ const DripCampaignRules = () => {
 
             {/* Floating Button */}
             <Fab className="fab-btn">
-                <AddIcon />
+                <AddIcon sx={{ color: colors.white }}/>
             </Fab>
         </div>
     );

@@ -5,6 +5,7 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 import ViewListIcon from "@mui/icons-material/ViewList";
 import BulkCampaignCard from "../../components/CampaignCard/CampaignCard";
 import "./BulkMarketingCampaign.css";
+import { colors } from "../../theme/colors";
 
 const campaignData = [
   {
@@ -212,9 +213,9 @@ const BulkCampaignContent = () => {
       <div className="bulk-top-bar">
         <div className="bulk-tab-active">All Bulk Communications (39)</div>
         <div className="bulk-top-actions">
-          <IconButton size="small"><RefreshIcon sx={{ color: "#f37021" }} /></IconButton>
-          <IconButton size="small"><ViewListIcon sx={{ color: "#f37021" }} /></IconButton>
-          <IconButton size="small"><FilterListIcon sx={{ color: "#f37021" }} /></IconButton>
+          <IconButton size="small"><RefreshIcon sx={{ color: colors.primary }} /></IconButton>
+          <IconButton size="small"><ViewListIcon sx={{ color: colors.primary }} /></IconButton>
+          <IconButton size="small"><FilterListIcon sx={{ color: colors.primary }} /></IconButton>
         </div>
       </div>
 
