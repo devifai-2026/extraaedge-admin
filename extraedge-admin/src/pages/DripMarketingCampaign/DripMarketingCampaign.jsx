@@ -71,8 +71,8 @@ const data = [
 
 const DripCampaignRules = () => {
     const [rows, setRows] = React.useState(data);
-    const [filterAnchor, setFilterAnchor] = React.useState(null);
-    const [counselor, setCounselor] = React.useState("");
+    const [filterAnchorEl, setFilterAnchorEl] = React.useState(null);
+    const [selectedCounselor, setSelectedCounselor] = React.useState("");
 
     const handleToggle = (index) => {
         const updated = [...rows];
@@ -80,8 +80,25 @@ const DripCampaignRules = () => {
         setRows(updated);
     };
 
-    const handleClearFilter = () => setCounselor("");
-    const handleApplyFilter = () => setFilterAnchor(null);
+    const handleFilterOpen = (event) => {
+        setFilterAnchorEl(event.currentTarget);
+    };
+
+    const handleFilterClose = () => {
+        setFilterAnchorEl(null);
+    };
+
+    const handleClearFilter = () => {
+        setSelectedCounselor("");
+    };
+
+    const handleApplyFilter = () => {
+        handleFilterClose();
+    };
+
+    const isFilterOpen = Boolean(filterAnchorEl);
+
+
 
     return (
         <div className="drip-container">
@@ -99,10 +116,58 @@ const DripCampaignRules = () => {
                     variant="outlined"
                     startIcon={<FilterAltIcon />}
                     className="filter-btn"
-                    onClick={(e) => setFilterAnchor(e.currentTarget)}
+                    onClick={handleFilterOpen}
                 >
                     Filter
                 </Button>
+
+                <Popover
+                    open={isFilterOpen}
+                    anchorEl={filterAnchorEl}
+                    onClose={handleFilterClose}
+                    anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                    transformOrigin={{ vertical: "top", horizontal: "right" }}
+                    slotProps={{ paper: { className: "counselor-filter-popover" } }}
+                >
+                    <div className="counselor-filter-header">
+                        <Typography className="counselor-filter-title">Counselors</Typography>
+                        <IconButton size="small" onClick={handleFilterClose}>
+                            <CloseIcon fontSize="small" />
+                        </IconButton>
+                    </div>
+
+                    <FormControl fullWidth size="small" className="counselor-filter-select">
+                        <Select
+                            displayEmpty
+                            value={selectedCounselor}
+                            onChange={(e) => setSelectedCounselor(e.target.value)}
+                            renderValue={(selected) =>
+                                selected ? selected : <span className="counselor-placeholder">Select...</span>
+                            }
+                        >
+                            <MenuItem value="Abhijeet Salgar">Abhijeet Salgar</MenuItem>
+                            <MenuItem value="Priya Sharma">Priya Sharma</MenuItem>
+                            <MenuItem value="Rahul Verma">Rahul Verma</MenuItem>
+                        </Select>
+                    </FormControl>
+
+                    <div className="counselor-filter-actions">
+                        <Button
+                            variant="outlined"
+                            className="clear-filter-btn"
+                            onClick={handleClearFilter}
+                        >
+                            Clear Filter
+                        </Button>
+                        <Button
+                            variant="contained"
+                            className="apply-filter-btn"
+                            onClick={handleApplyFilter}
+                        >
+                            Apply
+                        </Button>
+                    </div>
+                </Popover>
             </div>
 
             {/* Table */}
@@ -149,53 +214,7 @@ const DripCampaignRules = () => {
                 <AddIcon sx={{ color: colors.white }}/>
             </Fab>
 
-            <Popover
-                open={Boolean(filterAnchor)}
-                anchorEl={filterAnchor}
-                onClose={() => setFilterAnchor(null)}
-                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                transformOrigin={{ vertical: "top", horizontal: "right" }}
-                PaperProps={{ className: "counselor-filter-popover" }}
-            >
-                <div className="counselor-filter-header">
-                    <Typography className="counselor-filter-title">Counselors</Typography>
-                    <IconButton size="small" onClick={() => setFilterAnchor(null)}>
-                        <CloseIcon fontSize="small" />
-                    </IconButton>
-                </div>
-
-                <FormControl fullWidth size="small" className="counselor-filter-select">
-                    <Select
-                        displayEmpty
-                        value={counselor}
-                        onChange={(e) => setCounselor(e.target.value)}
-                        renderValue={(v) =>
-                            v ? v : <span className="counselor-placeholder">Select...</span>
-                        }
-                    >
-                        <MenuItem value="Abhijeet Salgar">Abhijeet Salgar</MenuItem>
-                        <MenuItem value="Rohit Sharma">Rohit Sharma</MenuItem>
-                        <MenuItem value="Priya Patel">Priya Patel</MenuItem>
-                    </Select>
-                </FormControl>
-
-                <div className="counselor-filter-actions">
-                    <Button
-                        variant="outlined"
-                        className="clear-filter-btn"
-                        onClick={handleClearFilter}
-                    >
-                        Clear Filter
-                    </Button>
-                    <Button
-                        variant="contained"
-                        className="apply-filter-btn"
-                        onClick={handleApplyFilter}
-                    >
-                        Apply
-                    </Button>
-                </div>
-            </Popover>
+            
         </div>
     );
 };
