@@ -6,6 +6,8 @@ import ViewListIcon from "@mui/icons-material/ViewList";
 import BulkCampaignCard from "../../components/CampaignCard/CampaignCard";
 import "./BulkMarketingCampaign.css";
 import { colors } from "../../theme/colors";
+import SavedList from "../../components/SavedList/SavedList";
+import CampaignFilter from "../../components/CampaignFilter/CampaignFilter";
 
 const campaignData = [
   {
@@ -199,12 +201,18 @@ const ITEMS_PER_PAGE = 8;
 
 const BulkCampaignContent = () => {
   const [currentPage, setCurrentPage] = useState(1);
+  const [openListDrawer, setOpenListDrawer] = useState(false);
+  const [openFilter, setOpenFilter] = useState(false);
 
   const totalPages = Math.ceil(campaignData.length / ITEMS_PER_PAGE);
   const paginatedData = campaignData.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+
+  const handleRefresh = () => {
+        window.location.reload();
+    };
 
   return (
     <div className="bulk-content-wrapper">
@@ -213,9 +221,9 @@ const BulkCampaignContent = () => {
       <div className="bulk-top-bar">
         <div className="bulk-tab-active">All Bulk Communications (39)</div>
         <div className="bulk-top-actions">
-          <IconButton size="small"><RefreshIcon sx={{ color: colors.primary }} /></IconButton>
-          <IconButton size="small"><ViewListIcon sx={{ color: colors.primary }} /></IconButton>
-          <IconButton size="small"><FilterListIcon sx={{ color: colors.primary }} /></IconButton>
+          <IconButton size="small"><RefreshIcon sx={{ color: colors.primary }}  onClick={handleRefresh} /></IconButton>
+          <IconButton size="small"><ViewListIcon sx={{ color: colors.primary }} onClick={() => setOpenListDrawer(true)} /></IconButton>
+          <IconButton size="small" onClick={() => setOpenFilter(true)}><FilterListIcon sx={{ color: colors.primary }} /></IconButton>
         </div>
       </div>
 
@@ -248,6 +256,14 @@ const BulkCampaignContent = () => {
           {">"}
         </span>
       </div>
+      <SavedList
+                open={openListDrawer}
+                onClose={() => setOpenListDrawer(false)}
+            />
+      <CampaignFilter
+                open={openFilter}
+                onClose={() => setOpenFilter(false)}
+            />
 
     </div>
   );
