@@ -15,7 +15,11 @@ import {
     Typography,
     Select,
     MenuItem,
-    FormControl
+    FormControl,
+    Menu,
+    Dialog,
+    DialogContent,
+    DialogActions
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
@@ -73,11 +77,57 @@ const DripCampaignRules = () => {
     const [rows, setRows] = React.useState(data);
     const [filterAnchorEl, setFilterAnchorEl] = React.useState(null);
     const [selectedCounselor, setSelectedCounselor] = React.useState("");
+    const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
+    const [activeRowIndex, setActiveRowIndex] = React.useState(null);
+    const [openStopModal, setOpenStopModal] = React.useState(false);
+    const [openToggleModal, setOpenToggleModal] = React.useState(false);
+    const [toggleRowIndex, setToggleRowIndex] = React.useState(null);
+
+    const handleMenuOpen = (event, index) => {
+        setMenuAnchorEl(event.currentTarget);
+        setActiveRowIndex(index);
+    };
+
+    const handleMenuClose = () => {
+        setMenuAnchorEl(null);
+    };
+
+    const handleEdit = () => {
+        handleMenuClose();
+    };
+
+    const handleDeleteClick = () => {
+        setOpenStopModal(true);
+        setMenuAnchorEl(null);
+    };
+
+    const handleConfirmDelete = () => {
+        if (activeRowIndex !== null) {
+            const updated = rows.filter((_, i) => i !== activeRowIndex);
+            setRows(updated);
+        }
+        setOpenStopModal(false);
+        setActiveRowIndex(null);
+    };
 
     const handleToggle = (index) => {
-        const updated = [...rows];
-        updated[index].active = !updated[index].active;
-        setRows(updated);
+        setToggleRowIndex(index);
+        setOpenToggleModal(true);
+    };
+
+    const handleConfirmToggle = () => {
+        if (toggleRowIndex !== null) {
+            const updated = [...rows];
+            updated[toggleRowIndex].active = !updated[toggleRowIndex].active;
+            setRows(updated);
+        }
+        setOpenToggleModal(false);
+        setToggleRowIndex(null);
+    };
+
+    const handleCancelToggle = () => {
+        setOpenToggleModal(false);
+        setToggleRowIndex(null);
     };
 
     const handleFilterOpen = (event) => {
@@ -103,12 +153,6 @@ const DripCampaignRules = () => {
     return (
         <div className="drip-container">
             {/* Header */}
-            {/* <div className="drip-header">
-                <h2>Drip Marketing Campaign Rules</h2>
-
-                
-            </div> */}
-
             <div className="drip-header">
                 
                 <div className="drip-tab-active">Drip Marketing Campaign Rules</div>
@@ -199,7 +243,10 @@ const DripCampaignRules = () => {
                                     />
                                 </TableCell>
                                 <TableCell>
-                                    <IconButton size="small">
+                                    <IconButton
+                                        size="small"
+                                        onClick={(e) => handleMenuOpen(e, index)}
+                                    >
                                         <MoreVertIcon />
                                     </IconButton>
                                 </TableCell>
@@ -214,7 +261,129 @@ const DripCampaignRules = () => {
                 <AddIcon sx={{ color: colors.white }}/>
             </Fab>
 
-            
+            <Menu
+                anchorEl={menuAnchorEl}
+                open={Boolean(menuAnchorEl)}
+                onClose={handleMenuClose}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                transformOrigin={{ vertical: "top", horizontal: "right" }}
+            >
+                <MenuItem onClick={handleEdit}>Edit</MenuItem>
+                <MenuItem onClick={handleDeleteClick}>Delete</MenuItem>
+            </Menu>
+
+            <Dialog
+                open={openStopModal}
+                onClose={() => setOpenStopModal(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <div
+                    style={{
+                        background: colors.primary,
+                        padding: "12px 16px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        color: colors.white
+                    }}
+                >
+                    <span style={{ fontWeight: 600 }}>Stop Campaign</span>
+                    <IconButton size="small" onClick={() => setOpenStopModal(false)}>
+                        <CloseIcon sx={{ color: colors.white }} />
+                    </IconButton>
+                </div>
+
+                <DialogContent style={{ padding: "24px" }}>
+                    <p style={{ fontSize: "25px", color: colors.textDark }}>
+                        Do you want to stop the Campaign?
+                    </p>
+                </DialogContent>
+
+                <DialogActions style={{ padding: "16px 24px" }}>
+                    <Button
+                        variant="outlined"
+                        onClick={() => setOpenStopModal(false)}
+                        sx={{ textTransform: "none" }}
+                    >
+                        No
+                    </Button>
+
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmDelete}
+                        sx={{
+                            textTransform: "none",
+                            backgroundColor: colors.primary,
+                            "&:hover": { backgroundColor: colors.primaryDark }
+                        }}
+                    >
+                        Yes
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={openToggleModal}
+                onClose={handleCancelToggle}
+                maxWidth="sm"
+                fullWidth
+            >
+                <div
+                    style={{
+                        background: colors.primary,
+                        padding: "12px 16px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        color: colors.white
+                    }}
+                >
+                    <span style={{ fontWeight: 600 }}>
+                        {toggleRowIndex !== null && rows[toggleRowIndex]?.active
+                            ? "Deactivate Segment"
+                            : "Activate Segment"}
+                    </span>
+                    <IconButton size="small" onClick={handleCancelToggle}>
+                        <CloseIcon sx={{ color: colors.white }} />
+                    </IconButton>
+                </div>
+
+                <DialogContent style={{ padding: "24px" }}>
+                    <p style={{ fontSize: "20px", color: colors.textDark, margin: 0 }}>
+                        {toggleRowIndex !== null && rows[toggleRowIndex]?.active
+                            ? "Do you want to deactivate the rule?"
+                            : "Do you want to activate the rule?"}
+                    </p>
+                    <p style={{ fontSize: "14px", color: colors.textDark, marginTop: "8px" }}>
+                        {toggleRowIndex !== null && rows[toggleRowIndex]?.active
+                            ? "Once the rule is inactive all the communication will stop"
+                            : "Once the rule is active all the communication will start going again"}
+                    </p>
+                </DialogContent>
+
+                <DialogActions style={{ padding: "16px 24px" }}>
+                    <Button
+                        variant="outlined"
+                        onClick={handleCancelToggle}
+                        sx={{ textTransform: "none" }}
+                    >
+                        No
+                    </Button>
+
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmToggle}
+                        sx={{
+                            textTransform: "none",
+                            backgroundColor: colors.primary,
+                            "&:hover": { backgroundColor: colors.primaryDark }
+                        }}
+                    >
+                        Yes
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </div>
     );
 };
