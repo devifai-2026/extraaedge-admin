@@ -27,6 +27,8 @@ import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import "./DripMarketingCampaign.css";
 import { colors } from "../../theme/colors";
+import EditRuleModal from "./EditRuleModal";
+import AddRuleModal from "./AddRuleModal";
 
 const data = [
     {
@@ -82,6 +84,10 @@ const DripCampaignRules = () => {
     const [openStopModal, setOpenStopModal] = React.useState(false);
     const [openToggleModal, setOpenToggleModal] = React.useState(false);
     const [toggleRowIndex, setToggleRowIndex] = React.useState(null);
+    const [openEditConfirmModal, setOpenEditConfirmModal] = React.useState(false);
+    const [openEditRuleModal, setOpenEditRuleModal] = React.useState(false);
+    const [editRowIndex, setEditRowIndex] = React.useState(null);
+    const [openAddRuleModal, setOpenAddRuleModal] = React.useState(false);
 
     const handleMenuOpen = (event, index) => {
         setMenuAnchorEl(event.currentTarget);
@@ -93,7 +99,24 @@ const DripCampaignRules = () => {
     };
 
     const handleEdit = () => {
-        handleMenuClose();
+        setEditRowIndex(activeRowIndex);
+        setOpenEditConfirmModal(true);
+        setMenuAnchorEl(null);
+    };
+
+    const handleConfirmEdit = () => {
+        setOpenEditConfirmModal(false);
+        setOpenEditRuleModal(true);
+    };
+
+    const handleCancelEditConfirm = () => {
+        setOpenEditConfirmModal(false);
+        setEditRowIndex(null);
+    };
+
+    const handleCloseEditRule = () => {
+        setOpenEditRuleModal(false);
+        setEditRowIndex(null);
     };
 
     const handleDeleteClick = () => {
@@ -257,9 +280,14 @@ const DripCampaignRules = () => {
             </TableContainer>
 
             {/* Floating Button */}
-            <Fab className="fab-btn">
+            <Fab className="fab-btn" onClick={() => setOpenAddRuleModal(true)}>
                 <AddIcon sx={{ color: colors.white }}/>
             </Fab>
+
+            <AddRuleModal
+                open={openAddRuleModal}
+                onClose={() => setOpenAddRuleModal(false)}
+            />
 
             <Menu
                 anchorEl={menuAnchorEl}
@@ -322,6 +350,68 @@ const DripCampaignRules = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Edit Confirmation Dialog */}
+            <Dialog
+                open={openEditConfirmModal}
+                onClose={handleCancelEditConfirm}
+                maxWidth="sm"
+                fullWidth
+            >
+                <div
+                    style={{
+                        background: colors.primaryLight,
+                        padding: "14px 18px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center"
+                    }}
+                >
+                    <span style={{ fontWeight: 600, color: colors.textDark }}>
+                        Edit Drip Marketing Rule
+                    </span>
+                    <IconButton size="small" onClick={handleCancelEditConfirm}>
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                </div>
+
+                <DialogContent style={{ padding: "24px" }}>
+                    <p style={{ fontSize: "18px", color: colors.textDark, margin: 0, fontWeight: 500 }}>
+                        Do you want to update the rule?
+                    </p>
+                    <p style={{ fontSize: "14px", color: colors.textSecondary, marginTop: "8px" }}>
+                        After editing the rule all the existing lead will not receive communication
+                    </p>
+                </DialogContent>
+
+                <DialogActions style={{ padding: "16px 24px" }}>
+                    <Button
+                        variant="outlined"
+                        onClick={handleCancelEditConfirm}
+                        sx={{ textTransform: "none" }}
+                    >
+                        No
+                    </Button>
+
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmEdit}
+                        sx={{
+                            textTransform: "none",
+                            backgroundColor: colors.primary,
+                            "&:hover": { backgroundColor: colors.primaryDark }
+                        }}
+                    >
+                        Yes
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <EditRuleModal
+                open={openEditRuleModal}
+                onClose={handleCloseEditRule}
+                ruleName={editRowIndex !== null ? rows[editRowIndex]?.description : ""}
+            />
 
             <Dialog
                 open={openToggleModal}
