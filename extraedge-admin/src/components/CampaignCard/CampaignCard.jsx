@@ -7,10 +7,19 @@ import StopCircleOutlinedIcon from "@mui/icons-material/StopCircleOutlined";
 import PersonAddAltIcon from "@mui/icons-material/PersonAddAlt";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { colors } from "../../theme/colors";
+import "./CampaignCard.css";
+import {
+  Dialog,
+  DialogContent,
+  DialogActions,
+  Button,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 
 const BulkCampaignCard = ({ item }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("processing");
+  const [openStopModal, setOpenStopModal] = useState(false);
 
   return (
     <div className="bulk-campaign-card">
@@ -54,7 +63,7 @@ const BulkCampaignCard = ({ item }) => {
           <p className="bulk-label">ACTIONS</p>
           <div className="bulk-row-actions">
             <GroupIcon sx={{ color: colors.primary, fontSize: 22, cursor: "pointer" }} />
-            <StopCircleOutlinedIcon sx={{ color: colors.primary, fontSize: 22, cursor: "pointer" }} />
+            <StopCircleOutlinedIcon sx={{ color: colors.primary, fontSize: 22, cursor: "pointer" }} onClick={() => setOpenStopModal(true)} />
             <PersonAddAltIcon sx={{ color: colors.primary, fontSize: 22, cursor: "pointer" }} />
             <IconButton size="small" onClick={() => setIsOpen((prev) => !prev)}>
               {isOpen ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
@@ -211,6 +220,49 @@ const BulkCampaignCard = ({ item }) => {
 
         </div>
       </Collapse>
+      <Dialog
+        open={openStopModal} onClose={() => setOpenStopModal(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <div style={{ background: colors.primary, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontWeight: 600 }}>Stop Campaign</span>
+          <IconButton size="small" onClick={() => setOpenStopModal(false)}>
+            <CloseIcon />
+          </IconButton>
+        </div>
+
+        <DialogContent style={{ padding: "24px" }}>
+          <p style={{ fontSize: "25px", color: colors.textDark }}>
+            Do you want to stop the Campaign?
+          </p>
+        </DialogContent>
+
+        <DialogActions style={{ padding: "16px 24px" }}>
+          <Button
+            variant="outlined"
+            onClick={() => setOpenStopModal(false)}
+            sx={{ textTransform: "none" }}
+          >
+            No
+          </Button>
+
+          <Button
+            variant="contained"
+            onClick={() => {
+              setOpenStopModal(false);
+              console.log("Campaign Stopped"); // 👉 call API here
+            }}
+            sx={{
+              textTransform: "none",
+              backgroundColor: colors.primary,
+              "&:hover": { backgroundColor: colors.primaryDark }
+            }}
+          >
+            Yes
+          </Button>
+        </DialogActions>
+      </Dialog>
 
     </div>
   );
