@@ -171,7 +171,7 @@ function AnalyticsDashboard() {
             <div style={{ marginTop: "10px" }}>
                 <ProgramStatus />
             </div>
-            <div style={{ marginTop: "10px" }}>
+            <div style={{ marginTop: "10px" , marginBottom: "10px"}}>
                 <ColdEnquiries />
             </div>
 
