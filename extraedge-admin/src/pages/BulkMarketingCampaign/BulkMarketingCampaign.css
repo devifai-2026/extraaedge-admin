@@ -223,7 +223,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #f37021;
+  color: var(--primary);
   font-size: 16px;
   font-weight: 600;
   border-radius: 4px;
@@ -231,7 +231,7 @@
 }
 
 .bulk-page-arrow:hover {
-  background: #fff3ec;
+  background: var(--primaryDark);
 }
 
 .bulk-page-num {
