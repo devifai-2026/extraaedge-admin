@@ -9,7 +9,7 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import "./LeadScore.css";
 
-const sections = [
+const counselorFollowupSections = [
   "Assign Lead",
   "Call",
   "Email",
@@ -17,11 +17,21 @@ const sections = [
   "Manually Added Activities",
   "Payment",
   "Refer As New Lead",
-  "Sales Field"
+  "Sales Field",
+  "Slot Booked",
+  "SMS",
+  "Vidya AI Agent Calling",
+  "VidyaGPT Action",
+  "WhatsApp"
 ];
+
+const prospectResponseSections = ["Email", "SMS", "WhatsApp"];
 
 const LeadScore = () => {
   const [subTab, setSubTab] = useState(0);
+
+  const sections =
+    subTab === 0 ? counselorFollowupSections : prospectResponseSections;
 
   return (
     <Box className="lead-score-container">
