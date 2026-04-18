@@ -53,3 +53,69 @@
   font-size: 14px;
   color: #333;
 }
+
+.accordion-details-lead-score {
+  padding: 0 !important;
+}
+
+.lead-score-table {
+  width: 100%;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.lead-score-table-header,
+.lead-score-table-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: center;
+}
+
+.lead-score-table-header {
+  background-color: #fde8db;
+  font-weight: 600;
+  font-size: 12px;
+  color: #333;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  padding: 12px 0;
+}
+
+.lead-score-table-row {
+  background-color: #fff;
+  font-size: 14px;
+  color: #333;
+  padding: 14px 0;
+  border-top: 1px solid #f0f0f0;
+}
+
+.lead-score-table-row.alt-row {
+  background-color: #f7f7f7;
+}
+
+.lead-score-cell {
+  padding: 0 20px;
+}
+
+.lead-score-cell.name-cell {
+  text-align: left;
+}
+
+.lead-score-cell.score-cell {
+  text-align: center;
+}
+
+.lead-score-cell.action-cell {
+  text-align: right;
+  padding-right: 24px;
+}
+
+.lead-score-edit-btn {
+  border: 1px solid #f58220 !important;
+  color: #f58220 !important;
+  padding: 4px !important;
+}
+
+.lead-score-edit-btn .MuiSvgIcon-root {
+  font-size: 16px;
+}
