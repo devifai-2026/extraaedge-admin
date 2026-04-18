@@ -71,6 +71,8 @@ const AutomationWorkflows = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [anchorElFilter, setAnchorElFilter] = useState(null);
   const [confirmIndex, setConfirmIndex] = useState(null);
+  const [menuIndex, setMenuIndex] = useState(null);
+  const [deleteIndex, setDeleteIndex] = useState(null);
 
   const handleFilterClick = (event) => {
     setAnchorElFilter(event.currentTarget);
@@ -98,12 +100,32 @@ const AutomationWorkflows = () => {
     setConfirmIndex(null);
   };
 
-  const handleMenuOpen = (event) => {
+  const handleMenuOpen = (event, index) => {
     setAnchorEl(event.currentTarget);
+    setMenuIndex(index);
   };
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+    setMenuIndex(null);
+  };
+
+  const handleDeleteClick = () => {
+    setDeleteIndex(menuIndex);
+    setAnchorEl(null);
+  };
+
+  const handleDeleteClose = () => {
+    setDeleteIndex(null);
+    setMenuIndex(null);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (deleteIndex === null) return;
+    const updated = rows.filter((_, i) => i !== deleteIndex);
+    setRows(updated);
+    setDeleteIndex(null);
+    setMenuIndex(null);
   };
 
   return (
@@ -170,7 +192,7 @@ const AutomationWorkflows = () => {
                 </TableCell>
 
                 <TableCell align="right">
-                  <IconButton onClick={handleMenuOpen}>
+                  <IconButton onClick={(e) => handleMenuOpen(e, index)}>
                     <MoreVertIcon />
                   </IconButton>
                 </TableCell>
@@ -186,8 +208,8 @@ const AutomationWorkflows = () => {
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
-        <MenuItem>Edit</MenuItem>
-        <MenuItem>Delete</MenuItem>
+        <MenuItem onClick={handleMenuClose}>Edit</MenuItem>
+        <MenuItem onClick={handleDeleteClick}>Delete</MenuItem>
       </Menu>
 
       {/* Floating Add Button */}
@@ -328,6 +350,63 @@ const AutomationWorkflows = () => {
           </Button>
           <Button
             onClick={handleConfirmYes}
+            variant="contained"
+            sx={{
+              textTransform: "none",
+              borderRadius: "6px",
+              backgroundColor: colors.primary,
+              "&:hover": { backgroundColor: colors.primaryDark }
+            }}
+          >
+            Yes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <Dialog
+        open={deleteIndex !== null}
+        onClose={handleDeleteClose}
+        maxWidth={false}
+        PaperProps={{ sx: { borderRadius: "10px", width: 680 } }}
+      >
+        <DialogTitle
+          sx={{
+            background: "#fbe9da",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            fontWeight: 600,
+            py: 1.5
+          }}
+        >
+          Delete Drip Marketing Rule
+          <IconButton size="small" onClick={handleDeleteClose}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography fontWeight={600} sx={{ mb: 1, mt: 1 }}>
+            Do you want to delete the rule?
+          </Typography>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={handleDeleteClose}
+            variant="outlined"
+            sx={{
+              textTransform: "none",
+              borderRadius: "6px",
+              color: colors.primary,
+              borderColor: colors.primary
+            }}
+          >
+            No
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
             variant="contained"
             sx={{
               textTransform: "none",
