@@ -13,7 +13,11 @@ import {
   Menu,
   MenuItem,
   Fab,
-  Paper
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from "@mui/material";
 import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -66,6 +70,7 @@ const AutomationWorkflows = () => {
   const [rows, setRows] = useState(rowsData);
   const [anchorEl, setAnchorEl] = useState(null);
   const [anchorElFilter, setAnchorElFilter] = useState(null);
+  const [confirmIndex, setConfirmIndex] = useState(null);
 
   const handleFilterClick = (event) => {
     setAnchorElFilter(event.currentTarget);
@@ -77,10 +82,20 @@ const AutomationWorkflows = () => {
 
   const openFilter = Boolean(anchorElFilter);
 
-  const handleToggle = (index) => {
+  const handleToggleClick = (index) => {
+    setConfirmIndex(index);
+  };
+
+  const handleConfirmClose = () => {
+    setConfirmIndex(null);
+  };
+
+  const handleConfirmYes = () => {
+    if (confirmIndex === null) return;
     const updated = [...rows];
-    updated[index].active = !updated[index].active;
+    updated[confirmIndex].active = !updated[confirmIndex].active;
     setRows(updated);
+    setConfirmIndex(null);
   };
 
   const handleMenuOpen = (event) => {
@@ -150,7 +165,7 @@ const AutomationWorkflows = () => {
                 <TableCell align="center">
                   <Switch
                     checked={row.active}
-                    onChange={() => handleToggle(index)}
+                    onChange={() => handleToggleClick(index)}
                   />
                 </TableCell>
 
@@ -260,6 +275,71 @@ const AutomationWorkflows = () => {
 
         </Box>
       </Popover>
+
+      {/* Activate / Deactivate Confirmation */}
+      <Dialog
+        open={confirmIndex !== null}
+        onClose={handleConfirmClose}
+        PaperProps={{ sx: { borderRadius: "10px", width: 480 } }}
+      >
+        <DialogTitle
+          sx={{
+            background: "#fbe9da",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            fontWeight: 600,
+            py: 1.5
+          }}
+        >
+          {confirmIndex !== null && rows[confirmIndex]?.active
+            ? "Deactivate Segment"
+            : "Activate Segment"}
+          <IconButton size="small" onClick={handleConfirmClose}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography fontWeight={600} sx={{ mb: 1, mt: 1 }}>
+            {confirmIndex !== null && rows[confirmIndex]?.active
+              ? "Do you want to deactivate the rule?"
+              : "Do you want to activate the rule?"}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {confirmIndex !== null && rows[confirmIndex]?.active
+              ? "Once the rule is inactive all the communication will stop."
+              : "Once the rule is active all the communication will start going again"}
+          </Typography>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={handleConfirmClose}
+            variant="outlined"
+            sx={{
+              textTransform: "none",
+              borderRadius: "6px",
+              color: colors.primary,
+              borderColor: colors.primary
+            }}
+          >
+            No
+          </Button>
+          <Button
+            onClick={handleConfirmYes}
+            variant="contained"
+            sx={{
+              textTransform: "none",
+              borderRadius: "6px",
+              backgroundColor: colors.primary,
+              "&:hover": { backgroundColor: colors.primaryDark }
+            }}
+          >
+            Yes
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
