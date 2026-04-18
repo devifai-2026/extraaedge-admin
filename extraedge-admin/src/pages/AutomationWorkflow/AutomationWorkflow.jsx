@@ -30,6 +30,8 @@ import {
   Select
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import EditConfirmModal from "./EditConfirmModal";
+import EditAutomationWorkflow from "./EditAutomationWorkflow";
 
 const rowsData = [
   {
@@ -73,6 +75,8 @@ const AutomationWorkflows = () => {
   const [confirmIndex, setConfirmIndex] = useState(null);
   const [menuIndex, setMenuIndex] = useState(null);
   const [deleteIndex, setDeleteIndex] = useState(null);
+  const [editConfirmIndex, setEditConfirmIndex] = useState(null);
+  const [editIndex, setEditIndex] = useState(null);
 
   const handleFilterClick = (event) => {
     setAnchorElFilter(event.currentTarget);
@@ -115,6 +119,26 @@ const AutomationWorkflows = () => {
     setAnchorEl(null);
   };
 
+  const handleEditClick = () => {
+    setEditConfirmIndex(menuIndex);
+    setAnchorEl(null);
+  };
+
+  const handleEditConfirmClose = () => {
+    setEditConfirmIndex(null);
+    setMenuIndex(null);
+  };
+
+  const handleEditConfirmYes = () => {
+    setEditIndex(editConfirmIndex);
+    setEditConfirmIndex(null);
+    setMenuIndex(null);
+  };
+
+  const handleEditBack = () => {
+    setEditIndex(null);
+  };
+
   const handleDeleteClose = () => {
     setDeleteIndex(null);
     setMenuIndex(null);
@@ -127,6 +151,17 @@ const AutomationWorkflows = () => {
     setDeleteIndex(null);
     setMenuIndex(null);
   };
+
+  if (editIndex !== null) {
+    return (
+      <EditAutomationWorkflow
+        workflow={rows[editIndex]}
+        onBack={handleEditBack}
+        onCancel={handleEditBack}
+        onSave={handleEditBack}
+      />
+    );
+  }
 
   return (
     <Box sx={{ p: 3, background: "#f6f6f6", minHeight: "100vh" }}>
@@ -208,7 +243,7 @@ const AutomationWorkflows = () => {
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={handleMenuClose}>Edit</MenuItem>
+        <MenuItem onClick={handleEditClick}>Edit</MenuItem>
         <MenuItem onClick={handleDeleteClick}>Delete</MenuItem>
       </Menu>
 
@@ -362,6 +397,13 @@ const AutomationWorkflows = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Edit Confirmation */}
+      <EditConfirmModal
+        open={editConfirmIndex !== null}
+        onClose={handleEditConfirmClose}
+        onConfirm={handleEditConfirmYes}
+      />
 
       {/* Delete Confirmation */}
       <Dialog
