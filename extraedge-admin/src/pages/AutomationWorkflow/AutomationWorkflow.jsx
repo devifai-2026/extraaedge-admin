@@ -20,6 +20,12 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import AddIcon from "@mui/icons-material/Add";
 import { colors } from "../../theme/colors";
 import "./AutomationWorkflow.css";
+import {
+  Popover,
+  FormControl,
+  Select
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 
 const rowsData = [
   {
@@ -59,6 +65,17 @@ const rowsData = [
 const AutomationWorkflows = () => {
   const [rows, setRows] = useState(rowsData);
   const [anchorEl, setAnchorEl] = useState(null);
+  const [anchorElFilter, setAnchorElFilter] = useState(null);
+
+  const handleFilterClick = (event) => {
+    setAnchorElFilter(event.currentTarget);
+  };
+
+  const handleFilterClose = () => {
+    setAnchorElFilter(null);
+  };
+
+  const openFilter = Boolean(anchorElFilter);
 
   const handleToggle = (index) => {
     const updated = [...rows];
@@ -78,7 +95,7 @@ const AutomationWorkflows = () => {
     <Box sx={{ p: 3, background: "#f6f6f6", minHeight: "100vh" }}>
       {/* Header */}
       <Box
-        
+
         className="automation-header"
       >
         {/* <Typography variant="h5" fontWeight={600}>
@@ -90,6 +107,7 @@ const AutomationWorkflows = () => {
           variant="outlined"
           className="filter-btn"
           startIcon={<FilterAltOutlinedIcon />}
+          onClick={handleFilterClick}
           sx={{
             textTransform: "none",
             borderRadius: "8px",
@@ -109,7 +127,7 @@ const AutomationWorkflows = () => {
       <Paper elevation={0} sx={{ borderRadius: "10px", overflow: "hidden" }}>
         <Table>
           <TableHead>
-            <TableRow sx={{ background: colors.primary , color: colors.white }}> 
+            <TableRow sx={{ background: colors.primary, color: colors.white }}>
               <TableCell><b>WORKFLOW NAME</b></TableCell>
               <TableCell><b>WORKFLOW CATEGORY</b></TableCell>
               <TableCell><b>CREATED BY</b></TableCell>
@@ -170,6 +188,78 @@ const AutomationWorkflows = () => {
       >
         <AddIcon />
       </Fab>
+      <Popover
+        open={openFilter}
+        anchorEl={anchorElFilter}
+        onClose={handleFilterClose}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "right"
+        }}
+        transformOrigin={{
+          vertical: "top",
+          horizontal: "right"
+        }}
+      >
+        <Box className="filter-popover">
+
+          {/* Header */}
+          <Box className="filter-header">
+            <Box display="flex" alignItems="center" gap={1}>
+              <FilterAltOutlinedIcon fontSize="small" />
+              <Typography fontWeight={600}>Filter</Typography>
+            </Box>
+
+            <IconButton size="small" onClick={handleFilterClose}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+
+          {/* Body */}
+          <Box className="filter-body">
+
+            <Typography className="filter-label">Counselors</Typography>
+            <FormControl fullWidth size="small">
+              <Select displayEmpty>
+                <MenuItem value="">Select...</MenuItem>
+              </Select>
+            </FormControl>
+
+            <Typography className="filter-label">Workflow Name</Typography>
+            <FormControl fullWidth size="small">
+              <Select displayEmpty>
+                <MenuItem value="">Select...</MenuItem>
+              </Select>
+            </FormControl>
+
+            <Typography className="filter-label">Workflow Category</Typography>
+            <FormControl fullWidth size="small">
+              <Select displayEmpty>
+                <MenuItem value="">Select...</MenuItem>
+              </Select>
+            </FormControl>
+
+            <Typography className="filter-label">Workflow Status</Typography>
+            <FormControl fullWidth size="small">
+              <Select displayEmpty>
+                <MenuItem value="">Select...</MenuItem>
+              </Select>
+            </FormControl>
+
+          </Box>
+
+          {/* Footer */}
+          <Box className="filter-footer">
+            <Button variant="outlined" className="reset-btn">
+              Reset
+            </Button>
+            <Button variant="contained" className="apply-btn">
+              Apply Filter
+            </Button>
+          </Box>
+
+        </Box>
+      </Popover>
     </Box>
   );
 };
