@@ -1,0 +1,256 @@
+.edit-automation-wrapper {
+  padding: 20px 24px;
+  background: #f6f6f6;
+  min-height: 100vh;
+  position: relative;
+  padding-bottom: 100px;
+}
+
+.edit-automation-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.edit-automation-title-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #222;
+}
+
+.edit-automation-top-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+  background: var(--white, #fff);
+  padding: 18px 20px;
+  border-radius: 8px;
+  margin-bottom: 18px;
+}
+
+.edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.edit-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+}
+
+.edit-label .req {
+  color: var(--primary, #e53935);
+  margin-left: 2px;
+}
+
+.edit-input .MuiOutlinedInput-root {
+  background: #f2f3f5;
+  border-radius: 6px;
+}
+
+.edit-automation-body {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.edit-automation-left {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.edit-step-card {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.edit-step-card.active {
+  border: 2px solid var(--primary, #e53935);
+}
+
+.edit-step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.edit-step-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #222;
+}
+
+.edit-step-desc {
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.edit-step-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-step-applied {
+  font-size: 13px;
+  font-weight: 500;
+  color: #222;
+}
+
+.edit-step-count {
+  background: var(--primary, #e53935);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.edit-step-arrow {
+  display: flex;
+  justify-content: center;
+  color: #999;
+  margin: 2px 0;
+}
+
+.edit-step-channel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f6f7f9;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.edit-step-channel-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: #222;
+}
+
+.edit-conditions-panel {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  min-height: 300px;
+}
+
+.edit-condition-heading {
+  font-size: 14px;
+  font-weight: 600;
+  color: #222;
+  margin-bottom: 14px;
+}
+
+.edit-condition-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.6fr;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.edit-chip-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 30px 6px 8px;
+  min-height: 40px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  position: relative;
+  background: #fff;
+}
+
+.edit-stage-chip {
+  background: #e9eaed !important;
+  color: #333 !important;
+  border-radius: 4px !important;
+  height: 24px !important;
+  font-size: 12px !important;
+}
+
+.edit-stage-chip .MuiChip-deleteIcon {
+  color: #555 !important;
+  font-size: 14px !important;
+  order: -1;
+  margin-left: 4px !important;
+  margin-right: -4px !important;
+}
+
+.edit-chip-more {
+  position: absolute;
+  right: 4px;
+  top: 6px;
+}
+
+.edit-subgroup-btn {
+  text-transform: none !important;
+  color: var(--primary, #e53935) !important;
+  font-weight: 500 !important;
+  margin-top: 14px !important;
+  padding-left: 0 !important;
+}
+
+.edit-new-condition-wrap {
+  margin-left: 378px;
+  margin-top: 14px;
+}
+
+.edit-new-condition-btn {
+  text-transform: none !important;
+  background-color: var(--primary, #e53935) !important;
+  color: #fff !important;
+  border-radius: 4px !important;
+  padding: 8px 18px !important;
+  font-weight: 600 !important;
+}
+
+.edit-new-condition-btn:hover {
+  background-color: var(--primary-dark, #c62828) !important;
+}
+
+.edit-automation-footer {
+  position: fixed;
+  right: 24px;
+  bottom: 20px;
+  display: flex;
+  gap: 10px;
+}
+
+.edit-cancel-btn {
+  text-transform: none !important;
+  border-radius: 6px !important;
+  color: #333 !important;
+  border-color: #bbb !important;
+  min-width: 96px !important;
+}
+
+.edit-save-btn {
+  text-transform: none !important;
+  border-radius: 6px !important;
+  background-color: var(--primary, #e53935) !important;
+  color: #fff !important;
+  min-width: 96px !important;
+}
+
+.edit-save-btn:hover {
+  background-color: var(--primary-dark, #c62828) !important;
+}

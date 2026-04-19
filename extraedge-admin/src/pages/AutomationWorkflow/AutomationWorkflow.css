@@ -1,0 +1,79 @@
+.automation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 16px;
+    border-bottom: 3px solid var(--primary);
+}
+
+.automation-tab-active {
+    background: var(--primary);
+    color: var(--white);
+    padding: 10px 18px;
+    border-radius: 4px 4px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.automation-header .filter-btn {
+    margin-bottom: 8px;
+}
+
+
+.filter-popover {
+  width: 360px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Header */
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: #e9dfd7;
+}
+
+/* Body */
+.filter-body {
+  padding: 14px;
+}
+
+.filter-label {
+  font-size: 13px;
+  margin-bottom: 6px;
+  margin-top: 12px;
+  font-weight: 500;
+}
+
+/* Select */
+.MuiSelect-select {
+  background: #f2f3f5 !important;
+  border-radius: 6px !important;
+}
+
+/* Footer */
+.filter-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px;
+}
+
+/* Buttons */
+.reset-btn {
+  text-transform: none;
+  border-radius: 6px;
+}
+
+.apply-btn {
+  text-transform: none;
+  border-radius: 6px;
+  background-color: #f57c00 !important;
+}
+
+.apply-btn:hover {
+  background-color: #ef6c00 !important;
+}

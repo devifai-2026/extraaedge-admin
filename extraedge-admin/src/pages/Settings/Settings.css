@@ -1,0 +1,59 @@
+.page-container-Settings {
+  padding: 20px;
+}
+
+.tabs-header-settings {
+  margin-bottom: 0;
+   border-bottom: 3px solid var(--primary);
+}
+
+.tabs-header-settings .MuiTabs-root {
+  min-height: auto;
+   
+}
+
+.page-container-Settings .Mui-selected {
+  background-color: var(--primary) !important;
+  color: var(--white) !important;
+  font-weight: 600 !important;
+}
+
+.page-container-Settings .css-1qltlow-MuiTabs-indicator {
+  display: none;
+}
+
+.tab-settings {
+  text-transform: none !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  min-height: 40px !important;
+  padding: 8px 20px !important;
+  color: #333 !important;
+}
+
+.active-tab-settings {
+  text-transform: none !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  min-height: 40px !important;
+  padding: 8px 20px !important;
+  border-radius: 4px 4px 0 0;
+  background-color: var(--primary);
+  color: var(--white);
+}
+
+.search-row-settings {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+  margin-bottom: 16px;
+}
+
+.search-box-settings {
+  width: 260px;
+  background-color: var(--white);
+}
+
+.search-box-settings .MuiOutlinedInput-root {
+  border-radius: 4px;
+}

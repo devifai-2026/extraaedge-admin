@@ -7,8 +7,8 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import ViewListIcon from "@mui/icons-material/ViewList";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import { Drawer } from "@mui/material";
 import WhatsappModal from "../WhatsApp/WhatsApp"
+import SavedList from "../SavedList/SavedList";
 
 import {
     Box,
@@ -23,7 +23,6 @@ import {
     Checkbox,
     FormControlLabel,
     Radio,
-    TextField
 } from "@mui/material";
 import { Popover, MenuItem, ListItemIcon, ListItemText, } from "@mui/material";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
@@ -154,70 +153,11 @@ const FiltersOptions = () => {
                 </div>
             </Menu>
 
-            {/* ================= LIST DRAWER ================= */}
-
-            <Drawer
-                anchor="right"
+            {/* ================= SAVED LIST DRAWER ================= */}
+            <SavedList
                 open={openListDrawer}
                 onClose={() => setOpenListDrawer(false)}
-            >
-                <Box
-                    sx={{
-                        width: 320,
-                        height: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                    }}
-                >
-                    {/* HEADER */}
-                    <Box
-                        sx={{
-                            p: 2,
-                            borderBottom: "1px solid #ddd",
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            fontWeight: 600
-                        }}
-                    >
-                        Saved List
-                        <span
-                            style={{ cursor: "pointer" }}
-                            onClick={() => setOpenListDrawer(false)}
-                        >
-                            ✕
-                        </span>
-                    </Box>
-
-                    {/* CONTENT */}
-                    <Box sx={{ p: 2, flex: 1 }}>
-                        <Typography fontSize={13} mb={1}>
-                            Select Saved List
-                        </Typography>
-
-                        <TextField
-                            fullWidth
-                            size="small"
-                            placeholder="Select Option"
-                        />
-                    </Box>
-
-                    {/* FOOTER */}
-                    <Box
-                        sx={{
-                            p: 2,
-                            borderTop: "1px solid #ddd",
-                            display: "flex",
-                            justifyContent: "space-between"
-                        }}
-                    >
-                        <Button variant="outlined">Reset</Button>
-                        <Button variant="contained" sx={{ background: "#f36f21" }}>
-                            Load List
-                        </Button>
-                    </Box>
-                </Box>
-            </Drawer>
+            />
             <FilterLeadsModal
                 open={openFilter}
                 onClose={() => setOpenFilter(false)}
