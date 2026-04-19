@@ -32,6 +32,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import EditConfirmModal from "./EditConfirmModal";
 import EditAutomationWorkflow from "./EditAutomationWorkflow";
+import CreateWorkflowCategory from "./CreateWorkflowCategory";
 
 const rowsData = [
   {
@@ -77,6 +78,7 @@ const AutomationWorkflows = () => {
   const [deleteIndex, setDeleteIndex] = useState(null);
   const [editConfirmIndex, setEditConfirmIndex] = useState(null);
   const [editIndex, setEditIndex] = useState(null);
+  const [showCreateCategory, setShowCreateCategory] = useState(false);
 
   const handleFilterClick = (event) => {
     setAnchorElFilter(event.currentTarget);
@@ -159,6 +161,15 @@ const AutomationWorkflows = () => {
         onBack={handleEditBack}
         onCancel={handleEditBack}
         onSave={handleEditBack}
+      />
+    );
+  }
+
+  if (showCreateCategory) {
+    return (
+      <CreateWorkflowCategory
+        onBack={() => setShowCreateCategory(false)}
+        onSelect={() => setShowCreateCategory(false)}
       />
     );
   }
@@ -250,6 +261,7 @@ const AutomationWorkflows = () => {
       {/* Floating Add Button */}
       <Fab
         color="warning"
+        onClick={() => setShowCreateCategory(true)}
         sx={{
           position: "fixed",
           bottom: 30,
