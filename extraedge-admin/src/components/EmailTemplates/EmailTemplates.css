@@ -1,0 +1,183 @@
+.table-container-email-templates {
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  border-left: 4px solid var(--primary);
+  min-height: 500px;
+  position: relative;
+}
+
+.table-container-email-templates .MuiTable-root {
+  border-collapse: collapse;
+}
+
+.table-header-email-templates {
+  background-color: var(--primary);
+}
+
+.table-header-email-templates .MuiTableCell-root {
+  color: var(--textGrey);
+  font-weight: 700;
+  font-size: 13px;
+  border-bottom: 1px solid var(--white);
+  padding: 12px 16px;
+}
+
+.table-container-email-templates .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--white);
+  font-size: 14px;
+}
+
+.row-alt-email {
+  background-color: var(--white);
+}
+
+.template-link-email {
+  color: #1a73e8;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.template-link-email:hover {
+  color: #0d47a1;
+}
+
+.chip-email-templates {
+  background-color: #333 !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  height: 24px !important;
+  border-radius: 4px !important;
+}
+
+.toggle-switch-email .MuiSwitch-switchBase.Mui-checked {
+  color: var(--primary);
+}
+
+.toggle-switch-email .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track {
+  background-color: var(--primary);
+}
+
+.action-icon-email {
+  color: var(--primary) !important;
+}
+
+.action-icon-delete-email {
+  color: var(--primary) !important;
+}
+
+.fab-email-templates {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  background-color: var(--primary);
+  color: #fff;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.fab-email-templates:hover {
+  background-color: var(--primary-dark);
+}
+
+/* Template Builder Modal */
+.template-builder-modal {
+  padding: 0 !important;
+}
+
+.template-builder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #fdecea;
+  padding: 14px 20px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.template-builder-body {
+  padding: 20px;
+}
+
+.template-builder-instruction {
+  font-size: 14px;
+  color: #555;
+  margin: 0 0 16px 0;
+  font-style: italic;
+}
+
+.template-builder-options {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  margin-bottom: 12px;
+}
+
+.template-builder-option {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+}
+
+.template-builder-checkbox.Mui-checked {
+  color: var(--primary) !important;
+}
+
+.template-builder-divider {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 12px 0 16px 0;
+}
+
+.template-builder-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 10px 0;
+}
+
+.template-builder-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  color: #555;
+  line-height: 1.8;
+}
+
+.template-builder-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.template-builder-cancel {
+  text-transform: none !important;
+  color: var(--primary) !important;
+  border: 1px solid var(--primary) !important;
+  padding: 6px 18px !important;
+  font-size: 14px !important;
+}
+
+.template-builder-continue {
+  text-transform: none !important;
+  background-color: var(--primary) !important;
+  color: #fff !important;
+  padding: 6px 18px !important;
+  font-size: 14px !important;
+}
+
+.template-builder-continue:hover {
+  background-color: var(--primary-dark) !important;
+}

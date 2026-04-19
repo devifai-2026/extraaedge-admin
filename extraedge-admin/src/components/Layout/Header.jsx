@@ -134,7 +134,7 @@ function Header() {
                     </div>
 
 
-                    <div className="search-input-wrapper">
+                    <div className="search-input-wrapper-header">
                         <input
                             type="text"
                             className="search-input"

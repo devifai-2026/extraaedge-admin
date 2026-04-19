@@ -11,6 +11,13 @@ import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import { colors } from '../../theme/colors';
 import RaiseTicketModal from './RaiseTicketModal';
 import './Sidebar.css';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import Person4Icon from '@mui/icons-material/Person4';
+import AdjustIcon from '@mui/icons-material/Adjust';
+import AutoModeIcon from '@mui/icons-material/AutoMode';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
+import IntegrationInstructionsIcon from '@mui/icons-material/IntegrationInstructions';
 
 const menuItems = [
   { id: 1, label: 'Analytics Dashboard', icon: DashboardIcon, path: '/dashboard' },
@@ -20,10 +27,18 @@ const menuItems = [
   { id: 5, label: 'Follow-ups Manager', icon: CalendarTodayIcon, path: '/followupmanager' },
   { id: 6, label: 'Upload Failed Leads', icon: UploadFileIcon, path: '/failedleads' },
   { id: 7, label: 'Bulk Action Stage', icon: SettingsIcon, path: '/bulkuploadlist' },
+  { id: 8, label: 'Bulk Marketing Campaign', icon: CampaignIcon, path: '/bulkmarketingcampaign' },
+  { id: 9, label: 'Drip Marketing Campaign', icon: Person4Icon, path: '/dripmarketingcampaign' },
+  { id: 10, label: 'Remarketing', icon: AdjustIcon, path: '/remarketing' },
+  { id: 11, label: 'Workflow Automation', icon: AutoModeIcon, path: '/automations' },
+  { id: 12, label: 'Connected Accounts', icon: AccountTreeIcon, path: '/connectedaccounts' },
+  { id: 13, label: 'Basic Settings', icon: SettingsIcon, path: '/settings' },
+  { id: 14, label: 'Advanced Settings', icon: SettingsSuggestIcon, path: '/advancedsettings' },
+  { id: 15, label: 'Third Party Integration', icon: IntegrationInstructionsIcon, path: '/thirdpartyintegration' },
 ];
 
 const bottomMenuItems = [
-  { id: 8, label: 'Raise a Ticket', icon: SupportAgentIcon, action: 'modal' },
+  { id: 16, label: 'Raise a Ticket', icon: SupportAgentIcon, action: 'modal' },
 ];
 
 function Sidebar({ collapsed = false }) {

@@ -10,6 +10,14 @@ import FailedLeads from './pages/FailedLeads/FailedLeads'
 import BulkUploadList from './pages/BulkUplodList/BulkUploadList'
 import FollowUpManager from './pages/FollowUpManager/FollowUpManager'
 import WhatsAppList from './pages/WhatsAppList/WhatAppsList'
+import BulkMarketingCampaign from './pages/BulkMarketingCampaign/BulkMarketingCampaign'
+import DripMarketingCampaign from './pages/DripMarketingCampaign/DripMarketingCampaign'
+import Remarketing from './pages/Remarketing/Remarketing'
+import WorkflowAutomation from './pages/AutomationWorkflow/AutomationWorkflow'
+import ConnectedAccounts from './pages/ConnectedAccounts/ConnectedAccounts'
+import Settings from './pages/Settings/Settings'
+import ThirdPartyIntegration from './pages/ThirdPartyIntegration/ThirdPartyIntegration'
+import AdvancedSettings from './pages/AdvancedSettings/AdvancedSettings'
 
 function App() {
   return (
@@ -21,79 +29,77 @@ function App() {
         {/* Protected Routes with Layout */}
         <Route
           path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <AnalyticsDashboard />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<ProtectedRoute><Layout><AnalyticsDashboard /></Layout></ProtectedRoute>}
         />
 
         <Route
           path="/leadlist"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <LeadList />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<ProtectedRoute><Layout><LeadList /></Layout></ProtectedRoute>}
         />
 
         <Route
           path="/rawdata"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <RawDataManager />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<ProtectedRoute><Layout><RawDataManager /></Layout></ProtectedRoute>}
         />
 
         <Route
           path="/failedleads"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <FailedLeads />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<ProtectedRoute><Layout><FailedLeads /></Layout></ProtectedRoute>}
         />
 
         <Route
           path="/bulkuploadlist"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <BulkUploadList />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<ProtectedRoute><Layout><BulkUploadList /></Layout></ProtectedRoute>}
         />
 
         <Route
           path="/followupmanager"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <FollowUpManager />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<ProtectedRoute><Layout><FollowUpManager /></Layout></ProtectedRoute>}
         />
 
         <Route
           path="/whatsapplist"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <WhatsAppList />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<ProtectedRoute><Layout><WhatsAppList /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/bulkmarketingcampaign"
+          element={<ProtectedRoute><Layout><BulkMarketingCampaign /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/dripmarketingcampaign"
+          element={<ProtectedRoute><Layout><DripMarketingCampaign /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/remarketing"
+          element={<ProtectedRoute><Layout><Remarketing /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/automations"
+          element={<ProtectedRoute><Layout><WorkflowAutomation /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/connectedaccounts"
+          element={<ProtectedRoute><Layout><ConnectedAccounts /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/settings"
+          element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/thirdpartyintegration"
+          element={<ProtectedRoute><Layout><ThirdPartyIntegration /></Layout></ProtectedRoute>}
+        />
+
+        <Route
+          path="/advancedsettings"
+          element={<ProtectedRoute><Layout><AdvancedSettings /></Layout></ProtectedRoute>}
         />
 
         {/* Catch-all - redirect to dashboard for authenticated users, login otherwise */}
