@@ -1,0 +1,163 @@
+.workflow-builder-wrapper {
+  padding: 20px 28px 90px;
+  background: #f6f6f6;
+  min-height: 100vh;
+  position: relative;
+}
+
+.workflow-builder-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 18px;
+}
+
+.workflow-builder-title-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #222;
+}
+
+.workflow-builder-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.workflow-builder-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.workflow-builder-label {
+  font-size: 12px;
+  color: #333;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.workflow-builder-req {
+  color: #e53935;
+  margin-left: 2px;
+}
+
+.workflow-builder-body {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.workflow-builder-left {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.workflow-builder-card {
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.workflow-builder-card.active {
+  border-color: #f39c12;
+  box-shadow: 0 0 0 1px #f39c12 inset;
+}
+
+.workflow-builder-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #222;
+  margin-bottom: 4px;
+}
+
+.workflow-builder-card-sub {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.5;
+}
+
+.workflow-builder-arrow {
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+  padding: 6px 0;
+}
+
+.workflow-builder-right {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.workflow-builder-condition {
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: 6px;
+  padding: 16px 18px;
+}
+
+.workflow-builder-condition-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #222;
+  margin-bottom: 10px;
+}
+
+.workflow-builder-condition .placeholder {
+  color: #9a9a9a;
+}
+
+.workflow-builder-recheck {
+  margin-left: 4px;
+}
+
+.workflow-builder-recheck .MuiFormControlLabel-label {
+  font-size: 13px;
+  color: #333;
+}
+
+.workflow-builder-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 28px;
+  z-index: 5;
+}
+
+.workflow-builder-cancel {
+  text-transform: none !important;
+  border-color: #f39c12 !important;
+  color: #f39c12 !important;
+  border-radius: 6px !important;
+  padding: 4px 22px !important;
+}
+
+.workflow-builder-save {
+  text-transform: none !important;
+  background: #f5b06a !important;
+  color: #fff !important;
+  border-radius: 6px !important;
+  padding: 4px 28px !important;
+  box-shadow: none !important;
+}
+
+.workflow-builder-save:hover {
+  background: #f39c12 !important;
+}

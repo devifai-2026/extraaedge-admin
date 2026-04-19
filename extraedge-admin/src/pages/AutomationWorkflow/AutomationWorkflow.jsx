@@ -33,6 +33,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import EditConfirmModal from "./EditConfirmModal";
 import EditAutomationWorkflow from "./EditAutomationWorkflow";
 import CreateWorkflowCategory from "./CreateWorkflowCategory";
+import WorkflowBuilder from "./WorkflowBuilder";
 
 const rowsData = [
   {
@@ -79,6 +80,7 @@ const AutomationWorkflows = () => {
   const [editConfirmIndex, setEditConfirmIndex] = useState(null);
   const [editIndex, setEditIndex] = useState(null);
   const [showCreateCategory, setShowCreateCategory] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null);
 
   const handleFilterClick = (event) => {
     setAnchorElFilter(event.currentTarget);
@@ -165,11 +167,28 @@ const AutomationWorkflows = () => {
     );
   }
 
+  if (selectedCategory) {
+    return (
+      <WorkflowBuilder
+        category={selectedCategory}
+        onBack={() => setSelectedCategory(null)}
+        onCancel={() => {
+          setSelectedCategory(null);
+          setShowCreateCategory(false);
+        }}
+        onSave={() => {
+          setSelectedCategory(null);
+          setShowCreateCategory(false);
+        }}
+      />
+    );
+  }
+
   if (showCreateCategory) {
     return (
       <CreateWorkflowCategory
         onBack={() => setShowCreateCategory(false)}
-        onSelect={() => setShowCreateCategory(false)}
+        onSelect={(cat) => setSelectedCategory(cat)}
       />
     );
   }
