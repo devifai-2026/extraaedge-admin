@@ -6,6 +6,7 @@ import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import SmsOutlinedIcon from "@mui/icons-material/SmsOutlined";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import "./CreateWorkflowCategory.css";
+import { colors } from '../../theme/colors'
 
 const categories = [
   {
@@ -85,10 +86,10 @@ const PreviewBlock = ({ type }) => {
             <WhatsAppIcon sx={{ fontSize: 12, color: "#25D366" }} /> Whatsapp
           </div>
           <div className="workflow-preview-sub">
-            <EmailOutlinedIcon sx={{ fontSize: 12, color: "#d97706" }} /> Email
+            <EmailOutlinedIcon sx={{ fontSize: 12, color: colors.primary }} /> Email
           </div>
           <div className="workflow-preview-sub">
-            <SmsOutlinedIcon sx={{ fontSize: 12, color: "#d97706" }} /> SMS
+            <SmsOutlinedIcon sx={{ fontSize: 12, color: colors.primary }} /> SMS
           </div>
         </Box>
       </Box>
@@ -108,7 +109,7 @@ const PreviewBlock = ({ type }) => {
         <Box className="workflow-preview-block">
           <span className="workflow-preview-label">⚡ THEN</span>
           <div className="workflow-preview-sub">
-            <SmsOutlinedIcon sx={{ fontSize: 12, color: "#d97706" }} /> SMS
+            <SmsOutlinedIcon sx={{ fontSize: 12, color: colors.primary }} /> SMS
           </div>
           <div className="workflow-preview-sub" style={{ paddingLeft: 14 }}>
             Template 1 · 1 hr
@@ -117,7 +118,7 @@ const PreviewBlock = ({ type }) => {
             Template 2 · 2 hr
           </div>
           <div className="workflow-preview-sub">
-            <EmailOutlinedIcon sx={{ fontSize: 12, color: "#d97706" }} /> Email
+            <EmailOutlinedIcon sx={{ fontSize: 12, color: colors.primary }} /> Email
           </div>
         </Box>
       </Box>
@@ -141,7 +142,7 @@ const PreviewBlock = ({ type }) => {
           style={{ justifyContent: "space-between" }}
         >
           <span>
-            <SmsOutlinedIcon sx={{ fontSize: 12, color: "#d97706" }} /> SMS
+            <SmsOutlinedIcon sx={{ fontSize: 12, color: colors.primary }} /> SMS
           </span>
           <AddCircleIcon sx={{ fontSize: 12, color: "#f39c12" }} />
         </div>
@@ -149,7 +150,7 @@ const PreviewBlock = ({ type }) => {
           Delivered
         </div>
         <div className="workflow-preview-sub" style={{ paddingLeft: 20 }}>
-          <EmailOutlinedIcon sx={{ fontSize: 12, color: "#d97706" }} /> Email
+          <EmailOutlinedIcon sx={{ fontSize: 12, color: colors.primary }} /> Email
         </div>
         <div className="workflow-preview-sub" style={{ paddingLeft: 28 }}>
           Clicked

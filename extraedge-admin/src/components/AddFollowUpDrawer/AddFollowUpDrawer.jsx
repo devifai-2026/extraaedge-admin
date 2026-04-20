@@ -63,7 +63,7 @@ const AddFollowUpDrawer = ({ open, onClose, lead }) => {
             justifyContent: "space-between",
             px: 2,
             py: 1.5,
-            borderBottom: "2px solid #E87B2F",
+            borderBottom: "2px solid #E53935",
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -173,10 +173,10 @@ const AddFollowUpDrawer = ({ open, onClose, lead }) => {
             disabled={!nextActionDate || !time || !remarks}
             sx={{
               textTransform: "none",
-              backgroundColor: "#E87B2F",
+              backgroundColor: "#E53935",
               fontSize: 13,
               borderRadius: 2,
-              "&:hover": { backgroundColor: "#d06a20" },
+              "&:hover": { backgroundColor: "#C62828" },
             }}
           >
             Add

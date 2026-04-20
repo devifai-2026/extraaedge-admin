@@ -1,5 +1,6 @@
 import React from "react";
 import { Drawer, Box, Typography, TextField, Button } from "@mui/material";
+import { colors } from '../../theme/colors'
 
 const SavedList = ({ open, onClose }) => {
     return (
@@ -55,7 +56,7 @@ const SavedList = ({ open, onClose }) => {
                     }}
                 >
                     <Button variant="outlined" onClick={onClose}>Reset</Button>
-                    <Button variant="contained" sx={{ background: "#f36f21" }}>
+                    <Button variant="contained" sx={{ background: colors.primary }}>
                         Load List
                     </Button>
                 </Box>

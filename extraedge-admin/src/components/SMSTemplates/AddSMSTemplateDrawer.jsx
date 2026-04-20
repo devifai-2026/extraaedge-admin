@@ -12,6 +12,7 @@ import {
   OutlinedInput,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import { colors } from '../../theme/colors'
 
 const VISIBILITY_OPTIONS = ["All Counselors", "Admins", "Managers"];
 const VARIABLE_OPTIONS = [
@@ -132,7 +133,7 @@ const AddSMSTemplateDrawer = ({ open, onClose }) => {
           <Box>
             <Typography sx={labelSx}>
               Template Name
-              <Box component="span" sx={{ color: "#E87B2F", ml: 0.25 }}>
+              <Box component="span" sx={{ color: colors.primary, ml: 0.25 }}>
                 *
               </Box>
             </Typography>
@@ -149,7 +150,7 @@ const AddSMSTemplateDrawer = ({ open, onClose }) => {
           <Box>
             <Typography sx={labelSx}>
               Visible For
-              <Box component="span" sx={{ color: "#E87B2F", ml: 0.25 }}>
+              <Box component="span" sx={{ color: colors.primary, ml: 0.25 }}>
                 *
               </Box>
             </Typography>
@@ -262,12 +263,12 @@ const AddSMSTemplateDrawer = ({ open, onClose }) => {
             onClick={handleClose}
             sx={{
               textTransform: "none",
-              color: "#E87B2F",
-              borderColor: "#E87B2F",
+              color: colors.primary,
+              borderColor: colors.primary,
               fontSize: 13,
               borderRadius: 1.5,
               px: 2.5,
-              "&:hover": { borderColor: "#d06a20", backgroundColor: "#fff" },
+              "&:hover": { borderColor: colors.primaryDark, backgroundColor: colors.white },
             }}
           >
             Cancel
@@ -278,12 +279,12 @@ const AddSMSTemplateDrawer = ({ open, onClose }) => {
             disabled={!templateName.trim() || visibleFor.length === 0}
             sx={{
               textTransform: "none",
-              backgroundColor: "#E87B2F",
+              backgroundColor: "#E53935",
               fontSize: 13,
               borderRadius: 1.5,
               px: 2.5,
               boxShadow: "none",
-              "&:hover": { backgroundColor: "#d06a20", boxShadow: "none" },
+              "&:hover": { backgroundColor: "#C62828", boxShadow: "none" },
             }}
           >
             Publish

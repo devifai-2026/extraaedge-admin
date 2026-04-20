@@ -18,6 +18,8 @@ import AutoModeIcon from '@mui/icons-material/AutoMode';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
 import IntegrationInstructionsIcon from '@mui/icons-material/IntegrationInstructions';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 const menuItems = [
   { id: 1, label: 'Analytics Dashboard', icon: DashboardIcon, path: '/dashboard' },
@@ -41,7 +43,7 @@ const bottomMenuItems = [
   { id: 16, label: 'Raise a Ticket', icon: SupportAgentIcon, action: 'modal' },
 ];
 
-function Sidebar({ collapsed = false }) {
+function Sidebar({ collapsed = false, onToggle }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
@@ -89,6 +91,22 @@ function Sidebar({ collapsed = false }) {
         className={`sidebar ${collapsed ? 'sidebar-mini' : ''}`}
         style={{ backgroundColor: colors.white, borderRight: `1px solid ${colors.borderGrey}` }}
       >
+        {onToggle && (
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={onToggle}
+            title={collapsed ? 'Expand menu' : 'Collapse menu'}
+            aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
+            style={{
+              backgroundColor: colors.white,
+              color: colors.primary,
+              borderColor: colors.borderGrey,
+            }}
+          >
+            {collapsed ? <ChevronRightIcon fontSize="small" /> : <ChevronLeftIcon fontSize="small" />}
+          </button>
+        )}
         <div className="sidebar-top">{renderMenuItems(menuItems)}</div>
         <div className="sidebar-bottom">{renderMenuItems(bottomMenuItems)}</div>
       </div>

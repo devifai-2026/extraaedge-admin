@@ -17,6 +17,7 @@ import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import BoltOutlinedIcon from "@mui/icons-material/BoltOutlined";
 import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
 import "./WorkflowBuilder.css";
+import { colors } from '../../theme/colors'
 
 const THEN_DESCRIPTIONS = {
   attributes: "Add actions to update fields or create tasks.",
@@ -104,7 +105,7 @@ const WorkflowBuilder = ({ category, onBack, onCancel, onSave }) => {
             <Box className="workflow-builder-card-head">
               <FilterAltOutlinedIcon
                 fontSize="small"
-                sx={{ color: "#d97706" }}
+                sx={{ color: colors.primary }}
               />
               <span>IF</span>
             </Box>
@@ -123,7 +124,7 @@ const WorkflowBuilder = ({ category, onBack, onCancel, onSave }) => {
             onClick={() => setActiveSection("THEN")}
           >
             <Box className="workflow-builder-card-head">
-              <BoltOutlinedIcon fontSize="small" sx={{ color: "#d97706" }} />
+              <BoltOutlinedIcon fontSize="small" sx={{ color: colors.primary }} />
               <span>THEN</span>
             </Box>
             {thenDescription && (

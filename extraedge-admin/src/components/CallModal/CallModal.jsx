@@ -12,6 +12,7 @@ import {
   IconButton
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import { colors } from '../../theme/colors'
 
 const CallModal = ({ open, onClose, lead }) => {
   const [selected, setSelected] = useState("lead");
@@ -83,7 +84,7 @@ const CallModal = ({ open, onClose, lead }) => {
         </Button>
         <Button
           variant="contained"
-          sx={{ background: "#f07c2b" }}
+          sx={{ background: colors.primary, "&:hover": { background: colors.primaryDark } }}
           onClick={() => {
             console.log("Calling:", selected);
             onClose();
