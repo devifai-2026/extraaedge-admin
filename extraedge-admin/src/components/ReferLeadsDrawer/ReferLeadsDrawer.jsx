@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import { colors } from '../../theme/colors'
 
 const ReferLeadsDrawer = ({ open, onClose, lead }) => {
   const [referTo, setReferTo] = useState("");
@@ -50,7 +51,7 @@ const ReferLeadsDrawer = ({ open, onClose, lead }) => {
             justifyContent: "space-between",
             px: 2,
             py: 1.5,
-            borderBottom: "2px solid #E87B2F",
+            borderBottom: "2px solid colors.primary",
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -148,10 +149,10 @@ const ReferLeadsDrawer = ({ open, onClose, lead }) => {
             disabled={!referTo}
             sx={{
               textTransform: "none",
-              backgroundColor: "#E87B2F",
+              backgroundColor: colors.primary,
               fontSize: 13,
               borderRadius: 2,
-              "&:hover": { backgroundColor: "#d06a20" },
+              "&:hover": { backgroundColor: colors.primaryDark },
             }}
           >
             Refer

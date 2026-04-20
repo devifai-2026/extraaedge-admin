@@ -102,7 +102,7 @@ const FilterLeadsModal = ({ open, onClose }) => {
                     <InputBase
                         placeholder="Select And Load Saved Filters"
                         sx={{
-                            background: "#f3ebe6",
+                            background: colors.lightError,
                             px: 2,
                             borderRadius: "6px",
                             width: 260
