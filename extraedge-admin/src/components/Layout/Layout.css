@@ -13,18 +13,19 @@
 
 .layout-content {
   flex: 1;
-  margin-left: 280px;
+  margin-left: 260px;
   padding-top: 30px;
   padding-left: 30px;
   padding-right: 10px;
   background-color: var(--bg-light);
   overflow-y: auto;
   height: calc(100vh - 70px);
+  transition: margin-left 0.25s ease;
 }
 
 /* Collapsed sidebar layout */
 .layout-content.sidebar-collapsed {
-  margin-left: 56px;
+  margin-left: 72px;
 }
 
 /* Responsive design */

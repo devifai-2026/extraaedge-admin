@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import NoteAltOutlinedIcon from "@mui/icons-material/NoteAltOutlined";
+import { colors } from '../../theme/colors'
 
 const AddNoteDrawer = ({ open, onClose, lead }) => {
   const [note, setNote] = useState("");
@@ -50,7 +51,7 @@ const AddNoteDrawer = ({ open, onClose, lead }) => {
             justifyContent: "space-between",
             px: 2,
             py: 1.5,
-            borderBottom: "2px solid #E87B2F",
+            borderBottom: "2px solid colors.primary",
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -129,10 +130,10 @@ const AddNoteDrawer = ({ open, onClose, lead }) => {
             disabled={!note.trim()}
             sx={{
               textTransform: "none",
-              backgroundColor: "#E87B2F",
+              backgroundColor: colors.primary,
               fontSize: 13,
               borderRadius: 2,
-              "&:hover": { backgroundColor: "#d06a20" },
+              "&:hover": { backgroundColor: colors.primaryDark },
             }}
           >
             Add

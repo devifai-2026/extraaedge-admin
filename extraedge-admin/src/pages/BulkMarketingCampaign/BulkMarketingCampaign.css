@@ -139,7 +139,7 @@
 }
 
 .bulk-stat-value.orange {
-  color: #f37021;
+  color: var(--primary);
 }
 
 .bulk-times-row {
