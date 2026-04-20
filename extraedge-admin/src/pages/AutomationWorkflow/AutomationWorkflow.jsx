@@ -372,7 +372,7 @@ const AutomationWorkflows = () => {
       >
         <DialogTitle
           sx={{
-            background: "#fbe9da",
+            background: colors.errorLight,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -445,7 +445,7 @@ const AutomationWorkflows = () => {
       >
         <DialogTitle
           sx={{
-            background: "#fbe9da",
+            background: colors.errorLight,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",

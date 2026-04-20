@@ -14,6 +14,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import EmailIcon from "@mui/icons-material/Email";
 import AddIcon from "@mui/icons-material/Add";
+import { colors } from '../../theme/colors'
 
 const EmailDrawer = ({ open, onClose, lead }) => {
 
@@ -39,7 +40,7 @@ const EmailDrawer = ({ open, onClose, lead }) => {
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          background: "#fff",
+          background: colors.white,
           position: "relative"
         }}
       >
@@ -51,7 +52,7 @@ const EmailDrawer = ({ open, onClose, lead }) => {
             justifyContent: "space-between",
             alignItems: "center",
             padding: "14px 16px",
-            borderBottom: "2px solid #f37021"
+            borderBottom: "2px solid colors.primary"
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -95,7 +96,7 @@ const EmailDrawer = ({ open, onClose, lead }) => {
                   onClick={() => toggleSection("sender")}
                   style={{
                     cursor: "pointer",
-                    color: sections.sender ? "#f37021" : "#555",
+                    color: sections.sender ? colors.primary : "#555",
                     fontWeight: sections.sender ? 600 : 400
                   }}
                 >
@@ -108,7 +109,7 @@ const EmailDrawer = ({ open, onClose, lead }) => {
                   onClick={() => toggleSection("cc")}
                   style={{
                     cursor: "pointer",
-                    color: sections.cc ? "#f37021" : "#555"
+                    color: sections.cc ? colors.primary : "#555"
                   }}
                 >
                   Cc
@@ -120,7 +121,7 @@ const EmailDrawer = ({ open, onClose, lead }) => {
                   onClick={() => toggleSection("bcc")}
                   style={{
                     cursor: "pointer",
-                    color: sections.bcc ? "#f37021" : "#555"
+                    color: sections.bcc ? "#E53935" : "#555"
                   }}
                 >
                   Bcc
@@ -227,7 +228,7 @@ const EmailDrawer = ({ open, onClose, lead }) => {
               position: "absolute",
               right: 20,
               bottom: 120,
-              background: "#f37021",
+              background: colors.primary,
               color: "#fff"
             }}
           >
@@ -251,8 +252,8 @@ const EmailDrawer = ({ open, onClose, lead }) => {
           <Button
             variant="contained"
             sx={{
-              background: "#f37021",
-              "&:hover": { background: "#d95f1f" }
+              background: colors.primary,
+              "&:hover": { background: colors.primaryDark }
             }}
           >
             Send Email

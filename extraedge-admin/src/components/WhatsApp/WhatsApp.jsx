@@ -18,6 +18,7 @@ import {
   Radio,
   TextField
 } from "@mui/material";
+import { colors } from '../../theme/colors'
 
 const WhatsappModal = ({ open, onClose }) => {
   return (
@@ -39,7 +40,7 @@ const WhatsappModal = ({ open, onClose }) => {
         </Typography>
 
         <TableContainer
-          sx={{ border: "1px solid #f87474", borderRadius: "6px", mb: 2 }}
+          sx={{ border: `1px solid ${colors.primary}`, borderRadius: "6px", mb: 2 }}
         >
           <Table size="small">
             <TableHead className="tablehead-whatapp-filters">

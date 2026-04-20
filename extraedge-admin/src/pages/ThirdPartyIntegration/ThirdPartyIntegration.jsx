@@ -5,10 +5,17 @@ import ViewListIcon from "@mui/icons-material/ViewList";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import AddIcon from "@mui/icons-material/Add";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
+import AddIntegrationDialog from "../../components/AddIntegrationDialog/AddIntegrationDialog";
 
 const ThirdPartyIntegration = () => {
   const [viewMode, setViewMode] = useState("grid");
-  const [integrations] = useState([]);
+  const [integrations, setIntegrations] = useState([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const handleSaveIntegration = (data) => {
+    setIntegrations((prev) => [...prev, { ...data, published: false }]);
+    setDialogOpen(false);
+  };
 
   const totalCount = integrations.length;
   const publishedCount = integrations.filter((i) => i.published).length;
@@ -56,7 +63,7 @@ const ThirdPartyIntegration = () => {
           <RefreshIcon fontSize="small" />
           <span>Refresh</span>
         </button>
-        <button className="tpi-add-btn">
+        <button className="tpi-add-btn" onClick={() => setDialogOpen(true)}>
           <AddIcon fontSize="small" />
           <span>Add New Integration</span>
         </button>
@@ -72,12 +79,21 @@ const ThirdPartyIntegration = () => {
           <p className="tpi-empty-subtitle">
             Add your first integration details to get started
           </p>
-          <button className="tpi-add-btn tpi-empty-add-btn">
+          <button
+            className="tpi-add-btn tpi-empty-add-btn"
+            onClick={() => setDialogOpen(true)}
+          >
             <AddIcon fontSize="small" />
             <span>Add New Integration</span>
           </button>
         </div>
       )}
+
+      <AddIntegrationDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onSave={handleSaveIntegration}
+      />
     </div>
   );
 };

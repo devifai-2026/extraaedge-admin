@@ -21,7 +21,7 @@ const EditConfirmModal = ({ open, onClose, onConfirm }) => {
     >
       <DialogTitle
         sx={{
-          background: "#fbe9da",
+          background: colors.primary,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",

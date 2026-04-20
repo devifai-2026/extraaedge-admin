@@ -263,7 +263,7 @@ function Header() {
                                         gap: 2
                                     }}>
                                         <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                                            <NotificationsActiveIcon sx={{ fontSize: 64, color: '#e0e0e0' }} />
+                                            <NotificationsActiveIcon sx={{ fontSize: 64, color: colors.borderGrey }} />
                                             <Box sx={{
                                                 position: 'absolute',
                                                 top: 2,
@@ -335,8 +335,8 @@ function Header() {
                                             bgcolor: "background.paper",
                                             transform: "translateY(-50%) rotate(45deg)",
                                             zIndex: 0,
-                                            borderLeft: "1px solid #e0e0e0",
-                                            borderTop: "1px solid #e0e0e0",
+                                            borderLeft: `1px solid ${colors.borderGrey}`,
+                                            borderTop: `1px solid ${colors.borderGrey}`,
                                         },
                                     },
                                 }}
@@ -372,7 +372,7 @@ function Header() {
                                     }}
                                     sx={{
                                         justifyContent: "flex-end",
-                                        color: "#ff5722",
+                                        color: colors.primary,
                                         fontWeight: 500,
                                     }}
                                 >
