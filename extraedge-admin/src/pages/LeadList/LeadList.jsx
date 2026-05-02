@@ -1,33 +1,251 @@
-import React, { useState } from "react";
-import { Fab } from "@mui/material";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Fab, Pagination, CircularProgress, Snackbar, Alert, Checkbox, Button } from "@mui/material";
 import './LeadList.css';
 import AddIcon from '@mui/icons-material/Add';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 
-import LeadCardContainer from "../../components/LeadCard/LeadCard";
+import LeadCard from "../../components/LeadCard/LeadCard";
+import LeadsTable from "../../components/LeadsTable/LeadsTable";
 import AddNewLead from "../../components/AddNewLead/AddNewLead";
 import UploadLeads from "../../components/UploadLeads/UploadLeads";
 import { colors } from "../../theme/colors";
-import './LeadList.css';
 import TabsSection from "../../components/TabsSection/TabsSection";
 import FiltersOptions from "../../components/FiltersOptions/FiltersOptions";
+import ReferLeadsDrawer from "../../components/ReferLeadsDrawer/ReferLeadsDrawer";
+import { leadsApi } from "../../lib/endpoints";
 
-
-
-
+const PAGE_SIZE = 20;
 
 const LeadList = () => {
-    
     const [addLeadOpen, setAddLeadOpen] = useState(false);
     const [uploadLeadOpen, setUploadLeadOpen] = useState(false);
+
+    // ?focus=<lead_id> deep-link from notifications. We pop the AddNewLead
+    // dialog in edit mode for that lead. Falls back silently if the id is
+    // gone (deleted or out of scope). Depends on the focus value, not just
+    // mount, so a second notification while already on /leadlist still
+    // re-opens the dialog with the new lead.
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [focusedLead, setFocusedLead] = useState(null);
+    const focusId = searchParams.get('focus');
+    useEffect(() => {
+        if (!focusId) return;
+        let alive = true;
+        leadsApi.get(focusId)
+            .then((r) => { if (alive && r?.data) setFocusedLead(r.data); })
+            .catch(() => { /* ignore — id may be stale */ })
+            .finally(() => {
+                // Clear the param so a refresh doesn't re-pop the dialog.
+                if (alive) {
+                    setSearchParams((prev) => {
+                        const next = new URLSearchParams(prev);
+                        next.delete('focus');
+                        return next;
+                    }, { replace: true });
+                }
+            });
+        return () => { alive = false; };
+    }, [focusId, setSearchParams]);
+
+    // Filtering state
+    const [activeStageId, setActiveStageId] = useState(null); // null = All, 'fresh', 'untouched', or stage UUID
+    const [page, setPage] = useState(1);
+    const [sort, setSort] = useState('created_desc');
+    const [advancedFilter, setAdvancedFilter] = useState({}); // from FilterLeadsModal
+    const [viewMode, setViewMode] = useState(() => {
+        try { return localStorage.getItem('ee_lead_view_mode') || 'card'; } catch { return 'card'; }
+    });
+    const [reloadKey, setReloadKey] = useState(0);
+
+    useEffect(() => {
+        try { localStorage.setItem('ee_lead_view_mode', viewMode); } catch { /* ignore */ }
+    }, [viewMode]);
+
+    // Data
+    const [leads, setLeads] = useState([]);
+    const [total, setTotal] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    // Unassigned count (used to badge the Auto-assign button + show context).
+    const [unassignedCount, setUnassignedCount] = useState(0);
+    useEffect(() => {
+        leadsApi.stageCounts()
+            .then((r) => setUnassignedCount(r?.data?.unassigned ?? 0))
+            .catch(() => setUnassignedCount(0));
+    }, [reloadKey]);
+
+    // Selection (for bulk reassign)
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [referOpen, setReferOpen] = useState(false);
+    const [referMode, setReferMode] = useState('selected'); // 'selected' | 'filter' | 'single'
+    const [referLead, setReferLead] = useState(null);
+
+    const [toast, setToast] = useState(null);
+
+    const filterParams = useMemo(() => {
+        // Start with whatever the advanced filter modal applied,
+        // then layer the tab-driven filter on top so the tab choice wins.
+        // Important: only override `flag` when the tab actually selects one,
+        // otherwise the advanced filter's flag (e.g. set via the Filter modal's
+        // "Assignment: Unassigned" option) would be silently dropped.
+        const params = { ...advancedFilter, page, limit: PAGE_SIZE, sort };
+        if (activeStageId === 'fresh' || activeStageId === 'untouched' || activeStageId === 'unassigned') {
+            params.flag = activeStageId;
+            delete params.stage_id;
+        } else if (activeStageId) {
+            params.stage_id = activeStageId;
+            // Stage tab also clears any advanced-filter flag — they'd conflict.
+            delete params.flag;
+        }
+        // else (All tab): keep params.flag from advancedFilter as-is
+        return params;
+    }, [activeStageId, page, sort, advancedFilter]);
+
+    const reload = useCallback(async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const res = await leadsApi.list(filterParams);
+            const rows = res?.data || [];
+            setLeads(rows);
+            setTotal(res?.meta?.total ?? rows.length);
+        } catch (e) {
+            setError(e.message || 'Failed to load leads');
+        } finally {
+            setLoading(false);
+        }
+    }, [filterParams]);
+
+    useEffect(() => { reload(); }, [reload, reloadKey]);
+
+    useEffect(() => { setPage(1); setSelectedIds(new Set()); }, [activeStageId]);
+
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+    const toggleSelect = (id) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const handleSingleReassign = (lead) => {
+        setReferLead(lead);
+        setReferMode('single');
+        setReferOpen(true);
+    };
+
+    const openBulkRefer = (mode) => {
+        if (mode === 'selected' && selectedIds.size === 0) return;
+        setReferMode(mode);
+        setReferOpen(true);
+    };
+
+    const onReferDone = (msg) => {
+        setReferOpen(false);
+        setSelectedIds(new Set());
+        setReloadKey((k) => k + 1);
+        if (msg) setToast({ severity: 'success', text: msg });
+    };
+
     return (
         <div className="lead-list-maincontainer">
-            
-            <TabsSection />
-            <FiltersOptions />
+            <TabsSection
+                activeStageId={activeStageId}
+                onChange={setActiveStageId}
+                reloadKey={reloadKey}
+            />
+            <FiltersOptions
+                onRefresh={() => setReloadKey((k) => k + 1)}
+                selectedCount={selectedIds.size}
+                totalInFilter={total}
+                onReassignSelected={() => openBulkRefer('selected')}
+                onReassignAll={() => openBulkRefer('filter')}
+                sort={sort}
+                onSortChange={(s) => { setSort(s); setPage(1); }}
+                advancedFilter={advancedFilter}
+                onApplyFilter={(f) => { setAdvancedFilter(f); setPage(1); }}
+                onResetFilter={() => { setAdvancedFilter({}); setPage(1); }}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                unassignedCount={unassignedCount}
+            />
+
+            {Object.keys(advancedFilter).length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px', background: '#fff7e6', borderTop: '1px solid #ffd591', borderBottom: '1px solid #ffd591', fontSize: 13 }}>
+                    <span style={{ color: '#d46b08', fontWeight: 600 }}>
+                        🔍 Filters active: {Object.keys(advancedFilter).length} field{Object.keys(advancedFilter).length === 1 ? '' : 's'}
+                    </span>
+                    <span style={{ color: '#888' }}>
+                        Showing {total} matching lead{total === 1 ? '' : 's'}
+                    </span>
+                    <Button
+                        size="small"
+                        onClick={() => { setAdvancedFilter({}); setPage(1); }}
+                        sx={{ marginLeft: 'auto', textTransform: 'none' }}
+                    >
+                        Clear all filters
+                    </Button>
+                </div>
+            )}
 
             <div className="lead-card-scroll-area">
-                <LeadCardContainer />
+                {loading && (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
+                        <CircularProgress />
+                    </div>
+                )}
+                {!loading && error && (
+                    <div style={{ color: '#d32f2f', padding: 16 }}>{error}</div>
+                )}
+                {!loading && !error && leads.length === 0 && (
+                    <div style={{ color: '#888', textAlign: 'center', padding: 40 }}>
+                        No leads in this view.
+                    </div>
+                )}
+                {!loading && leads.length > 0 && viewMode === 'card' && (
+                    <div className="lead-cards-container">
+                        {leads.map((lead) => (
+                            <LeadCard
+                                key={lead.id}
+                                lead={lead}
+                                selected={selectedIds.has(lead.id)}
+                                onToggleSelect={() => toggleSelect(lead.id)}
+                                onReassign={() => handleSingleReassign(lead)}
+                                onChanged={() => setReloadKey((k) => k + 1)}
+                            />
+                        ))}
+                    </div>
+                )}
+
+                {!loading && leads.length > 0 && viewMode === 'table' && (
+                    <LeadsTable
+                        leads={leads}
+                        selectedIds={selectedIds}
+                        onToggleSelect={(id) => toggleSelect(id)}
+                        onToggleSelectAll={(checked) => {
+                            if (checked) setSelectedIds(new Set(leads.map((l) => l.id)));
+                            else setSelectedIds(new Set());
+                        }}
+                        onReassign={(lead) => handleSingleReassign(lead)}
+                        onChanged={() => setReloadKey((k) => k + 1)}
+                    />
+                )}
+
+                {!loading && total > PAGE_SIZE && (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0 24px' }}>
+                        <Pagination
+                            count={totalPages}
+                            page={page}
+                            onChange={(_e, p) => setPage(p)}
+                            color="primary"
+                            shape="rounded"
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Floating Action Buttons */}
@@ -35,37 +253,57 @@ const LeadList = () => {
                 <Fab
                     size="medium"
                     onClick={() => setAddLeadOpen(true)}
-                    sx={{
-                        backgroundColor: colors.primary,
-                        color: colors.white,
-                        "&:hover": { backgroundColor: colors.primaryDark },
-                    }}
+                    sx={{ backgroundColor: colors.primary, color: colors.white, "&:hover": { backgroundColor: colors.primaryDark } }}
                 >
                     <AddIcon />
                 </Fab>
                 <Fab
                     size="medium"
                     onClick={() => setUploadLeadOpen(true)}
-                    sx={{
-                        backgroundColor: colors.primary,
-                        color: colors.white,
-                        "&:hover": { backgroundColor: colors.primaryDark },
-                    }}
+                    sx={{ backgroundColor: colors.primary, color: colors.white, "&:hover": { backgroundColor: colors.primaryDark } }}
                 >
                     <FileUploadIcon />
                 </Fab>
             </div>
+
             <AddNewLead
                 open={addLeadOpen}
                 onClose={() => setAddLeadOpen(false)}
+                onCreated={() => { setAddLeadOpen(false); setReloadKey((k) => k + 1); setToast({ severity: 'success', text: 'Lead created' }); }}
+            />
+            {/* Deep-link edit dialog opened from a notification click (?focus=<id>) */}
+            <AddNewLead
+                open={!!focusedLead}
+                leadData={focusedLead}
+                onClose={() => setFocusedLead(null)}
+                onSaved={() => { setFocusedLead(null); setReloadKey((k) => k + 1); }}
             />
             <UploadLeads
                 open={uploadLeadOpen}
                 onClose={() => setUploadLeadOpen(false)}
+                onUploaded={() => { setUploadLeadOpen(false); setReloadKey((k) => k + 1); }}
             />
+            <ReferLeadsDrawer
+                open={referOpen}
+                onClose={() => setReferOpen(false)}
+                mode={referMode}
+                lead={referLead}
+                selectedIds={Array.from(selectedIds)}
+                filterParams={filterParams}
+                totalInFilter={total}
+                onDone={onReferDone}
+            />
+
+            <Snackbar
+                open={!!toast}
+                autoHideDuration={3000}
+                onClose={() => setToast(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                {toast && <Alert severity={toast.severity}>{toast.text}</Alert>}
+            </Snackbar>
         </div>
     );
 }
 
 export default LeadList;
-

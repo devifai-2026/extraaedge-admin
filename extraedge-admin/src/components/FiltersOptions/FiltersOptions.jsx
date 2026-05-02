@@ -5,7 +5,12 @@ import SwapVertIcon from "@mui/icons-material/SwapVert";
 import GroupIcon from "@mui/icons-material/Group";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ViewListIcon from "@mui/icons-material/ViewList";
+import ViewModuleIcon from "@mui/icons-material/ViewModule";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
+import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
+import { Tooltip, CircularProgress } from "@mui/material";
+import { isRole, ROLES } from "../../lib/rbac";
+import { leadsApi } from "../../lib/endpoints";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import WhatsappModal from "../WhatsApp/WhatsApp"
 import SavedList from "../SavedList/SavedList";
@@ -29,7 +34,45 @@ import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { Menu } from "@mui/material";
 import FilterLeadsModal from "../Filter/Filter";
 
-const FiltersOptions = () => {
+const SORT_OPTIONS = [
+    { key: 'created_desc',       label: 'Added On (newest first)' },
+    { key: 'created_asc',        label: 'Added On (oldest first)' },
+    { key: 'updated_desc',       label: 'Last Updated On' },
+    { key: 'last_activity_desc', label: 'Last Activity' },
+    { key: 'score_desc',         label: 'Lead Score' },
+];
+
+const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onReassignSelected, onReassignAll, sort, onSortChange, advancedFilter, onApplyFilter, onResetFilter, viewMode = 'card', onViewModeChange, unassignedCount = 0 }) => {
+    // Auto-assign button is for super-admin and sales-manager only —
+    // counsellors don't manage assignments themselves.
+    const canAutoAssign = isRole(ROLES.SUPER_ADMIN, ROLES.SALES_MANAGER);
+    const [autoAssigning, setAutoAssigning] = useState(false);
+    const handleAutoAssign = async () => {
+        if (autoAssigning) return;
+        if (unassignedCount > 0) {
+            const ok = window.confirm(
+                `Run round-robin auto-assignment on ${unassignedCount} unassigned lead${unassignedCount === 1 ? '' : 's'}?`,
+            );
+            if (!ok) return;
+        }
+        setAutoAssigning(true);
+        try {
+            const r = await leadsApi.autoAssignUnassigned();
+            const d = r?.data || {};
+            const msg = d.assigned > 0
+                ? `Auto-assigned ${d.assigned} lead${d.assigned === 1 ? '' : 's'}` +
+                  (d.skipped > 0 ? ` · ${d.skipped} skipped (no rule matched)` : '')
+                : d.found === 0
+                    ? 'No unassigned leads to process.'
+                    : `Found ${d.found} but assigned 0 — check that an active assignment rule exists.`;
+            alert(msg);
+            onRefresh?.();
+        } catch (e) {
+            alert(e?.message || 'Auto-assign failed');
+        } finally {
+            setAutoAssigning(false);
+        }
+    };
     const [openAssign, setOpenAssign] = useState(false);
     const [openWhatsapp, setOpenWhatsapp] = useState(false);
     const [openSort, setOpenSort] = useState(false);
@@ -37,8 +80,16 @@ const FiltersOptions = () => {
     const [openListDrawer, setOpenListDrawer] = useState(false);
     const [openFilter, setOpenFilter] = useState(false);
 
+    const activeSort = SORT_OPTIONS.find((s) => s.key === sort) || SORT_OPTIONS[0];
+
     const handleRefresh = () => {
-        window.location.reload();
+        if (onRefresh) onRefresh();
+        else window.location.reload();
+    };
+
+    const handlePickSort = (key) => {
+        setOpenSort(false);
+        onSortChange?.(key);
     };
 
     return (
@@ -72,9 +123,47 @@ const FiltersOptions = () => {
                             <RefreshIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
-                        <IconButton size="small" onClick={() => setOpenListDrawer(true)}>
-                            <ViewListIcon sx={{ color: colors.primary }} />
-                        </IconButton>
+                        {canAutoAssign && (
+                            <Tooltip title={
+                                unassignedCount > 0
+                                    ? `Run round-robin on ${unassignedCount} unassigned lead${unassignedCount === 1 ? '' : 's'}`
+                                    : 'Run round-robin on every unassigned lead'
+                            }>
+                                <span>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        startIcon={autoAssigning
+                                            ? <CircularProgress size={14} sx={{ color: colors.primary }} />
+                                            : <AutoFixHighIcon fontSize="small" />}
+                                        onClick={handleAutoAssign}
+                                        disabled={autoAssigning}
+                                        sx={{
+                                            textTransform: 'none', fontSize: 12,
+                                            color: colors.primary, borderColor: colors.primary,
+                                            ml: 0.5,
+                                            '&:hover': { borderColor: colors.primary, background: '#fff7f7' },
+                                        }}
+                                    >
+                                        {autoAssigning ? 'Assigning…' : 'Auto-assign'}
+                                        {unassignedCount > 0 && !autoAssigning ? ` (${unassignedCount})` : ''}
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                        )}
+
+                        <Tooltip title={viewMode === 'table' ? 'Switch to card view' : 'Switch to table view'}>
+                            <IconButton
+                                size="small"
+                                onClick={() => onViewModeChange?.(viewMode === 'table' ? 'card' : 'table')}
+                                sx={{ background: viewMode === 'table' ? '#fdecea' : 'transparent' }}
+                            >
+                                {viewMode === 'table'
+                                    ? <ViewModuleIcon sx={{ color: colors.primary }} />
+                                    : <ViewListIcon sx={{ color: colors.primary }} />
+                                }
+                            </IconButton>
+                        </Tooltip>
 
                         <IconButton size="small" onClick={() => setOpenFilter(true)}>
                             <FilterAltIcon sx={{ color: colors.primary }} />
@@ -91,17 +180,30 @@ const FiltersOptions = () => {
 
                 <DialogContent>
                     <Typography fontWeight={600}>
-                        Do you want to assign 1360 Leads?
+                        Choose what to reassign:
                     </Typography>
-                    <Typography color="gray" fontSize={14}>
-                        Are you sure you want to proceed with referring all selected leads?
+                    <Typography color="gray" fontSize={14} sx={{ mt: 1 }}>
+                        {selectedCount > 0
+                            ? `${selectedCount} selected lead${selectedCount === 1 ? '' : 's'} on this page`
+                            : 'No leads selected — pick "All in current view" instead.'}
                     </Typography>
                 </DialogContent>
 
                 <DialogActions>
                     <Button onClick={() => setOpenAssign(false)}>Cancel</Button>
-                    <Button variant="contained" className='assign-btn-filter' >
-                        Assign
+                    <Button
+                        onClick={() => { setOpenAssign(false); onReassignSelected?.(); }}
+                        variant="outlined"
+                        disabled={selectedCount === 0}
+                    >
+                        Assign {selectedCount} selected
+                    </Button>
+                    <Button
+                        onClick={() => { setOpenAssign(false); onReassignAll?.(); }}
+                        variant="contained"
+                        className='assign-btn-filter'
+                    >
+                        Assign all {totalInFilter} in view
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -119,34 +221,23 @@ const FiltersOptions = () => {
                 open={openSort}
                 anchorEl={anchorEl}
                 onClose={() => setOpenSort(false)}
-                anchorOrigin={{
-                    vertical: "bottom",
-                    horizontal: "left",
-                }}
+                anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
             >
                 <div className="sort-modal">
-                    <p className="sort-title">No sorting applied to this list.</p>
-
-                    <div className="sort-header">
-                        Select a field to sort by ▲
-                    </div>
-
+                    <p className="sort-title">Sorted by: {activeSort.label}</p>
+                    <div className="sort-header">Select a field to sort by</div>
                     <div className="sort-list">
-                        {[
-                            "Added On",
-                            "Engagement Score",
-                            "Last Updated On",
-                            "Followup Scheduled On",
-                            "Re-enquiry Date",
-                            "Lead Score",
-                            "Automated Update Date",
-                            "Referred To Update Date",
-                        ].map((item, index) => (
-                            <MenuItem key={index} className="sort-item">
+                        {SORT_OPTIONS.map((opt) => (
+                            <MenuItem
+                                key={opt.key}
+                                className="sort-item"
+                                selected={opt.key === activeSort.key}
+                                onClick={() => handlePickSort(opt.key)}
+                            >
                                 <ListItemIcon>
                                     <CalendarTodayIcon fontSize="small" />
                                 </ListItemIcon>
-                                <ListItemText primary={item} />
+                                <ListItemText primary={opt.label} />
                             </MenuItem>
                         ))}
                     </div>
@@ -161,6 +252,9 @@ const FiltersOptions = () => {
             <FilterLeadsModal
                 open={openFilter}
                 onClose={() => setOpenFilter(false)}
+                value={advancedFilter}
+                onApply={(f) => { onApplyFilter?.(f); setOpenFilter(false); }}
+                onReset={() => { onResetFilter?.(); }}
             />
         </>
     );

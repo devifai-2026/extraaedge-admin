@@ -1,0 +1,730 @@
+// User Profiles management — matches the screenshots provided.
+// Two tabs: User Profiles (table + filter + add dialog) | Roles & Tabs (custom role editor).
+import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Tab, Tabs, Button, TextField, CircularProgress, Chip, Avatar, IconButton,
+  Dialog, DialogTitle, DialogContent, DialogActions, Switch, MenuItem,
+  InputAdornment, Tooltip, Checkbox, FormControlLabel, Autocomplete, Box,
+} from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import FilterAltIcon from '@mui/icons-material/FilterAlt';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import SwapVertIcon from '@mui/icons-material/SwapVert';
+import { usersApi, customRolesApi, programsApi } from '../../lib/endpoints';
+import { isRole, ROLES } from '../../lib/rbac';
+import Breadcrumb from './Breadcrumb';
+
+// Mirrors backend DEFAULT_TAB_KEYS in src/config/constants.js
+const TAB_KEYS = [
+  'dashboard', 'leads', 'raw_data', 'failed_leads', 'bulk_upload',
+  'followups', 'whatsapp', 'bulk_marketing', 'drip_marketing', 'remarketing',
+  'automation', 'connected_accounts',
+  'settings.email_templates', 'settings.sms_templates', 'settings.whatsapp_templates',
+  'settings.lead_score', 'settings.assignment_rules',
+  'advanced.dropdowns', 'advanced.users_roles', 'advanced.communications', 'advanced.subscription',
+  'third_party_integration', 'reports', 'analytics',
+];
+const PERM_LEVELS = ['hidden', 'read_only', 'full'];
+const blankTabPerms = () => Object.fromEntries(TAB_KEYS.map((k) => [k, 'hidden']));
+
+const ACCESS_LEVEL_OPTIONS = [
+  { value: 'super_admin', label: 'Admin (Super Admin)' },
+  { value: 'sales_manager', label: 'Sales Manager (Operations)' },
+  { value: 'counsellor', label: 'Counsellor (End User)' },
+];
+
+const initialsColor = (name = '') => {
+  const palette = ['#26a69a', '#5c6bc0', '#ef5350', '#ab47bc', '#fb8c00', '#42a5f5', '#66bb6a', '#ec407a'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  return palette[Math.abs(hash) % palette.length];
+};
+
+export default function UsersAndRoles() {
+  const [tab, setTab] = useState(0);
+  return (
+    <div style={{ background: '#fafafa', minHeight: '100vh' }}>
+      <Breadcrumb trail={[
+        { label: 'Settings', path: '/advancedsettings' },
+        { label: 'User Profiles' },
+      ]} />
+
+      <div style={{ padding: '0 24px' }}>
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: '1px solid #eee' }}>
+          <Tab label="Users" />
+          <Tab label="Roles & Tabs" />
+        </Tabs>
+
+        <div style={{ paddingTop: 16 }}>
+          {tab === 0 && <UsersTab />}
+          {tab === 1 && <RolesTab />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function useFetch(fn, deps = []) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true); setError('');
+    fn().then((r) => { if (!cancelled) setData(r); })
+      .catch((e) => { if (!cancelled) setError(e.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [...deps, reloadKey]);
+  return { data, loading, error, reload: () => setReloadKey((v) => v + 1) };
+}
+
+// ============================================================================
+// USERS TAB — table matches the User Profiles screenshot layout
+// ============================================================================
+
+function UsersTab() {
+  const navigate = useNavigate();
+  const { data, loading, error, reload } = useFetch(() => usersApi.list({ limit: 200 }));
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState({}); // { role, is_active, manager_id, ... }
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [activeUser, setActiveUser] = useState(null);
+  const canManage = isRole(ROLES.SUPER_ADMIN);
+
+  const allUsers = data?.data || [];
+  const filteredUsers = useMemo(() => {
+    return allUsers.filter((u) => {
+      if (search) {
+        const q = search.toLowerCase();
+        const matches = [u.name, u.email, u.phone].some((v) => v && v.toLowerCase().includes(q));
+        if (!matches) return false;
+      }
+      if (filter.role && u.role !== filter.role) return false;
+      if (filter.is_active === 'true' && !u.is_active) return false;
+      if (filter.is_active === 'false' && u.is_active) return false;
+      if (filter.manager_id && u.manager_id !== filter.manager_id) return false;
+      return true;
+    });
+  }, [allUsers, search, filter]);
+
+  const toggleActive = async (u) => {
+    try {
+      await usersApi.update(u.id, { is_active: !u.is_active });
+      reload();
+    } catch (e) { alert(e.message); }
+  };
+
+  const openResetPassword = (u) => {
+    setActiveUser(u);
+    setResetOpen(true);
+  };
+
+  // Navigate to the dedicated /users/:id profile page (replaces the old in-place popup
+  // which was too small for time-sheet, lead history etc.).
+  const openProfile = (u) => {
+    if (!u?.id) return;
+    navigate(`/users/${u.id}`);
+  };
+
+  if (loading) return <CircularProgress />;
+  if (error) return <div style={{ color: '#d32f2f' }}>{error}</div>;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <IconButton sx={{ color: '#E53935' }} title="Sort"><SwapVertIcon /></IconButton>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <IconButton sx={{ color: '#E53935' }} onClick={() => setFilterOpen(true)} title="Filter Users">
+            <FilterAltIcon />
+          </IconButton>
+          {canManage && (
+            <IconButton sx={{ color: '#E53935' }} onClick={() => setAddOpen(true)} title="Add new user">
+              <PersonAddIcon />
+            </IconButton>
+          )}
+          <TextField
+            size="small"
+            placeholder="Search by Name/ Email/ WhatsApp"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            sx={{ width: 320, background: '#fff' }}
+            InputProps={{ endAdornment: <InputAdornment position="end"><SearchIcon fontSize="small" /></InputAdornment> }}
+          />
+        </div>
+      </div>
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', border: '1px solid #e8e8e8', borderRadius: 4 }}>
+        <thead>
+          <tr style={{ background: '#fdf3ed' }}>
+            {['', 'User Name', 'Email Id', 'WhatsApp Number', 'Access Level', 'Official Designation', 'Reporting To', 'Account Status', 'Actions'].map((h, i) => (
+              <th key={i} style={{ textAlign: 'left', padding: '12px 16px', fontSize: 12, fontWeight: 600, color: '#6b4a3a', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {filteredUsers.length === 0 && (
+            <tr><td colSpan={9} style={{ padding: 24, textAlign: 'center', color: '#888' }}>No users match the filters</td></tr>
+          )}
+          {filteredUsers.map((u, idx) => {
+            const initial = (u.name || u.email || '?')[0].toUpperCase();
+            const reportingTo = allUsers.find((x) => x.id === u.manager_id);
+            return (
+              <tr key={u.id} style={{ background: idx % 2 ? '#fafafa' : '#fff', borderTop: '1px solid #f0f0f0' }}>
+                <td style={{ padding: '10px 16px' }}>
+                  <Avatar sx={{ width: 32, height: 32, fontSize: 14, bgcolor: initialsColor(u.name || u.email) }}>{initial}</Avatar>
+                </td>
+                <td style={{ padding: '14px 16px' }}>
+                  <span
+                    onClick={() => openProfile(u)}
+                    style={{ color: '#1565C0', cursor: 'pointer', fontWeight: 500 }}
+                    title="View / edit profile"
+                  >{u.name}</span>
+                </td>
+                <td style={{ padding: '14px 16px', color: '#555' }}>{u.email}</td>
+                <td style={{ padding: '14px 16px', color: '#555' }}>{u.phone || '—'}</td>
+                <td style={{ padding: '14px 16px' }}>
+                  <Chip size="small" label={u.role === 'super_admin' ? 'Admin' : u.role === 'sales_manager' ? 'Manager' : 'Counsellor'} />
+                </td>
+                <td style={{ padding: '14px 16px', color: '#555' }}>{u.role_name || '—'}</td>
+                <td style={{ padding: '14px 16px', color: '#555' }}>{reportingTo?.name || '—'}</td>
+                <td style={{ padding: '14px 16px' }}>
+                  <Tooltip title={u.is_active ? 'Deactivate user' : 'Activate user'}>
+                    <span>
+                      <Switch
+                        size="small"
+                        checked={!!u.is_active}
+                        onChange={() => canManage && toggleActive(u)}
+                        disabled={!canManage}
+                        sx={{ '& .MuiSwitch-thumb': { backgroundColor: u.is_active ? '#E53935' : undefined } }}
+                      />
+                    </span>
+                  </Tooltip>
+                </td>
+                <td style={{ padding: '14px 16px' }}>
+                  <Tooltip title="Reset password">
+                    <span><IconButton size="small" disabled={!canManage} onClick={() => openResetPassword(u)} sx={{ color: '#E53935' }}><LockOutlinedIcon fontSize="small" /></IconButton></span>
+                  </Tooltip>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <FilterDialog
+        open={filterOpen}
+        value={filter}
+        users={allUsers}
+        onClose={() => setFilterOpen(false)}
+        onApply={(v) => { setFilter(v); setFilterOpen(false); }}
+        onReset={() => { setFilter({}); setFilterOpen(false); }}
+      />
+
+      <AddUserDialog
+        open={addOpen}
+        users={allUsers}
+        onClose={() => setAddOpen(false)}
+        onCreated={() => { setAddOpen(false); reload(); }}
+      />
+
+      <ResetPasswordDialog
+        open={resetOpen}
+        user={activeUser}
+        onClose={() => { setResetOpen(false); setActiveUser(null); }}
+      />
+    </div>
+  );
+}
+
+// ----------------------------- User profile dialog (view + edit) -----------------------------
+
+function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPassword }) {
+  const { data: rolesData } = useFetch(() => customRolesApi.list(), [open]);
+  const [form, setForm] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const canManage = isRole(ROLES.SUPER_ADMIN);
+
+  useEffect(() => {
+    if (open && user) {
+      setForm({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        role: user.role || 'counsellor',
+        role_id: user.role_id || '',
+        manager_id: user.manager_id || '',
+        is_active: !!user.is_active,
+      });
+      setErr('');
+    }
+  }, [open, user]);
+
+  if (!user) return null;
+  const roles = (rolesData?.data || []).filter((r) => r.scope === form.role && !r.is_system);
+
+  const save = async () => {
+    setErr(''); setSaving(true);
+    try {
+      const payload = {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        role: form.role,
+        is_active: form.is_active,
+        ...(form.phone ? { phone: form.phone.trim() } : { phone: null }),
+        ...(form.role_id ? { role_id: form.role_id } : {}),
+        ...(form.manager_id ? { manager_id: form.manager_id } : {}),
+      };
+      await usersApi.update(user.id, payload);
+      onSaved?.();
+    } catch (e) {
+      setErr(e.message || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ background: '#fdf3ed' }}>User Profile</DialogTitle>
+      <DialogContent>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0 16px' }}>
+          <Avatar sx={{ width: 56, height: 56, bgcolor: initialsColor(user.name || user.email) }}>
+            {(user.name || user.email || '?')[0].toUpperCase()}
+          </Avatar>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 16 }}>{user.name}</div>
+            <div style={{ color: '#777', fontSize: 13 }}>{user.email}</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <TextField size="small" label="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={!canManage} />
+          <TextField size="small" type="email" label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled={!canManage} />
+          <TextField size="small" label="WhatsApp Number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} disabled={!canManage} />
+          <TextField size="small" select label="Access Level" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value, role_id: '' })} disabled={!canManage}>
+            {ACCESS_LEVEL_OPTIONS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+          </TextField>
+          <TextField size="small" select label="Custom role" value={form.role_id} onChange={(e) => setForm({ ...form, role_id: e.target.value })} disabled={!canManage}>
+            <MenuItem value="">— Use default {form.role} tabs —</MenuItem>
+            {roles.map((r) => <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>)}
+          </TextField>
+          <TextField size="small" select label="Reporting To" value={form.manager_id} onChange={(e) => setForm({ ...form, manager_id: e.target.value })} disabled={!canManage}>
+            <MenuItem value="">— None —</MenuItem>
+            {users.filter((u) => u.id !== user.id && u.role !== 'counsellor').map((u) => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
+          </TextField>
+        </div>
+
+        <FormControlLabel
+          control={
+            <Switch
+              checked={!!form.is_active}
+              onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+              disabled={!canManage}
+              sx={{ '& .MuiSwitch-thumb': { backgroundColor: form.is_active ? '#E53935' : undefined } }}
+            />
+          }
+          label={form.is_active ? 'Active' : 'Inactive'}
+          sx={{ mt: 2 }}
+        />
+
+        {canManage && (
+          <div style={{ marginTop: 16 }}>
+            <Button startIcon={<LockOutlinedIcon />} onClick={onResetPassword} sx={{ color: '#E53935' }}>
+              Reset password
+            </Button>
+          </div>
+        )}
+
+        {err && <div style={{ color: '#d32f2f', fontSize: 13, marginTop: 12 }}>{err}</div>}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Close</Button>
+        {canManage && (
+          <Button variant="contained" onClick={save} disabled={saving} sx={{ background: '#fb8c00' }}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </Button>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ----------------------------- Reset password dialog -----------------------------
+
+function ResetPasswordDialog({ open, user, onClose }) {
+  const [pw, setPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => { if (open) { setPw(''); setConfirmPw(''); setErr(''); } }, [open]);
+
+  if (!user) return null;
+
+  const submit = async () => {
+    setErr('');
+    if (pw.length < 10) { setErr('Password must be at least 10 chars'); return; }
+    if (pw !== confirmPw) { setErr('Passwords do not match'); return; }
+    setSaving(true);
+    try {
+      await usersApi.resetPassword(user.id, pw);
+      alert('Password updated.');
+      onClose();
+    } catch (e) {
+      setErr(e.message || 'Reset failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle sx={{ background: '#fdf3ed' }}>Reset password — {user.name}</DialogTitle>
+      <DialogContent>
+        <div style={{ paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <TextField size="small" type="password" label="New password (10+ chars)" value={pw} onChange={(e) => setPw(e.target.value)} />
+          <TextField size="small" type="password" label="Confirm new password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} />
+          <div style={{ fontSize: 12, color: '#888' }}>The user should change this password after logging in.</div>
+          {err && <div style={{ color: '#d32f2f', fontSize: 13 }}>{err}</div>}
+        </div>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" onClick={submit} disabled={saving} sx={{ background: '#E53935' }}>
+          {saving ? 'Saving…' : 'Reset password'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ----------------------------- Filter dialog -----------------------------
+
+function FilterDialog({ open, value, users, onClose, onApply, onReset }) {
+  const [v, setV] = useState(value || {});
+  useEffect(() => { setV(value || {}); }, [value, open]);
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ background: '#fdf3ed' }}>Filter Users</DialogTitle>
+      <DialogContent>
+        <h4 style={{ marginTop: 16, marginBottom: 12 }}>Filter by User Details</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <TextField size="small" select label="Access Level" value={v.role || ''}
+            onChange={(e) => setV({ ...v, role: e.target.value })}>
+            <MenuItem value="">All</MenuItem>
+            {ACCESS_LEVEL_OPTIONS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+          </TextField>
+          <TextField size="small" select label="Account Stage" value={v.is_active || ''}
+            onChange={(e) => setV({ ...v, is_active: e.target.value })}>
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="true">Active</MenuItem>
+            <MenuItem value="false">Inactive</MenuItem>
+          </TextField>
+          <TextField size="small" label="Official Designation" value={v.role_name || ''}
+            onChange={(e) => setV({ ...v, role_name: e.target.value })} />
+          <TextField size="small" select label="Select Reporting To User" value={v.manager_id || ''}
+            onChange={(e) => setV({ ...v, manager_id: e.target.value })}>
+            <MenuItem value="">All</MenuItem>
+            {users.map((u) => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
+          </TextField>
+        </div>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button variant="outlined" onClick={onReset}>Reset</Button>
+        <Button variant="contained" onClick={() => onApply(v)} sx={{ background: '#fb8c00' }}>Apply</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ----------------------------- Add user dialog -----------------------------
+
+// Decide which roles can be a "reporting manager" for a given access level.
+const reportingRolesFor = (role) => {
+  if (role === 'counsellor') return ['sales_manager'];
+  if (role === 'sales_manager') return ['super_admin'];
+  return []; // super_admin reports to no one
+};
+
+function AddUserDialog({ open, users, onClose, onCreated }) {
+  const { data: programsData } = useFetch(() => programsApi.list(), [open]);
+  const [form, setForm] = useState(() => initialAddForm());
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => { if (open) { setForm(initialAddForm()); setErr(''); } }, [open]);
+
+  const programs = programsData?.data || [];
+
+  const reportingRoles = reportingRolesFor(form.role);
+  const candidateManagers = users.filter((u) => u.is_active !== false && reportingRoles.includes(u.role));
+
+  const submit = async () => {
+    setErr('');
+    if (!form.first_name.trim()) { setErr('First name is required'); return; }
+    if (!form.email.trim()) { setErr('Email is required'); return; }
+    if (!form.password || form.password.length < 10) { setErr('Password must be at least 10 chars'); return; }
+    setSaving(true);
+    try {
+      const fullName = [form.first_name, form.last_name].filter(Boolean).join(' ').trim();
+      const payload = {
+        name: fullName,
+        email: form.email.trim(),
+        password: form.password,
+        role: form.role,
+        ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
+        ...(form.designation.trim() ? { designation: form.designation.trim() } : {}),
+        ...(form.manager_ids.length ? { manager_ids: form.manager_ids } : {}),
+      };
+      await usersApi.create(payload);
+      onCreated?.();
+    } catch (e) {
+      setErr(e.message || 'Failed to create user');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle sx={{ background: '#fdf3ed' }}>Add New User</DialogTitle>
+      <DialogContent>
+
+        <h4 style={{ marginTop: 16, marginBottom: 12 }}>Section 1: Basic User Details</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <TextField size="small" label="First Name *" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
+          <TextField size="small" label="Last Name" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+          <TextField size="small" type="email" label="Email Id *" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <TextField size="small" label="WhatsApp Number *" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <TextField size="small" label="Initial password (10+ chars) *" type="password"
+            value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          <TextField
+            size="small"
+            label="Official Designation"
+            placeholder="e.g. Senior Counsellor, Team Lead"
+            value={form.designation}
+            onChange={(e) => setForm({ ...form, designation: e.target.value })}
+          />
+        </div>
+
+        <h4 style={{ marginTop: 24, marginBottom: 12 }}>Section 2: Access Level Details</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+          <TextField size="small" select label="Select Access Level *" value={form.role}
+            onChange={(e) => setForm({ ...form, role: e.target.value, manager_ids: [] })}>
+            {ACCESS_LEVEL_OPTIONS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+          </TextField>
+
+          {reportingRoles.length > 0 && (
+            <Autocomplete
+              multiple
+              size="small"
+              disableCloseOnSelect
+              options={candidateManagers}
+              value={candidateManagers.filter((u) => form.manager_ids.includes(u.id))}
+              onChange={(_e, picked) => setForm({ ...form, manager_ids: picked.map((u) => u.id) })}
+              getOptionLabel={(o) => o?.name || o?.email || ''}
+              isOptionEqualToValue={(o, v) => o?.id === v?.id}
+              noOptionsText={`No ${reportingRoles.join(' / ').replace(/_/g, ' ')} available. Create one first, or leave blank.`}
+              renderOption={(props, opt, { selected }) => (
+                <li {...props} key={opt.id}>
+                  <Checkbox size="small" checked={selected} sx={{ mr: 1, p: 0.5, '&.Mui-checked': { color: '#E53935' } }} />
+                  <Box>
+                    <div style={{ fontSize: 13 }}>{opt.name}</div>
+                    <div style={{ fontSize: 11, color: '#888' }}>{opt.email} · {opt.role.replace('_', ' ')}</div>
+                  </Box>
+                </li>
+              )}
+              renderTags={(picked, getTagProps) =>
+                picked.map((u, i) => (
+                  <Chip
+                    {...getTagProps({ index: i })}
+                    key={u.id}
+                    label={u.name || u.email}
+                    size="small"
+                    sx={{ background: '#fdf3ed', color: '#c84200' }}
+                  />
+                ))
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label={`Reporting To ${reportingRoles.map((r) => r.replace('_', ' ')).join(' / ')}`}
+                  placeholder="Type to search and select…"
+                  helperText={`A ${form.role.replace('_', ' ')} can report to multiple ${reportingRoles.join(' / ').replace(/_/g, ' ')}s`}
+                />
+              )}
+            />
+          )}
+        </div>
+        <FormControlLabel
+          control={<Checkbox checked={form.allow_mobile} onChange={(e) => setForm({ ...form, allow_mobile: e.target.checked })} sx={{ color: '#E53935', '&.Mui-checked': { color: '#E53935' } }} />}
+          label="Allow this user to Log In ExtraaEdge Mobile App *"
+          sx={{ mt: 1 }}
+        />
+
+        <h4 style={{ marginTop: 24, marginBottom: 12 }}>Section 3: Default values to be set</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <TextField size="small" select label="Default Program *" value={form.program_id} onChange={(e) => setForm({ ...form, program_id: e.target.value })}>
+            <MenuItem value="">— None —</MenuItem>
+            {programs.length === 0 && <MenuItem value="" disabled>No programs configured. Add some in Settings → Setup Dropdown Values → Program.</MenuItem>}
+            {programs.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+          </TextField>
+        </div>
+
+        {err && <div style={{ color: '#d32f2f', fontSize: 13, marginTop: 12 }}>{err}</div>}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button variant="outlined" onClick={onClose}>Cancel</Button>
+        <Button variant="contained" onClick={submit} disabled={saving} sx={{ background: '#fb8c00' }}>
+          {saving ? 'Adding…' : 'Add'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+const initialAddForm = () => ({
+  first_name: '', last_name: '', email: '', phone: '', password: '',
+  role: 'counsellor', designation: '', manager_ids: [],
+  allow_mobile: true, program_id: '',
+});
+
+// ============================================================================
+// ROLES TAB — custom role editor with per-tab access level
+// ============================================================================
+
+function RolesTab() {
+  const { data, loading, error, reload } = useFetch(() => customRolesApi.list());
+  const [editing, setEditing] = useState(null);
+  const canEdit = isRole(ROLES.SUPER_ADMIN);
+
+  const startNew = () => setEditing({ name: '', description: '', scope: 'counsellor', tab_permissions: blankTabPerms() });
+  const startEdit = (r) => setEditing({
+    id: r.id, name: r.name, description: r.description || '',
+    scope: r.scope || 'counsellor',
+    tab_permissions: { ...blankTabPerms(), ...(r.tab_permissions || {}) },
+  });
+
+  const save = async () => {
+    if (!editing.name.trim()) { alert('Name required'); return; }
+    try {
+      const payload = {
+        name: editing.name.trim(),
+        description: editing.description || undefined,
+        scope: editing.scope,
+        tab_permissions: editing.tab_permissions,
+      };
+      if (editing.id) await customRolesApi.update(editing.id, payload);
+      else await customRolesApi.create(payload);
+      setEditing(null); reload();
+    } catch (e) { alert(e.message); }
+  };
+
+  if (loading) return <CircularProgress />;
+  if (error) return <div style={{ color: '#d32f2f' }}>{error}</div>;
+
+  return (
+    <div>
+      {canEdit && !editing && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ fontSize: 13, color: '#666' }}>
+            Define a role and choose which tabs it allows. Then assign it to users in the Users tab.
+          </div>
+          <Button variant="contained" onClick={startNew} sx={{ background: '#E53935' }}>+ New Role</Button>
+        </div>
+      )}
+
+      {editing && (
+        <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+          <h3 style={{ marginTop: 0 }}>{editing.id ? 'Edit role' : 'New role'}</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
+            <TextField size="small" label="Role name" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+            <TextField size="small" label="Description" value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
+            <TextField size="small" select label="Scope" value={editing.scope} onChange={(e) => setEditing({ ...editing, scope: e.target.value })}>
+              <MenuItem value="super_admin">super_admin</MenuItem>
+              <MenuItem value="sales_manager">sales_manager</MenuItem>
+              <MenuItem value="counsellor">counsellor</MenuItem>
+            </TextField>
+          </div>
+
+          <h4 style={{ margin: '12px 0 4px' }}>Tabs this role can see</h4>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <Button size="small" onClick={() => setEditing({ ...editing, tab_permissions: Object.fromEntries(TAB_KEYS.map((k) => [k, 'full'])) })}>Allow all</Button>
+            <Button size="small" onClick={() => setEditing({ ...editing, tab_permissions: blankTabPerms() })}>Hide all</Button>
+          </div>
+
+          <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fafafa', border: '1px solid #eee', borderRadius: 4 }}>
+            <thead>
+              <tr><th style={{ textAlign: 'left', padding: '8px 12px', fontSize: 12, color: '#666', width: '60%' }}>Tab</th><th style={{ textAlign: 'left', padding: '8px 12px', fontSize: 12, color: '#666' }}>Access level</th></tr>
+            </thead>
+            <tbody>
+              {TAB_KEYS.map((key) => (
+                <tr key={key} style={{ borderTop: '1px solid #f0f0f0' }}>
+                  <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontSize: 12 }}>{key}</td>
+                  <td style={{ padding: '6px 12px' }}>
+                    <select
+                      value={editing.tab_permissions[key] || 'hidden'}
+                      onChange={(e) => setEditing({ ...editing, tab_permissions: { ...editing.tab_permissions, [key]: e.target.value } })}
+                      style={{ padding: 4, border: '1px solid #ccc', borderRadius: 4 }}
+                    >
+                      {PERM_LEVELS.map((lvl) => <option key={lvl} value={lvl}>{lvl}</option>)}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div style={{ marginTop: 12, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Button onClick={() => setEditing(null)}>Cancel</Button>
+            <Button variant="contained" onClick={save} sx={{ background: '#E53935' }}>{editing.id ? 'Save changes' : 'Create role'}</Button>
+          </div>
+        </div>
+      )}
+
+      {!editing && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', border: '1px solid #e8e8e8', borderRadius: 4 }}>
+          <thead>
+            <tr style={{ background: '#fdf3ed' }}>
+              {['Name', 'Description', 'Scope', 'Tabs allowed', ''].map((h) => (
+                <th key={h} style={{ textAlign: 'left', padding: '12px 16px', fontSize: 12, fontWeight: 600, color: '#6b4a3a', textTransform: 'uppercase' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(data?.data || []).map((r, idx) => {
+              const allowed = Object.entries(r.tab_permissions || {}).filter(([, v]) => v && v !== 'hidden').length;
+              return (
+                <tr key={r.id} style={{ background: idx % 2 ? '#fafafa' : '#fff', borderTop: '1px solid #f0f0f0' }}>
+                  <td style={{ padding: '14px 16px' }}>{r.name} {r.is_system && <span style={{ fontSize: 11, color: '#888' }}>🔒 system</span>}</td>
+                  <td style={{ padding: '14px 16px', color: '#555' }}>{r.description || '—'}</td>
+                  <td style={{ padding: '14px 16px' }}><Chip size="small" label={r.scope} /></td>
+                  <td style={{ padding: '14px 16px' }}>{allowed} / {TAB_KEYS.length}</td>
+                  <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                    {canEdit && <Button size="small" onClick={() => startEdit(r)}>Edit tabs</Button>}
+                    {canEdit && !r.is_system && (
+                      <Button size="small" color="error" onClick={async () => {
+                        if (!confirm(`Delete role "${r.name}"?`)) return;
+                        try { await customRolesApi.delete(r.id); reload(); } catch (e) { alert(e.message); }
+                      }}>Delete</Button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+            {(data?.data || []).length === 0 && <tr><td colSpan={5} style={{ padding: 20, textAlign: 'center', color: '#888' }}>No roles defined</td></tr>}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}

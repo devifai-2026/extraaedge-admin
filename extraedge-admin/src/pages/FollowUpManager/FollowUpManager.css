@@ -1,4 +1,6 @@
-/* FollowUp Manager Layout */
+/* ============================================================
+   Follow-up Manager — page layout
+   ============================================================ */
 .followup-manager {
   display: flex;
   gap: 0;
@@ -15,7 +17,7 @@
 }
 
 .followup-right-sidebar {
-  width: 300px;
+  width: 340px;
   flex-shrink: 0;
   border-left: 1px solid var(--border-grey);
   background: var(--white);
@@ -23,20 +25,20 @@
   padding: 16px;
 }
 
-/* Header Badge */
+/* Header pill */
 .followup-header-badge {
   background: var(--primary);
   color: var(--white);
   font-size: 14px;
   font-weight: 600;
-  padding: 8px 20px;
-  border-radius: 4px;
+  padding: 8px 16px;
+  border-radius: 6px;
   display: inline-block;
   margin: 16px 16px 0;
   width: fit-content;
 }
 
-/* Tabs */
+/* Status tabs */
 .followup-tabs {
   display: flex;
   gap: 24px;
@@ -52,184 +54,119 @@
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s;
+  transition: opacity 0.15s;
 }
-
-.followup-tab:hover {
-  opacity: 0.8;
-}
-
-.followup-tab.active {
-  font-weight: 600;
-}
+.followup-tab:hover { opacity: 0.85; }
+.followup-tab.active { font-weight: 700; }
 
 /* Toolbar */
 .followup-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 16px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--border-grey);
+  gap: 12px;
 }
 
-/* Cards Area */
+/* List */
 .followup-cards-area {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 12px 16px 24px;
 }
 
-.followup-cards-area::-webkit-scrollbar {
-  width: 8px;
-}
-.followup-cards-area::-webkit-scrollbar-track {
-  background: var(--input-grey);
-  border-radius: 10px;
-}
-.followup-cards-area::-webkit-scrollbar-thumb {
-  background: var(--text-grey);
-  border-radius: 10px;
-}
-.followup-cards-area::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
-}
+.followup-cards-area::-webkit-scrollbar { width: 8px; }
+.followup-cards-area::-webkit-scrollbar-track { background: var(--input-grey); border-radius: 10px; }
+.followup-cards-area::-webkit-scrollbar-thumb { background: var(--text-grey); border-radius: 10px; }
 
-/* Empty State */
+/* Empty state */
 .followup-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 80px 20px;
+  padding: 60px 20px;
   text-align: center;
 }
-
 .followup-empty-img {
-  width: 180px;
-  height: 180px;
-  opacity: 0.7;
-  margin-bottom: 20px;
+  width: 140px; height: 140px; opacity: 0.7; margin-bottom: 16px;
 }
+.followup-empty-title { font-size: 16px; font-weight: 600; color: #555; margin: 0 0 6px; }
+.followup-empty-text  { font-size: 13px; color: #888; margin: 0; }
 
-.followup-empty-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin: 0 0 8px;
-}
-
-.followup-empty-text {
-  font-size: 14px;
-  color: var(--mid-grey);
-  margin: 0;
-}
-
-/* Followup Card Overrides */
-.followup-card {
-  width: 100%;
-  border-left: 3px solid var(--success);
-}
-
-.followup-checkbox {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: var(--primary);
-}
-
-/* Followup Detail Tabs (inside card) */
-.followup-tabs-inner {
-  display: flex;
-  gap: 0;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--border-grey);
-}
-
-.followup-detail-tab {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  padding: 10px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.followup-detail-tab.active {
-  color: var(--black);
-  border-bottom-color: var(--info);
-  font-weight: 600;
-}
-
-.followup-detail-tab:hover {
-  color: var(--dark-grey);
-}
-
-/* Followup Details Grid */
-.followup-details-grid {
+/* ============================================================
+   Follow-up row (single item)
+   ============================================================ */
+.followup-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
-}
-
-.stage-value {
-  color: var(--info);
-  font-weight: 500;
-}
-
-.remarks-link {
-  color: var(--info);
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.remarks-link:hover {
-  text-decoration: underline;
-}
-
-/* Activity counts in followup card header */
-.activity-count {
-  display: inline-flex;
+  grid-template-columns: 100px 1fr auto;
+  gap: 16px;
   align-items: center;
-  justify-content: center;
-  background: var(--border-grey);
-  border-radius: 50%;
-  width: 28px;
-  height: 28px;
-  font-size: 11px;
-  position: relative;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.followup-row:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-.activity-count.error {
-  background: var(--primary-light);
-}
-
-.activity-number {
+.followup-row-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #444;
   font-weight: 600;
-  color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 13px;
 }
 
-/* ========== Calendar ========== */
-.followup-calendar {
-  background: var(--white);
+.followup-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
-
-.calendar-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--dark-grey);
+.followup-row-lead {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.followup-row-meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
-.calendar-icon {
-  font-size: 20px;
+.followup-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+
+/* ============================================================
+   Calendar
+   ============================================================ */
+.followup-calendar {
+  background: var(--white);
+  border-radius: 8px;
+}
+
+.calendar-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #222;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.calendar-icon { color: var(--primary); }
 
 .calendar-nav {
   display: flex;
@@ -246,100 +183,129 @@
   padding: 4px 8px !important;
   font-size: 13px !important;
   font-family: inherit !important;
-  color: var(--dark-grey) !important;
-  background-color: var(--white) !important;
+  color: #333 !important;
+  background-color: #fff !important;
   cursor: pointer !important;
   outline: none !important;
-  min-width: 80px;
   height: 32px;
-  -webkit-appearance: menulist !important;
-  -moz-appearance: menulist !important;
   appearance: menulist !important;
-  opacity: 1 !important;
 }
+.calendar-year-select { min-width: 75px; }
 
-.calendar-month-select option,
-.calendar-year-select option {
-  color: var(--dark-grey) !important;
-  background: var(--white) !important;
+.calendar-today-btn {
+  margin-left: 4px;
+  padding: 4px 10px;
+  height: 32px;
+  background: #fff;
+  border: 1px solid var(--border-grey);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+  transition: background 0.15s;
 }
-
-.calendar-year-select {
-  min-width: 65px;
-}
+.calendar-today-btn:hover { background: #fdf3ed; }
 
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  gap: 4px;
   text-align: center;
 }
 
 .calendar-day-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--primary);
+  font-size: 11px;
+  font-weight: 700;
+  color: #888;
   padding: 6px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
-
-.calendar-day-label.sunday {
-  color: var(--primary);
-}
-
-.calendar-day-label.saturday {
-  color: var(--primary);
-}
+.calendar-day-label.sunday,
+.calendar-day-label.saturday { color: var(--primary); }
 
 .calendar-cell {
+  position: relative;
   font-size: 13px;
-  padding: 8px 4px;
-  border-radius: 4px;
+  padding: 8px 0 14px;
+  border-radius: 6px;
   cursor: pointer;
-  color: var(--dark-grey);
-  transition: background 0.15s;
+  color: #333;
+  transition: background 0.15s, transform 0.1s;
+  min-height: 38px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  user-select: none;
 }
+.calendar-cell:hover { background: #fafafa; }
+.calendar-cell:active { transform: scale(0.97); }
 
-.calendar-cell:hover {
-  background: var(--hover-grey);
-}
+.calendar-cell.empty { cursor: default; }
+.calendar-cell.empty:hover { background: transparent; }
 
-.calendar-cell.empty {
-  cursor: default;
-}
+.calendar-cell-num { line-height: 1; }
 
-.calendar-cell.empty:hover {
-  background: transparent;
-}
-
+/* Today gets an outline ring; selection gets a filled bg. */
 .calendar-cell.today {
-  background: var(--primary);
-  color: var(--white);
+  border: 2px solid var(--primary);
   font-weight: 700;
-  border-radius: 50%;
+  color: var(--primary);
+  padding: 6px 0 12px;
 }
-
-.calendar-cell.today:hover {
-  background: var(--primary-dark);
-}
-
 .calendar-cell.selected {
   background: var(--primary);
-  color: var(--white);
+  color: var(--white) !important;
   font-weight: 700;
+  border: 2px solid var(--primary);
+  padding: 6px 0 12px;
+}
+.calendar-cell.selected .calendar-dot { box-shadow: 0 0 0 1.5px #fff; }
+
+.calendar-cell.has-event:not(.selected):not(.today) {
+  background: #fff7ee;
+}
+
+.calendar-cell.sunday  { color: #c2185b; }
+.calendar-cell.saturday { color: #1565c0; }
+.calendar-cell.selected.sunday,
+.calendar-cell.selected.saturday { color: #fff; }
+
+/* Status dots under the day number */
+.calendar-dots {
+  position: absolute;
+  bottom: 4px;
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  justify-content: center;
+}
+.calendar-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
 }
+.dot-planned { background: #FB8C00; }
+.dot-done    { background: #43A047; }
+.dot-missed  { background: #E53935; }
 
-.calendar-cell.has-event {
-  background: var(--primary-light);
-  font-weight: 600;
+/* Legend below calendar */
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: #555;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed #eee;
 }
-
-.calendar-cell.has-event.today,
-.calendar-cell.has-event.selected {
-  background: var(--primary);
-  color: var(--white);
-}
-
-.calendar-cell.saturday {
-  color: var(--primary);
+.calendar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }

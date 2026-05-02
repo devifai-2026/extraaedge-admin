@@ -18,30 +18,36 @@ import AutoModeIcon from '@mui/icons-material/AutoMode';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
 import IntegrationInstructionsIcon from '@mui/icons-material/IntegrationInstructions';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import { hasTab } from '../../lib/rbac';
 
+// Each menu item declares the tab key it maps to (matches DEFAULT_TAB_KEYS on backend).
+// Items are filtered against the user's allowed_tabs from /auth/login.
 const menuItems = [
-  { id: 1, label: 'Analytics Dashboard', icon: DashboardIcon, path: '/dashboard' },
-  { id: 2, label: 'Lead Manager', icon: PeopleAltIcon, path: '/leadlist' },
-  { id: 3, label: 'Raw Data Manager', icon: FolderIcon, path: '/rawdata' },
-  { id: 4, label: 'WhatsApp Chat', icon: WhatsAppIcon, path: '/whatsapplist', badge: '12' },
-  { id: 5, label: 'Follow-ups Manager', icon: CalendarTodayIcon, path: '/followupmanager' },
-  { id: 6, label: 'Upload Failed Leads', icon: UploadFileIcon, path: '/failedleads' },
-  { id: 7, label: 'Bulk Action Stage', icon: SettingsIcon, path: '/bulkuploadlist' },
-  { id: 8, label: 'Bulk Marketing Campaign', icon: CampaignIcon, path: '/bulkmarketingcampaign' },
-  { id: 9, label: 'Drip Marketing Campaign', icon: Person4Icon, path: '/dripmarketingcampaign' },
-  { id: 10, label: 'Remarketing', icon: AdjustIcon, path: '/remarketing' },
-  { id: 11, label: 'Workflow Automation', icon: AutoModeIcon, path: '/automations' },
-  { id: 12, label: 'Connected Accounts', icon: AccountTreeIcon, path: '/connectedaccounts' },
-  { id: 13, label: 'Basic Settings', icon: SettingsIcon, path: '/settings' },
-  { id: 14, label: 'Advanced Settings', icon: SettingsSuggestIcon, path: '/advancedsettings' },
-  { id: 15, label: 'Third Party Integration', icon: IntegrationInstructionsIcon, path: '/thirdpartyintegration' },
+  { id: 1, label: 'Analytics Dashboard', icon: DashboardIcon, path: '/dashboard', tab: 'dashboard' },
+  { id: 2, label: 'Lead Manager', icon: PeopleAltIcon, path: '/leadlist', tab: 'leads' },
+  { id: 3, label: 'Raw Data Manager', icon: FolderIcon, path: '/rawdata', tab: 'raw_data' },
+  { id: 4, label: 'WhatsApp Chat', icon: WhatsAppIcon, path: '/whatsapplist', tab: 'whatsapp' },
+  { id: 5, label: 'Follow-ups Manager', icon: CalendarTodayIcon, path: '/followupmanager', tab: 'followups' },
+  { id: 6, label: 'Upload Failed Leads', icon: UploadFileIcon, path: '/failedleads', tab: 'failed_leads' },
+  { id: 7, label: 'Bulk Action Stage', icon: SettingsIcon, path: '/bulkuploadlist', tab: 'bulk_upload' },
+  { id: 8, label: 'Bulk Marketing Campaign', icon: CampaignIcon, path: '/bulkmarketingcampaign', tab: 'bulk_marketing' },
+  { id: 9, label: 'Drip Marketing Campaign', icon: Person4Icon, path: '/dripmarketingcampaign', tab: 'drip_marketing' },
+  { id: 10, label: 'Remarketing', icon: AdjustIcon, path: '/remarketing', tab: 'remarketing' },
+  { id: 11, label: 'Workflow Automation', icon: AutoModeIcon, path: '/automations', tab: 'automation' },
+  { id: 12, label: 'Connected Accounts', icon: AccountTreeIcon, path: '/connectedaccounts', tab: 'connected_accounts' },
+  { id: 13, label: 'Basic Settings', icon: SettingsIcon, path: '/settings', tab: 'settings.email_templates' },
+  { id: 14, label: 'Advanced Settings', icon: SettingsSuggestIcon, path: '/advancedsettings', tab: 'advanced.users_roles' },
+  { id: 15, label: 'Third Party Integration', icon: IntegrationInstructionsIcon, path: '/thirdpartyintegration', tab: 'third_party_integration' },
 ];
 
 const bottomMenuItems = [
   { id: 16, label: 'Raise a Ticket', icon: SupportAgentIcon, action: 'modal' },
+  { id: 17, label: 'My Tickets', icon: SupportAgentIcon, path: '/tickets' },
 ];
 
-function Sidebar({ collapsed = false }) {
+function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
@@ -54,9 +60,12 @@ function Sidebar({ collapsed = false }) {
     }
   };
 
+  // Hide items the user's role doesn't have access to (allowed_tabs from /auth/login).
+  const visibleItems = (items) => items.filter((item) => !item.tab || hasTab(item.tab));
+
   const renderMenuItems = (items) => (
     <ul className="menu-list">
-      {items.map((item) => {
+      {visibleItems(items).map((item) => {
         const IconComponent = item.icon;
         const isActive = !item.action && location.pathname === item.path;
         return (
@@ -92,6 +101,36 @@ function Sidebar({ collapsed = false }) {
         <div className="sidebar-top">{renderMenuItems(menuItems)}</div>
         <div className="sidebar-bottom">{renderMenuItems(bottomMenuItems)}</div>
       </div>
+      {canToggle && (
+        <button
+          type="button"
+          onClick={onToggle}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          style={{
+            position: 'fixed',
+            top: 84,
+            left: collapsed ? 44 : 268,
+            width: 24,
+            height: 24,
+            borderRadius: '50%',
+            border: `1px solid ${colors.borderGrey}`,
+            background: colors.white,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 200,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+            padding: 0,
+            transition: 'left 200ms ease',
+          }}
+        >
+          {collapsed
+            ? <ChevronRightIcon sx={{ fontSize: 16, color: colors.primary }} />
+            : <ChevronLeftIcon sx={{ fontSize: 16, color: colors.primary }} />
+          }
+        </button>
+      )}
       <RaiseTicketModal open={ticketModalOpen} onClose={() => setTicketModalOpen(false)} />
     </>
   );

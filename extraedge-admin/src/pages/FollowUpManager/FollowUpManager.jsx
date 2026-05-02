@@ -1,375 +1,486 @@
-import React, { useState, useMemo } from "react";
-import { IconButton, Box } from "@mui/material";
-import SwapVertIcon from "@mui/icons-material/SwapVert";
-import RefreshIcon from "@mui/icons-material/Refresh";
-import FilterAltIcon from "@mui/icons-material/FilterAlt";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import CallIcon from "@mui/icons-material/Call";
-import ChatIcon from "@mui/icons-material/Chat";
-import MailOutlineIcon from "@mui/icons-material/MailOutlined";
-import SmsIcon from "@mui/icons-material/Sms";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
-import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import WhatsAppIcon from "@mui/icons-material/WhatsApp";
+// Follow-up Manager page — fully API-bound.
+//
+//   GET /follow-ups?date=YYYY-MM-DD&status=&assigned_user_id=&q=…
+//                                                → list for the selected day
+//   GET /follow-ups/calendar?date_from&date_to    → per-day counts for the
+//                                                   calendar's status dots
+//
+// Calendar shows up to 3 dots under each day: planned (amber), done (green),
+// missed (red). Clicking a date filters the right-pane list.
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  IconButton, Box, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText,
+  TextField, InputAdornment, Chip, CircularProgress, Autocomplete,
+} from '@mui/material';
+import SwapVertIcon from '@mui/icons-material/SwapVert';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import FilterAltIcon from '@mui/icons-material/FilterAlt';
+import SearchIcon from '@mui/icons-material/Search';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
-import LeadCard from "../../components/LeadCard/LeadCard";
-import { colors } from "../../theme/colors";
-import "./FollowUpManager.css";
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import EventIcon from '@mui/icons-material/Event';
+import PersonIcon from '@mui/icons-material/Person';
+import { followUpsApi, usersApi } from '../../lib/endpoints';
+import { useNavigate } from 'react-router-dom';
+import { auth } from '../../lib/endpoints';
+import { useDropdown } from '../../lib/useDropdowns';
+import { colors } from '../../theme/colors';
+import './FollowUpManager.css';
 
-// Mock followup data with stage info and dates
-const followupLeads = [
-  {
-    id: 1,
-    name: "Nikhil Pr...",
-    phone: "9881874904",
-    status: "12-Cold",
-    subStatus: "Not Interested, got job",
-    value: "",
-    personal: {
-      program: "Data Analyst Training and Certification",
-      country: "India",
-      state: "Maharashtra",
-      district: "Pune",
-      city: "Pune",
-      leadAddedOn: "Jan 20, 2026 10:47 AM",
-      lastUpdatedOn: "Apr 7, 2026 3:58 PM",
-      previousLeadOwner: "Nikita Nagle",
-      currentLeadOwner: "Divya Nair",
-      leadAge: "80 Days",
-    },
-    source: [
-      { channel: "Direct", source: "Website", campaign: "ORGANIC", medium: "Free" },
-    ],
-    followup: {
-      scheduledOn: "",
-      remarks: "plan changed for 2-3 ...",
-      stage: "12-Cold",
-      subStage: "Not Interested, got job",
-    },
-    followupDate: "2026-04-21",
-    followupType: "done",
-  },
-  {
-    id: 2,
-    name: "Aarav Singh",
-    phone: "9876543210",
-    status: "08-Interested",
-    subStatus: "Awaiting confirmation",
-    value: "",
-    personal: {
-      program: "Advanced Python Development",
-      country: "India",
-      state: "Maharashtra",
-      district: "Pune",
-      city: "Pune",
-      leadAddedOn: "Feb 15, 2026 2:30 PM",
-      lastUpdatedOn: "Apr 5, 2026 5:15 PM",
-      previousLeadOwner: "Rajesh Kumar",
-      currentLeadOwner: "Priya Sharma",
-      leadAge: "55 Days",
-    },
-    source: [
-      { channel: "Facebook", source: "Social Media", campaign: "PAID", medium: "CPC" },
-    ],
-    followup: {
-      scheduledOn: "Apr 15, 2026 3:00 PM",
-      remarks: "Contact regarding course fees and batch timings",
-      stage: "08-Interested",
-      subStage: "Awaiting confirmation",
-    },
-    followupDate: "2026-04-15",
-    followupType: "planned",
-  },
-  {
-    id: 3,
-    name: "Sneha Desai",
-    phone: "9123456789",
-    status: "10-Enrolled",
-    subStatus: "Active student",
-    value: "",
-    personal: {
-      program: "Full Stack Web Development",
-      country: "India",
-      state: "Karnataka",
-      district: "Bangalore",
-      city: "Bangalore",
-      leadAddedOn: "Dec 10, 2025 11:20 AM",
-      lastUpdatedOn: "Apr 8, 2026 9:45 AM",
-      previousLeadOwner: "Amit Patel",
-      currentLeadOwner: "Neha Gupta",
-      leadAge: "122 Days",
-    },
-    source: [
-      { channel: "LinkedIn", source: "Professional Network", campaign: "ORGANIC", medium: "Referral" },
-    ],
-    followup: {
-      scheduledOn: "Apr 10, 2026 10:00 AM",
-      remarks: "Course progress review and assignment submission",
-      stage: "10-Enrolled",
-      subStage: "Active student",
-    },
-    followupDate: "2026-04-10",
-    followupType: "missed",
-  },
-  {
-    id: 4,
-    name: "Rohit Verma",
-    phone: "9555666777",
-    status: "05-Qualified",
-    subStatus: "Negotiation phase",
-    value: "Untouched",
-    personal: {
-      program: "Data Science with ML",
-      country: "India",
-      state: "Delhi",
-      district: "Central Delhi",
-      city: "New Delhi",
-      leadAddedOn: "Mar 1, 2026 8:15 AM",
-      lastUpdatedOn: "Apr 6, 2026 4:20 PM",
-      previousLeadOwner: "Vikram Singh",
-      currentLeadOwner: "Anjali Verma",
-      leadAge: "41 Days",
-    },
-    source: [
-      { channel: "Google Ads", source: "Search Engine", campaign: "PAID", medium: "CPC" },
-    ],
-    followup: {
-      scheduledOn: "Apr 22, 2026 2:30 PM",
-      remarks: "Follow up on EMI options and scholarship eligibility",
-      stage: "05-Qualified",
-      subStage: "Negotiation phase",
-    },
-    followupDate: "2026-04-22",
-    followupType: "planned",
-  },
+const STATUS_TABS = [
+  { key: 'all',     label: 'All' },
+  { key: 'planned', label: 'Planned',   color: '#FB8C00' },
+  { key: 'done',    label: 'Done',      color: '#43A047' },
+  { key: 'missed',  label: 'Missed',    color: '#E53935' },
+  { key: 'cancelled', label: 'Cancelled', color: '#9E9E9E' },
 ];
 
-const TABS = [
-  { key: "all", label: "All" },
-  { key: "done", label: "Done Followups", color: colors.success },
-  { key: "missed", label: "Missed Followups", color: colors.error },
-  { key: "planned", label: "Planned Followups", color: colors.primary },
+const SORT_OPTIONS = [
+  { key: 'time_asc',  label: 'Time (earliest first)' },
+  { key: 'time_desc', label: 'Time (latest first)' },
+  { key: 'name_asc',  label: 'Lead name (A → Z)' },
 ];
 
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-const DAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const toDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const fmtTime = (iso) => iso ? new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '';
+const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
 
-function FollowupCalendar({ selectedDate, onDateSelect, eventDates }) {
-  const [viewMonth, setViewMonth] = useState(selectedDate.getMonth());
-  const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
+// ===== Calendar =====
+function FollowupCalendar({ selectedDate, onDateSelect, dayBuckets, loading }) {
+  const [view, setView] = useState({
+    month: selectedDate.getMonth(),
+    year:  selectedDate.getFullYear(),
+  });
 
   const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const todayStr = toDateStr(today);
+  const selectedStr = toDateStr(selectedDate);
 
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(view.year, view.month + 1, 0).getDate();
+  const firstDayOfWeek = new Date(view.year, view.month, 1).getDay();
 
-  const calendarDays = [];
-  for (let i = 0; i < firstDayOfWeek; i++) {
-    calendarDays.push(null);
-  }
-  for (let d = 1; d <= daysInMonth; d++) {
-    calendarDays.push(d);
-  }
+  // Pad start; fill days; pad end so we always render 6 weeks for stable height.
+  const cells = [];
+  for (let i = 0; i < firstDayOfWeek; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length < 42) cells.push(null);
 
-  const prevMonth = () => {
-    if (viewMonth === 0) {
-      setViewMonth(11);
-      setViewYear(viewYear - 1);
-    } else {
-      setViewMonth(viewMonth - 1);
-    }
+  const goPrev = () => {
+    setView((v) => v.month === 0 ? { month: 11, year: v.year - 1 } : { ...v, month: v.month - 1 });
+  };
+  const goNext = () => {
+    setView((v) => v.month === 11 ? { month: 0, year: v.year + 1 } : { ...v, month: v.month + 1 });
+  };
+  const jumpToday = () => {
+    setView({ month: today.getMonth(), year: today.getFullYear() });
+    onDateSelect(today);
   };
 
-  const nextMonth = () => {
-    if (viewMonth === 11) {
-      setViewMonth(0);
-      setViewYear(viewYear + 1);
-    } else {
-      setViewMonth(viewMonth + 1);
-    }
-  };
-
-  const selectedStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`;
+  // Bubble months/years (3 in past, 3 in future)
+  const yearChoices = useMemo(() => {
+    const ty = today.getFullYear();
+    return Array.from({ length: 7 }, (_, i) => ty - 3 + i);
+  }, [today]);
 
   return (
     <div className="followup-calendar">
       <div className="calendar-title">
-        <span className="calendar-icon">
-          <CalendarMonthIcon />
-        </span>
-        Followup Calendar
+        <span className="calendar-icon"><CalendarMonthIcon /></span>
+        Follow-up Calendar
+        {loading && <CircularProgress size={14} sx={{ ml: 1 }} />}
       </div>
+
       <div className="calendar-nav">
-        <IconButton size="small" onClick={prevMonth}>
-          <ChevronLeftIcon />
-        </IconButton>
+        <IconButton size="small" onClick={goPrev} title="Previous month"><ChevronLeftIcon /></IconButton>
         <select
           className="calendar-month-select"
-          value={viewMonth}
-          onChange={(e) => setViewMonth(Number(e.target.value))}
+          value={view.month}
+          onChange={(e) => setView({ ...view, month: Number(e.target.value) })}
         >
-          {MONTH_NAMES.map((m, i) => (
-            <option key={i} value={i}>{m}</option>
-          ))}
+          {MONTH_NAMES.map((m, i) => <option key={i} value={i}>{m}</option>)}
         </select>
         <select
           className="calendar-year-select"
-          value={viewYear}
-          onChange={(e) => setViewYear(Number(e.target.value))}
+          value={view.year}
+          onChange={(e) => setView({ ...view, year: Number(e.target.value) })}
         >
-          {[2025, 2026, 2027].map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
+          {yearChoices.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
-        <IconButton size="small" onClick={nextMonth}>
-          <ChevronRightIcon />
-        </IconButton>
+        <IconButton size="small" onClick={goNext} title="Next month"><ChevronRightIcon /></IconButton>
+        <button className="calendar-today-btn" onClick={jumpToday} title="Jump to today">Today</button>
       </div>
 
       <div className="calendar-grid">
         {DAY_LABELS.map((d) => (
-          <div key={d} className={`calendar-day-label ${d === "Su" ? "sunday" : ""} ${d === "Sa" ? "saturday" : ""}`}>
+          <div
+            key={d}
+            className={`calendar-day-label ${d === 'Su' ? 'sunday' : ''} ${d === 'Sa' ? 'saturday' : ''}`}
+          >
             {d}
           </div>
         ))}
-        {calendarDays.map((day, idx) => {
-          if (day === null) return <div key={`empty-${idx}`} className="calendar-cell empty" />;
-
-          const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        {cells.map((day, idx) => {
+          if (day === null) return <div key={`e-${idx}`} className="calendar-cell empty" />;
+          const dateStr = `${view.year}-${String(view.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           const isToday = dateStr === todayStr;
           const isSelected = dateStr === selectedStr;
-          const hasEvent = eventDates.has(dateStr);
-          const dayOfWeek = (firstDayOfWeek + day - 1) % 7;
-          const isSaturday = dayOfWeek === 6;
-
+          const bucket = dayBuckets.get(dateStr);
+          const dow = (firstDayOfWeek + day - 1) % 7;
+          const tooltip = bucket
+            ? `${bucket.total} follow-up${bucket.total === 1 ? '' : 's'}${bucket.planned ? ` · ${bucket.planned} planned` : ''}${bucket.done ? ` · ${bucket.done} done` : ''}${bucket.missed ? ` · ${bucket.missed} missed` : ''}`
+            : '';
           return (
-            <div
-              key={day}
-              className={`calendar-cell ${isToday ? "today" : ""} ${isSelected ? "selected" : ""} ${hasEvent ? "has-event" : ""} ${isSaturday ? "saturday" : ""}`}
-              onClick={() => onDateSelect(new Date(viewYear, viewMonth, day))}
-            >
-              {day}
-            </div>
+            <Tooltip title={tooltip} arrow placement="top" key={day} disableHoverListener={!bucket}>
+              <div
+                className={`calendar-cell ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''} ${bucket ? 'has-event' : ''} ${dow === 0 ? 'sunday' : ''} ${dow === 6 ? 'saturday' : ''}`}
+                onClick={() => onDateSelect(new Date(view.year, view.month, day))}
+              >
+                <span className="calendar-cell-num">{day}</span>
+                {bucket && (
+                  <div className="calendar-dots">
+                    {bucket.planned > 0 && <span className="calendar-dot dot-planned" />}
+                    {bucket.done    > 0 && <span className="calendar-dot dot-done" />}
+                    {bucket.missed  > 0 && <span className="calendar-dot dot-missed" />}
+                  </div>
+                )}
+              </div>
+            </Tooltip>
           );
         })}
+      </div>
+
+      {/* Legend */}
+      <div className="calendar-legend">
+        <span><span className="calendar-dot dot-planned" /> Planned</span>
+        <span><span className="calendar-dot dot-done" /> Done</span>
+        <span><span className="calendar-dot dot-missed" /> Missed</span>
       </div>
     </div>
   );
 }
 
-function toDateStr(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
+// ===== Main =====
+export default function FollowUpManager() {
+  const sessionUser = auth.getUser() || {};
+  const isAdmin = sessionUser.role === 'super_admin';
+  const isManager = sessionUser.role === 'sales_manager';
 
-function FollowUpManager() {
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState('all');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [calendarMonth, setCalendarMonth] = useState({ month: selectedDate.getMonth(), year: selectedDate.getFullYear() });
+
+  // Filters
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [counsellorId, setCounsellorId] = useState('');
+  const [stageId, setStageId] = useState('');
+  const [sort, setSort] = useState('time_asc');
+  const [counsellors, setCounsellors] = useState([]);
+
+  // Data
+  const [followups, setFollowups] = useState([]);
+  const [calendarData, setCalendarData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [calLoading, setCalLoading] = useState(false);
+
+  // Anchor refs
+  const [sortAnchor, setSortAnchor] = useState(null);
+  const [filterAnchor, setFilterAnchor] = useState(null);
+
+  // Stages dropdown for filter
+  const stages = useDropdown('stages');
+
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Load counsellors for the manager / admin filter
+  useEffect(() => {
+    if (!isAdmin && !isManager) return;
+    const loader = isManager ? usersApi.myTeam() : usersApi.list({ role: 'counsellor', limit: 200 });
+    loader
+      .then((r) => setCounsellors((r?.data || []).filter((u) => u.role === 'counsellor' && u.is_active !== false)))
+      .catch(() => setCounsellors([]));
+  }, [isAdmin, isManager]);
 
   const selectedDateStr = toDateStr(selectedDate);
 
-  const eventDates = useMemo(() => {
-    return new Set(followupLeads.map((l) => l.followupDate));
-  }, []);
+  // Followup list for the selected day
+  const reloadList = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = { date: selectedDateStr, limit: 200 };
+      if (activeTab !== 'all') params.status = activeTab;
+      if (counsellorId)        params.assigned_user_id = counsellorId;
+      if (stageId)             params.stage_id = stageId;
+      if (debouncedSearch)     params.q = debouncedSearch;
+      const r = await followUpsApi.list(params);
+      let rows = r?.data || [];
+      // Client-side sort fallbacks
+      if (sort === 'time_desc') rows = [...rows].reverse();
+      if (sort === 'name_asc')  rows = [...rows].sort((a, b) => (a.lead_name || '').localeCompare(b.lead_name || ''));
+      setFollowups(rows);
+    } catch {
+      setFollowups([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedDateStr, activeTab, counsellorId, stageId, debouncedSearch, sort]);
 
-  // Leads for the selected date
-  const leadsForDate = useMemo(() => {
-    return followupLeads.filter((l) => l.followupDate === selectedDateStr);
-  }, [selectedDateStr]);
+  useEffect(() => { reloadList(); }, [reloadList]);
 
-  // Further filter by active tab
-  const filteredLeads = useMemo(() => {
-    if (activeTab === "all") return leadsForDate;
-    return leadsForDate.filter((l) => l.followupType === activeTab);
-  }, [activeTab, leadsForDate]);
+  // Per-day counts for the visible calendar month
+  const reloadCalendar = useCallback(async () => {
+    const fromDate = new Date(calendarMonth.year, calendarMonth.month, 1);
+    const toDate   = new Date(calendarMonth.year, calendarMonth.month + 1, 0, 23, 59, 59);
+    setCalLoading(true);
+    try {
+      const params = {
+        date_from: fromDate.toISOString(),
+        date_to:   toDate.toISOString(),
+      };
+      if (counsellorId) params.assigned_user_id = counsellorId;
+      const r = await followUpsApi.calendar(params);
+      setCalendarData(r?.data || []);
+    } catch {
+      setCalendarData([]);
+    } finally {
+      setCalLoading(false);
+    }
+  }, [calendarMonth, counsellorId]);
 
-  // Tab counts based on the selected date's leads
+  useEffect(() => { reloadCalendar(); }, [reloadCalendar]);
+
+  // Bucket lookup by YYYY-MM-DD
+  const dayBuckets = useMemo(() => {
+    const m = new Map();
+    for (const r of calendarData) m.set(r.day, r);
+    return m;
+  }, [calendarData]);
+
+  // Status counts for tabs (for the selected day)
   const tabCounts = useMemo(() => {
-    const counts = { all: leadsForDate.length, done: 0, missed: 0, planned: 0 };
-    leadsForDate.forEach((l) => {
-      if (counts[l.followupType] !== undefined) counts[l.followupType]++;
-    });
+    const counts = { all: followups.length, planned: 0, done: 0, missed: 0, cancelled: 0 };
+    for (const f of followups) {
+      if (counts[f.status] !== undefined) counts[f.status] += 1;
+    }
     return counts;
-  }, [leadsForDate]);
+  }, [followups]);
+
+  const onCalendarSelect = (d) => {
+    setSelectedDate(d);
+    setCalendarMonth({ month: d.getMonth(), year: d.getFullYear() });
+  };
 
   return (
     <div className="followup-manager">
-      {/* Left: Main content */}
       <div className="followup-main">
-        {/* Header badge */}
         <div className="followup-header-badge">
-          Followups ({tabCounts.all})
+          Follow-ups for {fmtDate(selectedDate)} ({tabCounts.all})
         </div>
 
-        {/* Tabs */}
+        {/* Status tabs */}
         <div className="followup-tabs">
-          {TABS.map((tab) => (
+          {STATUS_TABS.map((t) => (
             <button
-              key={tab.key}
-              className={`followup-tab ${activeTab === tab.key ? "active" : ""}`}
-              onClick={() => setActiveTab(tab.key)}
+              key={t.key}
+              className={`followup-tab ${activeTab === t.key ? 'active' : ''}`}
+              onClick={() => setActiveTab(t.key)}
               style={{
-                color: tab.color || (activeTab === tab.key ? colors.primary : colors.textSecondary),
-                borderBottom: activeTab === tab.key ? `2px solid ${tab.color || colors.primary}` : "2px solid transparent",
+                color: t.color || (activeTab === t.key ? colors.primary : colors.textSecondary),
+                borderBottom: activeTab === t.key ? `2px solid ${t.color || colors.primary}` : '2px solid transparent',
               }}
             >
-              {tab.label} ({tabCounts[tab.key]})
+              {t.label} ({tabCounts[t.key] ?? 0})
             </button>
           ))}
         </div>
 
-        {/* Toolbar */}
+        {/* Toolbar — search + sort + filter + refresh */}
         <div className="followup-toolbar">
-          <IconButton size="small">
-            <SwapVertIcon sx={{ color: colors.primary }} />
-          </IconButton>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <IconButton size="small">
-              <RefreshIcon sx={{ color: colors.primary }} />
-            </IconButton>
-            <IconButton size="small">
-              <FilterAltIcon sx={{ color: colors.primary }} />
-            </IconButton>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, flexWrap: 'wrap' }}>
+            <TextField
+              size="small"
+              placeholder="Search by lead name / phone / email"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+              }}
+              sx={{ minWidth: 280 }}
+            />
+            {(isAdmin || isManager) && (
+              <Autocomplete
+                size="small"
+                options={[{ id: '', name: 'All counsellors' }, ...counsellors]}
+                getOptionLabel={(o) => o.name || ''}
+                isOptionEqualToValue={(o, v) => o.id === v.id}
+                value={counsellors.find((u) => u.id === counsellorId) || { id: '', name: 'All counsellors' }}
+                onChange={(_e, opt) => setCounsellorId(opt?.id || '')}
+                sx={{ minWidth: 220 }}
+                renderInput={(p) => <TextField {...p} placeholder="Counsellor" />}
+              />
+            )}
+            <Autocomplete
+              size="small"
+              options={[{ id: '', name: 'Any stage' }, ...(stages.data || []).filter((s) => s.is_active !== false)]}
+              getOptionLabel={(o) => o.name || ''}
+              isOptionEqualToValue={(o, v) => o.id === v.id}
+              value={(stages.data || []).find((s) => s.id === stageId) || { id: '', name: 'Any stage' }}
+              onChange={(_e, opt) => setStageId(opt?.id || '')}
+              sx={{ minWidth: 200 }}
+              renderInput={(p) => <TextField {...p} placeholder="Stage" />}
+            />
           </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Tooltip title="Sort">
+              <IconButton size="small" onClick={(e) => setSortAnchor(e.currentTarget)}>
+                <SwapVertIcon sx={{ color: colors.primary }} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Reload">
+              <IconButton size="small" onClick={() => { reloadList(); reloadCalendar(); }}>
+                <RefreshIcon sx={{ color: colors.primary }} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="More filters">
+              <IconButton size="small" onClick={(e) => setFilterAnchor(e.currentTarget)}>
+                <FilterAltIcon sx={{ color: colors.primary }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
+
+          <Menu anchorEl={sortAnchor} open={Boolean(sortAnchor)} onClose={() => setSortAnchor(null)}>
+            {SORT_OPTIONS.map((o) => (
+              <MenuItem key={o.key} selected={sort === o.key} onClick={() => { setSort(o.key); setSortAnchor(null); }}>
+                <ListItemText primary={o.label} primaryTypographyProps={{ fontSize: 13 }} />
+              </MenuItem>
+            ))}
+          </Menu>
+
+          <Menu anchorEl={filterAnchor} open={Boolean(filterAnchor)} onClose={() => setFilterAnchor(null)}>
+            <MenuItem onClick={() => { setActiveTab('all'); setCounsellorId(''); setStageId(''); setSearch(''); setFilterAnchor(null); }}>
+              <ListItemIcon><FilterAltIcon fontSize="small" /></ListItemIcon>
+              <ListItemText primary="Clear all filters" primaryTypographyProps={{ fontSize: 13 }} />
+            </MenuItem>
+          </Menu>
         </div>
 
-        {/* Lead Cards or Empty State */}
+        {/* List */}
         <div className="followup-cards-area">
-          {filteredLeads.length === 0 ? (
+          {loading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>
+          )}
+          {!loading && followups.length === 0 && (
             <div className="followup-empty">
               <img
                 src="https://cdn-icons-png.flaticon.com/512/7486/7486744.png"
-                alt="No leads"
+                alt="No follow-ups"
                 className="followup-empty-img"
               />
-              <h3 className="followup-empty-title">No Leads found</h3>
+              <h3 className="followup-empty-title">No follow-ups</h3>
               <p className="followup-empty-text">
-                It looks like there are no follow-ups added yet
+                Nothing scheduled for {fmtDate(selectedDate)}{activeTab !== 'all' && ` matching "${activeTab}"`}.
               </p>
             </div>
-          ) : (
-            filteredLeads.map((lead) => (
-              <LeadCard key={lead.id} lead={lead} />
-            ))
           )}
+          {!loading && followups.map((f) => <FollowupRow key={f.id} f={f} onChanged={reloadList} />)}
         </div>
       </div>
 
-      {/* Right: Calendar sidebar */}
       <div className="followup-right-sidebar">
         <FollowupCalendar
           selectedDate={selectedDate}
-          onDateSelect={setSelectedDate}
-          eventDates={eventDates}
+          onDateSelect={onCalendarSelect}
+          dayBuckets={dayBuckets}
+          loading={calLoading}
         />
       </div>
     </div>
   );
 }
 
-export default FollowUpManager;
+// Single follow-up row in the list. Shows lead, time, status, owner.
+function FollowupRow({ f, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const navigate = useNavigate();
+  const statusColor = {
+    planned:   { bg: '#fff3e0', fg: '#e65100' },
+    done:      { bg: '#e8f5e9', fg: '#1b5e20' },
+    missed:    { bg: '#ffebee', fg: '#b71c1c' },
+    cancelled: { bg: '#eeeeee', fg: '#555' },
+  }[f.status] || { bg: '#f5f5f5', fg: '#555' };
+
+  const complete = async () => {
+    setBusy(true);
+    try { await followUpsApi.complete(f.id); onChanged?.(); }
+    catch (e) { alert(e.message || 'Failed'); }
+    finally { setBusy(false); }
+  };
+
+  // Open the lead's edit dialog by deep-linking to LeadList with ?focus=<id>;
+  // LeadList already handles the param and pops AddNewLead in edit mode.
+  const openLead = () => {
+    if (f.lead_id) navigate(`/leadlist?focus=${f.lead_id}`);
+  };
+
+  return (
+    <div
+      className="followup-row"
+      onClick={openLead}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter') openLead(); }}
+      style={{ cursor: f.lead_id ? 'pointer' : 'default' }}
+    >
+      <div className="followup-row-time">
+        <EventIcon fontSize="small" sx={{ color: '#888' }} />
+        <span>{fmtTime(f.next_action_datetime)}</span>
+      </div>
+      <div className="followup-row-main">
+        <div className="followup-row-lead">
+          <span style={{ fontWeight: 600 }}>{f.lead_name || '—'}</span>
+          <span style={{ color: '#888', fontSize: 12 }}>
+            {[f.lead_phone, f.lead_program_name].filter(Boolean).join(' · ')}
+          </span>
+        </div>
+        <div className="followup-row-meta">
+          {f.lead_stage_name && <Chip size="small" label={f.lead_stage_name} sx={{ height: 22, fontSize: 11 }} />}
+          {f.lead_assigned_to_name && (
+            <span style={{ fontSize: 12, color: '#666' }}>
+              <PersonIcon sx={{ fontSize: 14, verticalAlign: 'middle', mr: 0.3 }} />
+              {f.lead_assigned_to_name}
+            </span>
+          )}
+          {f.comment && (
+            <span style={{ fontSize: 12, color: '#444', fontStyle: 'italic', marginLeft: 8 }}>"{f.comment}"</span>
+          )}
+        </div>
+      </div>
+      <div className="followup-row-actions" onClick={(e) => e.stopPropagation()}>
+        <Chip
+          size="small"
+          label={f.status}
+          sx={{ height: 22, fontSize: 11, background: statusColor.bg, color: statusColor.fg, fontWeight: 600 }}
+        />
+        {f.status === 'planned' && (
+          <Tooltip title="Mark as done">
+            <span>
+              <IconButton size="small" onClick={complete} disabled={busy} sx={{ color: '#43A047' }}>
+                <CheckCircleIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
+      </div>
+    </div>
+  );
+}

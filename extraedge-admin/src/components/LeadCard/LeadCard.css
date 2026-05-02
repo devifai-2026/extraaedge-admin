@@ -175,6 +175,8 @@
   align-items: center;
   gap: 5px;
 }
+.untouched-badge.fresh { background: #2e7d32; }
+.untouched-badge.untouched { background: var(--primary-dark); }
 
 .untouched-dot {
   width: 6px;
@@ -211,22 +213,63 @@
   background: var(--input-grey);
   padding: 20px 24px;
   border-radius: 6px;
+  overflow: hidden;
 }
 
 .content {
   width: 100%;
+  min-height: 90px;
+}
+
+/* Slide-in animation for tab content */
+.content-anim {
+  animation: contentSlideIn 280ms cubic-bezier(.2, .8, .2, 1);
+}
+.content-anim.dir-prev { animation-name: contentSlideInPrev; }
+
+@keyframes contentSlideIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes contentSlideInPrev {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
 .content-chevron {
-  margin-left: 20px;
+  margin-left: 12px;
   display: flex;
   align-items: center;
-  color: var(--primary);
+  gap: 4px;
+}
+
+.content-chevron-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  border: none;
+  transition: transform 150ms ease, background 150ms ease;
+  padding: 0;
+}
+.content-chevron-btn:hover {
+  background: var(--primary-dark);
+  transform: scale(1.08);
+}
+.content-chevron-btn:active { transform: scale(0.95); }
+.content-chevron-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .content-chevron svg {
-  font-size: 28px;
+  font-size: 22px;
 }
 
 .grid {

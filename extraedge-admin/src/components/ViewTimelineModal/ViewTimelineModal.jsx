@@ -1,9 +1,20 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
   IconButton,
-  Chip
+  Chip,
+  CircularProgress,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Checkbox,
+  Popover,
+  Box,
+  Typography,
+  TextField,
+  Button,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import FlagIcon from "@mui/icons-material/Flag";
@@ -12,28 +23,166 @@ import HistoryIcon from "@mui/icons-material/History";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutlined";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutlined";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
-import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import KeyboardArrowDownOutlinedIcon from "@mui/icons-material/KeyboardArrowDownOutlined";
+import { leadsApi } from "../../lib/endpoints";
 import "./ViewTimelineModal.css";
 
-const activityFilters = [
-  "Lead Activity",
-  "Counselor Activity",
-  "Lead History",
-  "Lead Status Journey",
-];
+// Map a backend timeline row to a UI category.
+const categoryOf = (row) => {
+  if (row.kind === 'activity') {
+    if (row.subtype === 'stage_changed') return 'Lead Status Journey';
+    if (['assigned', 'reassign', 'auto_assign', 'refer'].includes(row.subtype)) return 'Counselor Activity';
+    return 'Lead History';
+  }
+  if (row.kind === 'note') return 'Counselor Activity';
+  if (row.kind === 'message' || row.kind === 'call') return 'Lead Activity';
+  return 'Lead History';
+};
+
+const iconFor = (row) => {
+  if (row.kind === 'activity' && row.subtype === 'stage_changed') return <SwapHorizIcon className="card-icon status-card" />;
+  if (row.kind === 'note') return <ChatBubbleOutlineIcon className="card-icon flag-card" />;
+  if (row.kind === 'call') return <FlagIcon className="card-icon flag-card" />;
+  if (row.kind === 'message') return <FlagIcon className="card-icon flag-card" />;
+  if (row.kind === 'activity') return <HistoryIcon className="card-icon history-card" />;
+  return <FlagIcon className="card-icon flag-card" />;
+};
+
+const titleFor = (row) => {
+  if (row.kind === 'activity') {
+    if (row.subtype === 'stage_changed') return 'Stage changed';
+    if (row.subtype === 'lead_created') return 'Lead created';
+    if (row.subtype === 'assigned' || row.subtype === 'reassign') return 'Lead assigned';
+    if (row.subtype === 'auto_assign') return 'Auto-assigned';
+    if (row.subtype === 'refer') return 'Lead referred';
+    return row.subtype || 'Activity';
+  }
+  if (row.kind === 'note') return 'Note';
+  if (row.kind === 'call') return `${row.subtype === 'inbound' ? 'Inbound' : 'Outbound'} call`;
+  if (row.kind === 'message') return `${row.subtype || 'Message'} message`.replace(/^./, (c) => c.toUpperCase());
+  return 'Event';
+};
+
+const fmtTime = (iso) => {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); }
+  catch { return ''; }
+};
+const fmtDate = (iso) => {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+  catch { return ''; }
+};
+const fmtDayKey = (iso) => {
+  if (!iso) return '';
+  try { return new Date(iso).toISOString().slice(0, 10); }
+  catch { return ''; }
+};
+// short label for an activity-filter menu (counts events of the given category)
+const labelWithCount = (rows, cat) => `${cat} (${rows.filter((r) => categoryOf(r) === cat).length})`;
+
+const CATEGORIES = ["Lead Activity", "Counselor Activity", "Lead History", "Lead Status Journey"];
 
 const ViewTimelineModal = ({ open, onClose, lead }) => {
-  const [dateExpanded, setDateExpanded] = useState(true);
-  const [activeFilters, setActiveFilters] = useState([...activityFilters]);
+  const [activeFilters, setActiveFilters] = useState([...CATEGORIES]);
   const [sortOrder, setSortOrder] = useState("newest");
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleRemoveFilter = (filter) => {
+  // dropdown anchors
+  const [filterMenuAnchor, setFilterMenuAnchor] = useState(null);
+  const [activityMenuAnchor, setActivityMenuAnchor] = useState(null);
+  const [datePickerAnchor, setDatePickerAnchor] = useState(null);
+
+  // Date range state
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  // Day-collapse state (so the top-right chevron can collapse all days)
+  const [allCollapsed, setAllCollapsed] = useState(false);
+  const [collapseSeq, setCollapseSeq] = useState(0); // bumps to force re-init
+
+  const reload = async () => {
+    if (!lead?.id) return;
+    setLoading(true);
+    setError('');
+    try {
+      const r = await leadsApi.timeline(lead.id, { limit: 200 });
+      setRows(r?.data || []);
+    } catch (e) {
+      setError(e.message || 'Failed to load timeline');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open && lead?.id) reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, lead?.id]);
+
+  // Reset filters when re-opened with a different lead
+  useEffect(() => {
+    if (open) {
+      setActiveFilters([...CATEGORIES]);
+      setSortOrder('newest');
+      setDateFrom('');
+      setDateTo('');
+      setAllCollapsed(false);
+    }
+  }, [open, lead?.id]);
+
+  const toggleFilter = (filter) => {
+    setActiveFilters((prev) =>
+      prev.includes(filter) ? prev.filter((f) => f !== filter) : [...prev, filter]
+    );
+  };
+  const removeFilter = (filter) => {
     setActiveFilters((prev) => prev.filter((f) => f !== filter));
+  };
+  const addFilter = (filter) => {
+    setActiveFilters((prev) => prev.includes(filter) ? prev : [...prev, filter]);
+  };
+
+  const filtered = useMemo(() => {
+    let r = rows.filter((row) => activeFilters.includes(categoryOf(row)));
+    if (dateFrom) {
+      const t = new Date(dateFrom).getTime();
+      r = r.filter((row) => new Date(row.created_at).getTime() >= t);
+    }
+    if (dateTo) {
+      // include the entire "to" day
+      const t = new Date(dateTo).getTime() + 24 * 3600 * 1000 - 1;
+      r = r.filter((row) => new Date(row.created_at).getTime() <= t);
+    }
+    if (sortOrder === 'oldest') return [...r].reverse();
+    return r;
+  }, [rows, activeFilters, sortOrder, dateFrom, dateTo]);
+
+  const groups = useMemo(() => {
+    const map = new Map();
+    for (const row of filtered) {
+      const key = fmtDayKey(row.created_at);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(row);
+    }
+    return Array.from(map.entries());
+  }, [filtered]);
+
+  const dateRangeLabel = useMemo(() => {
+    if (!dateFrom && !dateTo) return 'All time';
+    if (dateFrom && dateTo) return `${fmtDate(dateFrom)} - ${fmtDate(dateTo)}`;
+    if (dateFrom) return `From ${fmtDate(dateFrom)}`;
+    return `Until ${fmtDate(dateTo)}`;
+  }, [dateFrom, dateTo]);
+
+  const collapseAllToggle = () => {
+    setAllCollapsed((v) => !v);
+    setCollapseSeq((n) => n + 1);
   };
 
   if (!lead) return null;
@@ -41,95 +190,98 @@ const ViewTimelineModal = ({ open, onClose, lead }) => {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogContent className="timeline-modal">
-
         {/* Header */}
         <div className="timeline-header">
-          <div className="timeline-title">{lead.name}</div>
-          <IconButton onClick={onClose}>
-            <CloseIcon />
-          </IconButton>
+          <div className="timeline-title">{lead.name || lead.phone || 'Lead'}</div>
+          <IconButton onClick={onClose}><CloseIcon /></IconButton>
         </div>
 
-        {/* Body */}
         <div className="timeline-body">
 
-          {/* LEFT SIDE */}
+          {/* LEFT — compact day list + date filter */}
           <div className="timeline-left">
-            {/* Date Filter Bar */}
             <div className="timeline-date-filter">
-              <div className="date-range-picker">
-                <span className="date-range-text">Mar 20, 2026 - Apr 15, 2026</span>
+              <div
+                className="date-range-picker"
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => setDatePickerAnchor(e.currentTarget)}
+              >
+                <span className="date-range-text">{dateRangeLabel}</span>
                 <CalendarTodayIcon className="date-range-icon" />
               </div>
-              <IconButton size="small" className="reload-btn">
+              <IconButton size="small" className="reload-btn" onClick={reload} title="Reload timeline">
                 <RefreshIcon fontSize="small" />
               </IconButton>
             </div>
-            <div className="show-inactive-link">Show Inactive Dates</div>
 
-            <div className="timeline-date">20 Mar 26</div>
+            <Popover
+              open={Boolean(datePickerAnchor)}
+              anchorEl={datePickerAnchor}
+              onClose={() => setDatePickerAnchor(null)}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            >
+              <Box sx={{ p: 2, width: 280 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 1 }}>Filter by date</Typography>
+                <TextField
+                  type="date"
+                  size="small"
+                  fullWidth
+                  label="From"
+                  InputLabelProps={{ shrink: true }}
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  sx={{ mb: 1 }}
+                />
+                <TextField
+                  type="date"
+                  size="small"
+                  fullWidth
+                  label="To"
+                  InputLabelProps={{ shrink: true }}
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  sx={{ mb: 2 }}
+                />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Button size="small" onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear</Button>
+                  <Button size="small" variant="contained" onClick={() => setDatePickerAnchor(null)} sx={{ background: '#E87B2F' }}>
+                    Apply
+                  </Button>
+                </Box>
+              </Box>
+            </Popover>
+
+            {loading && <div style={{ padding: 24, textAlign: 'center' }}><CircularProgress size={20} /></div>}
+            {!loading && error && <div style={{ color: '#d32f2f', padding: 12, fontSize: 13 }}>{error}</div>}
+            {!loading && !error && filtered.length === 0 && (
+              <div style={{ color: '#888', padding: 16, fontSize: 13 }}>No events match the selected filters.</div>
+            )}
 
             <div className="timeline-items">
-              <div className="timeline-item">
-                <div className="timeline-icon-wrap">
-                  <FlagIcon className="timeline-icon flag-icon" />
-                  <div className="timeline-line" />
+              {filtered.slice(0, 30).map((row) => (
+                <div className="timeline-item" key={`${row.kind}-${row.id}`}>
+                  <div className="timeline-icon-wrap">
+                    {row.kind === 'activity' && row.subtype === 'stage_changed'
+                      ? <SwapHorizIcon className="timeline-icon status-icon" />
+                      : row.kind === 'activity'
+                        ? <HistoryIcon className="timeline-icon history-icon" />
+                        : <FlagIcon className="timeline-icon flag-icon" />
+                    }
+                    <div className="timeline-line" />
+                  </div>
+                  <div>
+                    <div className="time">{fmtTime(row.created_at)}</div>
+                    <div className="text">{titleFor(row)}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="time">12:55 PM</div>
-                  <div className="text">Manually Added Activities</div>
-                </div>
-              </div>
-
-              <div className="timeline-item">
-                <div className="timeline-icon-wrap">
-                  <SwapHorizIcon className="timeline-icon status-icon" />
-                  <div className="timeline-line" />
-                </div>
-                <div>
-                  <div className="time">12:55 PM</div>
-                  <div className="text">Status Change</div>
-                </div>
-              </div>
-
-              <div className="timeline-item">
-                <div className="timeline-icon-wrap">
-                  <HistoryIcon className="timeline-icon history-icon" />
-                  <div className="timeline-line" />
-                </div>
-                <div>
-                  <div className="time">12:55 PM</div>
-                  <div className="text">History Change</div>
-                </div>
-              </div>
-
-              <div className="timeline-item">
-                <div className="timeline-icon-wrap">
-                  <FlagIcon className="timeline-icon flag-icon" />
-                  <div className="timeline-line" />
-                </div>
-                <div>
-                  <div className="time">10:19 AM</div>
-                  <div className="text">Manually Added Activities</div>
-                </div>
-              </div>
-
-              <div className="timeline-item">
-                <div className="timeline-icon-wrap">
-                  <SwapHorizIcon className="timeline-icon status-icon" />
-                </div>
-                <div>
-                  <div className="time">10:19 AM</div>
-                  <div className="text">Status Change</div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* RIGHT SIDE */}
+          {/* RIGHT — full cards grouped by day */}
           <div className="timeline-right">
 
-            {/* Filter Chips Bar */}
+            {/* Filter chips bar (top) */}
             <div className="filter-chips-bar">
               <div className="filter-chips-list">
                 {activeFilters.map((filter) => (
@@ -137,196 +289,170 @@ const ViewTimelineModal = ({ open, onClose, lead }) => {
                     key={filter}
                     label={filter}
                     size="small"
-                    onDelete={() => handleRemoveFilter(filter)}
+                    onDelete={() => removeFilter(filter)}
                     className="filter-chip"
                   />
                 ))}
+                {CATEGORIES.filter((c) => !activeFilters.includes(c)).map((c) => (
+                  <Chip
+                    key={c}
+                    label={`+ ${c}`}
+                    size="small"
+                    variant="outlined"
+                    onClick={() => addFilter(c)}
+                    className="filter-chip"
+                    style={{ cursor: 'pointer' }}
+                  />
+                ))}
               </div>
-              <IconButton size="small">
-                <KeyboardArrowDownOutlinedIcon fontSize="small" />
+              <IconButton
+                size="small"
+                onClick={collapseAllToggle}
+                title={allCollapsed ? 'Expand all days' : 'Collapse all days'}
+              >
+                <KeyboardArrowDownOutlinedIcon
+                  fontSize="small"
+                  style={{ transform: allCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 150ms' }}
+                />
               </IconButton>
             </div>
 
-            {/* Activity Filter + Sort */}
+            {/* Activity Filter dropdown + sort */}
             <div className="activity-filter-bar">
-              <div className="activity-filter-dropdown">
-                <span className="activity-filter-text">Activity Filter</span>
+              <div
+                className="activity-filter-dropdown"
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => setActivityMenuAnchor(e.currentTarget)}
+              >
+                <span className="activity-filter-text">
+                  Activity Filter ({activeFilters.length}/{CATEGORIES.length})
+                </span>
                 <KeyboardArrowDownOutlinedIcon className="activity-filter-arrow" />
               </div>
+
+              <Menu
+                anchorEl={activityMenuAnchor}
+                open={Boolean(activityMenuAnchor)}
+                onClose={() => setActivityMenuAnchor(null)}
+              >
+                {CATEGORIES.map((c) => (
+                  <MenuItem key={c} onClick={() => toggleFilter(c)} dense>
+                    <ListItemIcon sx={{ minWidth: 32 }}>
+                      <Checkbox
+                        size="small"
+                        checked={activeFilters.includes(c)}
+                        sx={{ p: 0, '&.Mui-checked': { color: '#E87B2F' } }}
+                      />
+                    </ListItemIcon>
+                    <ListItemText primary={labelWithCount(rows, c)} primaryTypographyProps={{ fontSize: 13 }} />
+                  </MenuItem>
+                ))}
+                <MenuItem
+                  dense
+                  onClick={() => { setActiveFilters([...CATEGORIES]); setActivityMenuAnchor(null); }}
+                  sx={{ borderTop: '1px solid #eee', fontSize: 12, color: '#E87B2F' }}
+                >
+                  Select all
+                </MenuItem>
+                <MenuItem
+                  dense
+                  onClick={() => { setActiveFilters([]); setActivityMenuAnchor(null); }}
+                  sx={{ fontSize: 12, color: '#888' }}
+                >
+                  Clear all
+                </MenuItem>
+              </Menu>
+
               <div
                 className="sort-toggle"
-                onClick={() =>
-                  setSortOrder((prev) =>
-                    prev === "newest" ? "oldest" : "newest"
-                  )
-                }
+                onClick={() => setSortOrder((p) => p === 'newest' ? 'oldest' : 'newest')}
+                title="Toggle sort order"
               >
-                <span className="sort-text">
-                  {sortOrder === "newest" ? "Newest" : "Oldest"}
-                </span>
+                <span className="sort-text">{sortOrder === 'newest' ? 'Newest' : 'Oldest'}</span>
                 <div className="sort-icons">
-                  <ArrowDownwardIcon
-                    className={`sort-icon ${sortOrder === "newest" ? "active" : ""}`}
-                  />
-                  <ArrowUpwardIcon
-                    className={`sort-icon ${sortOrder === "oldest" ? "active" : ""}`}
-                  />
+                  <ArrowDownwardIcon className={`sort-icon ${sortOrder === 'newest' ? 'active' : ''}`} />
+                  <ArrowUpwardIcon className={`sort-icon ${sortOrder === 'oldest' ? 'active' : ''}`} />
                 </div>
               </div>
             </div>
 
-            {/* Date Group Header */}
-            <div
-              className="date-group-header"
-              onClick={() => setDateExpanded(!dateExpanded)}
-            >
-              <div className="date-group-left">
-                <div className="date-group-circle" />
-                <span className="date-group-text">Mar 20, 2026</span>
-              </div>
-              {dateExpanded ? (
-                <KeyboardArrowUpIcon className="date-group-arrow" />
-              ) : (
-                <KeyboardArrowDownIcon className="date-group-arrow" />
-              )}
-            </div>
+            {loading && <div style={{ padding: 40, textAlign: 'center' }}><CircularProgress /></div>}
 
-            {dateExpanded && (
-              <div className="date-group-content">
-
-                {/* Comment Card */}
-                <div className="timeline-card">
-                  <div className="timeline-card-header">
-                    <div className="timeline-card-icon-title">
-                      <FlagIcon className="card-icon flag-card" />
-                      <span className="timeline-card-title">Comment</span>
-                    </div>
-                    <span className="timeline-card-time">12:55 PM</span>
-                  </div>
-                  <div className="timeline-card-body">
-                    <div className="timeline-card-row">
-                      <ChatBubbleOutlineIcon className="card-meta-icon" />
-                      <span>10th pass only</span>
-                    </div>
-                    <div className="timeline-card-row">
-                      <PersonOutlineIcon className="card-meta-icon" />
-                      <span>Divya Nair</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Lead Status Changed Card */}
-                <div className="timeline-card">
-                  <div className="timeline-card-header">
-                    <div className="timeline-card-icon-title">
-                      <SwapHorizIcon className="card-icon status-card" />
-                      <span className="timeline-card-title">Lead Status changed from</span>
-                    </div>
-                    <span className="timeline-card-time">12:55 PM</span>
-                  </div>
-                  <div className="timeline-card-body">
-                    <div className="timeline-card-row">
-                      <span>03-Followup</span>
-                      <span className="arrow">→</span>
-                      <span>11-Junk</span>
-                      <span className="duration">· 2 h 36 m</span>
-                    </div>
-                    <div className="timeline-card-row">
-                      <PersonOutlineIcon className="card-meta-icon" />
-                      <span>Divya Nair</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Lead History Card */}
-                <div className="timeline-card">
-                  <div className="timeline-card-header">
-                    <div className="timeline-card-icon-title">
-                      <HistoryIcon className="card-icon history-card" />
-                      <span className="timeline-card-title">Lead History</span>
-                    </div>
-                    <span className="timeline-card-time">12:55 PM</span>
-                  </div>
-                  <div className="timeline-card-body">
-                    <div className="history-list">
-                      <div className="history-item">
-                        <span className="history-number">1.</span>
-                        <span>Updated the Stage from</span>
-                      </div>
-                      <div className="history-chips">
-                        <Chip label="03-Followup" size="small" variant="outlined" />
-                        <span className="arrow">→</span>
-                        <Chip label="11-Junk" size="small" color="success" />
-                      </div>
-
-                      <div className="history-item">
-                        <span className="history-number">2.</span>
-                        <span>Updated the Sub-Stage from</span>
-                      </div>
-                      <div className="history-chips">
-                        <Chip label="Asked to call later" size="small" variant="outlined" />
-                        <span className="arrow">→</span>
-                        <Chip label="Not Eligible" size="small" color="warning" />
-                      </div>
-                    </div>
-                    <div className="timeline-card-row">
-                      <PersonOutlineIcon className="card-meta-icon" />
-                      <span>Divya Nair</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Add Follow Up Card */}
-                <div className="timeline-card">
-                  <div className="timeline-card-header">
-                    <div className="timeline-card-icon-title">
-                      <FlagIcon className="card-icon flag-card" />
-                      <span className="timeline-card-title">Add Follow Up</span>
-                    </div>
-                    <span className="timeline-card-time">10:19 AM</span>
-                  </div>
-                  <div className="timeline-card-body">
-                    <div className="timeline-card-row">
-                      <ChatBubbleOutlineIcon className="card-meta-icon" />
-                      <span>Incoming off</span>
-                    </div>
-                    <div className="timeline-card-row">
-                      <PersonOutlineIcon className="card-meta-icon" />
-                      <span>Divya Nair</span>
-                    </div>
-                    <div className="timeline-card-row">
-                      <CalendarTodayIcon className="card-meta-icon" />
-                      <span>Mar 21, 2026 06:56:00 am</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Lead Status Will Be Card */}
-                <div className="timeline-card">
-                  <div className="timeline-card-header">
-                    <div className="timeline-card-icon-title">
-                      <SwapHorizIcon className="card-icon status-card" />
-                      <span className="timeline-card-title">Lead status will be</span>
-                    </div>
-                    <span className="timeline-card-time">10:19 AM</span>
-                  </div>
-                  <div className="timeline-card-body">
-                    <div className="timeline-card-row">
-                      <span>03-Followup</span>
-                    </div>
-                    <div className="timeline-card-row">
-                      <PersonOutlineIcon className="card-meta-icon" />
-                      <span>Divya Nair</span>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            )}
+            {!loading && groups.map(([day, dayRows]) => (
+              <DayGroup
+                key={`${day}-${collapseSeq}`}
+                day={day}
+                rows={dayRows}
+                initialExpanded={!allCollapsed}
+              />
+            ))}
           </div>
         </div>
       </DialogContent>
     </Dialog>
+  );
+};
+
+const DayGroup = ({ day, rows, initialExpanded = true }) => {
+  const [expanded, setExpanded] = useState(initialExpanded);
+  return (
+    <div>
+      <div className="date-group-header" onClick={() => setExpanded((v) => !v)} style={{ cursor: 'pointer' }}>
+        <div className="date-group-left">
+          <div className="date-group-circle" />
+          <span className="date-group-text">{fmtDate(rows[0]?.created_at)} <span style={{ color: '#888', fontSize: 12 }}>· {rows.length} event{rows.length === 1 ? '' : 's'}</span></span>
+        </div>
+        <KeyboardArrowDownOutlinedIcon
+          style={{ transform: expanded ? 'none' : 'rotate(-90deg)', transition: 'transform 150ms', color: '#888' }}
+        />
+      </div>
+      {expanded && (
+        <div className="date-group-content">
+          {rows.map((row) => (
+            <div className="timeline-card" key={`${row.kind}-${row.id}`}>
+              <div className="timeline-card-header">
+                <div className="timeline-card-icon-title">
+                  {iconFor(row)}
+                  <span className="timeline-card-title">{titleFor(row)}</span>
+                </div>
+                <span className="timeline-card-time">{fmtTime(row.created_at)}</span>
+              </div>
+              <div className="timeline-card-body">
+                {/* For stage_changed events, prefer joined names from backend, falling back to body */}
+                {row.kind === 'activity' && row.subtype === 'stage_changed' ? (
+                  <div className="timeline-card-row">
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={row.from_stage_name || row.from_sub_stage_name || 'Unset'}
+                    />
+                    <span className="arrow" style={{ margin: '0 8px' }}>→</span>
+                    <Chip
+                      size="small"
+                      label={row.to_stage_name || row.to_sub_stage_name || 'Unset'}
+                      sx={{ background: '#2e7d32', color: '#fff' }}
+                    />
+                  </div>
+                ) : (
+                  row.body && (
+                    <div className="timeline-card-row">
+                      <ChatBubbleOutlineIcon className="card-meta-icon" />
+                      <span>{String(row.body)}</span>
+                    </div>
+                  )
+                )}
+                {row.user_name && (
+                  <div className="timeline-card-row">
+                    <PersonOutlineIcon className="card-meta-icon" />
+                    <span>{row.user_name}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 

@@ -1,14 +1,18 @@
+// Settings hub page — matches the design in user's screenshot.
+// Each card navigates to a dedicated sub-page that wires the real backend API.
 import {
   Box,
   Typography,
   Card,
   CardActionArea,
 } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import PublicIcon from "@mui/icons-material/Public";
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
+import RuleFolderOutlinedIcon from "@mui/icons-material/RuleFolderOutlined";
 import "./AdvancedSettings.css";
 
 const sections = [
@@ -16,21 +20,37 @@ const sections = [
     icon: <PublicIcon sx={{ fontSize: 20, color: "#7b6b3a" }} />,
     title: "Dropdown Values",
     items: [
-      { label: "Setup Dropdown Values" },
+      { label: "Setup Dropdown Values", path: "/advancedsettings/dropdowns" },
     ],
   },
   {
     icon: <PeopleAltOutlinedIcon sx={{ fontSize: 20, color: "#555" }} />,
     title: "Users & Roles",
     items: [
-      { label: "User Profiles" },
+      { label: "User Profiles", path: "/advancedsettings/users" },
+      {
+        label: "Org Tree",
+        description: "Visual hierarchy of super admins, managers, and counsellors.",
+        path: "/advancedsettings/org-tree",
+      },
     ],
   },
   {
     icon: <ChatOutlinedIcon sx={{ fontSize: 20, color: "#555" }} />,
     title: "Communications",
     items: [
-      { label: "Template Settings" },
+      { label: "Template Settings", path: "/advancedsettings/templates" },
+    ],
+  },
+  {
+    icon: <RuleFolderOutlinedIcon sx={{ fontSize: 20, color: "#555" }} />,
+    title: "Lead Routing",
+    items: [
+      {
+        label: "Assignment Rules",
+        description: "Round-robin, load-balanced, and program-based auto-assignment.",
+        path: "/advancedsettings/assignment-rules",
+      },
     ],
   },
   {
@@ -40,12 +60,14 @@ const sections = [
       {
         label: "Manage your subscriptions",
         description: "View and manage your WhatsApp credit usage",
+        path: "/advancedsettings/subscription",
       },
     ],
   },
 ];
 
 const AdvancedSettings = () => {
+  const navigate = useNavigate();
   return (
     <Box className="advanced-settings-container">
       <Typography className="advanced-settings-title">Settings</Typography>
@@ -62,7 +84,10 @@ const AdvancedSettings = () => {
 
           {section.items.map((item, itemIdx) => (
             <Card key={itemIdx} className="advanced-settings-card" variant="outlined">
-              <CardActionArea className="advanced-settings-card-action">
+              <CardActionArea
+                className="advanced-settings-card-action"
+                onClick={() => item.path && navigate(item.path)}
+              >
                 <Box className="advanced-settings-card-content">
                   <Box>
                     <Typography className="advanced-settings-card-label">

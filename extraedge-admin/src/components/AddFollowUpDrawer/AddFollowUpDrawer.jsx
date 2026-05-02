@@ -6,42 +6,59 @@ import {
   IconButton,
   TextField,
   Button,
+  Alert,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import EventNoteIcon from "@mui/icons-material/EventNote";
+import { followUpsApi } from "../../lib/endpoints";
 
-const AddFollowUpDrawer = ({ open, onClose, lead }) => {
+const AddFollowUpDrawer = ({ open, onClose, lead, onSaved }) => {
   const today = new Date().toISOString().split("T")[0];
-  const currentTime = new Date().toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
+  const initialTime = (() => {
+    const d = new Date();
+    d.setHours(d.getHours() + 1);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  })();
 
   const [nextActionDate, setNextActionDate] = useState(today);
-  const [time, setTime] = useState(currentTime);
+  const [time, setTime] = useState(initialTime);
   const [remarks, setRemarks] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
 
-  const handleAdd = () => {
-    console.log("Adding follow up:", {
-      leadId: lead?.id,
-      nextActionDate,
-      time,
-      remarks,
-    });
-    resetForm();
-    onClose();
+  const resetForm = () => {
+    setNextActionDate(today);
+    setTime(initialTime);
+    setRemarks("");
+    setErr("");
   };
 
   const handleClose = () => {
     resetForm();
-    onClose();
+    onClose?.();
   };
 
-  const resetForm = () => {
-    setNextActionDate(today);
-    setTime(currentTime);
-    setRemarks("");
+  const handleAdd = async () => {
+    if (!lead?.id) { setErr('No lead selected'); return; }
+    if (!nextActionDate || !time) { setErr('Date and time are required'); return; }
+    setBusy(true);
+    setErr("");
+    try {
+      const dt = new Date(`${nextActionDate}T${time}:00`);
+      if (isNaN(dt.getTime())) throw new Error('Invalid date/time');
+      await followUpsApi.create({
+        lead_id: lead.id,
+        next_action_datetime: dt.toISOString(),
+        comment: remarks || undefined,
+      });
+      resetForm();
+      onSaved?.();
+      onClose?.();
+    } catch (e) {
+      setErr(e.message || 'Failed to add follow-up');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -129,7 +146,7 @@ const AddFollowUpDrawer = ({ open, onClose, lead }) => {
           {/* Followup Remarks */}
           <Box>
             <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 0.5 }}>
-              Followup Remarks<span style={{ color: "red" }}>*</span>
+              Followup Remarks
             </Typography>
             <TextField
               fullWidth
@@ -141,6 +158,7 @@ const AddFollowUpDrawer = ({ open, onClose, lead }) => {
               sx={{ "& .MuiInputBase-input": { fontSize: 13 } }}
             />
           </Box>
+          {err && <Alert severity="error" sx={{ fontSize: 13 }}>{err}</Alert>}
         </Box>
 
         {/* FOOTER */}
@@ -157,6 +175,7 @@ const AddFollowUpDrawer = ({ open, onClose, lead }) => {
           <Button
             variant="outlined"
             onClick={handleClose}
+            disabled={busy}
             sx={{
               textTransform: "none",
               color: "#555",
@@ -170,7 +189,7 @@ const AddFollowUpDrawer = ({ open, onClose, lead }) => {
           <Button
             variant="contained"
             onClick={handleAdd}
-            disabled={!nextActionDate || !time || !remarks}
+            disabled={!nextActionDate || !time || busy}
             sx={{
               textTransform: "none",
               backgroundColor: "#E87B2F",
@@ -179,7 +198,7 @@ const AddFollowUpDrawer = ({ open, onClose, lead }) => {
               "&:hover": { backgroundColor: "#d06a20" },
             }}
           >
-            Add
+            {busy ? 'Adding…' : 'Add'}
           </Button>
         </Box>
       </Box>

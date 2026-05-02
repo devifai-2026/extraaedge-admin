@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     Dialog,
     DialogTitle,
@@ -15,157 +15,515 @@ import {
     Switch,
     FormControlLabel,
     Button,
+    Checkbox,
+    ListItemText,
+    Alert,
+    CircularProgress,
+    Autocomplete,
+    Box,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutlined";
 import "./AddNewLead.css";
+import { leadsApi, usersApi } from "../../lib/endpoints";
+import { useDropdown } from "../../lib/useDropdowns";
+import QuickCreateDialog from "../QuickCreateDialog/QuickCreateDialog";
+import { isRole, ROLES } from "../../lib/rbac";
 
-const programOptions = [
-    "Data Analyst Training And Certification",
-    "Data Science Training And Certification",
-    "Advanced Python Development",
-    "Full Stack Web Development",
-    "Data Science with ML",
-    "UI/UX Design Bootcamp",
-];
 
-const genderOptions = ["Male", "Female", "Other"];
-
-const graduationYears = Array.from({ length: 20 }, (_, i) => 2015 + i);
-
-const stageOptions = [
-    "01-New",
-    "02-Contacted",
-    "03-Followup",
-    "05-Qualified",
-    "07-Requirement Match",
-    "08-Interested",
-    "09-Visited",
-    "10-Enrolled",
-    "11-Junk",
-    "12-Cold",
-];
-
-const subStageOptions = [
-    "Not Called",
-    "Awaiting confirmation",
-    "Will join soon",
-    "Negotiation phase",
-    "Needs demo",
-    "Not Eligible",
-    "Not Interested",
-    "Asked to call back",
-];
-
-const channelOptions = ["Offline", "Online", "Direct", "Facebook", "Google Ads", "LinkedIn", "Email Campaign"];
-
-const sourceOptions = ["Direct Walkin", "Website", "Social Media", "Professional Network", "Newsletter", "Referral"];
-
-const campaignOptions = ["Web Add Lead", "ORGANIC", "PAID"];
-
-const mediumOptions = ["Free", "CPC", "Referral", "Email"];
-
-const countryOptions = ["India"];
-
-const stateOptions2 = [
-    "Maharashtra",
-    "Karnataka",
-    "Delhi",
-    "Tamil Nadu",
-    "Gujarat",
-    "Rajasthan",
-    "West Bengal",
-    "Uttar Pradesh",
-];
-
-const initialFormData = {
-    applicantName: "",
-    emailId: "",
-    alternateEmailId: "",
-    whatsappNumber: "",
-    alternateContactNumber: "",
-    currentLocation: "",
-    ugDegree: "",
-    ugSpecialization: "",
-    ugUniversity: "",
-    ugGraduationYear: "",
-    pgDegree: "",
-    pgSpecialization: "",
-    pgUniversity: "",
-    pgGraduationYear: "",
-    program: "",
+// Build initial form. All ID fields default to '' (empty string) so the Select
+// renders empty rather than uncontrolled.
+const blankForm = {
+    // Personal
+    name: "",
+    email: "",
+    alternate_email: "",
+    phone: "",
+    whatsapp_number: "",
+    alternate_contact: "",
     gender: "",
-    stage: "01-New",
-    subStage: "Not Called",
-    closureRemarks: "",
-    remarks: "",
-    // Family & Address Details
-    fatherFullName: "",
-    motherFullName: "",
-    fatherMobile: "",
-    motherMobile: "",
-    fatherEmail: "",
-    motherEmail: "",
-    country: "India",
-    state: "",
+    // Education
+    ug_degree_id: "",
+    ug_specialization_id: "",
+    ug_university_id: "",
+    ug_graduation_year: "",
+    pg_degree_id: "",
+    pg_specialization_id: "",
+    pg_university_id: "",
+    pg_graduation_year: "",
+    // Address
+    country_id: "",
+    state_id: "",
     district: "",
     city: "",
     address: "",
     pincode: "",
-    // Source Details
-    channel: "",
-    source: "",
-    campaign: "",
-    medium: "",
+    // Stage / program
+    program_id: "",
+    stage_id: "",
+    sub_stage_id: "",
+    next_action_datetime: "",
+    remarks: "",
+    closure_remarks: "",
+    // Family
+    family: {
+        father_name: "",
+        father_mobile: "",
+        father_email: "",
+        mother_name: "",
+        mother_mobile: "",
+        mother_email: "",
+    },
+    // Source (single-row primary attribution)
+    source: {
+        channel_id: "",
+        source_id: "",
+        campaign_id: "",
+        medium_id: "",
+    },
+    // Custom fields keyed by field.key
+    custom_values: {},
 };
 
-const AddNewLead = ({ open, onClose, leadData }) => {
-    const isEditMode = Boolean(leadData);
+const valueOf = (custom_values, key) => custom_values?.[key] ?? '';
+
+const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
+    const isEditMode = Boolean(leadData?.id);
     const [activeTab, setActiveTab] = useState(0);
     const [mandatoryOnly, setMandatoryOnly] = useState(false);
-    const [formData, setFormData] = useState(initialFormData);
+    const [formData, setFormData] = useState(blankForm);
+    const [submitting, setSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState('');
+    const [hydrating, setHydrating] = useState(false);
 
-    React.useEffect(() => {
-        if (open && leadData) {
-            const sourceData = Array.isArray(leadData.source) ? leadData.source[0] : null;
-            setFormData({
-                ...initialFormData,
-                applicantName: leadData.name || "",
-                whatsappNumber: leadData.phone || "",
-                stage: leadData.status || leadData.stage || "01-New",
-                subStage: leadData.subStatus || leadData.subStage || "Not Called",
-                program: leadData.personal?.program || leadData.program || "",
-                country: leadData.personal?.country || leadData.country || "India",
-                state: leadData.personal?.state || leadData.state || "",
-                district: leadData.personal?.district || leadData.district || "",
-                city: leadData.personal?.city || leadData.city || "",
-                channel: sourceData?.channel || leadData.channel || "",
-                source: sourceData?.source || leadData.source || "",
-                campaign: sourceData?.campaign || leadData.campaign || "",
-                medium: sourceData?.medium || leadData.medium || "",
-                closureRemarks: leadData.closureRemarks || "",
-                remarks: leadData.remarks || "",
-                gender: leadData.gender || "",
-                emailId: leadData.emailId || "",
+    // Inline "Add new …" mini-dialog state. `quickCreate.type` controls which
+    // dropdown we're creating into (degrees / specializations / universities /
+    // programs). `quickCreate.assignTo` holds the form-key to auto-fill on success.
+    const [quickCreate, setQuickCreate] = useState({ type: null, assignTo: null });
+    const openQuickCreate = (type, assignTo) => setQuickCreate({ type, assignTo });
+    const closeQuickCreate = () => setQuickCreate({ type: null, assignTo: null });
+    const handleQuickCreated = ({ id }) => {
+        if (id && quickCreate.assignTo) {
+            // Auto-select the new id on the host form. Supports nested keys
+            // ("source.channel_id") via dotted path.
+            setFormData((prev) => {
+                const path = quickCreate.assignTo.split('.');
+                if (path.length === 1) return { ...prev, [path[0]]: id };
+                const [head, tail] = path;
+                return { ...prev, [head]: { ...(prev[head] || {}), [tail]: id } };
             });
-            setActiveTab(0);
-        } else if (open && !leadData) {
-            setFormData(initialFormData);
-            setActiveTab(0);
         }
-    }, [open, leadData]);
-
-    const handleChange = (field) => (e) => {
-        setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+        closeQuickCreate();
     };
 
-    const handleAdd = () => {
-        onClose(formData);
+    // -------- Reassign (admin / sales_manager only, edit mode only) --------
+    // Admin sees every active counsellor. Manager sees only their team
+    // hierarchy via /users/team. Picking a new counsellor + clicking
+    // "Reassign" calls POST /lead-assignments and the parent screen reloads.
+    const canReassign = isEditMode && isRole(ROLES.SUPER_ADMIN, ROLES.SALES_MANAGER);
+    const [reassignList, setReassignList] = useState([]);     // [{id,name,email,manager_id}]
+    const [reassignTo, setReassignTo] = useState('');         // chosen counsellor id
+    const [reassignReason, setReassignReason] = useState(''); // free-text
+    const [reassigning, setReassigning] = useState(false);
+    const [reassignErr, setReassignErr] = useState('');
+
+    useEffect(() => {
+        if (!open || !canReassign) return;
+        const loader = isRole(ROLES.SALES_MANAGER)
+            ? usersApi.myTeam()
+            : usersApi.list({ role: 'counsellor', limit: 500 });
+        loader
+            .then((r) => {
+                const rows = (r?.data || []).filter((u) => u.role === 'counsellor' && u.is_active !== false);
+                setReassignList(rows);
+            })
+            .catch(() => setReassignList([]));
+    }, [open, canReassign]);
+
+    const handleReassign = async () => {
+        setReassignErr('');
+        if (!reassignTo) { setReassignErr('Pick a counsellor'); return; }
+        if (!leadData?.id) { setReassignErr('No lead loaded'); return; }
+        setReassigning(true);
+        try {
+            await leadsApi.reassign({
+                lead_id: leadData.id,
+                assigned_to: reassignTo,
+                assignment_type: 'reassign',
+                reason: reassignReason.trim() || undefined,
+            });
+            // Close the dialog so the parent reloads — keeps the screen tidy.
+            onSaved?.();
+            onClose?.(null);
+        } catch (e) {
+            setReassignErr(e?.message || 'Reassign failed');
+        } finally {
+            setReassigning(false);
+        }
+    };
+
+    // Pull all dropdown lists. Sub-stages and states get filtered client-side
+    // by the chosen stage / country.
+    const stages       = useDropdown('stages',          { enabled: open });
+    const subStages    = useDropdown('sub-stages',      { enabled: open });
+    const programs     = useDropdown('programs',        { enabled: open });
+    const channels     = useDropdown('channels',        { enabled: open });
+    const sources      = useDropdown('sources',         { enabled: open });
+    const campaigns    = useDropdown('campaigns',       { enabled: open });
+    const mediums      = useDropdown('mediums',         { enabled: open });
+    const countries    = useDropdown('countries',       { enabled: open });
+    const states       = useDropdown('states',          { enabled: open });
+    const genders      = useDropdown('genders',         { enabled: open });
+    const degrees      = useDropdown('degrees',         { enabled: open });
+    const specs        = useDropdown('specializations', { enabled: open });
+    const universities = useDropdown('universities',    { enabled: open });
+    const customFields = useDropdown('custom-fields',   { enabled: open });
+
+    const filteredSubStages = useMemo(
+        () => (subStages.data || []).filter((s) => !formData.stage_id || s.stage_id === formData.stage_id),
+        [subStages.data, formData.stage_id],
+    );
+    const filteredStates = useMemo(
+        () => (states.data || []).filter((s) => !formData.country_id || s.country_id === formData.country_id),
+        [states.data, formData.country_id],
+    );
+
+    // Hydrate form when opening in edit mode. The list endpoint returns flat
+    // fields with names; we need IDs, so fetch full lead by id.
+    useEffect(() => {
+        if (!open) return;
+        if (!isEditMode) {
+            setFormData(blankForm);
+            setActiveTab(0);
+            setSubmitError('');
+            return;
+        }
+        let alive = true;
+        setHydrating(true);
+        leadsApi.get(leadData.id)
+            .then((r) => {
+                if (!alive) return;
+                const lead = r?.data || {};
+                const family = lead.family || {};
+                const primarySource = (lead.sources || [])[0] || {};
+                setFormData({
+                    ...blankForm,
+                    name: lead.name || '',
+                    email: lead.email || '',
+                    alternate_email: lead.alternate_email || '',
+                    phone: lead.phone || '',
+                    whatsapp_number: lead.whatsapp_number || '',
+                    alternate_contact: lead.alternate_contact || '',
+                    gender: lead.gender || '',
+                    ug_degree_id: lead.ug_degree_id || '',
+                    ug_specialization_id: lead.ug_specialization_id || '',
+                    ug_university_id: lead.ug_university_id || '',
+                    ug_graduation_year: lead.ug_graduation_year || '',
+                    pg_degree_id: lead.pg_degree_id || '',
+                    pg_specialization_id: lead.pg_specialization_id || '',
+                    pg_university_id: lead.pg_university_id || '',
+                    pg_graduation_year: lead.pg_graduation_year || '',
+                    country_id: lead.country_id || '',
+                    state_id: lead.state_id || '',
+                    district: lead.district || '',
+                    city: lead.city || '',
+                    address: lead.address || '',
+                    pincode: lead.pincode || '',
+                    program_id: lead.program_id || '',
+                    stage_id: lead.stage_id || '',
+                    sub_stage_id: lead.sub_stage_id || '',
+                    remarks: lead.remarks || '',
+                    closure_remarks: lead.closure_remarks || '',
+                    family: {
+                        father_name: family.father_name || '',
+                        father_mobile: family.father_mobile || '',
+                        father_email: family.father_email || '',
+                        mother_name: family.mother_name || '',
+                        mother_mobile: family.mother_mobile || '',
+                        mother_email: family.mother_email || '',
+                    },
+                    source: {
+                        channel_id: primarySource.channel_id || '',
+                        source_id: primarySource.source_id || '',
+                        campaign_id: primarySource.campaign_id || '',
+                        medium_id: primarySource.medium_id || '',
+                    },
+                    custom_values: lead.custom_values || {},
+                });
+                setActiveTab(0);
+                setSubmitError('');
+            })
+            .catch((e) => { if (alive) setSubmitError(e.message || 'Failed to load lead'); })
+            .finally(() => { if (alive) setHydrating(false); });
+        return () => { alive = false; };
+    }, [open, isEditMode, leadData?.id]);
+
+    const setField = (field) => (e) => {
+        const val = e.target.value;
+        setFormData((prev) => {
+            const next = { ...prev, [field]: val };
+            // When stage changes, clear sub-stage if it belongs to a different parent
+            if (field === 'stage_id') {
+                const ss = (subStages.data || []).find((x) => x.id === prev.sub_stage_id);
+                if (!ss || ss.stage_id !== val) next.sub_stage_id = '';
+            }
+            // When country changes, clear state
+            if (field === 'country_id') {
+                const st = (states.data || []).find((x) => x.id === prev.state_id);
+                if (!st || st.country_id !== val) next.state_id = '';
+            }
+            return next;
+        });
+    };
+
+    const setFamilyField = (field) => (e) => {
+        const val = e.target.value;
+        setFormData((prev) => ({ ...prev, family: { ...prev.family, [field]: val } }));
+    };
+
+    const setSourceField = (field) => (e) => {
+        const val = e.target.value;
+        setFormData((prev) => ({ ...prev, source: { ...prev.source, [field]: val } }));
+    };
+
+    const setCustomValue = (key) => (e) => {
+        const val = e.target.value;
+        setFormData((prev) => ({ ...prev, custom_values: { ...prev.custom_values, [key]: val } }));
+    };
+
+    // Strip empty strings before sending — backend zod fields are .optional() but
+    // empty strings would fail uuid validation.
+    const buildPayload = () => {
+        const p = {};
+        const scalars = [
+            'name', 'email', 'alternate_email', 'phone', 'whatsapp_number', 'alternate_contact', 'gender',
+            'ug_degree_id', 'ug_specialization_id', 'ug_university_id',
+            'pg_degree_id', 'pg_specialization_id', 'pg_university_id',
+            'country_id', 'state_id', 'district', 'city', 'address', 'pincode',
+            'program_id', 'stage_id', 'sub_stage_id', 'remarks', 'closure_remarks',
+        ];
+        for (const k of scalars) {
+            const v = formData[k];
+            if (v !== undefined && v !== null && v !== '') p[k] = v;
+        }
+        if (formData.ug_graduation_year) p.ug_graduation_year = Number(formData.ug_graduation_year);
+        if (formData.pg_graduation_year) p.pg_graduation_year = Number(formData.pg_graduation_year);
+
+        // Family: only include if any field set
+        const fam = formData.family;
+        if (Object.values(fam).some((v) => v && v !== '')) p.family = { ...fam };
+
+        // Source: include the primary source row only if any id present
+        const src = formData.source;
+        if (Object.values(src).some((v) => v && v !== '')) {
+            p.sources = [{
+                channel_id: src.channel_id || undefined,
+                source_id: src.source_id || undefined,
+                campaign_id: src.campaign_id || undefined,
+                medium_id: src.medium_id || undefined,
+                is_primary: true,
+            }];
+        }
+
+        // Custom values: pass the dict (backend resolves keys → field IDs server-side)
+        const cv = {};
+        for (const [k, v] of Object.entries(formData.custom_values || {})) {
+            if (v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)) cv[k] = v;
+        }
+        if (Object.keys(cv).length) p.custom_values = cv;
+
+        return p;
+    };
+
+    const handleSubmit = async () => {
+        setSubmitError('');
+        if (!formData.name?.trim() && !formData.email?.trim() && !formData.phone?.trim() && !formData.whatsapp_number?.trim()) {
+            setSubmitError('Provide at least name, email, phone or WhatsApp number');
+            return;
+        }
+        // Reject past-dated follow-ups before any network call. The picker
+        // already enforces `min` natively but DevTools editing or browsers
+        // that ignore `min` would otherwise let it through.
+        if (
+            formData.next_action_datetime &&
+            new Date(formData.next_action_datetime).getTime() < Date.now()
+        ) {
+            setSubmitError('Follow-up date and time must be in the future');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const payload = buildPayload();
+            if (isEditMode) {
+                await leadsApi.update(leadData.id, payload);
+                // If stage was changed via this dialog, also call /stage so the timeline gets a stage_changed entry.
+                if (payload.stage_id && payload.stage_id !== leadData.stage_id) {
+                    await leadsApi.changeStage(leadData.id, {
+                        stage_id: payload.stage_id,
+                        sub_stage_id: payload.sub_stage_id,
+                        remarks: payload.closure_remarks || payload.remarks,
+                        // If the user filled in the follow-up datetime, ship
+                        // it; backend creates the lead_followups row.
+                        ...(formData.next_action_datetime
+                            ? { next_action_datetime: new Date(formData.next_action_datetime).toISOString() }
+                            : {}),
+                    });
+                }
+                onSaved?.();
+            } else {
+                await leadsApi.create(payload);
+                onCreated?.();
+            }
+            setFormData(blankForm);
+            onClose?.(null);
+        } catch (e) {
+            setSubmitError(e.message || 'Save failed');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const handleCancel = () => {
-        setFormData(initialFormData);
-        onClose(null);
+        setFormData(blankForm);
+        setSubmitError('');
+        onClose?.(null);
     };
+
+    // Render helper for ID-based selects.
+    //   addNew: { type, assignTo } — when set, appends a "+ Create new …" entry
+    //   that opens the QuickCreateDialog. assignTo is the form key (or dotted
+    //   path for nested fields like 'source.channel_id') to auto-fill on success.
+    const idSelect = ({ label, value, onChange, options, loading, required, mandatoryHide, addNew }) => {
+        if (mandatoryHide) return null;
+        // Sentinel value used to detect a "+ Create new" click without losing the current value.
+        const CREATE_SENTINEL = '__create__';
+        const handleChange = (e) => {
+            if (e.target.value === CREATE_SENTINEL) {
+                openQuickCreate(addNew.type, addNew.assignTo);
+                return; // don't propagate — keep prior selection
+            }
+            onChange(e);
+        };
+        return (
+            <FormControl size="small" fullWidth required={!!required}>
+                <InputLabel>{label}</InputLabel>
+                <Select label={label} value={value || ''} onChange={handleChange} disabled={loading}>
+                    <MenuItem value=""><em>None</em></MenuItem>
+                    {(options || []).filter((o) => o.is_active !== false).map((o) => (
+                        <MenuItem key={o.id} value={o.id}>{o.name || o.label || o.code}</MenuItem>
+                    ))}
+                    {addNew && (
+                        <MenuItem
+                            value={CREATE_SENTINEL}
+                            sx={{ borderTop: '1px solid #eee', mt: 0.5, color: '#E53935', fontWeight: 600 }}
+                        >
+                            <AddCircleOutlineIcon fontSize="small" sx={{ mr: 1 }} />
+                            Create new {label.toLowerCase()}
+                        </MenuItem>
+                    )}
+                </Select>
+            </FormControl>
+        );
+    };
+
+    // Render a custom-field input. Supports text / number / date / select / multiselect / textarea.
+    const renderCustomField = (field) => {
+        const v = valueOf(formData.custom_values, field.key);
+        const onChange = setCustomValue(field.key);
+        switch (field.field_type) {
+            case 'select':
+                return (
+                    <FormControl key={field.id} size="small" fullWidth>
+                        <InputLabel>{field.label}</InputLabel>
+                        <Select label={field.label} value={v || ''} onChange={onChange}>
+                            <MenuItem value=""><em>None</em></MenuItem>
+                            {(field.options_json || []).map((opt) => {
+                                const val = typeof opt === 'string' ? opt : opt.value;
+                                const lbl = typeof opt === 'string' ? opt : (opt.label ?? opt.value);
+                                return <MenuItem key={val} value={val}>{lbl}</MenuItem>;
+                            })}
+                        </Select>
+                    </FormControl>
+                );
+            case 'multiselect': {
+                const arr = Array.isArray(v) ? v : [];
+                return (
+                    <FormControl key={field.id} size="small" fullWidth>
+                        <InputLabel>{field.label}</InputLabel>
+                        <Select
+                            multiple
+                            label={field.label}
+                            value={arr}
+                            onChange={(e) => setCustomValue(field.key)({ target: { value: e.target.value } })}
+                            renderValue={(sel) => (sel || []).join(', ')}
+                        >
+                            {(field.options_json || []).map((opt) => {
+                                const val = typeof opt === 'string' ? opt : opt.value;
+                                const lbl = typeof opt === 'string' ? opt : (opt.label ?? opt.value);
+                                return (
+                                    <MenuItem key={val} value={val}>
+                                        <Checkbox checked={arr.indexOf(val) > -1} size="small" />
+                                        <ListItemText primary={lbl} />
+                                    </MenuItem>
+                                );
+                            })}
+                        </Select>
+                    </FormControl>
+                );
+            }
+            case 'number':
+                return (
+                    <TextField
+                        key={field.id}
+                        label={field.label}
+                        size="small"
+                        type="number"
+                        value={v ?? ''}
+                        onChange={onChange}
+                        fullWidth
+                    />
+                );
+            case 'date':
+                return (
+                    <TextField
+                        key={field.id}
+                        label={field.label}
+                        size="small"
+                        type="date"
+                        InputLabelProps={{ shrink: true }}
+                        value={v ?? ''}
+                        onChange={onChange}
+                        fullWidth
+                    />
+                );
+            case 'textarea':
+                return (
+                    <TextField
+                        key={field.id}
+                        label={field.label}
+                        size="small"
+                        multiline
+                        minRows={2}
+                        value={v ?? ''}
+                        onChange={onChange}
+                        fullWidth
+                    />
+                );
+            default:
+                return (
+                    <TextField
+                        key={field.id}
+                        label={field.label}
+                        size="small"
+                        value={v ?? ''}
+                        onChange={onChange}
+                        fullWidth
+                    />
+                );
+        }
+    };
+
+    const visibleCustomFields = (customFields.data || []).filter((f) => f.is_active !== false);
 
     return (
         <Dialog
@@ -175,8 +533,23 @@ const AddNewLead = ({ open, onClose, leadData }) => {
             fullWidth
             PaperProps={{ className: "add-lead-dialog" }}
         >
-            <DialogTitle className="add-lead-title">
-                {isEditMode ? `Edit Lead ${leadData.name}` : "Add New Lead"}
+            <DialogTitle className="add-lead-title" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {isEditMode ? `Edit Lead ${leadData?.name || ''}` : 'Add New Lead'}
+                    {isEditMode && (
+                        <span
+                            title="Lead score (auto-recomputed from stage / sub-stage scores when you save)"
+                            style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 6,
+                                padding: '4px 12px', borderRadius: 999,
+                                background: '#fff7e6', border: '1px solid #ffd591',
+                                color: '#d46b08', fontSize: 13, fontWeight: 600,
+                            }}
+                        >
+                            ★ {leadData?.lead_score != null ? Number(leadData.lead_score).toFixed(0) : 0}
+                        </span>
+                    )}
+                </span>
                 <IconButton onClick={handleCancel} className="add-lead-close-btn">
                     <CloseIcon />
                 </IconButton>
@@ -188,288 +561,234 @@ const AddNewLead = ({ open, onClose, leadData }) => {
                     onChange={(e, v) => setActiveTab(v)}
                     TabIndicatorProps={{ style: { display: "none" } }}
                 >
-                    <Tab
-                        label="Lead/Applicant & Stage Details"
-                        className={activeTab === 0 ? "add-lead-tab active" : "add-lead-tab"}
-                    />
-                    <Tab
-                        label="Family & Address Details"
-                        className={activeTab === 1 ? "add-lead-tab active" : "add-lead-tab"}
-                    />
-                    <Tab
-                        label="Source Details"
-                        className={activeTab === 2 ? "add-lead-tab active" : "add-lead-tab"}
-                    />
+                    <Tab label="Lead/Applicant & Stage Details" className={activeTab === 0 ? "add-lead-tab active" : "add-lead-tab"} />
+                    <Tab label="Family & Address Details"      className={activeTab === 1 ? "add-lead-tab active" : "add-lead-tab"} />
+                    <Tab label="Source Details"                className={activeTab === 2 ? "add-lead-tab active" : "add-lead-tab"} />
+                    {visibleCustomFields.length > 0 && (
+                        <Tab label="Additional Fields" className={activeTab === 3 ? "add-lead-tab active" : "add-lead-tab"} />
+                    )}
                 </Tabs>
             </div>
 
             <DialogContent className="add-lead-content">
-                {/* Tab 0: Lead/Applicant & Stage Details */}
-                {activeTab === 0 && (
+                {hydrating && (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+                        <CircularProgress size={28} />
+                    </div>
+                )}
+
+                {!hydrating && activeTab === 0 && (
                     <>
                         <div className="add-lead-mandatory-toggle">
                             <FormControlLabel
-                                control={
-                                    <Switch
-                                        checked={mandatoryOnly}
-                                        onChange={(e) => setMandatoryOnly(e.target.checked)}
-                                        size="small"
-                                    />
-                                }
+                                control={<Switch checked={mandatoryOnly} onChange={(e) => setMandatoryOnly(e.target.checked)} size="small" />}
                                 label="Mandatory only"
                                 labelPlacement="start"
                             />
                         </div>
 
                         <div className="add-lead-section-title">Lead Details</div>
-
                         <div className="add-lead-form-grid">
-                            <TextField
-                                label="Applicant Name"
-                                placeholder="Applicant Name"
-                                required
-                                size="small"
-                                value={formData.applicantName}
-                                onChange={handleChange("applicantName")}
-                                fullWidth
-                            />
+                            <TextField label="Applicant Name" required size="small" value={formData.name} onChange={setField('name')} fullWidth />
+                            {!mandatoryOnly && <TextField label="Email Id" size="small" value={formData.email} onChange={setField('email')} fullWidth />}
+                            {!mandatoryOnly && <TextField label="Alternate Email Id" size="small" value={formData.alternate_email} onChange={setField('alternate_email')} fullWidth />}
+                            <TextField label="WhatsApp Number" required size="small" value={formData.whatsapp_number} onChange={setField('whatsapp_number')} fullWidth />
+                            {!mandatoryOnly && <TextField label="Phone" size="small" value={formData.phone} onChange={setField('phone')} fullWidth />}
+                            {!mandatoryOnly && <TextField label="Alternate Contact Number" size="small" value={formData.alternate_contact} onChange={setField('alternate_contact')} fullWidth />}
+
+                            {!mandatoryOnly && idSelect({ label: 'Under Graduation Degree',  value: formData.ug_degree_id,         onChange: setField('ug_degree_id'),         options: degrees.data,      loading: degrees.loading,      addNew: { type: 'degrees',         assignTo: 'ug_degree_id' } })}
+                            {!mandatoryOnly && idSelect({ label: 'UG Specialization',        value: formData.ug_specialization_id, onChange: setField('ug_specialization_id'), options: specs.data,        loading: specs.loading,        addNew: { type: 'specializations', assignTo: 'ug_specialization_id' } })}
+                            {!mandatoryOnly && idSelect({ label: 'UG University',            value: formData.ug_university_id,     onChange: setField('ug_university_id'),     options: universities.data, loading: universities.loading, addNew: { type: 'universities',    assignTo: 'ug_university_id' } })}
                             {!mandatoryOnly && (
                                 <TextField
-                                    label="Email Id"
-                                    placeholder="Email Id"
                                     size="small"
-                                    value={formData.emailId}
-                                    onChange={handleChange("emailId")}
+                                    type="number"
+                                    label="UG Graduation Year"
+                                    placeholder="e.g. 2024"
+                                    value={formData.ug_graduation_year || ''}
+                                    onChange={(e) => {
+                                        const v = e.target.value;
+                                        // Only allow 4-digit years in the 1950–2100 range while typing.
+                                        if (v === '' || /^\d{0,4}$/.test(v)) setField('ug_graduation_year')({ target: { value: v } });
+                                    }}
+                                    inputProps={{ min: 1950, max: 2100, step: 1 }}
                                     fullWidth
                                 />
                             )}
+                            {!mandatoryOnly && idSelect({ label: 'Post Graduation Degree', value: formData.pg_degree_id,         onChange: setField('pg_degree_id'),         options: degrees.data,      loading: degrees.loading,      addNew: { type: 'degrees',         assignTo: 'pg_degree_id' } })}
+                            {!mandatoryOnly && idSelect({ label: 'PG Specialization',     value: formData.pg_specialization_id, onChange: setField('pg_specialization_id'), options: specs.data,        loading: specs.loading,        addNew: { type: 'specializations', assignTo: 'pg_specialization_id' } })}
+                            {!mandatoryOnly && idSelect({ label: 'PG University',         value: formData.pg_university_id,     onChange: setField('pg_university_id'),     options: universities.data, loading: universities.loading, addNew: { type: 'universities',    assignTo: 'pg_university_id' } })}
                             {!mandatoryOnly && (
                                 <TextField
-                                    label="Alternate Email Id"
-                                    placeholder="Alternate Email Id"
                                     size="small"
-                                    value={formData.alternateEmailId}
-                                    onChange={handleChange("alternateEmailId")}
+                                    type="number"
+                                    label="PG Graduation Year"
+                                    placeholder="e.g. 2026"
+                                    value={formData.pg_graduation_year || ''}
+                                    onChange={(e) => {
+                                        const v = e.target.value;
+                                        if (v === '' || /^\d{0,4}$/.test(v)) setField('pg_graduation_year')({ target: { value: v } });
+                                    }}
+                                    inputProps={{ min: 1950, max: 2100, step: 1 }}
                                     fullWidth
                                 />
                             )}
-                            <TextField
-                                label="WhatsApp Number"
-                                placeholder="WhatsApp Number"
-                                required
-                                size="small"
-                                value={formData.whatsappNumber}
-                                onChange={handleChange("whatsappNumber")}
-                                fullWidth
-                            />
-                            {!mandatoryOnly && (
-                                <>
-                                    <TextField
-                                        label="Alternate Contact Number"
-                                        placeholder="Alternate Contact Number"
-                                        size="small"
-                                        value={formData.alternateContactNumber}
-                                        onChange={handleChange("alternateContactNumber")}
-                                        fullWidth
-                                    />
-                                    <TextField
-                                        label="Current Location"
-                                        placeholder="Current Location"
-                                        size="small"
-                                        value={formData.currentLocation}
-                                        onChange={handleChange("currentLocation")}
-                                        fullWidth
-                                    />
-                                    <TextField
-                                        label="Under Graduation degree"
-                                        placeholder="Under Graduation degree"
-                                        size="small"
-                                        value={formData.ugDegree}
-                                        onChange={handleChange("ugDegree")}
-                                        fullWidth
-                                    />
-                                    <TextField
-                                        label="UG Specialization"
-                                        placeholder="UG Specialization"
-                                        size="small"
-                                        value={formData.ugSpecialization}
-                                        onChange={handleChange("ugSpecialization")}
-                                        fullWidth
-                                    />
-                                    <TextField
-                                        label="UG University/institute Name"
-                                        placeholder="UG University/institute Name"
-                                        size="small"
-                                        value={formData.ugUniversity}
-                                        onChange={handleChange("ugUniversity")}
-                                        fullWidth
-                                    />
-                                    <FormControl size="small" fullWidth>
-                                        <InputLabel>UG Graduation Year</InputLabel>
-                                        <Select
-                                            label="UG Graduation Year"
-                                            value={formData.ugGraduationYear}
-                                            onChange={handleChange("ugGraduationYear")}
-                                        >
-                                            <MenuItem value="">
-                                                <em>Select UG Graduation Year</em>
-                                            </MenuItem>
-                                            {graduationYears.map((year) => (
-                                                <MenuItem key={year} value={year}>
-                                                    {year}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-                                    <TextField
-                                        label="Post graduation degree"
-                                        placeholder="Post graduation degree"
-                                        size="small"
-                                        value={formData.pgDegree}
-                                        onChange={handleChange("pgDegree")}
-                                        fullWidth
-                                    />
-                                    <TextField
-                                        label="PG specialization"
-                                        placeholder="PG specialization"
-                                        size="small"
-                                        value={formData.pgSpecialization}
-                                        onChange={handleChange("pgSpecialization")}
-                                        fullWidth
-                                    />
-                                    <TextField
-                                        label="PG university/institute name"
-                                        placeholder="PG university/institute name"
-                                        size="small"
-                                        value={formData.pgUniversity}
-                                        onChange={handleChange("pgUniversity")}
-                                        fullWidth
-                                    />
-                                    <FormControl size="small" fullWidth>
-                                        <InputLabel>PG Graduation Year</InputLabel>
-                                        <Select
-                                            label="PG Graduation Year"
-                                            value={formData.pgGraduationYear}
-                                            onChange={handleChange("pgGraduationYear")}
-                                        >
-                                            <MenuItem value="">
-                                                <em>Select PG Graduation Year</em>
-                                            </MenuItem>
-                                            {graduationYears.map((year) => (
-                                                <MenuItem key={year} value={year}>
-                                                    {year}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-                                </>
-                            )}
-                            <FormControl size="small" fullWidth required>
-                                <InputLabel>Program</InputLabel>
-                                <Select
-                                    label="Program"
-                                    value={formData.program}
-                                    onChange={handleChange("program")}
-                                >
-                                    {programOptions.map((p) => (
-                                        <MenuItem key={p} value={p}>
-                                            {p}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            {!mandatoryOnly && (
-                                <FormControl size="small" fullWidth>
-                                    <InputLabel>Gender</InputLabel>
-                                    <Select
-                                        label="Gender"
-                                        value={formData.gender}
-                                        onChange={handleChange("gender")}
-                                    >
-                                        <MenuItem value="">
-                                            <em>Select Gender</em>
-                                        </MenuItem>
-                                        {genderOptions.map((g) => (
-                                            <MenuItem key={g} value={g}>
-                                                {g}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            )}
+
+                            {idSelect({ label: 'Program', value: formData.program_id, onChange: setField('program_id'), options: programs.data, loading: programs.loading, required: true, addNew: { type: 'programs', assignTo: 'program_id' } })}
+                            {!mandatoryOnly && idSelect({ label: 'Gender', value: formData.gender, onChange: setField('gender'), options: (genders.data || []).map((g) => ({ ...g, id: g.name })), loading: genders.loading })}
                         </div>
+
+                        {/* Reassign section — admin / manager only, edit mode only.
+                            Shows current owner + manager + a picker for the new counsellor.
+                            Manager picker is auto-scoped to the actor's team via /users/team.
+                            Manager_id auto-snaps to the picked counsellor's primary manager
+                            (handled server-side: bulkAssign / reassign both update leads.manager_id). */}
+                        {canReassign && (
+                            <>
+                                <div className="add-lead-section-title">Reassign Lead</div>
+                                <div className="add-lead-form-grid" style={{ alignItems: 'center' }}>
+                                    <TextField
+                                        size="small" label="Current Counsellor" fullWidth
+                                        value={leadData?.assigned_to_name || 'Unassigned'}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                    <TextField
+                                        size="small" label="Current Manager" fullWidth
+                                        value={leadData?.manager_name || '—'}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                </div>
+                                <div className="add-lead-form-grid" style={{ alignItems: 'center' }}>
+                                    <Autocomplete
+                                        size="small"
+                                        options={reassignList}
+                                        getOptionLabel={(o) => o ? `${o.name || o.email}${o.email ? ` · ${o.email}` : ''}` : ''}
+                                        isOptionEqualToValue={(a, b) => a?.id === b?.id}
+                                        value={reassignList.find((u) => u.id === reassignTo) || null}
+                                        onChange={(_e, opt) => setReassignTo(opt?.id || '')}
+                                        renderInput={(p) => (
+                                            <TextField
+                                                {...p}
+                                                label={isRole(ROLES.SALES_MANAGER) ? 'New counsellor (your team)' : 'New counsellor'}
+                                                placeholder="Pick a counsellor…"
+                                                helperText={
+                                                    reassignList.length === 0
+                                                        ? 'No eligible counsellors available.'
+                                                        : 'The new owner\'s manager will be linked automatically.'
+                                                }
+                                            />
+                                        )}
+                                    />
+                                    <TextField
+                                        size="small"
+                                        label="Reason (optional)"
+                                        value={reassignReason}
+                                        onChange={(e) => setReassignReason(e.target.value)}
+                                        placeholder="Why this reassignment?"
+                                        fullWidth
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
+                                    <Button
+                                        variant="contained"
+                                        color="warning"
+                                        onClick={handleReassign}
+                                        disabled={reassigning || !reassignTo || reassignTo === leadData?.assigned_to}
+                                        sx={{ textTransform: 'none' }}
+                                    >
+                                        {reassigning ? 'Reassigning…' : 'Reassign now'}
+                                    </Button>
+                                    {reassignTo === leadData?.assigned_to && reassignTo && (
+                                        <span style={{ fontSize: 12, color: '#888' }}>
+                                            That's already the current owner.
+                                        </span>
+                                    )}
+                                    {reassignErr && (
+                                        <span style={{ fontSize: 12, color: '#d32f2f' }}>{reassignErr}</span>
+                                    )}
+                                </div>
+                            </>
+                        )}
 
                         <div className="add-lead-section-title">Change Lead /Application Stage</div>
-
                         <div className="add-lead-form-grid">
-                            <FormControl size="small" fullWidth>
-                                <InputLabel>Stage</InputLabel>
-                                <Select
-                                    label="Stage"
-                                    value={formData.stage}
-                                    onChange={handleChange("stage")}
-                                >
-                                    {stageOptions.map((s) => (
-                                        <MenuItem key={s} value={s}>
-                                            {s}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <FormControl size="small" fullWidth>
-                                <InputLabel>Sub-Stage</InputLabel>
-                                <Select
-                                    label="Sub-Stage"
-                                    value={formData.subStage}
-                                    onChange={handleChange("subStage")}
-                                >
-                                    {subStageOptions.map((s) => (
-                                        <MenuItem key={s} value={s}>
-                                            {s}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                            <Autocomplete
+                                size="small"
+                                options={(stages.data || []).filter((s) => s.is_active !== false)}
+                                getOptionLabel={(o) => o?.name || ''}
+                                value={(stages.data || []).find((s) => s.id === formData.stage_id) || null}
+                                onChange={(_e, opt) => setField('stage_id')({ target: { value: opt?.id || '' } })}
+                                isOptionEqualToValue={(o, v) => o?.id === v?.id}
+                                loading={stages.loading}
+                                renderInput={(params) => <TextField {...params} label="Stage" placeholder="Type to search…" />}
+                            />
+                            <Autocomplete
+                                size="small"
+                                options={filteredSubStages.filter((s) => s.is_active !== false)}
+                                getOptionLabel={(o) => o?.name || ''}
+                                value={filteredSubStages.find((s) => s.id === formData.sub_stage_id) || null}
+                                onChange={(_e, opt) => setField('sub_stage_id')({ target: { value: opt?.id || '' } })}
+                                isOptionEqualToValue={(o, v) => o?.id === v?.id}
+                                loading={subStages.loading}
+                                disabled={!formData.stage_id}
+                                noOptionsText={
+                                    !formData.stage_id
+                                        ? 'Pick a stage first'
+                                        : 'No sub-stages configured for this stage. Add some in Settings → Setup Dropdown Values → Sub-Stage.'
+                                }
+                                renderInput={(params) => <TextField {...params} label="Sub-Stage" placeholder={formData.stage_id ? 'Type to search…' : 'Pick a stage first'} />}
+                            />
                         </div>
+
+
+                        {/* When the picked stage is a follow-up stage, offer an
+                            optional next-action datetime so the lead lands in the
+                            counsellor's Follow-up Manager view automatically. */}
+                        {(() => {
+                            const picked = (stages.data || []).find((s) => s.id === formData.stage_id);
+                            const isFollowup = picked?.name && /follow/i.test(picked.name);
+                            if (!isFollowup) return null;
+                            // Min = now (in local-time), formatted for the
+                            // datetime-local input. Browser blocks past picks
+                            // natively; we also re-validate on submit.
+                            const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
+                            const minStr = now.toISOString().slice(0, 16);
+                            const value = formData.next_action_datetime || '';
+                            const isPast = value && new Date(value).getTime() < Date.now();
+                            return (
+                                <div className="add-lead-form-grid">
+                                    <TextField
+                                        label="Follow-up at"
+                                        size="small"
+                                        type="datetime-local"
+                                        value={value}
+                                        onChange={setField('next_action_datetime')}
+                                        InputLabelProps={{ shrink: true }}
+                                        inputProps={{ min: minStr, style: { paddingTop: 8 } }}
+                                        error={isPast}
+                                        helperText={isPast
+                                            ? 'Pick a future date and time.'
+                                            : 'Optional. Schedules a planned follow-up so the lead shows up in Follow-up Manager.'}
+                                        fullWidth
+                                    />
+                                </div>
+                            );
+                        })()}
 
                         <div className="add-lead-form-grid">
                             {isEditMode && (
-                                <TextField
-                                    label="Closure Remarks"
-                                    placeholder="Closure Remarks"
-                                    required
-                                    size="small"
-                                    value={formData.closureRemarks}
-                                    onChange={handleChange("closureRemarks")}
-                                    fullWidth
-                                />
+                                <TextField label="Closure Remarks" required size="small" value={formData.closure_remarks} onChange={setField('closure_remarks')} fullWidth />
                             )}
-                            <TextField
-                                label="Remarks"
-                                placeholder="Remarks"
-                                size="small"
-                                multiline
-                                minRows={2}
-                                value={formData.remarks}
-                                onChange={handleChange("remarks")}
-                                fullWidth
-                            />
+                            <TextField label="Remarks" size="small" multiline minRows={2} value={formData.remarks} onChange={setField('remarks')} fullWidth />
                         </div>
                     </>
                 )}
 
-                {/* Tab 1: Family & Address Details */}
-                {activeTab === 1 && (
+                {!hydrating && activeTab === 1 && (
                     <>
                         <div className="add-lead-mandatory-toggle">
                             <FormControlLabel
-                                control={
-                                    <Switch
-                                        checked={mandatoryOnly}
-                                        onChange={(e) => setMandatoryOnly(e.target.checked)}
-                                        size="small"
-                                    />
-                                }
+                                control={<Switch checked={mandatoryOnly} onChange={(e) => setMandatoryOnly(e.target.checked)} size="small" />}
                                 label="Mandatory only"
                                 labelPlacement="start"
                             />
@@ -477,231 +796,82 @@ const AddNewLead = ({ open, onClose, leadData }) => {
 
                         <div className="add-lead-section-title">Parent's Details</div>
                         <div className="add-lead-form-grid">
-                            <TextField
-                                label="Father's Full Name"
-                                placeholder="Father's Full Name"
-                                size="small"
-                                value={formData.fatherFullName}
-                                onChange={handleChange("fatherFullName")}
-                                fullWidth
-                            />
-                            <TextField
-                                label="Mother's Full Name"
-                                placeholder="Mother's Full Name"
-                                size="small"
-                                value={formData.motherFullName}
-                                onChange={handleChange("motherFullName")}
-                                fullWidth
-                            />
-                            <TextField
-                                label="Father's Mobile No."
-                                placeholder="Father's Mobile No."
-                                size="small"
-                                value={formData.fatherMobile}
-                                onChange={handleChange("fatherMobile")}
-                                fullWidth
-                            />
-                            <TextField
-                                label="Mother's Mobile No."
-                                placeholder="Mother's Mobile No."
-                                size="small"
-                                value={formData.motherMobile}
-                                onChange={handleChange("motherMobile")}
-                                fullWidth
-                            />
-                            <TextField
-                                label="Father's Email Id"
-                                placeholder="Father's Email Id"
-                                size="small"
-                                value={formData.fatherEmail}
-                                onChange={handleChange("fatherEmail")}
-                                fullWidth
-                            />
-                            <TextField
-                                label="Mother's Email Id"
-                                placeholder="Mother's Email Id"
-                                size="small"
-                                value={formData.motherEmail}
-                                onChange={handleChange("motherEmail")}
-                                fullWidth
-                            />
+                            <TextField label="Father's Full Name" size="small" value={formData.family.father_name} onChange={setFamilyField('father_name')} fullWidth />
+                            <TextField label="Mother's Full Name" size="small" value={formData.family.mother_name} onChange={setFamilyField('mother_name')} fullWidth />
+                            <TextField label="Father's Mobile No." size="small" value={formData.family.father_mobile} onChange={setFamilyField('father_mobile')} fullWidth />
+                            <TextField label="Mother's Mobile No." size="small" value={formData.family.mother_mobile} onChange={setFamilyField('mother_mobile')} fullWidth />
+                            <TextField label="Father's Email Id" size="small" value={formData.family.father_email} onChange={setFamilyField('father_email')} fullWidth />
+                            <TextField label="Mother's Email Id" size="small" value={formData.family.mother_email} onChange={setFamilyField('mother_email')} fullWidth />
                         </div>
 
                         <div className="add-lead-section-title">Address Details</div>
                         <div className="add-lead-form-grid">
-                            <FormControl size="small" fullWidth>
-                                <InputLabel>Country</InputLabel>
-                                <Select
-                                    label="Country"
-                                    value={formData.country}
-                                    onChange={handleChange("country")}
-                                >
-                                    {countryOptions.map((c) => (
-                                        <MenuItem key={c} value={c}>
-                                            {c}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                            {idSelect({ label: 'Country', value: formData.country_id, onChange: setField('country_id'), options: countries.data, loading: countries.loading })}
                             <FormControl size="small" fullWidth>
                                 <InputLabel>State</InputLabel>
-                                <Select
-                                    label="State"
-                                    value={formData.state}
-                                    onChange={handleChange("state")}
-                                >
-                                    <MenuItem value="">
-                                        <em>Select State</em>
-                                    </MenuItem>
-                                    {stateOptions2.map((s) => (
-                                        <MenuItem key={s} value={s}>
-                                            {s}
-                                        </MenuItem>
+                                <Select label="State" value={formData.state_id || ''} onChange={setField('state_id')} disabled={states.loading}>
+                                    <MenuItem value=""><em>None</em></MenuItem>
+                                    {filteredStates.filter((s) => s.is_active !== false).map((s) => (
+                                        <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
                                     ))}
                                 </Select>
                             </FormControl>
-                            <FormControl size="small" fullWidth>
-                                <InputLabel>District</InputLabel>
-                                <Select
-                                    label="District"
-                                    value={formData.district}
-                                    onChange={handleChange("district")}
-                                >
-                                    <MenuItem value="">
-                                        <em>Select District</em>
-                                    </MenuItem>
-                                </Select>
-                            </FormControl>
-                            <FormControl size="small" fullWidth>
-                                <InputLabel>City</InputLabel>
-                                <Select
-                                    label="City"
-                                    value={formData.city}
-                                    onChange={handleChange("city")}
-                                >
-                                    <MenuItem value="">
-                                        <em>Select City</em>
-                                    </MenuItem>
-                                </Select>
-                            </FormControl>
-                            <TextField
-                                label="Address"
-                                placeholder="Address"
-                                size="small"
-                                value={formData.address}
-                                onChange={handleChange("address")}
-                                fullWidth
-                            />
-                            <TextField
-                                label="Pincode"
-                                placeholder="Enter Pincode"
-                                size="small"
-                                value={formData.pincode}
-                                onChange={handleChange("pincode")}
-                                fullWidth
-                            />
+                            <TextField label="District" size="small" value={formData.district} onChange={setField('district')} fullWidth />
+                            <TextField label="City" size="small" value={formData.city} onChange={setField('city')} fullWidth />
+                            <TextField label="Address" size="small" value={formData.address} onChange={setField('address')} fullWidth />
+                            <TextField label="Pincode" size="small" value={formData.pincode} onChange={setField('pincode')} fullWidth />
                         </div>
                     </>
                 )}
 
-                {/* Tab 2: Source Details */}
-                {activeTab === 2 && (
+                {!hydrating && activeTab === 2 && (
                     <>
                         <div className="add-lead-mandatory-toggle">
                             <FormControlLabel
-                                control={
-                                    <Switch
-                                        checked={mandatoryOnly}
-                                        onChange={(e) => setMandatoryOnly(e.target.checked)}
-                                        size="small"
-                                    />
-                                }
+                                control={<Switch checked={mandatoryOnly} onChange={(e) => setMandatoryOnly(e.target.checked)} size="small" />}
                                 label="Mandatory only"
                                 labelPlacement="start"
                             />
                         </div>
-
                         <div className="add-lead-form-grid">
-                            <FormControl size="small" fullWidth required>
-                                <InputLabel>Channel</InputLabel>
-                                <Select
-                                    label="Channel"
-                                    value={formData.channel}
-                                    onChange={handleChange("channel")}
-                                >
-                                    {channelOptions.map((c) => (
-                                        <MenuItem key={c} value={c}>
-                                            {c}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <FormControl size="small" fullWidth required>
-                                <InputLabel>Source</InputLabel>
-                                <Select
-                                    label="Source"
-                                    value={formData.source}
-                                    onChange={handleChange("source")}
-                                >
-                                    {sourceOptions.map((s) => (
-                                        <MenuItem key={s} value={s}>
-                                            {s}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <FormControl size="small" fullWidth>
-                                <InputLabel>Campaign</InputLabel>
-                                <Select
-                                    label="Campaign"
-                                    value={formData.campaign}
-                                    onChange={handleChange("campaign")}
-                                >
-                                    {campaignOptions.map((c) => (
-                                        <MenuItem key={c} value={c}>
-                                            {c}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <FormControl size="small" fullWidth>
-                                <InputLabel>Medium</InputLabel>
-                                <Select
-                                    label="Medium"
-                                    value={formData.medium}
-                                    onChange={handleChange("medium")}
-                                >
-                                    <MenuItem value="">
-                                        <em>Select Medium</em>
-                                    </MenuItem>
-                                    {mediumOptions.map((m) => (
-                                        <MenuItem key={m} value={m}>
-                                            {m}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                            {idSelect({ label: 'Channel', value: formData.source.channel_id, onChange: setSourceField('channel_id'), options: channels.data, loading: channels.loading, required: true })}
+                            {idSelect({ label: 'Source', value: formData.source.source_id, onChange: setSourceField('source_id'), options: sources.data, loading: sources.loading, required: true })}
+                            {idSelect({ label: 'Campaign', value: formData.source.campaign_id, onChange: setSourceField('campaign_id'), options: campaigns.data, loading: campaigns.loading })}
+                            {idSelect({ label: 'Medium', value: formData.source.medium_id, onChange: setSourceField('medium_id'), options: mediums.data, loading: mediums.loading })}
+                        </div>
+                    </>
+                )}
+
+                {!hydrating && activeTab === 3 && visibleCustomFields.length > 0 && (
+                    <>
+                        <div className="add-lead-section-title">Additional Fields</div>
+                        <div className="add-lead-form-grid">
+                            {visibleCustomFields.map(renderCustomField)}
                         </div>
                     </>
                 )}
             </DialogContent>
 
             <DialogActions className="add-lead-actions">
-                <Button
-                    variant="outlined"
-                    onClick={handleCancel}
-                    className="add-lead-cancel-btn"
-                >
+                {submitError && (
+                    <Alert severity="error" sx={{ mr: 'auto', flex: 1, fontSize: 13, py: 0 }}>{submitError}</Alert>
+                )}
+                <Button variant="outlined" onClick={handleCancel} disabled={submitting} className="add-lead-cancel-btn">
                     Cancel
                 </Button>
-                <Button
-                    variant="contained"
-                    onClick={handleAdd}
-                    className="add-lead-add-btn"
-                >
-                    {isEditMode ? "Update" : "Add"}
+                <Button variant="contained" onClick={handleSubmit} disabled={submitting || hydrating} className="add-lead-add-btn">
+                    {submitting ? (isEditMode ? 'Updating…' : 'Adding…') : (isEditMode ? 'Update' : 'Add')}
                 </Button>
             </DialogActions>
+
+            {/* Inline create-new dialog. Renders on top of this Dialog with a higher
+                z-index; closing it leaves the Add/Edit Lead form intact. */}
+            <QuickCreateDialog
+                open={!!quickCreate.type}
+                type={quickCreate.type}
+                onClose={closeQuickCreate}
+                onCreated={handleQuickCreated}
+            />
         </Dialog>
     );
 };

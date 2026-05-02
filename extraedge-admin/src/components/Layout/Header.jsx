@@ -1,6 +1,9 @@
 import { useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { colors } from '../../theme/colors'
+import { auth, authApi, notificationsApi, followUpsApi, leadsApi } from '../../lib/endpoints'
+import { connectSocket, onNotification, isSocketConnected } from '../../lib/socket'
+import WorkTimer from './WorkTimer'
 import SearchIcon from '@mui/icons-material/Search';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import AddIcon from '@mui/icons-material/Add';
@@ -21,6 +24,7 @@ import {
     Popover,
     List,
     ListItem,
+    ListItemButton,
     ListItemText,
     Button,
     Badge,
@@ -28,9 +32,6 @@ import {
 
 function Header() {
     const navigate = useNavigate()
-
-    // Timer state (example: 20 minutes 35 seconds)
-    const [timeLeft, setTimeLeft] = useState(20 * 60 + 35) // seconds
 
     // Search context: 'applicant' or 'application'
     const [searchContext, setSearchContext] = useState('applicant')
@@ -52,37 +53,117 @@ function Header() {
     const [anchorEl, setAnchorEl] = useState(null);
     const openUserMenu = Boolean(anchorEl);
 
-    // Sample follow-up data
-    const followUps = [
-        { name: 'DAWARE RAHUL KIRAN', date: 'Apr 9, 2026 11:00 PM', ago: '4 days ago' },
-        { name: 'Pradip Pawar', date: 'Apr 9, 2026 10:58 AM', ago: '4 days ago' },
-        { name: 'VAIJUNATH MALGONDA', date: 'Apr 8, 2026 6:05 PM', ago: '5 days ago' },
-        { name: 'Lipika', date: 'Apr 8, 2026 3:59 PM', ago: '5 days ago' },
-        { name: 'BANKAR SOHAM ASHOK', date: 'Apr 4, 2026 10:38 PM', ago: '9 days ago' },
-        { name: 'PRIT', date: 'Apr 3, 2026 2:15 PM', ago: '10 days ago' },
-    ]
+    // Real follow-ups (loaded on mount)
+    const [followUps, setFollowUps] = useState([])
+
+    // Live notifications pushed over the websocket. Last 50 only.
+    const [liveEvents, setLiveEvents] = useState([])
+    const [unreadCount, setUnreadCount] = useState(0)
+    const [socketLive, setSocketLive] = useState(false)
+
+    // Global search state
+    const [searchQuery, setSearchQuery] = useState('')
+    const [searchResults, setSearchResults] = useState([])
+    const [searchLoading, setSearchLoading] = useState(false)
+    const [showSearchResults, setShowSearchResults] = useState(false)
+    const searchTimer = useRef(null)
+    const searchWrapperRef = useRef(null)
 
     useEffect(() => {
-        const timer = setInterval(() => {
-            setTimeLeft(prev => (prev > 0 ? prev - 1 : 0))
-        }, 1000)
-        return () => clearInterval(timer)
+        let cancelled = false
+        followUpsApi.myUpcoming()
+            .then((r) => { if (!cancelled) setFollowUps((r?.data || []).slice(0, 10)) })
+            .catch(() => {})
+        return () => { cancelled = true }
     }, [])
 
-    const formatTime = (seconds) => {
-        const h = Math.floor(seconds / 3600)
-        const m = Math.floor((seconds % 3600) / 60)
-        const s = seconds % 60
-        return `${h.toString().padStart(2, '0')}:${m
-            .toString()
-            .padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    // Open the websocket once for the session and subscribe to events.
+    useEffect(() => {
+        const sock = connectSocket()
+        if (!sock) return
+        const onConnect = () => setSocketLive(true)
+        const onDisconnect = () => setSocketLive(false)
+        sock.on('connect', onConnect)
+        sock.on('disconnect', onDisconnect)
+        if (sock.connected) setSocketLive(true)
+
+        const off = onNotification((evt) => {
+            // Push newest first, cap at 50.
+            setLiveEvents((prev) => [{ ...evt, id: `${evt.type}-${evt.lead_id || ''}-${evt.occurred_at}` }, ...prev].slice(0, 50))
+            // Bump the badge unless the notification panel is currently open.
+            setUnreadCount((n) => (anchorNotification ? 0 : n + 1))
+        })
+        return () => {
+            sock.off('connect', onConnect)
+            sock.off('disconnect', onDisconnect)
+            off()
+        }
+        // anchorNotification dep intentionally omitted — we read it directly so
+        // counter keeps incrementing while panel is closed and resets on open.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    // Reset unread when user opens the panel.
+    useEffect(() => {
+        if (anchorNotification) setUnreadCount(0)
+    }, [anchorNotification])
+
+    // Debounced global search against /leads?q=…
+    useEffect(() => {
+        if (searchTimer.current) clearTimeout(searchTimer.current)
+        const q = searchQuery.trim()
+        if (q.length < 2) {
+            setSearchResults([])
+            setSearchLoading(false)
+            return
+        }
+        setSearchLoading(true)
+        searchTimer.current = setTimeout(() => {
+            leadsApi.list({ q, limit: 10 })
+                .then((r) => setSearchResults(r?.data || []))
+                .catch(() => setSearchResults([]))
+                .finally(() => setSearchLoading(false))
+        }, 300)
+        return () => { if (searchTimer.current) clearTimeout(searchTimer.current) }
+    }, [searchQuery])
+
+    // Close results when clicking outside
+    useEffect(() => {
+        const onClick = (e) => {
+            if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target)) {
+                setShowSearchResults(false)
+                setShowGlobalMenu(false)
+            }
+        }
+        document.addEventListener('mousedown', onClick)
+        return () => document.removeEventListener('mousedown', onClick)
+    }, [])
+
+    // Open the full search-results page with the current query.
+    const goToSearchPage = () => {
+        const q = searchQuery.trim()
+        if (!q) return
+        setShowSearchResults(false)
+        navigate(`/search?q=${encodeURIComponent(q)}`)
+    }
+    // Single hit click — go straight to the search page (which opens the lead's
+    // edit dialog via the result list).
+    const handleResultClick = () => {
+        setSearchResults([])
+        setShowSearchResults(false)
+        goToSearchPage()
     }
 
-    const handleLogout = () => {
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
+    const handleLogout = async () => {
+        try { await authApi.logout(); } catch { /* ignore */ }
+        // Tear down the websocket so the next login opens a fresh session.
+        try { (await import('../../lib/socket')).disconnectSocket(); } catch { /* ignore */ }
+        auth.clear()
         navigate('/')
     }
+
+    const sessionUser = auth.getUser()
+    const sessionTenant = auth.getTenant()
 
     const getPlaceholder = () => {
         return searchContext === 'applicant'
@@ -108,12 +189,11 @@ function Header() {
         >
             {/* Brand & Timer Section */}
             <div className="header-brand">
-                <span className="brand-text">SPEEDUP INNOVATION</span>
-
+                <span className="brand-text">{sessionTenant?.brand_name || sessionTenant?.name || 'EXTRAEDGE'}</span>
             </div>
 
             <div className='main-container'>
-                <div className="header-search-wrapper">
+                <div className="header-search-wrapper" ref={searchWrapperRef} style={{ position: 'relative' }}>
                     <div>
                         <div className="global-search-dropdown">
                             <button
@@ -124,24 +204,90 @@ function Header() {
                                 <ExpandMoreIcon sx={{ fontSize: 18, marginLeft: '4px' }} />
                             </button>
                             {showGlobalMenu && (
-                                <div className="global-menu">
-                                    <div className="menu-item">Applicant Name</div>
-                                    <div className="menu-item">WhatsApp Number</div>
-                                    <div className="menu-item">Email Id</div>
+                                <div className="global-menu" style={{ zIndex: 1300 }}>
+                                    <div className="menu-item" onClick={() => { setSearchContext('applicant'); setShowGlobalMenu(false); }}>Applicant Name</div>
+                                    <div className="menu-item" onClick={() => { setSearchContext('applicant'); setShowGlobalMenu(false); }}>WhatsApp Number</div>
+                                    <div className="menu-item" onClick={() => { setSearchContext('applicant'); setShowGlobalMenu(false); }}>Email Id</div>
                                 </div>
                             )}
                         </div>
                     </div>
 
-
-                    <div className="search-input-wrapper-header">
+                    <div className="search-input-wrapper-header" style={{ position: 'relative' }}>
                         <input
                             type="text"
                             className="search-input"
                             placeholder={getPlaceholder()}
                             style={{ color: colors.textDark }}
+                            value={searchQuery}
+                            onChange={(e) => { setSearchQuery(e.target.value); setShowSearchResults(true); }}
+                            onFocus={() => setShowSearchResults(true)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape') { setShowSearchResults(false); }
+                                if (e.key === 'Enter' && searchQuery.trim()) { goToSearchPage(); }
+                            }}
                         />
                         <SearchIcon className="search-icon" sx={{ fontSize: 20 }} />
+
+                        {showSearchResults && searchQuery.trim().length >= 2 && (
+                            <Box
+                                sx={{
+                                    position: 'absolute',
+                                    top: 'calc(100% + 4px)',
+                                    left: 0,
+                                    right: 0,
+                                    background: '#fff',
+                                    border: `1px solid ${colors.borderGrey}`,
+                                    borderRadius: 1.5,
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                                    maxHeight: 360,
+                                    overflowY: 'auto',
+                                    zIndex: 1300,
+                                }}
+                            >
+                                {searchLoading && (
+                                    <Box sx={{ p: 2, fontSize: 13, color: '#888', textAlign: 'center' }}>Searching…</Box>
+                                )}
+                                {!searchLoading && searchResults.length === 0 && (
+                                    <Box sx={{ p: 2, fontSize: 13, color: '#888', textAlign: 'center' }}>
+                                        No leads matching "{searchQuery}"
+                                    </Box>
+                                )}
+                                {!searchLoading && searchResults.length > 0 && (
+                                    <List dense disablePadding>
+                                        {searchResults.map((r) => (
+                                            <ListItem
+                                                key={r.id}
+                                                disablePadding
+                                                sx={{ borderBottom: `1px solid ${colors.borderGrey}`, '&:last-child': { borderBottom: 'none' } }}
+                                            >
+                                                <ListItemButton onClick={() => handleResultClick(r)}>
+                                                    <ListItemText
+                                                        primary={
+                                                            <Typography sx={{ fontSize: 14, fontWeight: 500 }}>
+                                                                {r.name || r.email || r.phone}
+                                                            </Typography>
+                                                        }
+                                                        secondary={
+                                                            <Typography sx={{ fontSize: 12, color: colors.midGrey }}>
+                                                                {[r.email, r.phone, r.stage_name].filter(Boolean).join(' · ')}
+                                                            </Typography>
+                                                        }
+                                                    />
+                                                </ListItemButton>
+                                            </ListItem>
+                                        ))}
+                                        <ListItem disablePadding sx={{ borderTop: `2px solid ${colors.borderGrey}` }}>
+                                            <ListItemButton onClick={goToSearchPage} sx={{ justifyContent: 'center' }}>
+                                                <Typography sx={{ fontSize: 13, fontWeight: 600, color: colors.primary }}>
+                                                    View all results →
+                                                </Typography>
+                                            </ListItemButton>
+                                        </ListItem>
+                                    </List>
+                                )}
+                            </Box>
+                        )}
                     </div>
 
                 </div>
@@ -150,74 +296,32 @@ function Header() {
                         <div className="notification-wrapper">
                             <button
                                 className="header-btn notification-btn"
-                                title="Notifications"
+                                title={socketLive ? 'Notifications (live)' : 'Notifications (offline)'}
                                 onClick={(e) => setAnchorNotification(e.currentTarget)}
                             >
-                                <Badge badgeContent={followUps.length} color="error">
-                                    <NotificationsActiveIcon sx={{ fontSize: 22, color: colors.primary }} />
+                                <Badge
+                                    badgeContent={unreadCount + followUps.length}
+                                    color="error"
+                                    max={99}
+                                >
+                                    <NotificationsActiveIcon sx={{ fontSize: 22, color: socketLive ? colors.primary : '#999' }} />
                                 </Badge>
                             </button>
-                            <Popover
-                                open={Boolean(anchorNotification)}
-                                anchorEl={anchorNotification}
+                            <NotificationsPopover
+                                anchor={anchorNotification}
                                 onClose={() => setAnchorNotification(null)}
-                                anchorOrigin={{
-                                    vertical: 'bottom',
-                                    horizontal: 'right',
+                                liveEvents={liveEvents}
+                                followUps={followUps}
+                                socketLive={socketLive}
+                                onClear={() => setLiveEvents([])}
+                                onNavigateLead={(leadId) => {
+                                    setAnchorNotification(null)
+                                    // Land on the Lead Manager with ?focus=<id>;
+                                    // LeadList opens the edit dialog for that lead on mount.
+                                    if (leadId) navigate(`/leadlist?focus=${leadId}`)
+                                    else navigate('/leadlist')
                                 }}
-                                transformOrigin={{
-                                    vertical: 'top',
-                                    horizontal: 'right',
-                                }}
-                            >
-                                <Box sx={{ width: 360, maxHeight: 400 }}>
-                                    <Box sx={{ 
-                                        px: 2, 
-                                        py: 1.5, 
-                                        borderBottom: `1px solid ${colors.borderGrey}`,
-                                        fontWeight: 600,
-                                        fontSize: 15
-                                    }}>
-                                        Follow ups ({followUps.length})
-                                    </Box>
-                                    <List sx={{ maxHeight: 350, overflow: 'auto' }}>
-                                        {followUps.map((item, index) => (
-                                            <ListItem 
-                                                key={index}
-                                                sx={{
-                                                    py: 1.5,
-                                                    px: 2,
-                                                    borderBottom: `1px solid ${colors.borderGrey}`,
-                                                    '&:last-child': {
-                                                        borderBottom: 'none'
-                                                    },
-                                                    '&:hover': {
-                                                        backgroundColor: colors.inputGrey
-                                                    }
-                                                }}
-                                            >
-                                                <ListItemText
-                                                    primary={
-                                                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                                                            <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
-                                                                {item.name}
-                                                            </Typography>
-                                                            <Typography sx={{ fontSize: 13, color: colors.midGrey }}>
-                                                                Add Follow Up
-                                                            </Typography>
-                                                        </Box>
-                                                    }
-                                                    secondary={
-                                                        <Typography sx={{ fontSize: 12, color: colors.midGrey }}>
-                                                            {item.date} &middot; {item.ago}
-                                                        </Typography>
-                                                    }
-                                                />
-                                            </ListItem>
-                                        ))}
-                                    </List>
-                                </Box>
-                            </Popover>
+                            />
                         </div>
 
                         <button className="header-btn add-btn" title="Add" onClick={() => setShowQuickAdd(true)}>
@@ -290,8 +394,8 @@ function Header() {
                             </Popover>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '5px' }}>
-                        <div className="timer">{formatTime(timeLeft)}</div>
+                    <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                        <WorkTimer />
                         <div>
                             {/* USER BUTTON */}
                             <button
@@ -346,14 +450,16 @@ function Header() {
                                     <Avatar sx={{ width: 40, height: 40 }} />
                                     <Box>
                                         <Typography fontWeight={600} fontSize={14}>
-                                            Divya Nair
+                                            {sessionUser?.name || sessionUser?.email || 'User'}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary">
-                                            counselor4@speedupinfotech.com
+                                            {sessionUser?.email}
                                         </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                            8669012416
-                                        </Typography>
+                                        {sessionUser?.phone && (
+                                            <Typography variant="body2" color="text.secondary">
+                                                {sessionUser.phone}
+                                            </Typography>
+                                        )}
                                     </Box>
                                 </Box>
 
@@ -387,6 +493,179 @@ function Header() {
 
             <QuickAdd open={showQuickAdd} onClose={() => setShowQuickAdd(false)} />
         </header>
+    )
+}
+
+/* ==============================================================
+   Real-time notifications popover.
+   Two tabs:
+     Live   → events pushed over the websocket (lead.assigned / reassigned /
+              stage_changed). Newest first; click to open the lead.
+     Follow-ups → today's planned follow-ups loaded over REST.
+   ============================================================== */
+function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLive, onClear, onNavigateLead }) {
+    const [tab, setTab] = useState('live')
+
+    const titleFor = (e) => {
+        if (e.type === 'lead.assigned')      return e.payload?.auto ? 'New lead auto-assigned' : 'New lead assigned'
+        if (e.type === 'lead.reassigned')    return 'Lead reassigned'
+        if (e.type === 'lead.stage_changed') return 'Lead stage changed'
+        if (e.type === 'lead.created')       return 'Lead created'
+        return e.type || 'Event'
+    }
+    const iconColor = (e) => {
+        if (e.type === 'lead.assigned')      return '#43A047'
+        if (e.type === 'lead.reassigned')    return '#FB8C00'
+        if (e.type === 'lead.stage_changed') return '#1E88E5'
+        return colors.primary
+    }
+    const fmtRel = (iso) => {
+        if (!iso) return ''
+        const sec = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000))
+        if (sec < 60) return `${sec}s ago`
+        if (sec < 3600) return `${Math.floor(sec / 60)}m ago`
+        if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`
+        return new Date(iso).toLocaleDateString()
+    }
+
+    return (
+        <Popover
+            open={Boolean(anchor)}
+            anchorEl={anchor}
+            onClose={onClose}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+            <Box sx={{ width: 380, maxHeight: 480, display: 'flex', flexDirection: 'column' }}>
+                <Box sx={{ px: 2, py: 1.5, borderBottom: `1px solid ${colors.borderGrey}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Notifications</Typography>
+                    <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11,
+                        color: socketLive ? '#16a34a' : '#dc2626', fontWeight: 600,
+                    }}>
+                        <span style={{
+                            width: 8, height: 8, borderRadius: '50%',
+                            background: socketLive ? '#16a34a' : '#dc2626',
+                        }} />
+                        {socketLive ? 'Live' : 'Offline'}
+                    </span>
+                </Box>
+
+                <Box sx={{ display: 'flex', borderBottom: `1px solid ${colors.borderGrey}` }}>
+                    <button
+                        onClick={() => setTab('live')}
+                        style={{
+                            flex: 1, padding: '10px 0', background: 'none', border: 'none',
+                            fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                            color: tab === 'live' ? colors.primary : '#666',
+                            borderBottom: tab === 'live' ? `2px solid ${colors.primary}` : '2px solid transparent',
+                        }}
+                    >
+                        Live ({liveEvents.length})
+                    </button>
+                    <button
+                        onClick={() => setTab('followups')}
+                        style={{
+                            flex: 1, padding: '10px 0', background: 'none', border: 'none',
+                            fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                            color: tab === 'followups' ? colors.primary : '#666',
+                            borderBottom: tab === 'followups' ? `2px solid ${colors.primary}` : '2px solid transparent',
+                        }}
+                    >
+                        Follow-ups ({followUps.length})
+                    </button>
+                </Box>
+
+                <Box sx={{ flex: 1, overflowY: 'auto', maxHeight: 380 }}>
+                    {tab === 'live' && (
+                        <>
+                            {liveEvents.length === 0 && (
+                                <Box sx={{ p: 4, textAlign: 'center', color: '#888', fontSize: 13 }}>
+                                    No real-time events yet. They'll appear here as soon as
+                                    leads are assigned, reassigned, or move stages.
+                                </Box>
+                            )}
+                            {liveEvents.length > 0 && (
+                                <List dense disablePadding>
+                                    {liveEvents.map((e) => (
+                                        <ListItem
+                                            key={e.id}
+                                            disablePadding
+                                            sx={{ borderBottom: `1px solid ${colors.borderGrey}` }}
+                                        >
+                                            <ListItemButton onClick={() => onNavigateLead?.(e.lead_id)}>
+                                                <Box sx={{
+                                                    width: 8, height: 8, borderRadius: '50%',
+                                                    background: iconColor(e), mr: 1.5,
+                                                }} />
+                                                <ListItemText
+                                                    primary={
+                                                        <Typography sx={{ fontWeight: 600, fontSize: 13 }}>
+                                                            {titleFor(e)}{e.lead_name ? ` · ${e.lead_name}` : ''}
+                                                        </Typography>
+                                                    }
+                                                    secondary={
+                                                        <Typography sx={{ fontSize: 11, color: '#888' }}>
+                                                            {fmtRel(e.occurred_at)}
+                                                            {e.payload?.reason ? ` · ${e.payload.reason}` : ''}
+                                                        </Typography>
+                                                    }
+                                                />
+                                            </ListItemButton>
+                                        </ListItem>
+                                    ))}
+                                </List>
+                            )}
+                        </>
+                    )}
+
+                    {tab === 'followups' && (
+                        <>
+                            {followUps.length === 0 && (
+                                <Box sx={{ p: 4, textAlign: 'center', color: '#888', fontSize: 13 }}>
+                                    No upcoming follow-ups.
+                                </Box>
+                            )}
+                            <List dense disablePadding>
+                                {followUps.map((item, index) => (
+                                    <ListItem key={index} disablePadding sx={{ borderBottom: `1px solid ${colors.borderGrey}` }}>
+                                        <ListItemButton onClick={() => onNavigateLead?.(item.lead_id)}>
+                                            <ListItemText
+                                                primary={
+                                                    <Typography sx={{ fontWeight: 600, fontSize: 13 }}>
+                                                        {item.lead_name || 'Follow-up'}
+                                                    </Typography>
+                                                }
+                                                secondary={
+                                                    <Typography sx={{ fontSize: 11, color: '#888' }}>
+                                                        {item.next_action_datetime ? new Date(item.next_action_datetime).toLocaleString() : '—'}
+                                                        {item.comment ? ` · ${String(item.comment).slice(0, 50)}` : ''}
+                                                    </Typography>
+                                                }
+                                            />
+                                        </ListItemButton>
+                                    </ListItem>
+                                ))}
+                            </List>
+                        </>
+                    )}
+                </Box>
+
+                {tab === 'live' && liveEvents.length > 0 && (
+                    <Box sx={{ borderTop: `1px solid ${colors.borderGrey}`, p: 1, textAlign: 'center' }}>
+                        <button
+                            onClick={onClear}
+                            style={{
+                                background: 'none', border: 'none', cursor: 'pointer',
+                                color: '#666', fontSize: 12, fontWeight: 600,
+                            }}
+                        >
+                            Clear all
+                        </button>
+                    </Box>
+                )}
+            </Box>
+        </Popover>
     )
 }
 

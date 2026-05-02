@@ -6,29 +6,42 @@ import {
   IconButton,
   TextField,
   Button,
+  Alert,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import NoteAltOutlinedIcon from "@mui/icons-material/NoteAltOutlined";
+import { leadNotesApi } from "../../lib/endpoints";
 
-const AddNoteDrawer = ({ open, onClose, lead }) => {
+const AddNoteDrawer = ({ open, onClose, lead, onSaved }) => {
   const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
 
-  const handleAdd = () => {
-    console.log("Adding note:", {
-      leadId: lead?.id,
-      note,
-    });
-    resetForm();
-    onClose();
+  const resetForm = () => {
+    setNote("");
+    setErr("");
   };
 
   const handleClose = () => {
     resetForm();
-    onClose();
+    onClose?.();
   };
 
-  const resetForm = () => {
-    setNote("");
+  const handleAdd = async () => {
+    if (!lead?.id) { setErr('No lead selected'); return; }
+    if (!note.trim()) { setErr('Note cannot be empty'); return; }
+    setBusy(true);
+    setErr("");
+    try {
+      await leadNotesApi.create(lead.id, { body: note.trim(), visibility: 'internal' });
+      resetForm();
+      onSaved?.();
+      onClose?.();
+    } catch (e) {
+      setErr(e.message || 'Failed to add note');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -97,6 +110,7 @@ const AddNoteDrawer = ({ open, onClose, lead }) => {
               sx={{ "& .MuiInputBase-input": { fontSize: 13 } }}
             />
           </Box>
+          {err && <Alert severity="error" sx={{ fontSize: 13 }}>{err}</Alert>}
         </Box>
 
         {/* FOOTER */}
@@ -113,6 +127,7 @@ const AddNoteDrawer = ({ open, onClose, lead }) => {
           <Button
             variant="outlined"
             onClick={handleClose}
+            disabled={busy}
             sx={{
               textTransform: "none",
               color: "#555",
@@ -126,7 +141,7 @@ const AddNoteDrawer = ({ open, onClose, lead }) => {
           <Button
             variant="contained"
             onClick={handleAdd}
-            disabled={!note.trim()}
+            disabled={!note.trim() || busy}
             sx={{
               textTransform: "none",
               backgroundColor: "#E87B2F",
@@ -135,7 +150,7 @@ const AddNoteDrawer = ({ open, onClose, lead }) => {
               "&:hover": { backgroundColor: "#d06a20" },
             }}
           >
-            Add
+            {busy ? 'Adding…' : 'Add'}
           </Button>
         </Box>
       </Box>
