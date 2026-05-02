@@ -7,6 +7,12 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import ViewListIcon from "@mui/icons-material/ViewList";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import CampaignIcon from "@mui/icons-material/Campaign";
+import EditIcon from "@mui/icons-material/Edit";
+import CallIcon from "@mui/icons-material/Call";
+import ChatIcon from "@mui/icons-material/Chat";
+import EmailIcon from "@mui/icons-material/Email";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import WhatsappModal from "../WhatsApp/WhatsApp"
 import SavedList from "../SavedList/SavedList";
 
@@ -58,9 +64,34 @@ const FiltersOptions = () => {
 
                     <Box sx={{ display: "flex", gap: 1 }}>
 
+                        {/* CAMPAIGN */}
+                        <IconButton size="small">
+                            <CampaignIcon sx={{ color: colors.primary }} />
+                        </IconButton>
+
+                        {/* EDIT */}
+                        <IconButton size="small">
+                            <EditIcon sx={{ color: colors.primary }} />
+                        </IconButton>
+
                         {/* GROUP MODAL */}
                         <IconButton size="small" onClick={() => setOpenAssign(true)}>
                             <GroupIcon sx={{ color: colors.primary }} />
+                        </IconButton>
+
+                        {/* CALL */}
+                        <IconButton size="small">
+                            <CallIcon sx={{ color: colors.primary }} />
+                        </IconButton>
+
+                        {/* CHAT */}
+                        <IconButton size="small">
+                            <ChatIcon sx={{ color: colors.primary }} />
+                        </IconButton>
+
+                        {/* EMAIL */}
+                        <IconButton size="small">
+                            <EmailIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
                         {/* WHATSAPP MODAL */}
@@ -70,6 +101,11 @@ const FiltersOptions = () => {
 
                         <IconButton size="small" onClick={handleRefresh}>
                             <RefreshIcon sx={{ color: colors.primary }} />
+                        </IconButton>
+
+                        {/* DOWNLOAD */}
+                        <IconButton size="small">
+                            <FileDownloadIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
                         <IconButton size="small" onClick={() => setOpenListDrawer(true)}>
