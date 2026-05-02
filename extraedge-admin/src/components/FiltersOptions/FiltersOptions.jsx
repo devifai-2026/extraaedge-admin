@@ -15,6 +15,7 @@ import EmailIcon from "@mui/icons-material/Email";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import WhatsappModal from "../WhatsApp/WhatsApp"
 import SavedList from "../SavedList/SavedList";
+import BulkMarketingCampaignDrawer from "../BulkMarketingCampaignDrawer/BulkMarketingCampaignDrawer";
 
 import {
     Box,
@@ -42,6 +43,8 @@ const FiltersOptions = () => {
     const [anchorEl, setAnchorEl] = useState(null);
     const [openListDrawer, setOpenListDrawer] = useState(false);
     const [openFilter, setOpenFilter] = useState(false);
+    const [openCampaignConfirm, setOpenCampaignConfirm] = useState(false);
+    const [openCampaignDrawer, setOpenCampaignDrawer] = useState(false);
 
     const handleRefresh = () => {
         window.location.reload();
@@ -65,7 +68,7 @@ const FiltersOptions = () => {
                     <Box sx={{ display: "flex", gap: 1 }}>
 
                         {/* CAMPAIGN */}
-                        <IconButton size="small">
+                        <IconButton size="small" onClick={() => setOpenCampaignConfirm(true)}>
                             <CampaignIcon sx={{ color: colors.primary }} />
                         </IconButton>
 
@@ -197,6 +200,45 @@ const FiltersOptions = () => {
             <FilterLeadsModal
                 open={openFilter}
                 onClose={() => setOpenFilter(false)}
+            />
+
+            {/* ================= CAMPAIGN CONFIRM MODAL ================= */}
+            <Dialog
+                open={openCampaignConfirm}
+                onClose={() => setOpenCampaignConfirm(false)}
+                maxWidth="xs"
+                fullWidth
+            >
+                <DialogTitle className='assignmodel-filter'>
+                    Add Campaign
+                </DialogTitle>
+
+                <DialogContent>
+                    <Typography fontWeight={600}>
+                        Do you want to add bulk communication marketing campaign?
+                    </Typography>
+                </DialogContent>
+
+                <DialogActions>
+                    <Button onClick={() => setOpenCampaignConfirm(false)}>No</Button>
+                    <Button
+                        variant="contained"
+                        className='assign-btn-filter'
+                        onClick={() => {
+                            setOpenCampaignConfirm(false);
+                            setOpenCampaignDrawer(true);
+                        }}
+                    >
+                        Yes
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ================= BULK MARKETING CAMPAIGN DRAWER ================= */}
+            <BulkMarketingCampaignDrawer
+                open={openCampaignDrawer}
+                onClose={() => setOpenCampaignDrawer(false)}
+                leadsCount={28625}
             />
         </>
     );
