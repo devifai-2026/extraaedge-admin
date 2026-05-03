@@ -11,7 +11,7 @@ let connectedAt = null;
 // VITE_API_BASE_URL already includes /api/v1, so we strip it before passing
 // the URL to the io() client. Falling back to localhost:4000 if not set.
 const apiBase = () => {
-  const fallback = 'http://localhost:4000';
+  const fallback = 'https://extraaedge-server.onrender.com';
   if (typeof window === 'undefined') return fallback;
   const env = (import.meta && import.meta.env) || {};
   const raw = env.VITE_API_BASE_URL || fallback;
