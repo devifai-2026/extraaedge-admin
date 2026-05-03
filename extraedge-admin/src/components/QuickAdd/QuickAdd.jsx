@@ -23,6 +23,7 @@ const initialFormData = {
     program_id: '',
     channel_id: '',
     source_id: '',
+    remarks: '',
     sendWelcomeEmail: false,
     sendWelcomeSMS: false,
 };
@@ -42,8 +43,11 @@ const QuickAdd = ({ open, onClose, onCreated }) => {
         if (open) { setFormData(initialFormData); setError(''); }
     }, [open]);
 
+    const NUMERIC_FIELDS = new Set(['whatsappNumber', 'alternateContactNumber']);
     const handleChange = (field) => (e) => {
-        setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+        let val = e.target.value;
+        if (NUMERIC_FIELDS.has(field)) val = val.replace(/\D+/g, '').slice(0, 15);
+        setFormData((prev) => ({ ...prev, [field]: val }));
     };
     const handleCheckbox = (field) => (e) => {
         setFormData((prev) => ({ ...prev, [field]: e.target.checked }));
@@ -61,6 +65,7 @@ const QuickAdd = ({ open, onClose, onCreated }) => {
         }
         if (formData.alternateContactNumber.trim()) p.alternate_contact = formData.alternateContactNumber.trim();
         if (formData.emailId.trim()) p.email = formData.emailId.trim();
+        if (formData.remarks.trim()) p.remarks = formData.remarks.trim();
         if (formData.program_id) p.program_id = formData.program_id;
         // Source attribution row — single primary
         const src = {};
@@ -150,7 +155,10 @@ const QuickAdd = ({ open, onClose, onCreated }) => {
                         <div className="quick-add-field">
                             <label>WhatsApp Number<span className="required">*</span></label>
                             <input
-                                type="text"
+                                type="tel"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={15}
                                 placeholder="WhatsApp Number"
                                 value={formData.whatsappNumber}
                                 onChange={handleChange('whatsappNumber')}
@@ -160,7 +168,10 @@ const QuickAdd = ({ open, onClose, onCreated }) => {
                         <div className="quick-add-field">
                             <label>Alternate Contact Number</label>
                             <input
-                                type="text"
+                                type="tel"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={15}
                                 placeholder="Alternate Contact Number"
                                 value={formData.alternateContactNumber}
                                 onChange={handleChange('alternateContactNumber')}
@@ -235,6 +246,17 @@ const QuickAdd = ({ open, onClose, onCreated }) => {
                                 )}
                                 <span className="select-arrow">&#9662;</span>
                             </div>
+                        </div>
+
+                        <div className="quick-add-field full-width">
+                            <label>Remarks</label>
+                            <textarea
+                                placeholder="Add a note about this lead (optional)"
+                                rows={3}
+                                value={formData.remarks}
+                                onChange={handleChange('remarks')}
+                                maxLength={1000}
+                            />
                         </div>
                     </div>
 

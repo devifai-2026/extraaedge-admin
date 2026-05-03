@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { colors } from '../../theme/colors'
 import { api, auth } from '../../lib/api'
+import { applyThemeFromUser } from '../../theme/applyTheme'
+import { firstAllowedRoute } from '../../lib/rbac'
 
 function Login() {
   const [currentSlide, setCurrentSlide] = useState(0)
@@ -51,14 +53,21 @@ function Login() {
         ...(tenantSlug.trim() ? { tenant_slug: tenantSlug.trim() } : {}),
       })
       const payload = res?.data ?? res
+      const sessionUser = payload.user || payload.platform_user
       auth.setSession({
         access_token: payload.access_token,
         refresh_token: payload.refresh_token,
-        user: payload.user || payload.platform_user,
+        user: sessionUser,
         tenant: payload.tenant,
         allowed_tabs: payload.allowed_tabs,
       })
-      navigate('/dashboard')
+      // Repaint to the user's saved theme as soon as they log in. Without
+      // this the dashboard would briefly render in whoever-was-here-last's
+      // colors before the next reload.
+      applyThemeFromUser(sessionUser)
+      // Land on the first tab THIS user can actually access. Hardcoding
+      // /dashboard breaks for any user whose custom role hides dashboard.
+      navigate(firstAllowedRoute())
     } catch (err) {
       setError(err.message || 'Login failed')
     } finally {

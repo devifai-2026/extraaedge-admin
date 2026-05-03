@@ -260,7 +260,12 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
         phone: user.phone || '',
         role: user.role || 'counsellor',
         role_id: user.role_id || '',
-        manager_id: user.manager_id || '',
+        // Seed multi-manager from manager_ids (preferred) or fall back to
+        // the legacy single manager_id, so existing users don't lose data
+        // when the form opens.
+        manager_ids: Array.isArray(user.manager_ids) && user.manager_ids.length
+          ? user.manager_ids
+          : (user.manager_id ? [user.manager_id] : []),
         is_active: !!user.is_active,
       });
       setErr('');
@@ -268,19 +273,23 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
   }, [open, user]);
 
   if (!user) return null;
-  const roles = (rolesData?.data || []).filter((r) => r.scope === form.role && !r.is_system);
+  // All active roles in the tenant, system + custom. The server will derive
+  // the user's `role` bucket from the chosen role's `scope` automatically.
+  const allRoles = rolesData?.data || [];
 
   const save = async () => {
     setErr(''); setSaving(true);
     try {
+      // We send role_id only — server resolves the role bucket from
+      // custom_roles.scope, so we don't have to think about it on the FE.
       const payload = {
         name: form.name.trim(),
         email: form.email.trim(),
-        role: form.role,
         is_active: form.is_active,
         ...(form.phone ? { phone: form.phone.trim() } : { phone: null }),
-        ...(form.role_id ? { role_id: form.role_id } : {}),
-        ...(form.manager_id ? { manager_id: form.manager_id } : {}),
+        ...(form.role_id ? { role_id: form.role_id } : { role: form.role }),
+        // Multi-manager. First entry becomes primary manager_id server-side.
+        manager_ids: Array.isArray(form.manager_ids) ? form.manager_ids : [],
       };
       await usersApi.update(user.id, payload);
       onSaved?.();
@@ -309,17 +318,74 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
           <TextField size="small" label="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={!canManage} />
           <TextField size="small" type="email" label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled={!canManage} />
           <TextField size="small" label="WhatsApp Number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} disabled={!canManage} />
-          <TextField size="small" select label="Access Level" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value, role_id: '' })} disabled={!canManage}>
-            {ACCESS_LEVEL_OPTIONS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+
+          {/* Combined Role picker: lists every role the tenant has — system
+              and custom alike. Server derives the role bucket from the
+              chosen role's scope, so we only need to send role_id. */}
+          <TextField
+            size="small"
+            select
+            label="Role"
+            value={form.role_id || ''}
+            onChange={(e) => {
+              const role_id = e.target.value;
+              const picked = allRoles.find((r) => r.id === role_id);
+              setForm({ ...form, role_id, role: picked?.scope || form.role });
+            }}
+            disabled={!canManage}
+            helperText={form.role_id
+              ? `Inherits scope: ${(allRoles.find((r) => r.id === form.role_id)?.scope || '').replace('_', ' ')}`
+              : 'Pick a role'}
+          >
+            {allRoles.length === 0 && <MenuItem disabled value="">Loading roles…</MenuItem>}
+            {allRoles.filter((r) => r.is_system).map((r) => (
+              <MenuItem key={r.id} value={r.id}>
+                {r.name} <span style={{ color: '#888', fontSize: 11, marginLeft: 6 }}>· system</span>
+              </MenuItem>
+            ))}
+            {allRoles.some((r) => !r.is_system) && (
+              <MenuItem disabled value="" sx={{ opacity: 0.6, fontSize: 11 }}>— Custom roles —</MenuItem>
+            )}
+            {allRoles.filter((r) => !r.is_system).map((r) => (
+              <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>
+            ))}
           </TextField>
-          <TextField size="small" select label="Custom role" value={form.role_id} onChange={(e) => setForm({ ...form, role_id: e.target.value })} disabled={!canManage}>
-            <MenuItem value="">— Use default {form.role} tabs —</MenuItem>
-            {roles.map((r) => <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>)}
-          </TextField>
-          <TextField size="small" select label="Reporting To" value={form.manager_id} onChange={(e) => setForm({ ...form, manager_id: e.target.value })} disabled={!canManage}>
-            <MenuItem value="">— None —</MenuItem>
-            {users.filter((u) => u.id !== user.id && u.role !== 'counsellor').map((u) => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
-          </TextField>
+
+          {/* Multi-select reporting managers. All active users in the
+              tenant are candidates (excluding the user being edited). */}
+          <Autocomplete
+            multiple
+            size="small"
+            disabled={!canManage}
+            disableCloseOnSelect
+            options={(users || []).filter((u) => u.id !== user.id && u.is_active !== false)}
+            value={(users || []).filter((u) => (form.manager_ids || []).includes(u.id))}
+            onChange={(_e, picked) => setForm({ ...form, manager_ids: picked.map((u) => u.id) })}
+            getOptionLabel={(o) => o?.name || o?.email || ''}
+            isOptionEqualToValue={(o, v) => o?.id === v?.id}
+            noOptionsText="No other active users in this tenant."
+            renderOption={(props, opt, { selected }) => (
+              <li {...props} key={opt.id}>
+                <Checkbox size="small" checked={selected} sx={{ mr: 1, p: 0.5, '&.Mui-checked': { color: '#E53935' } }} />
+                <Box>
+                  <div style={{ fontSize: 13 }}>{opt.name || opt.email}</div>
+                  <div style={{ fontSize: 11, color: '#888' }}>{opt.email} · {String(opt.role || '').replace('_', ' ')}</div>
+                </Box>
+              </li>
+            )}
+            renderTags={(picked, getTagProps) =>
+              picked.map((u, i) => (
+                <Chip
+                  {...getTagProps({ index: i })}
+                  key={u.id}
+                  label={u.name || u.email}
+                  size="small"
+                  sx={{ background: '#fdf3ed', color: '#c84200' }}
+                />
+              ))
+            }
+            renderInput={(params) => <TextField {...params} label="Reporting To (multi-select)" placeholder="Search by name or email…" />}
+          />
         </div>
 
         <FormControlLabel
@@ -448,15 +514,9 @@ function FilterDialog({ open, value, users, onClose, onApply, onReset }) {
 
 // ----------------------------- Add user dialog -----------------------------
 
-// Decide which roles can be a "reporting manager" for a given access level.
-const reportingRolesFor = (role) => {
-  if (role === 'counsellor') return ['sales_manager'];
-  if (role === 'sales_manager') return ['super_admin'];
-  return []; // super_admin reports to no one
-};
-
 function AddUserDialog({ open, users, onClose, onCreated }) {
   const { data: programsData } = useFetch(() => programsApi.list(), [open]);
+  const { data: rolesData } = useFetch(() => customRolesApi.list(), [open]);
   const [form, setForm] = useState(() => initialAddForm());
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -464,9 +524,13 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
   useEffect(() => { if (open) { setForm(initialAddForm()); setErr(''); } }, [open]);
 
   const programs = programsData?.data || [];
-
-  const reportingRoles = reportingRolesFor(form.role);
-  const candidateManagers = users.filter((u) => u.is_active !== false && reportingRoles.includes(u.role));
+  // System + custom roles. Server derives the user's role bucket from the
+  // selected role's scope, so the FE never has to think about buckets.
+  const allRoles = rolesData?.data || [];
+  // Reporting Managers = every active user in the tenant. Per spec the
+  // picker is unrestricted (used to be filtered to "users above this role
+  // in the hierarchy" — that was friction without a real benefit).
+  const candidateManagers = users.filter((u) => u.is_active !== false);
 
   const submit = async () => {
     setErr('');
@@ -476,11 +540,14 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
     setSaving(true);
     try {
       const fullName = [form.first_name, form.last_name].filter(Boolean).join(' ').trim();
+      // We send role_id (the chosen role); server computes the role bucket
+      // from custom_roles.scope. Role bucket is a fallback for legacy paths.
       const payload = {
         name: fullName,
         email: form.email.trim(),
         password: form.password,
         role: form.role,
+        ...(form.role_id ? { role_id: form.role_id } : {}),
         ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
         ...(form.designation.trim() ? { designation: form.designation.trim() } : {}),
         ...(form.manager_ids.length ? { manager_ids: form.manager_ids } : {}),
@@ -518,52 +585,77 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
 
         <h4 style={{ marginTop: 24, marginBottom: 12 }}>Section 2: Access Level Details</h4>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-          <TextField size="small" select label="Select Access Level *" value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value, manager_ids: [] })}>
-            {ACCESS_LEVEL_OPTIONS.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+          {/* Combined role picker: every role in the tenant — system + custom.
+              Server reads custom_roles.scope to decide the user's role bucket. */}
+          <TextField
+            size="small"
+            select
+            label="Role *"
+            value={form.role_id || ''}
+            onChange={(e) => {
+              const role_id = e.target.value;
+              const picked = allRoles.find((r) => r.id === role_id);
+              setForm({ ...form, role_id, role: picked?.scope || form.role });
+            }}
+            helperText={form.role_id
+              ? `Inherits scope: ${(allRoles.find((r) => r.id === form.role_id)?.scope || '').replace('_', ' ')}`
+              : 'Pick a system or custom role'}
+          >
+            {allRoles.length === 0 && <MenuItem disabled value="">Loading roles…</MenuItem>}
+            {allRoles.filter((r) => r.is_system).map((r) => (
+              <MenuItem key={r.id} value={r.id}>
+                {r.name} <span style={{ color: '#888', fontSize: 11, marginLeft: 6 }}>· system</span>
+              </MenuItem>
+            ))}
+            {allRoles.some((r) => !r.is_system) && (
+              <MenuItem disabled value="" sx={{ opacity: 0.6, fontSize: 11 }}>— Custom roles —</MenuItem>
+            )}
+            {allRoles.filter((r) => !r.is_system).map((r) => (
+              <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>
+            ))}
           </TextField>
 
-          {reportingRoles.length > 0 && (
-            <Autocomplete
-              multiple
-              size="small"
-              disableCloseOnSelect
-              options={candidateManagers}
-              value={candidateManagers.filter((u) => form.manager_ids.includes(u.id))}
-              onChange={(_e, picked) => setForm({ ...form, manager_ids: picked.map((u) => u.id) })}
-              getOptionLabel={(o) => o?.name || o?.email || ''}
-              isOptionEqualToValue={(o, v) => o?.id === v?.id}
-              noOptionsText={`No ${reportingRoles.join(' / ').replace(/_/g, ' ')} available. Create one first, or leave blank.`}
-              renderOption={(props, opt, { selected }) => (
-                <li {...props} key={opt.id}>
-                  <Checkbox size="small" checked={selected} sx={{ mr: 1, p: 0.5, '&.Mui-checked': { color: '#E53935' } }} />
-                  <Box>
-                    <div style={{ fontSize: 13 }}>{opt.name}</div>
-                    <div style={{ fontSize: 11, color: '#888' }}>{opt.email} · {opt.role.replace('_', ' ')}</div>
-                  </Box>
-                </li>
-              )}
-              renderTags={(picked, getTagProps) =>
-                picked.map((u, i) => (
-                  <Chip
-                    {...getTagProps({ index: i })}
-                    key={u.id}
-                    label={u.name || u.email}
-                    size="small"
-                    sx={{ background: '#fdf3ed', color: '#c84200' }}
-                  />
-                ))
-              }
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label={`Reporting To ${reportingRoles.map((r) => r.replace('_', ' ')).join(' / ')}`}
-                  placeholder="Type to search and select…"
-                  helperText={`A ${form.role.replace('_', ' ')} can report to multiple ${reportingRoles.join(' / ').replace(/_/g, ' ')}s`}
+          {/* Multi-select reporting managers. All active users in the
+              tenant are candidates. Per-spec the picker is unrestricted. */}
+          <Autocomplete
+            multiple
+            size="small"
+            disableCloseOnSelect
+            options={candidateManagers}
+            value={candidateManagers.filter((u) => form.manager_ids.includes(u.id))}
+            onChange={(_e, picked) => setForm({ ...form, manager_ids: picked.map((u) => u.id) })}
+            getOptionLabel={(o) => o?.name || o?.email || ''}
+            isOptionEqualToValue={(o, v) => o?.id === v?.id}
+            noOptionsText="No active users in this tenant yet."
+            renderOption={(props, opt, { selected }) => (
+              <li {...props} key={opt.id}>
+                <Checkbox size="small" checked={selected} sx={{ mr: 1, p: 0.5, '&.Mui-checked': { color: '#E53935' } }} />
+                <Box>
+                  <div style={{ fontSize: 13 }}>{opt.name || opt.email}</div>
+                  <div style={{ fontSize: 11, color: '#888' }}>{opt.email} · {String(opt.role || '').replace('_', ' ')}</div>
+                </Box>
+              </li>
+            )}
+            renderTags={(picked, getTagProps) =>
+              picked.map((u, i) => (
+                <Chip
+                  {...getTagProps({ index: i })}
+                  key={u.id}
+                  label={u.name || u.email}
+                  size="small"
+                  sx={{ background: '#fdf3ed', color: '#c84200' }}
                 />
-              )}
-            />
-          )}
+              ))
+            }
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Reporting To (multi-select)"
+                placeholder="Type a name or email to search…"
+                helperText="One or more managers. The first becomes the user’s primary manager."
+              />
+            )}
+          />
         </div>
         <FormControlLabel
           control={<Checkbox checked={form.allow_mobile} onChange={(e) => setForm({ ...form, allow_mobile: e.target.checked })} sx={{ color: '#E53935', '&.Mui-checked': { color: '#E53935' } }} />}
@@ -594,7 +686,7 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
 
 const initialAddForm = () => ({
   first_name: '', last_name: '', email: '', phone: '', password: '',
-  role: 'counsellor', designation: '', manager_ids: [],
+  role: 'counsellor', role_id: '', designation: '', manager_ids: [],
   allow_mobile: true, program_id: '',
 });
 

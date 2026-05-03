@@ -21,11 +21,16 @@ import {
     CircularProgress,
     Autocomplete,
     Box,
+    Tooltip,
+    Chip,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
+import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import "./AddNewLead.css";
-import { leadsApi, usersApi } from "../../lib/endpoints";
+import { leadsApi, usersApi, uploadsApi } from "../../lib/endpoints";
+import { auth } from "../../lib/api";
 import { useDropdown } from "../../lib/useDropdowns";
 import QuickCreateDialog from "../QuickCreateDialog/QuickCreateDialog";
 import { isRole, ROLES } from "../../lib/rbac";
@@ -117,28 +122,39 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
     };
 
     // -------- Reassign (admin / sales_manager only, edit mode only) --------
-    // Admin sees every active counsellor. Manager sees only their team
-    // hierarchy via /users/team. Picking a new counsellor + clicking
-    // "Reassign" calls POST /lead-assignments and the parent screen reloads.
-    const canReassign = isEditMode && isRole(ROLES.SUPER_ADMIN, ROLES.SALES_MANAGER);
+    // Reassign is open to all 3 tenant roles. Server-side scope (in
+    // /lead-assignments POST) decides who can move which lead to whom:
+    //   super_admin   → any active user
+    //   sales_manager → users in their team hierarchy
+    //   counsellor    → only own leads, only to teammates / their manager
+    //
+    // The candidate list shown to counsellors comes from /users/team —
+    // returns the counsellor's own peers + managers — which matches what
+    // the server will accept.
+    const canReassign = isEditMode;
     const [reassignList, setReassignList] = useState([]);     // [{id,name,email,manager_id}]
-    const [reassignTo, setReassignTo] = useState('');         // chosen counsellor id
+    const [reassignTo, setReassignTo] = useState('');         // chosen user id
     const [reassignReason, setReassignReason] = useState(''); // free-text
     const [reassigning, setReassigning] = useState(false);
     const [reassignErr, setReassignErr] = useState('');
 
     useEffect(() => {
         if (!open || !canReassign) return;
-        const loader = isRole(ROLES.SALES_MANAGER)
-            ? usersApi.myTeam()
-            : usersApi.list({ role: 'counsellor', limit: 500 });
+        // Admins see every active counsellor; managers + counsellors get
+        // their team-scoped list from the server.
+        const loader = isRole(ROLES.SUPER_ADMIN)
+            ? usersApi.list({ role: 'counsellor', limit: 500 })
+            : usersApi.myTeam();
         loader
             .then((r) => {
-                const rows = (r?.data || []).filter((u) => u.role === 'counsellor' && u.is_active !== false);
+                const me = leadData?.assigned_to;
+                const rows = (r?.data || []).filter((u) =>
+                    u.is_active !== false && u.id !== me,
+                );
                 setReassignList(rows);
             })
             .catch(() => setReassignList([]));
-    }, [open, canReassign]);
+    }, [open, canReassign, leadData?.assigned_to]);
 
     const handleReassign = async () => {
         setReassignErr('');
@@ -258,8 +274,14 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
         return () => { alive = false; };
     }, [open, isEditMode, leadData?.id]);
 
+    // Fields that must contain digits only (phone numbers, pincode, etc.).
+    const NUMERIC_FIELDS = new Set(['phone', 'whatsapp_number', 'alternate_contact', 'pincode']);
+    const NUMERIC_FAMILY_FIELDS = new Set(['father_mobile', 'mother_mobile']);
+    const sanitizeDigits = (v, max = 15) => String(v ?? '').replace(/\D+/g, '').slice(0, max);
+
     const setField = (field) => (e) => {
-        const val = e.target.value;
+        let val = e.target.value;
+        if (NUMERIC_FIELDS.has(field)) val = sanitizeDigits(val, field === 'pincode' ? 10 : 15);
         setFormData((prev) => {
             const next = { ...prev, [field]: val };
             // When stage changes, clear sub-stage if it belongs to a different parent
@@ -277,7 +299,8 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
     };
 
     const setFamilyField = (field) => (e) => {
-        const val = e.target.value;
+        let val = e.target.value;
+        if (NUMERIC_FAMILY_FIELDS.has(field)) val = sanitizeDigits(val, 15);
         setFormData((prev) => ({ ...prev, family: { ...prev.family, [field]: val } }));
     };
 
@@ -337,9 +360,18 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
 
     const handleSubmit = async () => {
         setSubmitError('');
-        if (!formData.name?.trim() && !formData.email?.trim() && !formData.phone?.trim() && !formData.whatsapp_number?.trim()) {
-            setSubmitError('Provide at least name, email, phone or WhatsApp number');
-            return;
+        // Required-fields gate. Only enforced on CREATE — edits can update
+        // a single field at a time without re-asserting the full set.
+        if (!isEditMode) {
+            const missing = [];
+            if (!formData.name?.trim()) missing.push('Name');
+            if (!formData.whatsapp_number?.trim()) missing.push('WhatsApp number');
+            if (!formData.program_id) missing.push('Program');
+            if (!formData.remarks?.trim()) missing.push('Remarks');
+            if (missing.length) {
+                setSubmitError(`Required: ${missing.join(', ')}`);
+                return;
+            }
         }
         // Reject past-dated follow-ups before any network call. The picker
         // already enforces `min` natively but DevTools editing or browsers
@@ -567,6 +599,15 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                     {visibleCustomFields.length > 0 && (
                         <Tab label="Additional Fields" className={activeTab === 3 ? "add-lead-tab active" : "add-lead-tab"} />
                     )}
+                    {/* Call Recordings: edit-only — you can't attach to a
+                        lead before it exists in the DB. The active index is
+                        4 when Additional Fields is showing, otherwise 3. */}
+                    {isEditMode && (
+                        <Tab
+                            label="Call Recordings"
+                            className={activeTab === (visibleCustomFields.length > 0 ? 4 : 3) ? "add-lead-tab active" : "add-lead-tab"}
+                        />
+                    )}
                 </Tabs>
             </div>
 
@@ -592,9 +633,9 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                             <TextField label="Applicant Name" required size="small" value={formData.name} onChange={setField('name')} fullWidth />
                             {!mandatoryOnly && <TextField label="Email Id" size="small" value={formData.email} onChange={setField('email')} fullWidth />}
                             {!mandatoryOnly && <TextField label="Alternate Email Id" size="small" value={formData.alternate_email} onChange={setField('alternate_email')} fullWidth />}
-                            <TextField label="WhatsApp Number" required size="small" value={formData.whatsapp_number} onChange={setField('whatsapp_number')} fullWidth />
-                            {!mandatoryOnly && <TextField label="Phone" size="small" value={formData.phone} onChange={setField('phone')} fullWidth />}
-                            {!mandatoryOnly && <TextField label="Alternate Contact Number" size="small" value={formData.alternate_contact} onChange={setField('alternate_contact')} fullWidth />}
+                            <TextField label="WhatsApp Number" required size="small" value={formData.whatsapp_number} onChange={setField('whatsapp_number')} fullWidth inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 }} />
+                            {!mandatoryOnly && <TextField label="Phone" size="small" value={formData.phone} onChange={setField('phone')} fullWidth inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 }} />}
+                            {!mandatoryOnly && <TextField label="Alternate Contact Number" size="small" value={formData.alternate_contact} onChange={setField('alternate_contact')} fullWidth inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 }} />}
 
                             {!mandatoryOnly && idSelect({ label: 'Under Graduation Degree',  value: formData.ug_degree_id,         onChange: setField('ug_degree_id'),         options: degrees.data,      loading: degrees.loading,      addNew: { type: 'degrees',         assignTo: 'ug_degree_id' } })}
                             {!mandatoryOnly && idSelect({ label: 'UG Specialization',        value: formData.ug_specialization_id, onChange: setField('ug_specialization_id'), options: specs.data,        loading: specs.loading,        addNew: { type: 'specializations', assignTo: 'ug_specialization_id' } })}
@@ -779,27 +820,19 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                             {isEditMode && (
                                 <TextField label="Closure Remarks" required size="small" value={formData.closure_remarks} onChange={setField('closure_remarks')} fullWidth />
                             )}
-                            <TextField label="Remarks" size="small" multiline minRows={2} value={formData.remarks} onChange={setField('remarks')} fullWidth />
+                            <TextField label="Remarks" required={!isEditMode} size="small" multiline minRows={2} value={formData.remarks} onChange={setField('remarks')} fullWidth />
                         </div>
                     </>
                 )}
 
                 {!hydrating && activeTab === 1 && (
                     <>
-                        <div className="add-lead-mandatory-toggle">
-                            <FormControlLabel
-                                control={<Switch checked={mandatoryOnly} onChange={(e) => setMandatoryOnly(e.target.checked)} size="small" />}
-                                label="Mandatory only"
-                                labelPlacement="start"
-                            />
-                        </div>
-
                         <div className="add-lead-section-title">Parent's Details</div>
                         <div className="add-lead-form-grid">
                             <TextField label="Father's Full Name" size="small" value={formData.family.father_name} onChange={setFamilyField('father_name')} fullWidth />
                             <TextField label="Mother's Full Name" size="small" value={formData.family.mother_name} onChange={setFamilyField('mother_name')} fullWidth />
-                            <TextField label="Father's Mobile No." size="small" value={formData.family.father_mobile} onChange={setFamilyField('father_mobile')} fullWidth />
-                            <TextField label="Mother's Mobile No." size="small" value={formData.family.mother_mobile} onChange={setFamilyField('mother_mobile')} fullWidth />
+                            <TextField label="Father's Mobile No." size="small" value={formData.family.father_mobile} onChange={setFamilyField('father_mobile')} fullWidth inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 }} />
+                            <TextField label="Mother's Mobile No." size="small" value={formData.family.mother_mobile} onChange={setFamilyField('mother_mobile')} fullWidth inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 }} />
                             <TextField label="Father's Email Id" size="small" value={formData.family.father_email} onChange={setFamilyField('father_email')} fullWidth />
                             <TextField label="Mother's Email Id" size="small" value={formData.family.mother_email} onChange={setFamilyField('mother_email')} fullWidth />
                         </div>
@@ -819,23 +852,16 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                             <TextField label="District" size="small" value={formData.district} onChange={setField('district')} fullWidth />
                             <TextField label="City" size="small" value={formData.city} onChange={setField('city')} fullWidth />
                             <TextField label="Address" size="small" value={formData.address} onChange={setField('address')} fullWidth />
-                            <TextField label="Pincode" size="small" value={formData.pincode} onChange={setField('pincode')} fullWidth />
+                            <TextField label="Pincode" size="small" value={formData.pincode} onChange={setField('pincode')} fullWidth inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 10 }} />
                         </div>
                     </>
                 )}
 
                 {!hydrating && activeTab === 2 && (
                     <>
-                        <div className="add-lead-mandatory-toggle">
-                            <FormControlLabel
-                                control={<Switch checked={mandatoryOnly} onChange={(e) => setMandatoryOnly(e.target.checked)} size="small" />}
-                                label="Mandatory only"
-                                labelPlacement="start"
-                            />
-                        </div>
                         <div className="add-lead-form-grid">
-                            {idSelect({ label: 'Channel', value: formData.source.channel_id, onChange: setSourceField('channel_id'), options: channels.data, loading: channels.loading, required: true })}
-                            {idSelect({ label: 'Source', value: formData.source.source_id, onChange: setSourceField('source_id'), options: sources.data, loading: sources.loading, required: true })}
+                            {idSelect({ label: 'Channel', value: formData.source.channel_id, onChange: setSourceField('channel_id'), options: channels.data, loading: channels.loading })}
+                            {idSelect({ label: 'Source', value: formData.source.source_id, onChange: setSourceField('source_id'), options: sources.data, loading: sources.loading })}
                             {idSelect({ label: 'Campaign', value: formData.source.campaign_id, onChange: setSourceField('campaign_id'), options: campaigns.data, loading: campaigns.loading })}
                             {idSelect({ label: 'Medium', value: formData.source.medium_id, onChange: setSourceField('medium_id'), options: mediums.data, loading: mediums.loading })}
                         </div>
@@ -849,6 +875,13 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                             {visibleCustomFields.map(renderCustomField)}
                         </div>
                     </>
+                )}
+
+                {/* Call Recordings tab — only the last index, only edit
+                    mode, regardless of whether Additional Fields is showing.
+                    Index is 4 when custom fields visible, otherwise 3. */}
+                {!hydrating && isEditMode && activeTab === (visibleCustomFields.length > 0 ? 4 : 3) && (
+                    <CallRecordingsTab leadId={leadData.id} />
                 )}
             </DialogContent>
 
@@ -877,3 +910,281 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
 };
 
 export default AddNewLead;
+
+// ============================================================================
+// Call Recordings tab
+// ----------------------------------------------------------------------------
+// Edit-mode-only tab in the AddNewLead drawer. Lets any role with access to
+// the lead attach an .mp3 recording (≤ 100 MB) and listen to existing ones.
+// Stage / sub-stage are snapshotted server-side from the lead's current
+// stage at attach time, so this UI doesn't need to send them.
+// ============================================================================
+const MAX_RECORDING_BYTES = 100 * 1024 * 1024;
+
+const fmtRecTime = (v) => {
+    if (!v) return '—';
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return String(v);
+    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+};
+const fmtRecSize = (n) => {
+    if (!n) return '';
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+function CallRecordingsTab({ leadId }) {
+    const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState('');
+
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState('');
+    const [uploadProgress, setUploadProgress] = useState('');
+    const fileInputRef = React.useRef(null);
+
+    // signed playback URLs keyed by recording id; loaded lazily on first
+    // play. They expire after 5 min server-side; we don't try to refresh
+    // unless the user actually clicks play again.
+    const [playUrls, setPlayUrls] = useState({});
+    const [playLoadingId, setPlayLoadingId] = useState(null);
+
+    const me = auth.getUser() || {};
+    const isAdmin = me.role === 'super_admin';
+
+    const reload = async () => {
+        setLoading(true); setLoadError('');
+        try {
+            const r = await leadsApi.recordings.list(leadId);
+            setItems(r?.data ?? []);
+        } catch (e) { setLoadError(e?.message || 'Failed to load recordings'); }
+        finally { setLoading(false); }
+    };
+
+    useEffect(() => { if (leadId) reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [leadId]);
+
+    const handlePick = () => fileInputRef.current?.click();
+
+    const handleFile = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = ''; // allow re-uploading the same file later
+        setUploadError('');
+        if (!/\.mp3$/i.test(file.name) && file.type !== 'audio/mpeg') {
+            setUploadError('Only .mp3 files are accepted');
+            return;
+        }
+        if (file.size > MAX_RECORDING_BYTES) {
+            setUploadError(`File too large — limit is ${fmtRecSize(MAX_RECORDING_BYTES)}`);
+            return;
+        }
+
+        setUploading(true);
+        try {
+            // 1. presign
+            setUploadProgress('Requesting upload URL…');
+            const ps = await uploadsApi.presign({
+                purpose: 'recording',
+                content_type: 'audio/mpeg',
+                size_bytes: file.size,
+                filename: file.name,
+            });
+            const presign = ps?.data;
+            if (!presign?.upload_url || !presign?.r2_key) throw new Error('Presign returned no URL');
+
+            // 2. PUT the file to GCS using the signed URL. Same Content-Type
+            //    that was signed, otherwise GCS rejects the PUT.
+            setUploadProgress('Uploading…');
+            const putRes = await fetch(presign.upload_url, {
+                method: 'PUT',
+                headers: presign.headers || { 'Content-Type': 'audio/mpeg' },
+                body: file,
+            });
+            if (!putRes.ok) throw new Error(`Upload to storage failed (${putRes.status})`);
+
+            // 3. Optionally probe duration via an HTMLAudioElement so the
+            //    server can store it. Best-effort; if it fails we skip.
+            let duration_seconds;
+            try {
+                duration_seconds = await new Promise((resolve, reject) => {
+                    const audio = document.createElement('audio');
+                    audio.preload = 'metadata';
+                    audio.onloadedmetadata = () => {
+                        const d = Math.round(audio.duration);
+                        URL.revokeObjectURL(audio.src);
+                        resolve(Number.isFinite(d) ? d : undefined);
+                    };
+                    audio.onerror = () => { URL.revokeObjectURL(audio.src); reject(); };
+                    audio.src = URL.createObjectURL(file);
+                });
+            } catch { /* metadata probe failed — fine */ }
+
+            // 4. Record the metadata server-side. Server snapshots stage.
+            setUploadProgress('Saving…');
+            await leadsApi.recordings.create(leadId, {
+                r2_key: presign.r2_key,
+                file_name: file.name,
+                size_bytes: file.size,
+                duration_seconds,
+            });
+
+            await reload();
+        } catch (err) {
+            setUploadError(err?.message || 'Upload failed');
+        } finally {
+            setUploading(false);
+            setUploadProgress('');
+        }
+    };
+
+    const handlePlay = async (rec) => {
+        if (playUrls[rec.id]) return;
+        setPlayLoadingId(rec.id);
+        try {
+            const r = await leadsApi.recordings.playUrl(leadId, rec.id);
+            const url = r?.data?.url;
+            if (!url) throw new Error('No playback URL');
+            setPlayUrls((prev) => ({ ...prev, [rec.id]: url }));
+        } catch (e) {
+            alert(e?.message || 'Could not load recording');
+        } finally {
+            setPlayLoadingId(null);
+        }
+    };
+
+    const handleDelete = async (rec) => {
+        if (!confirm(`Delete recording "${rec.file_name || 'this file'}"? This can't be undone.`)) return;
+        try {
+            await leadsApi.recordings.delete(leadId, rec.id);
+            setPlayUrls((prev) => { const next = { ...prev }; delete next[rec.id]; return next; });
+            await reload();
+        } catch (e) {
+            alert(e?.message || 'Delete failed');
+        }
+    };
+
+    // Group recordings by stage so the user can see "Followup → 3 recordings".
+    // Uploads with no stage_id snapshot bucket under "Untagged".
+    const grouped = useMemo(() => {
+        const map = new Map();
+        for (const r of items) {
+            const key = r.stage_id || 'untagged';
+            const label = r.stage_name
+                ? (r.sub_stage_name ? `${r.stage_name} · ${r.sub_stage_name}` : r.stage_name)
+                : 'Untagged';
+            if (!map.has(key)) map.set(key, { label, rows: [] });
+            map.get(key).rows.push(r);
+        }
+        return Array.from(map.values());
+    }, [items]);
+
+    return (
+        <div style={{ padding: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div>
+                    <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Call Recordings</div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                        Attach .mp3 files (up to 100 MB). Each upload is tagged with the lead’s current stage.
+                    </div>
+                </div>
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".mp3,audio/mpeg"
+                    style={{ display: 'none' }}
+                    onChange={handleFile}
+                />
+                <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handlePick}
+                    disabled={uploading}
+                    startIcon={uploading ? <CircularProgress size={14} /> : <GraphicEqIcon />}
+                >
+                    {uploading ? (uploadProgress || 'Working…') : 'Upload recording'}
+                </Button>
+            </div>
+
+            {uploadError && <Alert severity="error" sx={{ mb: 1.5, fontSize: 13 }}>{uploadError}</Alert>}
+            {loadError && <Alert severity="error" sx={{ mb: 1.5, fontSize: 13 }}>{loadError}</Alert>}
+
+            {loading && (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
+                    <CircularProgress size={22} />
+                </div>
+            )}
+
+            {!loading && items.length === 0 && (
+                <div style={{
+                    padding: 32, textAlign: 'center', color: '#6b7280',
+                    background: '#fafafa', border: '1px dashed #e5e7eb', borderRadius: 8,
+                }}>
+                    No call recordings yet. Click <strong>Upload recording</strong> to add one.
+                </div>
+            )}
+
+            {!loading && grouped.map((group) => (
+                <div key={group.label} style={{ marginBottom: 16 }}>
+                    <div style={{
+                        fontSize: 12, fontWeight: 700, color: '#475569',
+                        textTransform: 'uppercase', letterSpacing: 0.5,
+                        padding: '6px 0', borderBottom: '1px solid #e5e7eb', marginBottom: 8,
+                    }}>
+                        {group.label} <Chip size="small" label={group.rows.length} sx={{ ml: 1, height: 18, fontSize: 11 }} />
+                    </div>
+                    {group.rows.map((rec) => {
+                        const canDelete = isAdmin || rec.uploaded_by === me.id;
+                        return (
+                            <div key={rec.id} style={{
+                                display: 'flex', flexDirection: 'column', gap: 6,
+                                padding: '10px 12px', marginBottom: 6,
+                                background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6,
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {rec.file_name || 'recording.mp3'}
+                                        </div>
+                                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+                                            {rec.uploaded_by_name || rec.uploaded_by_email || 'Unknown uploader'}
+                                            {' · '}{fmtRecTime(rec.uploaded_at)}
+                                            {rec.size_bytes ? ` · ${fmtRecSize(rec.size_bytes)}` : ''}
+                                            {rec.duration_seconds ? ` · ${rec.duration_seconds}s` : ''}
+                                        </div>
+                                    </div>
+                                    {canDelete && (
+                                        <Tooltip title="Delete recording">
+                                            <IconButton size="small" onClick={() => handleDelete(rec)}>
+                                                <DeleteOutlineIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    )}
+                                </div>
+                                {playUrls[rec.id] ? (
+                                    <audio
+                                        controls
+                                        src={playUrls[rec.id]}
+                                        preload="none"
+                                        style={{ width: '100%', height: 36 }}
+                                    />
+                                ) : (
+                                    <Button
+                                        variant="text"
+                                        size="small"
+                                        onClick={() => handlePlay(rec)}
+                                        disabled={playLoadingId === rec.id}
+                                        startIcon={playLoadingId === rec.id ? <CircularProgress size={14} /> : <GraphicEqIcon />}
+                                        sx={{ alignSelf: 'flex-start', fontSize: 12 }}
+                                    >
+                                        {playLoadingId === rec.id ? 'Loading…' : 'Listen'}
+                                    </Button>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            ))}
+        </div>
+    );
+}

@@ -1,8 +1,9 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { colors } from '../../theme/colors'
 import { auth, authApi, notificationsApi, followUpsApi, leadsApi } from '../../lib/endpoints'
 import { connectSocket, onNotification, isSocketConnected } from '../../lib/socket'
+import { hasTab, firstAllowedRoute } from '../../lib/rbac'
 import WorkTimer from './WorkTimer'
 import SearchIcon from '@mui/icons-material/Search';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
@@ -30,8 +31,55 @@ import {
     Badge,
 } from "@mui/material";
 
+// Mirrors the tab gates declared in App.jsx for each route, so the live
+// tab-refresh handler below can ask "is this user still allowed on the
+// path they're currently on?" without parsing route definitions.
+const ROUTE_TO_TAB = {
+    '/dashboard': 'dashboard',
+    '/leadlist': 'leads',
+    '/rawdata': 'raw_data',
+    '/failedleads': 'failed_leads',
+    '/bulkuploadlist': 'bulk_upload',
+    '/followupmanager': 'followups',
+    '/whatsapplist': 'whatsapp',
+    '/bulkmarketingcampaign': 'bulk_marketing',
+    '/dripmarketingcampaign': 'drip_marketing',
+    '/remarketing': 'remarketing',
+    '/automations': 'automation',
+    '/connectedaccounts': 'connected_accounts',
+    '/settings': 'settings.email_templates',
+}
+
 function Header() {
     const navigate = useNavigate()
+    const location = useLocation()
+
+    // Live-refresh handler: triggered by the websocket event
+    // `role.tab_permissions_changed` whenever an admin edits this user's
+    // role. We re-fetch /auth/me, swap the cached allowed_tabs in
+    // localStorage, then redirect away from forbidden routes.
+    const handleTabPermsChanged = async () => {
+        try {
+            const r = await authApi.me()
+            const data = r?.data ?? r
+            // Server returns { user, allowed_tabs, ... }. Persist what's
+            // changed without disturbing the auth tokens.
+            auth.setSession({
+                user: data?.user,
+                tenant: data?.tenant,
+                allowed_tabs: data?.allowed_tabs,
+            })
+            // If the current path is gated on a tab the user just lost,
+            // bounce them to the first route they can still see.
+            const tabForPath = ROUTE_TO_TAB[location.pathname]
+            if (tabForPath && !hasTab(tabForPath)) {
+                navigate(`${firstAllowedRoute()}?denied=1`, { replace: true })
+            }
+        } catch {
+            // Best-effort — if the refresh fails, the user keeps their
+            // cached perms until next login. Not fatal.
+        }
+    }
 
     // Search context: 'applicant' or 'application'
     const [searchContext, setSearchContext] = useState('applicant')
@@ -56,10 +104,31 @@ function Header() {
     // Real follow-ups (loaded on mount)
     const [followUps, setFollowUps] = useState([])
 
-    // Live notifications pushed over the websocket. Last 50 only.
-    const [liveEvents, setLiveEvents] = useState([])
-    const [unreadCount, setUnreadCount] = useState(0)
+    // Live notifications pushed over the websocket. Persisted in localStorage
+    // (per-user-session) so reloading the page doesn't drop notifications the
+    // user hasn't dismissed yet. Cap at 50; only "Clear all" empties the list.
+    const NOTIF_KEY = `ee_live_notifications_${auth.getUser()?.id || 'anon'}`
+    const NOTIF_UNREAD_KEY = `ee_live_notifications_unread_${auth.getUser()?.id || 'anon'}`
+    const [liveEvents, setLiveEvents] = useState(() => {
+        try {
+            const raw = localStorage.getItem(NOTIF_KEY)
+            return raw ? JSON.parse(raw) : []
+        } catch { return [] }
+    })
+    const [unreadCount, setUnreadCount] = useState(() => {
+        const raw = localStorage.getItem(NOTIF_UNREAD_KEY)
+        const n = raw ? Number(raw) : 0
+        return Number.isFinite(n) ? n : 0
+    })
     const [socketLive, setSocketLive] = useState(false)
+
+    // Mirror liveEvents + unreadCount to localStorage so a reload restores them.
+    useEffect(() => {
+        try { localStorage.setItem(NOTIF_KEY, JSON.stringify(liveEvents)) } catch { /* quota or private mode */ }
+    }, [liveEvents, NOTIF_KEY])
+    useEffect(() => {
+        try { localStorage.setItem(NOTIF_UNREAD_KEY, String(unreadCount)) } catch { /* ignore */ }
+    }, [unreadCount, NOTIF_UNREAD_KEY])
 
     // Global search state
     const [searchQuery, setSearchQuery] = useState('')
@@ -88,6 +157,14 @@ function Header() {
         if (sock.connected) setSocketLive(true)
 
         const off = onNotification((evt) => {
+            // System signal: the admin changed this user's role's
+            // tab_permissions. Refetch /auth/me to pick up the new
+            // allowed_tabs, replace localStorage, and redirect if the
+            // user is currently on a tab they just lost.
+            if (evt?.type === 'role.tab_permissions_changed') {
+                handleTabPermsChanged()
+                return
+            }
             // Push newest first, cap at 50.
             setLiveEvents((prev) => [{ ...evt, id: `${evt.type}-${evt.lead_id || ''}-${evt.occurred_at}` }, ...prev].slice(0, 50))
             // Bump the badge unless the notification panel is currently open.
@@ -158,6 +235,9 @@ function Header() {
         try { await authApi.logout(); } catch { /* ignore */ }
         // Tear down the websocket so the next login opens a fresh session.
         try { (await import('../../lib/socket')).disconnectSocket(); } catch { /* ignore */ }
+        // Reset the theme so the login screen + next user don't inherit colors
+        // from whoever just logged out.
+        try { (await import('../../theme/applyTheme')).clearTheme(); } catch { /* ignore */ }
         auth.clear()
         navigate('/')
     }
@@ -313,7 +393,26 @@ function Header() {
                                 liveEvents={liveEvents}
                                 followUps={followUps}
                                 socketLive={socketLive}
-                                onClear={() => setLiveEvents([])}
+                                onFollowUpsChanged={() => {
+                                    // After cancel / reschedule the popover
+                                    // optimistically updates its local list, but
+                                    // we still want the bell badge count to
+                                    // catch up — refetch the source of truth.
+                                    followUpsApi.myUpcoming()
+                                        .then((r) => setFollowUps((r?.data || []).slice(0, 10)))
+                                        .catch(() => {})
+                                }}
+                                onClear={() => {
+                                    // "Clear all" is the only action that wipes
+                                    // notifications. Reset state + localStorage
+                                    // so a reload won't bring them back.
+                                    setLiveEvents([])
+                                    setUnreadCount(0)
+                                    try {
+                                        localStorage.removeItem(NOTIF_KEY)
+                                        localStorage.removeItem(NOTIF_UNREAD_KEY)
+                                    } catch { /* ignore */ }
+                                }}
                                 onNavigateLead={(leadId) => {
                                     setAnchorNotification(null)
                                     // Land on the Lead Manager with ?focus=<id>;
@@ -470,6 +569,16 @@ function Header() {
                                     Request a feature
                                 </MenuItem>
 
+                                {/* PROFILE — open to every authenticated tenant role */}
+                                <MenuItem
+                                    onClick={() => {
+                                        handleUserClose();
+                                        navigate('/profile');
+                                    }}
+                                >
+                                    My Profile
+                                </MenuItem>
+
                                 {/* LOGOUT */}
                                 <MenuItem
                                     onClick={() => {
@@ -503,20 +612,84 @@ function Header() {
               stage_changed). Newest first; click to open the lead.
      Follow-ups → today's planned follow-ups loaded over REST.
    ============================================================== */
-function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLive, onClear, onNavigateLead }) {
+function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLive, onClear, onNavigateLead, onFollowUpsChanged }) {
     const [tab, setTab] = useState('live')
+    // Track which followup is mid-action so we can disable buttons + show
+    // a spinner without yanking the row out of the list.
+    const [busyFollowUpId, setBusyFollowUpId] = useState(null)
+    const [rescheduleFor, setRescheduleFor] = useState(null) // { id, lead_name, current }
+    const [rescheduleAt, setRescheduleAt] = useState('')
+
+    const handleCancel = async (item) => {
+        if (!item?.id) return
+        if (!confirm(`Cancel follow-up for ${item.lead_name || 'this lead'}?`)) return
+        setBusyFollowUpId(item.id)
+        try {
+            await followUpsApi.cancel(item.id)
+            onFollowUpsChanged?.()
+        } catch (e) {
+            alert(e?.message || 'Could not cancel')
+        } finally {
+            setBusyFollowUpId(null)
+        }
+    }
+
+    const openReschedule = (item) => {
+        setRescheduleFor({ id: item.id, lead_name: item.lead_name, current: item.next_action_datetime })
+        // datetime-local needs local-zone YYYY-MM-DDTHH:MM. Pre-fill with
+        // current due time so users can nudge it forward without retyping.
+        const cur = item.next_action_datetime ? new Date(item.next_action_datetime) : new Date(Date.now() + 60 * 60 * 1000)
+        const pad = (n) => String(n).padStart(2, '0')
+        setRescheduleAt(`${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}T${pad(cur.getHours())}:${pad(cur.getMinutes())}`)
+    }
+
+    const submitReschedule = async () => {
+        if (!rescheduleFor?.id || !rescheduleAt) return
+        const at = new Date(rescheduleAt)
+        if (isNaN(at.getTime()) || at.getTime() <= Date.now()) {
+            alert('Pick a future date and time.')
+            return
+        }
+        setBusyFollowUpId(rescheduleFor.id)
+        try {
+            await followUpsApi.reschedule(rescheduleFor.id, at.toISOString())
+            setRescheduleFor(null)
+            onFollowUpsChanged?.()
+        } catch (e) {
+            alert(e?.message || 'Could not reschedule')
+        } finally {
+            setBusyFollowUpId(null)
+        }
+    }
 
     const titleFor = (e) => {
-        if (e.type === 'lead.assigned')      return e.payload?.auto ? 'New lead auto-assigned' : 'New lead assigned'
-        if (e.type === 'lead.reassigned')    return 'Lead reassigned'
-        if (e.type === 'lead.stage_changed') return 'Lead stage changed'
-        if (e.type === 'lead.created')       return 'Lead created'
+        if (e.type === 'lead.assigned')        return e.payload?.auto ? 'New lead auto-assigned' : 'New lead assigned'
+        if (e.type === 'lead.reassigned')      return 'Lead reassigned'
+        if (e.type === 'lead.stage_changed')   return 'Lead stage changed'
+        if (e.type === 'lead.created')         return 'Lead created'
+        if (e.type === 'follow_up.reminder') {
+            const inLabel = e.payload?.lead_in === '5min' ? '5 min' : '15 min'
+            return `Followup reminder · due in ${inLabel}${e.payload?.lead_name ? ` · ${e.payload.lead_name}` : ''}`
+        }
+        if (e.type === 'follow_up.overdue') {
+            return `Followup overdue${e.payload?.lead_name ? ` · ${e.payload.lead_name}` : ''}${e.payload?.counsellor_name ? ` (by ${e.payload.counsellor_name})` : ''}`
+        }
+        if (e.type === 'bulk_import.completed') {
+            const p = e.payload || {}
+            const who = p.uploader_name || p.uploader_email || 'A team member'
+            const role = (p.uploader_role || '').replace('_', ' ')
+            const counts = `${p.success_rows ?? 0} added, ${p.failed_rows ?? 0} failed, ${p.duplicate_rows ?? 0} duplicates`
+            return `${who}${role ? ` (${role})` : ''} finished a bulk upload — ${counts}`
+        }
         return e.type || 'Event'
     }
     const iconColor = (e) => {
-        if (e.type === 'lead.assigned')      return '#43A047'
-        if (e.type === 'lead.reassigned')    return '#FB8C00'
-        if (e.type === 'lead.stage_changed') return '#1E88E5'
+        if (e.type === 'lead.assigned')         return '#43A047'
+        if (e.type === 'lead.reassigned')       return '#FB8C00'
+        if (e.type === 'lead.stage_changed')    return '#1E88E5'
+        if (e.type === 'follow_up.reminder')    return '#0288D1'
+        if (e.type === 'follow_up.overdue')     return '#D32F2F'
+        if (e.type === 'bulk_import.completed') return '#7E57C2'
         return colors.primary
     }
     const fmtRel = (iso) => {
@@ -628,8 +801,12 @@ function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLi
                             )}
                             <List dense disablePadding>
                                 {followUps.map((item, index) => (
-                                    <ListItem key={index} disablePadding sx={{ borderBottom: `1px solid ${colors.borderGrey}` }}>
-                                        <ListItemButton onClick={() => onNavigateLead?.(item.lead_id)}>
+                                    <ListItem
+                                        key={item.id || index}
+                                        disablePadding
+                                        sx={{ borderBottom: `1px solid ${colors.borderGrey}`, flexDirection: 'column', alignItems: 'stretch' }}
+                                    >
+                                        <ListItemButton onClick={() => onNavigateLead?.(item.lead_id)} sx={{ pb: 0.5 }}>
                                             <ListItemText
                                                 primary={
                                                     <Typography sx={{ fontWeight: 600, fontSize: 13 }}>
@@ -638,15 +815,78 @@ function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLi
                                                 }
                                                 secondary={
                                                     <Typography sx={{ fontSize: 11, color: '#888' }}>
-                                                        {item.next_action_datetime ? new Date(item.next_action_datetime).toLocaleString() : '—'}
+                                                        Followup reminder · {item.next_action_datetime ? new Date(item.next_action_datetime).toLocaleString() : '—'}
                                                         {item.comment ? ` · ${String(item.comment).slice(0, 50)}` : ''}
                                                     </Typography>
                                                 }
                                             />
                                         </ListItemButton>
+                                        <Box sx={{ px: 2, pb: 1, display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                                            <button
+                                                onClick={() => openReschedule(item)}
+                                                disabled={busyFollowUpId === item.id}
+                                                style={{
+                                                    background: 'transparent', border: '1px solid #d1d5db', color: '#374151',
+                                                    fontSize: 11, padding: '2px 8px', borderRadius: 4, cursor: 'pointer',
+                                                }}
+                                            >
+                                                Reschedule
+                                            </button>
+                                            <button
+                                                onClick={() => handleCancel(item)}
+                                                disabled={busyFollowUpId === item.id}
+                                                style={{
+                                                    background: 'transparent', border: '1px solid #fecaca', color: '#b91c1c',
+                                                    fontSize: 11, padding: '2px 8px', borderRadius: 4, cursor: 'pointer',
+                                                }}
+                                            >
+                                                Cancel
+                                            </button>
+                                        </Box>
                                     </ListItem>
                                 ))}
                             </List>
+
+                            {/* Inline reschedule prompt — opens beneath the list when a row's
+                                Reschedule button is clicked. Kept in the popover (not a separate
+                                Dialog) so the user doesn't lose their place. */}
+                            {rescheduleFor && (
+                                <Box sx={{ borderTop: `1px solid ${colors.borderGrey}`, p: 1.5, background: '#fafafa' }}>
+                                    <Typography sx={{ fontSize: 12, fontWeight: 600, mb: 0.5 }}>
+                                        Reschedule {rescheduleFor.lead_name ? `· ${rescheduleFor.lead_name}` : ''}
+                                    </Typography>
+                                    <input
+                                        type="datetime-local"
+                                        value={rescheduleAt}
+                                        onChange={(e) => setRescheduleAt(e.target.value)}
+                                        style={{
+                                            width: '100%', padding: 6, fontSize: 13,
+                                            border: '1px solid #d1d5db', borderRadius: 4, marginBottom: 6,
+                                        }}
+                                    />
+                                    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                                        <button
+                                            onClick={() => setRescheduleFor(null)}
+                                            style={{
+                                                background: 'transparent', border: '1px solid #d1d5db', color: '#374151',
+                                                fontSize: 11, padding: '4px 10px', borderRadius: 4, cursor: 'pointer',
+                                            }}
+                                        >
+                                            Close
+                                        </button>
+                                        <button
+                                            onClick={submitReschedule}
+                                            disabled={busyFollowUpId === rescheduleFor.id}
+                                            style={{
+                                                background: colors.primary, border: `1px solid ${colors.primary}`, color: '#fff',
+                                                fontSize: 11, padding: '4px 10px', borderRadius: 4, cursor: 'pointer',
+                                            }}
+                                        >
+                                            {busyFollowUpId === rescheduleFor.id ? 'Saving…' : 'Save'}
+                                        </button>
+                                    </Box>
+                                </Box>
+                            )}
                         </>
                     )}
                 </Box>

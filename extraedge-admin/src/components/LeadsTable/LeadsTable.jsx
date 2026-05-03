@@ -13,7 +13,7 @@ import EmailIcon from '@mui/icons-material/Email';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import ViewTimelineModal from '../ViewTimelineModal/ViewTimelineModal';
 import AddNewLead from '../AddNewLead/AddNewLead';
-import { flagForLead, TONE_BG } from '../../lib/leadFlags';
+import { flagForLead, TONE_BG, formatLeadAge, formatTimestamp } from '../../lib/leadFlags';
 import { leadsApi } from '../../lib/endpoints';
 import { isRole, ROLES } from '../../lib/rbac';
 
@@ -132,7 +132,18 @@ const LeadsTable = ({ leads, selectedIds, onToggleSelect, onToggleSelectAll, onR
                 </td>
                 <td style={cellStyle}>{lead.phone || lead.whatsapp_number || '-'}</td>
                 <td style={cellStyle}>
-                  {lead.stage_name ? <Chip size="small" label={lead.stage_name} sx={{ height: 22, fontSize: 11 }} /> : '-'}
+                  <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                    {lead.stage_name ? <Chip size="small" label={lead.stage_name} sx={{ height: 22, fontSize: 11 }} /> : '-'}
+                    {lead.is_converted && (
+                      <Tooltip title={lead.converted_at ? `Converted on ${formatTimestamp(lead.converted_at)}` : 'Converted'}>
+                        <Chip
+                          size="small"
+                          label={lead.converted_at ? `Converted · ${formatTimestamp(lead.converted_at)}` : 'Converted'}
+                          sx={{ height: 18, fontSize: 10, background: TONE_BG.converted, color: '#fff', fontWeight: 600 }}
+                        />
+                      </Tooltip>
+                    )}
+                  </span>
                 </td>
                 <td style={cellStyle}>{lead.sub_stage_name || '-'}</td>
                 <td style={cellStyle}>{lead.program_name || '-'}</td>
@@ -186,7 +197,11 @@ const LeadsTable = ({ leads, selectedIds, onToggleSelect, onToggleSelectAll, onR
                     ★ {lead.lead_score != null ? Number(lead.lead_score).toFixed(0) : 0}
                   </span>
                 </td>
-                <td style={cellStyle}>{lead.lead_age_days ?? 0}d</td>
+                <td style={cellStyle}>
+                  <Tooltip title={lead.created_at ? `Created ${formatTimestamp(lead.created_at)}` : 'Lead age'}>
+                    <span>{formatLeadAge(lead.created_at, lead.lead_age_days)}</span>
+                  </Tooltip>
+                </td>
                 <td style={cellStyle}>
                   {flag
                     ? <Chip size="small" label={flag.text} sx={{ height: 20, fontSize: 10, background: TONE_BG[flag.tone] || TONE_BG.neutral, color: '#fff' }} />

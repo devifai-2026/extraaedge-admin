@@ -27,6 +27,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import KeyboardArrowDownOutlinedIcon from "@mui/icons-material/KeyboardArrowDownOutlined";
+import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import { leadsApi } from "../../lib/endpoints";
 import "./ViewTimelineModal.css";
 
@@ -35,6 +36,7 @@ const categoryOf = (row) => {
   if (row.kind === 'activity') {
     if (row.subtype === 'stage_changed') return 'Lead Status Journey';
     if (['assigned', 'reassign', 'auto_assign', 'refer'].includes(row.subtype)) return 'Counselor Activity';
+    if (row.subtype === 'call_recording_uploaded') return 'Lead Activity';
     return 'Lead History';
   }
   if (row.kind === 'note') return 'Counselor Activity';
@@ -58,6 +60,7 @@ const titleFor = (row) => {
     if (row.subtype === 'assigned' || row.subtype === 'reassign') return 'Lead assigned';
     if (row.subtype === 'auto_assign') return 'Auto-assigned';
     if (row.subtype === 'refer') return 'Lead referred';
+    if (row.subtype === 'call_recording_uploaded') return 'Call recording uploaded';
     return row.subtype || 'Activity';
   }
   if (row.kind === 'note') return 'Note';
@@ -221,23 +224,21 @@ const ViewTimelineModal = ({ open, onClose, lead }) => {
               anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
             >
               <Box sx={{ p: 2, width: 280 }}>
-                <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 1 }}>Filter by date</Typography>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 1.5 }}>Filter by date</Typography>
+                <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>FROM</Typography>
                 <TextField
                   type="date"
                   size="small"
                   fullWidth
-                  label="From"
-                  InputLabelProps={{ shrink: true }}
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  sx={{ mb: 1 }}
+                  sx={{ mb: 1.5 }}
                 />
+                <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>TO</Typography>
                 <TextField
                   type="date"
                   size="small"
                   fullWidth
-                  label="To"
-                  InputLabelProps={{ shrink: true }}
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
                   sx={{ mb: 2 }}
@@ -384,6 +385,7 @@ const ViewTimelineModal = ({ open, onClose, lead }) => {
                 day={day}
                 rows={dayRows}
                 initialExpanded={!allCollapsed}
+                leadId={lead?.id}
               />
             ))}
           </div>
@@ -393,7 +395,7 @@ const ViewTimelineModal = ({ open, onClose, lead }) => {
   );
 };
 
-const DayGroup = ({ day, rows, initialExpanded = true }) => {
+const DayGroup = ({ day, rows, initialExpanded = true, leadId }) => {
   const [expanded, setExpanded] = useState(initialExpanded);
   return (
     <div>
@@ -441,6 +443,35 @@ const DayGroup = ({ day, rows, initialExpanded = true }) => {
                     </div>
                   )
                 )}
+                {/* Assignment events: show assignee + their reporting manager. */}
+                {row.kind === 'activity'
+                  && ['assigned', 'reassign', 'auto_assign', 'refer'].includes(row.subtype)
+                  && row.assignee_name && (
+                  <>
+                    <div className="timeline-card-row">
+                      <PersonOutlineIcon className="card-meta-icon" />
+                      <span>
+                        Assigned to <strong>{row.assignee_name}</strong>
+                        {row.assignee_email && (
+                          <span style={{ color: '#666' }}> ({row.assignee_email})</span>
+                        )}
+                      </span>
+                    </div>
+                    {row.assignee_manager_name && (
+                      <div className="timeline-card-row">
+                        <PersonOutlineIcon className="card-meta-icon" style={{ opacity: 0.6 }} />
+                        <span style={{ fontSize: 12, color: '#666' }}>
+                          Reporting to <strong>{row.assignee_manager_name}</strong>
+                          {row.assignee_manager_email && ` (${row.assignee_manager_email})`}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+                {/* Call-recording uploads: show stage tag + inline play. */}
+                {row.kind === 'activity' && row.subtype === 'call_recording_uploaded' && (
+                  <RecordingPlayer leadId={leadId} row={row} />
+                )}
                 {row.user_name && (
                   <div className="timeline-card-row">
                     <PersonOutlineIcon className="card-meta-icon" />
@@ -455,5 +486,67 @@ const DayGroup = ({ day, rows, initialExpanded = true }) => {
     </div>
   );
 };
+
+// Inline recording player for the timeline. The activity row carries a
+// recording_id in its metadata_json — we fetch a short-lived signed URL on
+// click rather than at list time so URLs only get signed for events the
+// user actually plays.
+function RecordingPlayer({ leadId, row }) {
+  const [url, setUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const recordingId = row?.metadata_json?.recording_id;
+  const fileName = row?.metadata_json?.file_name;
+  const duration = row?.metadata_json?.duration_seconds;
+
+  const load = async () => {
+    if (!recordingId || url) return;
+    setLoading(true); setError('');
+    try {
+      const r = await leadsApi.recordings.playUrl(leadId, recordingId);
+      const u = r?.data?.url;
+      if (!u) throw new Error('No playback URL');
+      setUrl(u);
+    } catch (e) {
+      setError(e?.message || 'Could not load recording');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!recordingId) {
+    return (
+      <div className="timeline-card-row">
+        <GraphicEqIcon className="card-meta-icon" />
+        <span style={{ color: '#888' }}>Recording metadata missing</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="timeline-card-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#444' }}>
+        <GraphicEqIcon className="card-meta-icon" />
+        <span style={{ fontWeight: 600 }}>{fileName || 'recording.mp3'}</span>
+        {duration ? <span style={{ color: '#888' }}>· {duration}s</span> : null}
+      </div>
+      {url ? (
+        <audio controls src={url} preload="none" style={{ width: '100%', height: 36 }} />
+      ) : (
+        <Button
+          variant="text"
+          size="small"
+          onClick={load}
+          disabled={loading}
+          startIcon={loading ? <CircularProgress size={14} /> : <GraphicEqIcon />}
+          sx={{ fontSize: 12 }}
+        >
+          {loading ? 'Loading…' : 'Listen'}
+        </Button>
+      )}
+      {error && <span style={{ fontSize: 11, color: '#d32f2f' }}>{error}</span>}
+    </div>
+  );
+}
 
 export default ViewTimelineModal;

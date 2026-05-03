@@ -8,16 +8,30 @@
   width: 97%
 }
 
-/* HEADER */
+/* HEADER
+   Fixed grid so the chip / comm-stats / activity / actions columns line up
+   row-to-row regardless of name length, chip count, or score width. */
 .card-header {
-  display: flex;
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 1fr)   /* col 1: checkbox + name/phone (flexes) */
+    auto                 /* col 2: middle wrapper (status + stats + activity) */
+    auto;                /* col 3: action buttons */
   align-items: center;
   padding: 20px 16px;
   background: var(--bg-card);
-  gap: 12px;
+  gap: 16px;
   border-bottom: 1px solid var(--border-grey);
-  flex-wrap: nowrap;
-  justify-content: space-between;
+}
+
+/* The middle wrapper is a 4-column sub-grid: status | comm-stats | divider | activity.
+   Each track has a fixed width so the same icon/text appears at the same x in every card. */
+.card-header > div:nth-child(2) {
+  display: grid !important;
+  grid-template-columns: 180px 180px 1px 180px;
+  align-items: center;
+  gap: 16px;
+  justify-content: center;
 }
 
 .card-checkbox {
@@ -47,12 +61,20 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  font-size: 10px;
+  gap: 3px;
+  height: 20px;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
   font-weight: 600;
+  line-height: 1;
   color: var(--white);
+}
+
+.name-badge svg {
+  font-size: 14px !important;
+  flex-shrink: 0;
 }
 
 .name-badge.orange {
@@ -70,8 +92,11 @@
 
 /* STATUS */
 .status {
-  text-align: center;
-  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .status-chip {
@@ -82,19 +107,23 @@
   border: 1px solid var(--text-secondary) !important;
 }
 
+.status .MuiChip-root {
+  margin: 0 !important;
+}
+
 .sub-status {
-  display: block;
+  flex-basis: 100%;
+  text-align: center;
   font-size: 11px;
   color: var(--text-grey);
-  margin-top: 2px;
 }
 
 /* COMMUNICATION STATS */
 .comm-stats {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 12px;
-  flex-shrink: 0;
 }
 
 .stat-item {
@@ -115,15 +144,15 @@
   width: 1px;
   height: 30px;
   background: var(--scroll-grey);
-  flex-shrink: 0;
+  justify-self: center;
 }
 
 /* ACTIVITY ICONS */
 .activity-icons {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 10px;
-  flex-shrink: 0;
 }
 
 .activity-badge .MuiBadge-badge {

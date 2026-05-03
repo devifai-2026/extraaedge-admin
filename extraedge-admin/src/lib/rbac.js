@@ -40,17 +40,74 @@ export const currentRole = () => auth.getUser()?.role || null;
 export const isRole = (...roles) => roles.includes(currentRole());
 
 // Check if the logged-in user has access to a tab key (matches DEFAULT_TAB_KEYS on backend).
+//
+// Two sources of truth, in order:
+//   1. `allowed_tabs` from /auth/login or /auth/me — the explicit list the
+//      backend computed from the user's role's tab_permissions. We trust it
+//      whenever the backend has populated it (even if empty — an empty list
+//      means "this user has had their tabs custom-restricted to nothing").
+//   2. Role buckets — only used when the backend hasn't populated allowed_tabs
+//      at all (legacy users without a custom role row).
+//
+// Previously this function fell back to the role bucket whenever
+// `allowed_tabs` was an empty array, which silently undid an admin's "hide
+// dashboard" choice for a counsellor with all tabs hidden.
 export const hasTab = (tabKey) => {
   if (!tabKey) return true;
   const allowed = auth.getAllowedTabs();
-  if (Array.isArray(allowed) && allowed.length > 0) {
+  if (Array.isArray(allowed)) {
     return allowed.includes(tabKey);
   }
-  // Backend didn't send allowed_tabs (custom-roles not configured). Fall back to role buckets.
+  // No allowed_tabs at all → fall back to the bucket for the role.
   const role = currentRole();
   const tabs = FALLBACK_TABS[role];
   if (!tabs) return false;
   return tabs.includes('*') || tabs.includes(tabKey);
+};
+
+// Map of tab key → the route the sidebar uses for it. When we need to
+// redirect a user away from a forbidden route we use this to find a page
+// they can actually access.
+const TAB_TO_ROUTE = {
+  dashboard: '/dashboard',
+  leads: '/leadlist',
+  raw_data: '/rawdata',
+  failed_leads: '/failedleads',
+  bulk_upload: '/bulkuploadlist',
+  followups: '/followupmanager',
+  whatsapp: '/whatsapplist',
+  bulk_marketing: '/bulkmarketingcampaign',
+  drip_marketing: '/dripmarketingcampaign',
+  remarketing: '/remarketing',
+  automation: '/automations',
+  connected_accounts: '/connectedaccounts',
+  third_party_integration: '/connectedaccounts',
+  reports: '/dashboard',
+};
+
+// First route the current user is allowed to land on. Used by login and
+// "denied access" redirects so we never bounce a user to a page they
+// don't have permission for.
+export const firstAllowedRoute = () => {
+  const allowed = auth.getAllowedTabs();
+  // Empty / unset allowed_tabs: use the role bucket (back-compat).
+  const candidates = (Array.isArray(allowed) && allowed.length)
+    ? allowed
+    : (FALLBACK_TABS[currentRole()] || []);
+
+  // Walk the canonical sidebar order so the user lands on the most
+  // dashboard-y thing they can access.
+  const order = ['dashboard', 'leads', 'raw_data', 'failed_leads', 'followups', 'whatsapp', 'bulk_upload'];
+  for (const key of order) {
+    if (candidates.includes('*') || candidates.includes(key)) {
+      const route = TAB_TO_ROUTE[key];
+      if (route) return route;
+    }
+  }
+  // Nothing matched — last resort the user is "logged in but has no
+  // accessible page". Send them to the profile page (open to all roles)
+  // so they aren't stuck on a blank screen.
+  return '/profile';
 };
 
 // Render-prop / wrapper: <Gate tab="leads">...</Gate>  or  <Gate role="super_admin">...</Gate>

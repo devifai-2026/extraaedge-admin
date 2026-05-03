@@ -23,6 +23,14 @@ export const leadsApi = {
   // Run the active assignment rule against every unassigned lead in the tenant.
   // Returns { found, assigned, skipped }. Admin / sales-manager only at the API layer.
   autoAssignUnassigned: () => api.post('/leads/auto-assign-unassigned'),
+  // Manually-uploaded call recordings on a lead. Stage / sub-stage are
+  // snapshotted server-side from the lead's current stage at attach time.
+  recordings: {
+    list: (leadId) => api.get(`/leads/${leadId}/recordings`),
+    create: (leadId, body) => api.post(`/leads/${leadId}/recordings`, body),
+    playUrl: (leadId, recId) => api.get(`/leads/${leadId}/recordings/${recId}/url`),
+    delete: (leadId, recId) => api.delete(`/leads/${leadId}/recordings/${recId}`),
+  },
 };
 
 export const followUpsApi = {
@@ -35,6 +43,9 @@ export const followUpsApi = {
   update: (id, body, ifMatch) => api.put(`/follow-ups/${id}`, body, ifMatch),
   complete: (id) => api.post(`/follow-ups/${id}/complete`),
   reschedule: (id, next_action_datetime) => api.post(`/follow-ups/${id}/reschedule`, { next_action_datetime }),
+  // Cancel keeps the row (status='cancelled') so reports + timeline see it.
+  // Use delete for hard-removal.
+  cancel: (id, reason) => api.post(`/follow-ups/${id}/cancel`, reason ? { reason } : {}),
   delete: (id) => api.delete(`/follow-ups/${id}`),
 };
 
@@ -65,6 +76,10 @@ export const usersApi = {
   workSessions: (id, params) => api.get(`/users/${id}/work-sessions`, params),
   loginEvents: (id, params) => api.get(`/users/${id}/login-events`, params),
   orgTree: () => api.get('/users/org-tree'),
+  // Per-user UI theme (Profile → Theme). Body shape:
+  //   { theme_preset, theme_primary, theme_primary_dark, theme_primary_light }
+  // Any field can be null to reset that piece to system default.
+  updateMyTheme: (body) => api.put('/users/me/theme', body),
 };
 
 export const teamsApi = {
@@ -173,13 +188,58 @@ export const integrationsApi = {
   getWebhookUrl: (id) => api.post(`/integrations/${id}/webhook-url`),
 };
 
+export const uploadsApi = {
+  presign: (body) => api.post('/uploads/presign', body),
+  confirm: (body) => api.post('/uploads/confirm', body),
+  signedUrl: (id) => api.get(`/uploads/${id}/signed-url`),
+};
+
 export const bulkApi = {
   templateCsv: () => api.get('/bulk/leads/template'),
   templateFields: () => api.get('/bulk/leads/template/fields'),
+  // Triggers a browser file download. Default is the .xlsx template; pass
+  // `format: 'csv'` for the legacy CSV. Uses fetch directly (not the JSON
+  // `api` client) because the body is binary.
+  //
+  // Validates the server's content-type before saving — otherwise a stale
+  // server still on the old CSV-only route would silently save a CSV with
+  // an .xlsx extension and Excel would refuse to open it.
+  downloadTemplate: async ({ format = 'xlsx' } = {}) => {
+    const { auth, API_BASE } = await import('./api');
+    const token = auth.getAccess();
+    const url = `${API_BASE}/bulk/leads/template${format === 'csv' ? '?format=csv' : ''}`;
+    const res = await fetch(url, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) {
+      let detail = '';
+      try { const j = await res.json(); detail = j?.error?.message || ''; } catch { /* ignore */ }
+      throw new Error(`Template download failed (${res.status})${detail ? `: ${detail}` : ''}`);
+    }
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    const expectedMime = format === 'csv' ? 'text/csv' : 'spreadsheetml';
+    if (!ct.includes(expectedMime)) {
+      throw new Error(
+        `Server returned ${ct || 'unknown content-type'} — expected ${format.toUpperCase()}. ` +
+        `Restart the server (npm run dev) so the new template route is loaded.`,
+      );
+    }
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = `bulk-lead-template.${format === 'csv' ? 'csv' : 'xlsx'}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+  },
   preview: (body) => api.post('/bulk/leads/preview', body),
   getPreview: (id) => api.get(`/bulk/leads/previews/${id}`),
   commit: (body) => api.post('/bulk/leads/commit', body),
-  imports: () => api.get('/bulk/leads/imports'),
+  imports: (params) => api.get('/bulk/leads/imports', params),
+  importsUploaders: () => api.get('/bulk/leads/imports/uploaders'),
+  // Returns { url, file_name }. The url is a short-lived signed GCS URL —
+  // hand it to the browser to download the original upload again.
+  importFile: (id) => api.get(`/bulk/leads/imports/${id}/file`),
   import: (id) => api.get(`/bulk/leads/imports/${id}`),
   importFailures: (id) => api.get(`/bulk/leads/imports/${id}/failures`),
   retryFailures: (id) => api.post(`/bulk/leads/imports/${id}/retry-failures`),
@@ -251,6 +311,9 @@ export const failedLeadsApi = {
   retry: (id) => api.post(`/failed-leads/${id}/retry`),
   update: (id, body) => api.put(`/failed-leads/${id}`, body),
   delete: (id) => api.delete(`/failed-leads/${id}`),
+  duplicates: (params) => api.get('/failed-leads/duplicates', params),
+  deleteDuplicate: (id) => api.delete(`/failed-leads/duplicates/${id}`),
+  summary: (params) => api.get('/failed-leads/summary', params),
 };
 
 export const outboundWebhooksApi = {

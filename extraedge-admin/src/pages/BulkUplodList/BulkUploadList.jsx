@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   IconButton,
   Select,
   MenuItem,
   InputBase,
   FormControl,
+  CircularProgress,
+  Tooltip,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
@@ -17,22 +19,23 @@ import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import "./BulkUploadList.css";
 import noLeadsImg from "../../assets/no-leads.svg";
 import { colors } from "../../theme/colors";
+import { bulkApi } from "../../lib/endpoints";
 
 const tabs = ["Bulk Upload", "Data Download", "Bulk Status Change", "Bulk Refer"];
 
-// Sample data for each tab
-const bulkUploadData = [
-  { fileName: "lead-upload 3rd apr_20260413113738.csv", uploadDate: "Apr 13, 2026 5:08 PM", uploadedBy: "Abhijeet Salgar", totalRecords: 60, stage: "Completed" },
-  { fileName: "lead-upload-template (3)_20260410052542.csv", uploadDate: "Apr 10, 2026 10:55 AM", uploadedBy: "Abhijeet Salgar", totalRecords: 100, stage: "Completed" },
-  { fileName: "lead-upload 3rd apr_20260409053612.csv", uploadDate: "Apr 9, 2026 11:06 AM", uploadedBy: "Abhijeet Salgar", totalRecords: 38, stage: "Completed" },
-  { fileName: "lead-upload-template (3)_20260408080846.csv", uploadDate: "Apr 8, 2026 1:39 PM", uploadedBy: "Abhijeet Salgar", totalRecords: 8, stage: "Completed" },
-  { fileName: "lead-upload 3rd apr_20260408051830.csv", uploadDate: "Apr 8, 2026 10:49 AM", uploadedBy: "Abhijeet Salgar", totalRecords: 51, stage: "Completed" },
-  { fileName: "lead-upload 3rd apr_20260407053101.csv", uploadDate: "Apr 7, 2026 11:01 AM", uploadedBy: "Abhijeet Salgar", totalRecords: 62, stage: "Completed" },
-  { fileName: "lead-upload 3rd apr_20260406044941.csv", uploadDate: "Apr 6, 2026 10:20 AM", uploadedBy: "Abhijeet Salgar", totalRecords: 105, stage: "Completed" },
-  { fileName: "lead-upload 3rd apr_20260404053922.csv", uploadDate: "Apr 4, 2026 11:10 AM", uploadedBy: "Abhijeet Salgar", totalRecords: 61, stage: "Completed" },
-  { fileName: "lead-upload 3rd apr_20260403043017.csv", uploadDate: "Apr 3, 2026 10:00 AM", uploadedBy: "Abhijeet Salgar", totalRecords: 30, stage: "Completed" },
-  { fileName: "lead-upload 30th Mar_20260402075859.csv", uploadDate: "Apr 2, 2026 1:29 PM", uploadedBy: "Abhijeet Salgar", totalRecords: 32, stage: "Completed" },
-];
+// Format an ISO timestamp the same way the rest of the admin shows dates.
+const fmtDate = (v) => {
+  if (!v) return "—";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+};
+
+// Capitalize the bulk_imports.status enum value for display ("completed" → "Completed").
+const fmtStatus = (s) => {
+  if (!s) return "—";
+  return String(s).charAt(0).toUpperCase() + String(s).slice(1);
+};
 
 const dataDownloadData = [
   { downloadedBy: "Abhijeet Salgar", personInCcBcc: "Abhijeet Salgar", downloadedFrom: "Leads", downloadDate: "Apr 8, 2026 1:24 PM", totalRecords: 28368, stage: "Completed" },
@@ -64,13 +67,16 @@ const bulkReferData = [
   { createdBy: "Abhijeet Salgar", createdDate: "Apr 5, 2026 9:30 AM", totalRecords: 12, actionStatus: "Completed" },
 ];
 
-const Pagination = ({ data, rowsPerPage, setRowsPerPage, currentPage, setCurrentPage }) => {
-  const totalPages = Math.ceil(data.length / rowsPerPage);
+const Pagination = ({ data, rowsPerPage, setRowsPerPage, currentPage, setCurrentPage, totalCount }) => {
+  // For server-paginated tabs the caller passes totalCount; for the legacy
+  // client-paginated tabs we still derive it from the in-memory array.
+  const total = typeof totalCount === "number" ? totalCount : data.length;
+  const totalPages = Math.max(1, Math.ceil(total / rowsPerPage));
   const startIndex = (currentPage - 1) * rowsPerPage;
-  const startRow = startIndex + 1;
-  const endRow = Math.min(startIndex + rowsPerPage, data.length);
+  const startRow = total === 0 ? 0 : startIndex + 1;
+  const endRow = Math.min(startIndex + rowsPerPage, total);
 
-  if (data.length === 0) return null;
+  if (total === 0) return null;
 
   return (
     <div className="bulk-pagination">
@@ -125,7 +131,7 @@ const BulkUploadList = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [searchType, setSearchType] = useState("fileName");
   const [searchValue, setSearchValue] = useState("");
-  const [selectedUser, setSelectedUser] = useState("Abhijeet Salgar");
+  const [selectedUserId, setSelectedUserId] = useState("");
 
   // Per-tab pagination state
   const [rowsPerPage, setRowsPerPage] = useState({ 0: 10, 1: 10, 2: 10, 3: 10 });
@@ -141,7 +147,101 @@ const BulkUploadList = () => {
   const [referDateType, setReferDateType] = useState("Created Date");
   const [referCounselor, setReferCounselor] = useState("");
 
-  const users = ["Abhijeet Salgar", "Rahul Sharma", "Priya Patel"];
+  // ---------- Tab 0 (Bulk Upload) — real API state ----------
+  // Server scopes by role: super_admin sees all, sales_manager sees own +
+  // hierarchy below, counsellor sees only their own. Filters are applied
+  // server-side so we don't have to over-fetch.
+  const [imports, setImports] = useState([]);
+  const [importsTotal, setImportsTotal] = useState(0);
+  const [importsLoading, setImportsLoading] = useState(false);
+  const [importsError, setImportsError] = useState("");
+  const [uploaders, setUploaders] = useState([]);
+  // Tracks which row's download is currently in flight so the icon can
+  // show a spinner. We don't bother with a queue — single-click flow.
+  const [downloadingId, setDownloadingId] = useState(null);
+
+  const handleDownload = async (item) => {
+    if (!item?.id || !item?.file_r2_key) return;
+    setDownloadingId(item.id);
+    try {
+      const r = await bulkApi.importFile(item.id);
+      const url = r?.data?.url;
+      if (!url) throw new Error("No download URL returned");
+      // The signed URL has Content-Disposition baked in by the server, so
+      // a same-tab navigation (or window.open) saves the file with the
+      // right filename. Use a hidden <a> click so we don't replace the
+      // current page on browsers that ignore the disposition header.
+      const a = document.createElement("a");
+      a.href = url;
+      a.rel = "noopener noreferrer";
+      // download attr lets the browser save without navigating, when the
+      // signed-URL response sends an attachment disposition.
+      a.download = item.file_name
+        || (item.file_r2_key ? item.file_r2_key.split("/").pop() : "upload.xlsx");
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      alert(e?.message || "Download failed");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  // Debounce the file-name input so typing doesn't fire a request per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchValue.trim()), 350);
+    return () => clearTimeout(id);
+  }, [searchValue]);
+
+  // Reset to page 1 whenever any filter changes.
+  useEffect(() => {
+    setCurrentPage((prev) => ({ ...prev, 0: 1 }));
+  }, [debouncedSearch, selectedUserId, searchType]);
+
+  // Load uploaders once when the component mounts so the dropdown is
+  // populated. The server already restricts this list to people the
+  // viewer is allowed to filter by.
+  useEffect(() => {
+    let alive = true;
+    bulkApi.importsUploaders()
+      .then((r) => { if (alive) setUploaders(r?.data || []); })
+      .catch(() => { if (alive) setUploaders([]); });
+    return () => { alive = false; };
+  }, []);
+
+  // A tick counter that bumps when the user clicks Refresh — drives the
+  // effect below to re-fetch even when the filter inputs haven't changed.
+  const [reloadTick, setReloadTick] = useState(0);
+  const reloadImports = () => setReloadTick((n) => n + 1);
+
+  // Fetch the page whenever any of the filter / pagination dependencies
+  // change, or when the user clicks Refresh.
+  useEffect(() => {
+    if (activeTab !== 0) return undefined;
+    let alive = true;
+    setImportsLoading(true);
+    setImportsError("");
+    const params = { page: currentPage[0], limit: rowsPerPage[0] };
+    if (searchType === "fileName" && debouncedSearch) params.file_name = debouncedSearch;
+    if (selectedUserId) params.user_id = selectedUserId;
+    bulkApi.imports(params)
+      .then((r) => {
+        if (!alive) return;
+        setImports(r?.data || []);
+        setImportsTotal(r?.meta?.total ?? (r?.data?.length || 0));
+      })
+      .catch((e) => {
+        if (!alive) return;
+        setImportsError(e?.message || "Failed to load uploads");
+        setImports([]);
+        setImportsTotal(0);
+      })
+      .finally(() => { if (alive) setImportsLoading(false); });
+    return () => { alive = false; };
+  }, [activeTab, currentPage, rowsPerPage, debouncedSearch, selectedUserId, searchType, reloadTick]);
+
   const counselors = ["Abhijeet Salgar", "Divya Nair", "ExtraaEdge Admin", "Akansha Kondalwade"];
 
   const getTabRowsPerPage = rowsPerPage[activeTab];
@@ -158,7 +258,8 @@ const BulkUploadList = () => {
 
   const getTabData = () => {
     switch (activeTab) {
-      case 0: return bulkUploadData;
+      // Tab 0 is server-paginated; the rows we already fetched ARE the page.
+      case 0: return imports;
       case 1: return dataDownloadData;
       case 2: return bulkStatusChangeData;
       case 3: return bulkReferData;
@@ -167,8 +268,12 @@ const BulkUploadList = () => {
   };
 
   const tabData = getTabData();
+  // Tabs 1..3 still paginate client-side (they're hardcoded mock data).
+  // Tab 0 is server-paginated, so the rows we received ARE already the page.
   const startIndex = (getTabCurrentPage - 1) * getTabRowsPerPage;
-  const paginatedData = tabData.slice(startIndex, startIndex + getTabRowsPerPage);
+  const paginatedData = activeTab === 0
+    ? tabData
+    : tabData.slice(startIndex, startIndex + getTabRowsPerPage);
   const hasData = tabData.length > 0;
 
   const renderToolbar = () => {
@@ -176,7 +281,7 @@ const BulkUploadList = () => {
       case 0:
         return (
           <div className="bulk-upload-toolbar">
-            <IconButton size="small">
+            <IconButton size="small" onClick={reloadImports} disabled={importsLoading} title="Refresh">
               <RefreshIcon sx={{ color: colors.primary, fontSize: 22 }} />
             </IconButton>
             <div className="toolbar-right">
@@ -198,36 +303,51 @@ const BulkUploadList = () => {
                 </FormControl>
                 <div className="search-input-wrapper">
                   <InputBase
-                    placeholder="Enter File Name"
+                    placeholder={searchType === "fileName" ? "Enter File Name" : "Use Uploaded By dropdown →"}
                     value={searchValue}
                     onChange={(e) => setSearchValue(e.target.value)}
+                    disabled={searchType !== "fileName"}
                     sx={{ fontSize: 13, px: 1, flex: 1 }}
                   />
+                  {searchValue && (
+                    <IconButton size="small" onClick={() => setSearchValue("")} title="Clear">
+                      <CloseIcon sx={{ fontSize: 16, color: colors.textGrey }} />
+                    </IconButton>
+                  )}
                   <IconButton size="small">
                     <SearchIcon sx={{ fontSize: 18, color: colors.textGrey }} />
                   </IconButton>
                 </div>
               </div>
-              <FormControl size="small" sx={{ minWidth: 160 }}>
+              <FormControl size="small" sx={{ minWidth: 200 }}>
                 <Select
-                  value={selectedUser}
-                  onChange={(e) => setSelectedUser(e.target.value)}
+                  value={selectedUserId}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
                   displayEmpty
+                  renderValue={(val) => {
+                    if (!val) return <span style={{ color: colors.midGrey }}>All Uploaders</span>;
+                    const u = uploaders.find((x) => x.id === val);
+                    return u?.name || u?.email || val;
+                  }}
                   sx={{
                     fontSize: 13,
                     "& .MuiSelect-select": { padding: "7px 36px 7px 12px" },
                     "& .MuiOutlinedInput-notchedOutline": { borderColor: colors.borderGrey },
                   }}
                   endAdornment={
-                    selectedUser && (
-                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); setSelectedUser(""); }} sx={{ mr: 1 }}>
+                    selectedUserId && (
+                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); setSelectedUserId(""); }} sx={{ mr: 1 }}>
                         <CloseIcon sx={{ fontSize: 16 }} />
                       </IconButton>
                     )
                   }
                 >
-                  {users.map((user) => (
-                    <MenuItem key={user} value={user}>{user}</MenuItem>
+                  <MenuItem value=""><em>All Uploaders</em></MenuItem>
+                  {uploaders.map((u) => (
+                    <MenuItem key={u.id} value={u.id}>
+                      {u.name || u.email}
+                      {u.role && <span style={{ color: colors.midGrey, fontSize: 11, marginLeft: 6 }}>· {String(u.role).replace(/_/g, " ")}</span>}
+                    </MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -398,6 +518,95 @@ const BulkUploadList = () => {
   };
 
   const renderTable = () => {
+    // Tab 0 has its own loading/error states because it pulls from the API.
+    if (activeTab === 0) {
+      if (importsLoading) {
+        return (
+          <div className="empty-state" style={{ padding: 64 }}>
+            <CircularProgress size={28} />
+          </div>
+        );
+      }
+      if (importsError) {
+        return (
+          <div className="empty-state">
+            <h3 style={{ color: "#c62828" }}>{importsError}</h3>
+          </div>
+        );
+      }
+      if (!hasData) {
+        return (
+          <div className="empty-state">
+            <img src={noLeadsImg} alt="No data" />
+            <h3>No bulk uploads yet</h3>
+          </div>
+        );
+      }
+      return (
+        <table className="bulk-table">
+          <thead>
+            <tr>
+              <th>FILE NAME</th>
+              <th>UPLOAD DATE</th>
+              <th>UPLOADED BY</th>
+              <th>TOTAL RECORDS</th>
+              <th>STAGE</th>
+              <th style={{ textAlign: "right" }}>ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {paginatedData.map((item) => {
+              // file_name is the user-supplied filename (set by UploadLeads
+              // on commit). Fall back to the basename of the storage key
+              // for older rows imported before file_name existed.
+              const fileLabel = item.file_name
+                || (item.file_r2_key ? item.file_r2_key.split("/").pop() : "—");
+              const canDownload = !!item.file_r2_key;
+              return (
+                <tr key={item.id}>
+                  <td className="file-name-cell" title={item.file_r2_key}>{fileLabel}</td>
+                  <td>{fmtDate(item.created_at)}</td>
+                  <td>
+                    {item.uploaded_by_name || item.uploaded_by_email || "—"}
+                    {item.uploaded_by_role && (
+                      <span style={{ color: colors.midGrey, fontSize: 11, marginLeft: 6 }}>
+                        · {String(item.uploaded_by_role).replace(/_/g, " ")}
+                      </span>
+                    )}
+                  </td>
+                  <td className="records-cell">{item.total_rows ?? 0}</td>
+                  <td className="stage-cell">
+                    <span className={`status-badge ${
+                      item.status === "completed" ? "status-completed"
+                        : item.status === "failed" ? "status-failed"
+                        : ""
+                    }`}>
+                      {fmtStatus(item.status)}
+                    </span>
+                  </td>
+                  <td className="actions-cell" style={{ textAlign: "right" }}>
+                    <Tooltip title={canDownload ? "Download original file" : "Original file unavailable"}>
+                      <span>
+                        <IconButton
+                          size="small"
+                          disabled={!canDownload || downloadingId === item.id}
+                          onClick={() => handleDownload(item)}
+                        >
+                          {downloadingId === item.id
+                            ? <CircularProgress size={16} />
+                            : <FileDownloadOutlinedIcon sx={{ fontSize: 18, color: canDownload ? colors.primary : colors.midGrey }} />}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      );
+    }
+
     if (!hasData) {
       return (
         <div className="empty-state">
@@ -409,32 +618,8 @@ const BulkUploadList = () => {
 
     switch (activeTab) {
       case 0:
-        return (
-          <table className="bulk-table">
-            <thead>
-              <tr>
-                <th>FILE NAME</th>
-                <th>UPLOAD DATE</th>
-                <th>UPLOADED BY</th>
-                <th>TOTAL RECORDS</th>
-                <th>STAGE</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedData.map((item, index) => (
-                <tr key={index}>
-                  <td className="file-name-cell">{item.fileName}</td>
-                  <td>{item.uploadDate}</td>
-                  <td>{item.uploadedBy}</td>
-                  <td className="records-cell">{item.totalRecords}</td>
-                  <td className="stage-cell">
-                    <span className="status-badge status-completed">{item.stage}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        );
+        // (handled above)
+        return null;
 
       case 1:
         return (
@@ -569,13 +754,14 @@ const BulkUploadList = () => {
       </div>
 
       {/* Pagination */}
-      {hasData && (
+      {(activeTab === 0 ? importsTotal > 0 : hasData) && (
         <Pagination
           data={tabData}
           rowsPerPage={getTabRowsPerPage}
           setRowsPerPage={setTabRowsPerPage}
           currentPage={getTabCurrentPage}
           setCurrentPage={setTabCurrentPage}
+          totalCount={activeTab === 0 ? importsTotal : undefined}
         />
       )}
     </div>

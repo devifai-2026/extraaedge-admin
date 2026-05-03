@@ -53,7 +53,8 @@
 }
 
 .quick-add-field input,
-.quick-add-field select {
+.quick-add-field select,
+.quick-add-field textarea {
     padding: 10px 12px;
     border: 1px solid var(--border-grey, #ddd);
     border-radius: 4px;
@@ -65,12 +66,20 @@
     font-family: inherit;
 }
 
+.quick-add-field textarea {
+    resize: vertical;
+    min-height: 72px;
+    line-height: 1.4;
+}
+
 .quick-add-field input:focus,
-.quick-add-field select:focus {
+.quick-add-field select:focus,
+.quick-add-field textarea:focus {
     border-color: var(--primary, #f26522);
 }
 
-.quick-add-field input::placeholder {
+.quick-add-field input::placeholder,
+.quick-add-field textarea::placeholder {
     color: var(--mid-grey, #aaa);
 }
 

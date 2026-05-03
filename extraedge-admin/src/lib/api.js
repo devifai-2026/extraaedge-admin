@@ -132,7 +132,21 @@ const doFetch = async (path, init = {}, retried = false) => {
     try { data = JSON.parse(text); } catch { data = text; }
   }
   if (!res.ok) {
-    const msg = data?.error?.message || data?.message || res.statusText || 'Request failed';
+    // For validation errors the server sends `error.details: [{path, message}]`.
+    // The bare "Validation failed" top-level message isn't useful — expand the
+    // first ~3 details into a single string so the UI shows what's actually wrong.
+    const baseMsg = data?.error?.message || data?.message || res.statusText || 'Request failed';
+    const details = data?.error?.details;
+    let msg = baseMsg;
+    if (Array.isArray(details) && details.length > 0) {
+      const lines = details.slice(0, 3).map((d) => {
+        const path = Array.isArray(d?.path) ? d.path.join('.') : (d?.path || '');
+        const m = d?.message || 'Invalid value';
+        return path ? `${path}: ${m}` : m;
+      });
+      const more = details.length > 3 ? ` (+${details.length - 3} more)` : '';
+      msg = `${baseMsg} — ${lines.join('; ')}${more}`;
+    }
     throw new ApiError(msg, res.status, data);
   }
   return data;

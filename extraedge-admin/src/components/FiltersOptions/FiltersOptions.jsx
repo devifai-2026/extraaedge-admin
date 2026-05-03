@@ -127,7 +127,7 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                             <Tooltip title={
                                 unassignedCount > 0
                                     ? `Run round-robin on ${unassignedCount} unassigned lead${unassignedCount === 1 ? '' : 's'}`
-                                    : 'Run round-robin on every unassigned lead'
+                                    : 'No unassigned leads to process'
                             }>
                                 <span>
                                     <Button
@@ -137,7 +137,7 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                                             ? <CircularProgress size={14} sx={{ color: colors.primary }} />
                                             : <AutoFixHighIcon fontSize="small" />}
                                         onClick={handleAutoAssign}
-                                        disabled={autoAssigning}
+                                        disabled={autoAssigning || unassignedCount === 0}
                                         sx={{
                                             textTransform: 'none', fontSize: 12,
                                             color: colors.primary, borderColor: colors.primary,

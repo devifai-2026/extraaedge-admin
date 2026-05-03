@@ -82,4 +82,39 @@ export const TONE_BG = {
   success:    '#0277bd',
   primary:    '#c62828',
   untouched:  '#6d4c41',
+  converted:  '#1b5e20',
+};
+
+// Age display: "Xd" for whole days, but for leads under 24h we show hours
+// (e.g. "5h") and for leads under an hour we show minutes ("12m"). Falls
+// back to the server-side `lead_age_days` count when `created_at` is missing
+// so existing rows still render something sensible.
+//
+// Why: the API rounds age down via integer division, so a lead created
+// 30 minutes ago looks identical to one created yesterday — both render "0d".
+// Hour-level granularity for fresh leads matches what counsellors expect.
+export const formatLeadAge = (createdAt, fallbackDays) => {
+  if (createdAt) {
+    const created = new Date(createdAt);
+    if (!isNaN(created.getTime())) {
+      const diffMs = Date.now() - created.getTime();
+      if (diffMs < 0) return '0m';
+      const minutes = Math.floor(diffMs / 60000);
+      if (minutes < 60) return `${minutes}m`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h`;
+      const days = Math.floor(hours / 24);
+      return `${days}d`;
+    }
+  }
+  return `${fallbackDays ?? 0}d`;
+};
+
+// Friendly absolute timestamp used in tooltips (e.g. "May 2, 2026, 12:37 AM").
+const TS_FMT = { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true };
+export const formatTimestamp = (v) => {
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  return d.toLocaleString('en-US', TS_FMT);
 };

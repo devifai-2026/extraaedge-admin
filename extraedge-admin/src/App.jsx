@@ -28,6 +28,7 @@ import SearchResults from './pages/Search/SearchResults'
 import UserProfile from './pages/UserProfile/UserProfile'
 import Tickets from './pages/Tickets/Tickets'
 import OrgTree from './pages/OrgTree/OrgTree'
+import Profile from './pages/Profile/Profile'
 
 // Each route declares the backend tab key it requires.
 // `<ProtectedRoute tab="...">` redirects to /dashboard if user lacks access.
@@ -41,6 +42,9 @@ function App() {
         <Route path="/leadlist"             element={<ProtectedRoute tab="leads"><Layout><LeadList /></Layout></ProtectedRoute>} />
         <Route path="/search"               element={<ProtectedRoute tab="leads"><Layout><SearchResults /></Layout></ProtectedRoute>} />
         <Route path="/users/:id"            element={<ProtectedRoute tab="advanced.users_roles"><Layout><UserProfile /></Layout></ProtectedRoute>} />
+        {/* /profile is open to every authenticated tenant role — each user
+            manages their own preferences (theme, etc.). No `tab` gate. */}
+        <Route path="/profile"              element={<ProtectedRoute><Layout><Profile /></Layout></ProtectedRoute>} />
         <Route path="/rawdata"              element={<ProtectedRoute tab="raw_data"><Layout><RawDataManager /></Layout></ProtectedRoute>} />
         <Route path="/failedleads"          element={<ProtectedRoute tab="failed_leads"><Layout><FailedLeads /></Layout></ProtectedRoute>} />
         <Route path="/bulkuploadlist"       element={<ProtectedRoute tab="bulk_upload"><Layout><BulkUploadList /></Layout></ProtectedRoute>} />

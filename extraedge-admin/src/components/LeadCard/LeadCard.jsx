@@ -33,7 +33,7 @@ import AddNewLead from "../AddNewLead/AddNewLead";
 import AddFollowUpDrawer from "../AddFollowUpDrawer/AddFollowUpDrawer";
 import AddNoteDrawer from "../AddNoteDrawer/AddNoteDrawer";
 import { followUpsApi, leadsApi } from "../../lib/endpoints";
-import { flagForLead, TONE_BG } from "../../lib/leadFlags";
+import { flagForLead, TONE_BG, formatLeadAge, formatTimestamp } from "../../lib/leadFlags";
 
 import "./LeadCard.css";
 
@@ -125,13 +125,13 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                             </Typography>
                             <Tooltip title={`${lead.missed_calls_count ?? 0} missed call(s)`}>
                                 <span className="name-badge orange">
-                                    <PhoneMissedIcon style={{ fontSize: 12, marginRight: 2, verticalAlign: 'middle' }} />
+                                    <PhoneMissedIcon />
                                     {lead.missed_calls_count ?? 0}
                                 </span>
                             </Tooltip>
                             <Tooltip title={`${lead.unread_messages_count ?? 0} unread message(s)`}>
                                 <span className="name-badge green">
-                                    <MarkChatUnreadIcon style={{ fontSize: 12, marginRight: 2, verticalAlign: 'middle' }} />
+                                    <MarkChatUnreadIcon />
                                     {lead.unread_messages_count ?? 0}
                                 </span>
                             </Tooltip>
@@ -144,6 +144,15 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                     <div className="status">
                         <Chip label={stageLabel} size="small" className="status-chip" />
                         {subStageLabel && <span className="sub-status">{subStageLabel}</span>}
+                        {lead.is_converted && (
+                            <Tooltip title={lead.converted_at ? `Converted on ${formatTimestamp(lead.converted_at)}` : 'Converted'}>
+                                <Chip
+                                    label="Converted"
+                                    size="small"
+                                    sx={{ height: 22, fontSize: 11, background: TONE_BG.converted, color: '#fff', fontWeight: 600 }}
+                                />
+                            </Tooltip>
+                        )}
                     </div>
 
                     <div className="comm-stats">
@@ -173,9 +182,9 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                 ★ {lead.lead_score != null ? Number(lead.lead_score).toFixed(0) : 0}
                             </span>
                         </Tooltip>
-                        <Tooltip title="Lead age (days)">
+                        <Tooltip title={lead.created_at ? `Created ${formatTimestamp(lead.created_at)}` : 'Lead age'}>
                             <span className="stat-item" style={{ cursor: 'default' }}>
-                                {lead.lead_age_days ?? 0}d
+                                {formatLeadAge(lead.created_at, lead.lead_age_days)}
                             </span>
                         </Tooltip>
                         <span className="view-all" onClick={() => setOpenTimeline(true)} style={{ cursor: "pointer" }}>View all</span>
@@ -264,7 +273,10 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                             : '—'}
                                     />
                                     <Field label="LEAD SCORE" value={lead.lead_score != null ? Number(lead.lead_score).toFixed(0) : '0'} />
-                                    <Field label="LEAD AGE" value={lead.lead_age_days != null ? `${lead.lead_age_days} Days` : null} />
+                                    <Field label="LEAD AGE" value={formatLeadAge(lead.created_at, lead.lead_age_days)} />
+                                    {lead.is_converted && (
+                                        <Field label="CONVERTED ON" value={fmt(lead.converted_at)} />
+                                    )}
                                 </div>
                             </div>
                             <div className="content-chevron">
