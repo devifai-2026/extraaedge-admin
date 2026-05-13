@@ -37,6 +37,8 @@ export const followUpsApi = {
   list: (params) => api.get('/follow-ups', params),
   // Per-day counts for the FollowUp Manager calendar dots.
   calendar: (params) => api.get('/follow-ups/calendar', params),
+  // Range analytics: status totals + per-lead breakdown.
+  analytics: (params) => api.get('/follow-ups/analytics', params),
   myUpcoming: () => api.get('/follow-ups/my'),
   overdue: () => api.get('/follow-ups/overdue'),
   create: (body) => api.post('/follow-ups', body),

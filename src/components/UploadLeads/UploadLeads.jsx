@@ -21,23 +21,6 @@ import { bulkApi, uploadsApi } from "../../lib/endpoints";
 
 const channelOptions = ["Offline", "Online", "Direct", "Facebook", "Google Ads", "LinkedIn", "Email Campaign"];
 const sourceOptions = ["Direct Walkin", "Website", "Social Media", "Professional Network", "Newsletter", "Referral"];
-const stageOptions = [
-    "01-New",
-    "02-Contacted",
-    "03-Followup",
-    "05-Qualified",
-    "07-Requirement Match",
-    "08-Interested",
-    "09-Visited",
-    "10-Enrolled",
-];
-const subStageOptions = [
-    "Not Called",
-    "Awaiting confirmation",
-    "Will join soon",
-    "Negotiation phase",
-    "Needs demo",
-];
 
 // Two visible steps. Step 3 (column mapping) was removed because the
 // canonical .xlsx template the user downloads already uses the exact column
@@ -73,8 +56,6 @@ const UploadLeads = ({ open, onClose }) => {
     const [activeStep, setActiveStep] = useState(0);
     const [channel, setChannel] = useState("Offline");
     const [source, setSource] = useState("Direct Walkin");
-    const [stage, setStage] = useState("01-New");
-    const [subStage, setSubStage] = useState("Not Called");
     const [sendWelcomeEmail, setSendWelcomeEmail] = useState(false);
     const [sendWelcomeSMS, setSendWelcomeSMS] = useState(false);
     const [uploadedFile, setUploadedFile] = useState(null);
@@ -101,6 +82,15 @@ const UploadLeads = ({ open, onClose }) => {
     const handleFileUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        // Only .xlsx is accepted — CSV is intentionally blocked because the
+        // template's dropdowns / data-validation rules don't survive a CSV.
+        if (!/\.xlsx$/i.test(file.name)) {
+            setError("Only .xlsx files are supported. Please re-save your file as Excel (.xlsx).");
+            setUploadedFile(null);
+            // Reset the input so the same file can be picked again after fixing.
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            return;
+        }
         setUploadedFile(file);
         setError(null);
         setResult(null);
@@ -161,12 +151,10 @@ const UploadLeads = ({ open, onClose }) => {
             const previewKick = await bulkApi.preview({
                 r2_key: presign.r2_key,
                 field_mapping: {},
-                defaults: {
-                    channel,
-                    source,
-                    stage,
-                    sub_stage: subStage,
-                },
+                // Stage / sub_stage are required per-row in the spreadsheet,
+                // so we don't ship batch defaults for them — the file is the
+                // source of truth.
+                defaults: { channel, source },
             });
             const previewId = previewKick?.data?.id;
             if (!previewId) throw new Error("Preview returned no id");
@@ -261,11 +249,10 @@ const UploadLeads = ({ open, onClose }) => {
                     <p>Please follow the instructions mentioned below</p>
                 </div>
                 <ul>
-                    <li>
-                        You can upload an .xlsx (or .csv) file with up to 30,000 rows.
-                    </li>
+                    <li>Upload an <b>.xlsx</b> file (max 30,000 rows). CSV is not supported — please convert to .xlsx.</li>
                     <li>You cannot upload more than 1 file at the same time.</li>
-                    <li>Duplicate detection uses email + WhatsApp number. Duplicates appear on the Failed Leads page.</li>
+                    <li>Every row must have at least one of <b>email / first_name / last_name</b>, at least one of <b>whatsapp_number / phone</b>, and a <b>stage</b>. Sub-stage is required only when the chosen stage has sub-stages configured.</li>
+                    <li>Duplicate detection uses email, phone, and WhatsApp number. Duplicates appear on the Failed Leads page.</li>
                 </ul>
             </div>
 
@@ -273,6 +260,7 @@ const UploadLeads = ({ open, onClose }) => {
                 <h4>Default values for this batch</h4>
                 <p>
                     These defaults fill in any column the spreadsheet leaves blank. Per-row values in the file always win.
+                    Stage and sub-stage are required per row in the file itself, so they aren&apos;t set here.
                 </p>
 
                 <div className="upload-leads-form-grid">
@@ -304,33 +292,6 @@ const UploadLeads = ({ open, onClose }) => {
                         />
                     </div>
 
-                    <div className="upload-leads-field">
-                        <label className="upload-leads-field-label">Stage</label>
-                        <Autocomplete
-                            size="small"
-                            fullWidth
-                            options={stageOptions}
-                            value={stage}
-                            onChange={(_, val) => setStage(val)}
-                            renderInput={(params) => (
-                                <TextField {...params} placeholder="Select Stage" />
-                            )}
-                        />
-                    </div>
-
-                    <div className="upload-leads-field">
-                        <label className="upload-leads-field-label">Sub-Stage</label>
-                        <Autocomplete
-                            size="small"
-                            fullWidth
-                            options={subStageOptions}
-                            value={subStage}
-                            onChange={(_, val) => setSubStage(val)}
-                            renderInput={(params) => (
-                                <TextField {...params} placeholder="Select Sub-Stage" />
-                            )}
-                        />
-                    </div>
                 </div>
 
                 <div className="upload-leads-checkboxes">
@@ -375,20 +336,10 @@ const UploadLeads = ({ open, onClose }) => {
                 >
                     Download Template (.xlsx)
                 </Button>
-                <Button
-                    variant="text"
-                    size="small"
-                    startIcon={<FileDownloadIcon />}
-                    onClick={() => handleDownloadTemplate("csv")}
-                    sx={{ color: colors.textSecondary }}
-                    disabled={busy}
-                >
-                    Download .csv
-                </Button>
             </div>
             <input
                 type="file"
-                accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 ref={fileInputRef}
                 style={{ display: "none" }}
                 onChange={handleFileUpload}

@@ -11,7 +11,11 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   IconButton, Box, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText,
   TextField, InputAdornment, Chip, CircularProgress, Autocomplete,
+  Collapse, Table, TableBody, TableCell, TableHead, TableRow, Button,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import InsightsIcon from '@mui/icons-material/Insights';
 import SwapVertIcon from '@mui/icons-material/SwapVert';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
@@ -165,7 +169,17 @@ function FollowupCalendar({ selectedDate, onDateSelect, dayBuckets, loading }) {
 }
 
 // ===== Main =====
+function KpiTile({ label, value, color }) {
+  return (
+    <div className="followup-kpi" style={{ borderTopColor: color }}>
+      <div className="followup-kpi-value" style={{ color }}>{value ?? 0}</div>
+      <div className="followup-kpi-label">{label}</div>
+    </div>
+  );
+}
+
 export default function FollowUpManager() {
+  const navigate = useNavigate();
   const sessionUser = auth.getUser() || {};
   const isAdmin = sessionUser.role === 'super_admin';
   const isManager = sessionUser.role === 'sales_manager';
@@ -187,6 +201,15 @@ export default function FollowUpManager() {
   const [calendarData, setCalendarData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [calLoading, setCalLoading] = useState(false);
+
+  // Date-range analytics (defaults: 1st of current month → today)
+  const today = new Date();
+  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const [rangeFrom, setRangeFrom] = useState(toDateStr(firstOfMonth));
+  const [rangeTo, setRangeTo]     = useState(toDateStr(today));
+  const [analytics, setAnalytics] = useState({ totals: { planned: 0, done: 0, missed: 0, cancelled: 0, total: 0 }, by_lead: [] });
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [showByLead, setShowByLead] = useState(false);
 
   // Anchor refs
   const [sortAnchor, setSortAnchor] = useState(null);
@@ -258,6 +281,34 @@ export default function FollowUpManager() {
 
   useEffect(() => { reloadCalendar(); }, [reloadCalendar]);
 
+  // Range analytics for the selected From/To range
+  const reloadAnalytics = useCallback(async () => {
+    if (!rangeFrom || !rangeTo) return;
+    setAnalyticsLoading(true);
+    try {
+      const from = new Date(`${rangeFrom}T00:00:00`);
+      const to   = new Date(`${rangeTo}T23:59:59`);
+      const params = {
+        date_from: from.toISOString(),
+        date_to:   to.toISOString(),
+      };
+      if (counsellorId) params.assigned_user_id = counsellorId;
+      if (stageId)      params.stage_id = stageId;
+      const r = await followUpsApi.analytics(params);
+      const d = r?.data || {};
+      setAnalytics({
+        totals: d.totals || { planned: 0, done: 0, missed: 0, cancelled: 0, total: 0 },
+        by_lead: d.by_lead || [],
+      });
+    } catch {
+      setAnalytics({ totals: { planned: 0, done: 0, missed: 0, cancelled: 0, total: 0 }, by_lead: [] });
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [rangeFrom, rangeTo, counsellorId, stageId]);
+
+  useEffect(() => { reloadAnalytics(); }, [reloadAnalytics]);
+
   // Bucket lookup by YYYY-MM-DD
   const dayBuckets = useMemo(() => {
     const m = new Map();
@@ -282,6 +333,104 @@ export default function FollowUpManager() {
   return (
     <div className="followup-manager">
       <div className="followup-main">
+        {/* Date-range analytics strip */}
+        <div className="followup-analytics-strip">
+          <div className="followup-analytics-head">
+            <div className="followup-analytics-title">
+              <InsightsIcon fontSize="small" />
+              <span>Date-range analytics</span>
+              {analyticsLoading && <CircularProgress size={12} sx={{ ml: 1 }} />}
+            </div>
+            <div className="followup-analytics-controls">
+              <TextField
+                size="small"
+                type="date"
+                label="From"
+                value={rangeFrom}
+                onChange={(e) => setRangeFrom(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={{ width: 160 }}
+              />
+              <TextField
+                size="small"
+                type="date"
+                label="To"
+                value={rangeTo}
+                onChange={(e) => setRangeTo(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                sx={{ width: 160 }}
+              />
+              <Button
+                size="small"
+                variant="text"
+                onClick={() => setShowByLead((v) => !v)}
+                endIcon={showByLead ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                disabled={!analytics.by_lead.length}
+              >
+                By lead ({analytics.by_lead.length})
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => {
+                  const now = new Date();
+                  setRangeFrom(toDateStr(new Date(now.getFullYear(), now.getMonth(), 1)));
+                  setRangeTo(toDateStr(now));
+                  setShowByLead(false);
+                }}
+              >
+                Reset
+              </Button>
+            </div>
+          </div>
+
+          <div className="followup-kpis">
+            <KpiTile label="Total"     value={analytics.totals.total}     color="#3F51B5" />
+            <KpiTile label="Planned"   value={analytics.totals.planned}   color="#FB8C00" />
+            <KpiTile label="Done"      value={analytics.totals.done}      color="#43A047" />
+            <KpiTile label="Missed"    value={analytics.totals.missed}    color="#E53935" />
+            <KpiTile label="Cancelled" value={analytics.totals.cancelled} color="#9E9E9E" />
+          </div>
+
+          <Collapse in={showByLead} unmountOnExit>
+            <div className="followup-bylead-wrap">
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Lead</TableCell>
+                    <TableCell>Phone</TableCell>
+                    <TableCell>Owner</TableCell>
+                    <TableCell align="right">Planned</TableCell>
+                    <TableCell align="right">Done</TableCell>
+                    <TableCell align="right">Missed</TableCell>
+                    <TableCell align="right">Cancelled</TableCell>
+                    <TableCell align="right">Total</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {analytics.by_lead.map((r) => (
+                    <TableRow
+                      key={r.lead_id}
+                      hover
+                      sx={{ cursor: 'pointer' }}
+                      onClick={() => navigate(`/leadlist?focus=${r.lead_id}`)}
+                    >
+                      <TableCell>{r.lead_name || '—'}</TableCell>
+                      <TableCell>{r.lead_phone || ''}</TableCell>
+                      <TableCell>{r.lead_assigned_to_name || ''}</TableCell>
+                      <TableCell align="right" sx={{ color: '#FB8C00', fontWeight: 600 }}>{r.planned}</TableCell>
+                      <TableCell align="right" sx={{ color: '#43A047', fontWeight: 600 }}>{r.done}</TableCell>
+                      <TableCell align="right" sx={{ color: '#E53935', fontWeight: 600 }}>{r.missed}</TableCell>
+                      <TableCell align="right" sx={{ color: '#9E9E9E', fontWeight: 600 }}>{r.cancelled}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700 }}>{r.total}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </Collapse>
+        </div>
+
         <div className="followup-header-badge">
           Follow-ups for {fmtDate(selectedDate)} ({tabCounts.all})
         </div>

@@ -101,6 +101,12 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
     const [submitError, setSubmitError] = useState('');
     const [hydrating, setHydrating] = useState(false);
 
+    // Once a lead has crossed into a success stage (converted_at !== null),
+    // only super_admin can keep editing. The backend enforces the same rule
+    // on PUT /leads/:id and POST /leads/:id/stage — this flag drives the UI.
+    const isConverted = isEditMode && Boolean(leadData?.converted_at || leadData?.is_converted);
+    const lockedConverted = isConverted && !isRole(ROLES.SUPER_ADMIN);
+
     // Inline "Add new …" mini-dialog state. `quickCreate.type` controls which
     // dropdown we're creating into (degrees / specializations / universities /
     // programs). `quickCreate.assignTo` holds the form-key to auto-fill on success.
@@ -611,12 +617,16 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                 </Tabs>
             </div>
 
-            <DialogContent className="add-lead-content">
+            <DialogContent className={`add-lead-content${lockedConverted ? ' locked-converted' : ''}`}>
                 {hydrating && (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
                         <CircularProgress size={28} />
                     </div>
                 )}
+                {/* Once a lead is converted, every input on every tab becomes
+                    read-only for non-admins. The Reassign + Change-Stage blocks
+                    above are hidden outright; the .locked-converted CSS rule
+                    on DialogContent disables input interaction for the rest. */}
 
                 {!hydrating && activeTab === 0 && (
                     <>
@@ -684,7 +694,7 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                             Manager picker is auto-scoped to the actor's team via /users/team.
                             Manager_id auto-snaps to the picked counsellor's primary manager
                             (handled server-side: bulkAssign / reassign both update leads.manager_id). */}
-                        {canReassign && (
+                        {canReassign && !lockedConverted && (
                             <>
                                 <div className="add-lead-section-title">Reassign Lead</div>
                                 <div className="add-lead-form-grid" style={{ alignItems: 'center' }}>
@@ -751,77 +761,103 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                             </>
                         )}
 
-                        <div className="add-lead-section-title">Change Lead /Application Stage</div>
-                        <div className="add-lead-form-grid">
-                            <Autocomplete
-                                size="small"
-                                options={(stages.data || []).filter((s) => s.is_active !== false)}
-                                getOptionLabel={(o) => o?.name || ''}
-                                value={(stages.data || []).find((s) => s.id === formData.stage_id) || null}
-                                onChange={(_e, opt) => setField('stage_id')({ target: { value: opt?.id || '' } })}
-                                isOptionEqualToValue={(o, v) => o?.id === v?.id}
-                                loading={stages.loading}
-                                renderInput={(params) => <TextField {...params} label="Stage" placeholder="Type to search…" />}
-                            />
-                            <Autocomplete
-                                size="small"
-                                options={filteredSubStages.filter((s) => s.is_active !== false)}
-                                getOptionLabel={(o) => o?.name || ''}
-                                value={filteredSubStages.find((s) => s.id === formData.sub_stage_id) || null}
-                                onChange={(_e, opt) => setField('sub_stage_id')({ target: { value: opt?.id || '' } })}
-                                isOptionEqualToValue={(o, v) => o?.id === v?.id}
-                                loading={subStages.loading}
-                                disabled={!formData.stage_id}
-                                noOptionsText={
-                                    !formData.stage_id
-                                        ? 'Pick a stage first'
-                                        : 'No sub-stages configured for this stage. Add some in Settings → Setup Dropdown Values → Sub-Stage.'
-                                }
-                                renderInput={(params) => <TextField {...params} label="Sub-Stage" placeholder={formData.stage_id ? 'Type to search…' : 'Pick a stage first'} />}
-                            />
-                        </div>
-
-
-                        {/* When the picked stage is a follow-up stage, offer an
-                            optional next-action datetime so the lead lands in the
-                            counsellor's Follow-up Manager view automatically. */}
-                        {(() => {
-                            const picked = (stages.data || []).find((s) => s.id === formData.stage_id);
-                            const isFollowup = picked?.name && /follow/i.test(picked.name);
-                            if (!isFollowup) return null;
-                            // Min = now (in local-time), formatted for the
-                            // datetime-local input. Browser blocks past picks
-                            // natively; we also re-validate on submit.
-                            const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
-                            const minStr = now.toISOString().slice(0, 16);
-                            const value = formData.next_action_datetime || '';
-                            const isPast = value && new Date(value).getTime() < Date.now();
-                            return (
+                        {lockedConverted ? (
+                            <>
+                                <div className="add-lead-section-title">Lead / Application Stage</div>
                                 <div className="add-lead-form-grid">
                                     <TextField
-                                        label="Follow-up at"
-                                        size="small"
-                                        type="datetime-local"
-                                        value={value}
-                                        onChange={setField('next_action_datetime')}
-                                        InputLabelProps={{ shrink: true }}
-                                        inputProps={{ min: minStr, style: { paddingTop: 8 } }}
-                                        error={isPast}
-                                        helperText={isPast
-                                            ? 'Pick a future date and time.'
-                                            : 'Optional. Schedules a planned follow-up so the lead shows up in Follow-up Manager.'}
-                                        fullWidth
+                                        size="small" label="Stage" fullWidth
+                                        value={(stages.data || []).find((s) => s.id === formData.stage_id)?.name || '—'}
+                                        InputProps={{ readOnly: true }}
+                                    />
+                                    <TextField
+                                        size="small" label="Sub-Stage" fullWidth
+                                        value={(subStages.data || []).find((s) => s.id === formData.sub_stage_id)?.name || '—'}
+                                        InputProps={{ readOnly: true }}
                                     />
                                 </div>
-                            );
-                        })()}
+                                {formData.closure_remarks && (
+                                    <div className="add-lead-form-grid">
+                                        <TextField
+                                            size="small" label="Closure Remarks" fullWidth multiline
+                                            value={formData.closure_remarks}
+                                            InputProps={{ readOnly: true }}
+                                        />
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <div className="add-lead-section-title">Change Lead /Application Stage</div>
+                                <div className="add-lead-form-grid">
+                                    <Autocomplete
+                                        size="small"
+                                        options={(stages.data || []).filter((s) => s.is_active !== false)}
+                                        getOptionLabel={(o) => o?.name || ''}
+                                        value={(stages.data || []).find((s) => s.id === formData.stage_id) || null}
+                                        onChange={(_e, opt) => setField('stage_id')({ target: { value: opt?.id || '' } })}
+                                        isOptionEqualToValue={(o, v) => o?.id === v?.id}
+                                        loading={stages.loading}
+                                        renderInput={(params) => <TextField {...params} label="Stage" placeholder="Type to search…" />}
+                                    />
+                                    <Autocomplete
+                                        size="small"
+                                        options={filteredSubStages.filter((s) => s.is_active !== false)}
+                                        getOptionLabel={(o) => o?.name || ''}
+                                        value={filteredSubStages.find((s) => s.id === formData.sub_stage_id) || null}
+                                        onChange={(_e, opt) => setField('sub_stage_id')({ target: { value: opt?.id || '' } })}
+                                        isOptionEqualToValue={(o, v) => o?.id === v?.id}
+                                        loading={subStages.loading}
+                                        disabled={!formData.stage_id}
+                                        noOptionsText={
+                                            !formData.stage_id
+                                                ? 'Pick a stage first'
+                                                : 'No sub-stages configured for this stage. Add some in Settings → Setup Dropdown Values → Sub-Stage.'
+                                        }
+                                        renderInput={(params) => <TextField {...params} label="Sub-Stage" placeholder={formData.stage_id ? 'Type to search…' : 'Pick a stage first'} />}
+                                    />
+                                </div>
 
-                        <div className="add-lead-form-grid">
-                            {isEditMode && (
-                                <TextField label="Closure Remarks" required size="small" value={formData.closure_remarks} onChange={setField('closure_remarks')} fullWidth />
-                            )}
-                            <TextField label="Remarks" required={!isEditMode} size="small" multiline minRows={2} value={formData.remarks} onChange={setField('remarks')} fullWidth />
-                        </div>
+
+                                {/* When the picked stage is a follow-up stage, offer an
+                                    optional next-action datetime so the lead lands in the
+                                    counsellor's Follow-up Manager view automatically. */}
+                                {(() => {
+                                    const picked = (stages.data || []).find((s) => s.id === formData.stage_id);
+                                    const isFollowup = picked?.name && /follow/i.test(picked.name);
+                                    if (!isFollowup) return null;
+                                    const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
+                                    const minStr = now.toISOString().slice(0, 16);
+                                    const value = formData.next_action_datetime || '';
+                                    const isPast = value && new Date(value).getTime() < Date.now();
+                                    return (
+                                        <div className="add-lead-form-grid">
+                                            <TextField
+                                                label="Follow-up at"
+                                                size="small"
+                                                type="datetime-local"
+                                                value={value}
+                                                onChange={setField('next_action_datetime')}
+                                                InputLabelProps={{ shrink: true }}
+                                                inputProps={{ min: minStr, style: { paddingTop: 8 } }}
+                                                error={isPast}
+                                                helperText={isPast
+                                                    ? 'Pick a future date and time.'
+                                                    : 'Optional. Schedules a planned follow-up so the lead shows up in Follow-up Manager.'}
+                                                fullWidth
+                                            />
+                                        </div>
+                                    );
+                                })()}
+
+                                <div className="add-lead-form-grid">
+                                    {isEditMode && (
+                                        <TextField label="Closure Remarks" required size="small" value={formData.closure_remarks} onChange={setField('closure_remarks')} fullWidth />
+                                    )}
+                                    <TextField label="Remarks" required={!isEditMode} size="small" multiline minRows={2} value={formData.remarks} onChange={setField('remarks')} fullWidth />
+                                </div>
+                            </>
+                        )}
                     </>
                 )}
 
@@ -889,12 +925,29 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                 {submitError && (
                     <Alert severity="error" sx={{ mr: 'auto', flex: 1, fontSize: 13, py: 0 }}>{submitError}</Alert>
                 )}
+                {!submitError && lockedConverted && (
+                    <Alert severity="info" sx={{ mr: 'auto', flex: 1, fontSize: 13, py: 0 }}>
+                        This lead has been converted. Only an administrator can edit it.
+                    </Alert>
+                )}
                 <Button variant="outlined" onClick={handleCancel} disabled={submitting} className="add-lead-cancel-btn">
-                    Cancel
+                    {lockedConverted ? 'Close' : 'Cancel'}
                 </Button>
-                <Button variant="contained" onClick={handleSubmit} disabled={submitting || hydrating} className="add-lead-add-btn">
-                    {submitting ? (isEditMode ? 'Updating…' : 'Adding…') : (isEditMode ? 'Update' : 'Add')}
-                </Button>
+                <Tooltip
+                    title={lockedConverted ? 'Converted leads can only be edited by an administrator' : ''}
+                    disableHoverListener={!lockedConverted}
+                >
+                    <span>
+                        <Button
+                            variant="contained"
+                            onClick={handleSubmit}
+                            disabled={submitting || hydrating || lockedConverted}
+                            className="add-lead-add-btn"
+                        >
+                            {submitting ? (isEditMode ? 'Updating…' : 'Adding…') : (isEditMode ? 'Update' : 'Add')}
+                        </Button>
+                    </span>
+                </Tooltip>
             </DialogActions>
 
             {/* Inline create-new dialog. Renders on top of this Dialog with a higher

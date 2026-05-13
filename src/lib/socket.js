@@ -2,6 +2,7 @@
 // to real-time `notification` events without each one opening its own connection.
 import { io as ioClient } from 'socket.io-client';
 import { auth } from './endpoints';
+import { SERVER_HOST } from './config';
 
 let socket = null;
 const listeners = new Set();
@@ -11,7 +12,7 @@ let connectedAt = null;
 // VITE_API_BASE_URL already includes /api/v1, so we strip it before passing
 // the URL to the io() client. Falling back to localhost:4000 if not set.
 const apiBase = () => {
-  const fallback = 'https://extraaedge-server.onrender.com';
+  const fallback = SERVER_HOST;
   if (typeof window === 'undefined') return fallback;
   const env = (import.meta && import.meta.env) || {};
   const raw = env.VITE_API_BASE_URL || fallback;

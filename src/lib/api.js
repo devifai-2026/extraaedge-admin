@@ -1,7 +1,8 @@
 // Shared API client for the tenant frontend.
 // Reads VITE_API_BASE_URL, attaches JWT, refreshes once on 401, surfaces clean errors.
+import { API_URL } from './config';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://extraaedge-server.onrender.com/api/v1';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || API_URL;
 
 const STORAGE = {
   ACCESS: 'ee_access_token',
