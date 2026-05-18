@@ -12,8 +12,7 @@ import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import SwapVertIcon from '@mui/icons-material/SwapVert';
-import { usersApi, customRolesApi, programsApi, authApi } from '../../lib/endpoints';
-import { auth } from '../../lib/api';
+import { usersApi, customRolesApi, programsApi } from '../../lib/endpoints';
 import { isRole, ROLES } from '../../lib/rbac';
 import Breadcrumb from './Breadcrumb';
 
@@ -34,6 +33,7 @@ const ACCESS_LEVEL_OPTIONS = [
   { value: 'super_admin', label: 'Admin (Super Admin)' },
   { value: 'sales_manager', label: 'Sales Manager (Operations)' },
   { value: 'counsellor', label: 'Counsellor (End User)' },
+  { value: 'account_manager', label: 'Account Manager (Post-Conversion)' },
 ];
 
 const initialsColor = (name = '') => {
@@ -191,7 +191,12 @@ function UsersTab() {
                 <td style={{ padding: '14px 16px', color: '#555' }}>{u.email}</td>
                 <td style={{ padding: '14px 16px', color: '#555' }}>{u.phone || '—'}</td>
                 <td style={{ padding: '14px 16px' }}>
-                  <Chip size="small" label={u.role === 'super_admin' ? 'Admin' : u.role === 'sales_manager' ? 'Manager' : 'Counsellor'} />
+                  <Chip size="small" label={
+                    u.role === 'super_admin' ? 'Admin'
+                      : u.role === 'sales_manager' ? 'Manager'
+                      : u.role === 'account_manager' ? 'Account Mgr'
+                      : 'Counsellor'
+                  } />
                 </td>
                 <td style={{ padding: '14px 16px', color: '#555' }}>{u.role_name || '—'}</td>
                 <td style={{ padding: '14px 16px', color: '#555' }}>{reportingTo?.name || '—'}</td>
@@ -713,29 +718,12 @@ function RolesTab() {
       const payload = {
         name: editing.name.trim(),
         description: editing.description || undefined,
-        // Scope is no longer exposed in the UI — a role is just a name + tabs.
-        // Server still needs a value to derive users.role bucket on assignment,
-        // so we always submit 'counsellor' (least-privileged) for new roles.
-        // For existing system roles the server ignores scope on update.
-        scope: editing.scope || 'counsellor',
+        scope: editing.scope,
         tab_permissions: editing.tab_permissions,
       };
       if (editing.id) await customRolesApi.update(editing.id, payload);
       else await customRolesApi.create(payload);
       setEditing(null); reload();
-      // If the admin edited their OWN role, the live socket signal is sent to
-      // every user with that role_id including themselves — but the signal
-      // only fires after the round-trip. Re-fetch /auth/me immediately so the
-      // sidebar updates without waiting on the websocket round-trip.
-      try {
-        const me = await authApi.me();
-        const data = me?.data ?? me;
-        auth.setSession({
-          user: data?.user,
-          tenant: data?.tenant,
-          allowed_tabs: data?.allowed_tabs,
-        });
-      } catch { /* non-fatal; socket signal will catch it */ }
     } catch (e) { alert(e.message); }
   };
 
@@ -756,9 +744,14 @@ function RolesTab() {
       {editing && (
         <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 8, padding: 16, marginBottom: 16 }}>
           <h3 style={{ marginTop: 0 }}>{editing.id ? 'Edit role' : 'New role'}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
             <TextField size="small" label="Role name" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
             <TextField size="small" label="Description" value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
+            <TextField size="small" select label="Scope" value={editing.scope} onChange={(e) => setEditing({ ...editing, scope: e.target.value })}>
+              <MenuItem value="super_admin">super_admin</MenuItem>
+              <MenuItem value="sales_manager">sales_manager</MenuItem>
+              <MenuItem value="counsellor">counsellor</MenuItem>
+            </TextField>
           </div>
 
           <h4 style={{ margin: '12px 0 4px' }}>Tabs this role can see</h4>
@@ -800,7 +793,7 @@ function RolesTab() {
         <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', border: '1px solid #e8e8e8', borderRadius: 4 }}>
           <thead>
             <tr style={{ background: '#fdf3ed' }}>
-              {['Name', 'Description', 'Tabs allowed', ''].map((h) => (
+              {['Name', 'Description', 'Scope', 'Tabs allowed', ''].map((h) => (
                 <th key={h} style={{ textAlign: 'left', padding: '12px 16px', fontSize: 12, fontWeight: 600, color: '#6b4a3a', textTransform: 'uppercase' }}>{h}</th>
               ))}
             </tr>
@@ -812,6 +805,7 @@ function RolesTab() {
                 <tr key={r.id} style={{ background: idx % 2 ? '#fafafa' : '#fff', borderTop: '1px solid #f0f0f0' }}>
                   <td style={{ padding: '14px 16px' }}>{r.name} {r.is_system && <span style={{ fontSize: 11, color: '#888' }}>🔒 system</span>}</td>
                   <td style={{ padding: '14px 16px', color: '#555' }}>{r.description || '—'}</td>
+                  <td style={{ padding: '14px 16px' }}><Chip size="small" label={r.scope} /></td>
                   <td style={{ padding: '14px 16px' }}>{allowed} / {TAB_KEYS.length}</td>
                   <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                     {canEdit && <Button size="small" onClick={() => startEdit(r)}>Edit tabs</Button>}
@@ -825,7 +819,7 @@ function RolesTab() {
                 </tr>
               );
             })}
-            {(data?.data || []).length === 0 && <tr><td colSpan={4} style={{ padding: 20, textAlign: 'center', color: '#888' }}>No roles defined</td></tr>}
+            {(data?.data || []).length === 0 && <tr><td colSpan={5} style={{ padding: 20, textAlign: 'center', color: '#888' }}>No roles defined</td></tr>}
           </tbody>
         </table>
       )}

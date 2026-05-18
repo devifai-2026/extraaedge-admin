@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import DeleteIcon from "@mui/icons-material/Delete";
-import ReplayIcon from "@mui/icons-material/Replay";
+import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import IconButton from "@mui/material/IconButton";
+import Checkbox from "@mui/material/Checkbox";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
 import Tooltip from "@mui/material/Tooltip";
@@ -59,6 +60,11 @@ function FailedLeads() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [deleteRow, setDeleteRow] = useState(null);
+  // Per-tab row selection. Keyed by tab so switching tabs preserves each
+  // tab's selection independently.
+  const [selected, setSelected] = useState({ 0: new Set(), 1: new Set() });
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,6 +78,9 @@ function FailedLeads() {
       setSummary(s?.data ?? { failures: 0, duplicates: 0 });
       setFailures(f?.data ?? []);
       setDuplicates(d?.data ?? []);
+      // Clear selections after a reload so deleted ids don't linger as
+      // "selected" against stale state.
+      setSelected({ 0: new Set(), 1: new Set() });
     } catch (e) {
       setError(e?.message || "Failed to load");
     } finally {
@@ -80,15 +89,6 @@ function FailedLeads() {
   }, [page]);
 
   useEffect(() => { load(); }, [load]);
-
-  const handleRetry = async (id) => {
-    try {
-      await failedLeadsApi.retry(id);
-      await load();
-    } catch (e) {
-      alert(e?.message || "Retry failed");
-    }
-  };
 
   const handleDelete = async () => {
     if (!deleteRow) return;
@@ -108,6 +108,53 @@ function FailedLeads() {
     }
   };
 
+  const currentRows = tab === 0 ? failures : duplicates;
+  const currentSelection = selected[tab];
+  const allSelectedOnPage = currentRows.length > 0 && currentRows.every((r) => currentSelection.has(r.id));
+  const someSelectedOnPage = currentRows.some((r) => currentSelection.has(r.id));
+
+  const toggleRow = (id) => {
+    setSelected((prev) => {
+      const next = new Set(prev[tab]);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return { ...prev, [tab]: next };
+    });
+  };
+  const toggleAllOnPage = () => {
+    setSelected((prev) => {
+      const next = new Set(prev[tab]);
+      if (allSelectedOnPage) {
+        // unselect everything on this page
+        for (const r of currentRows) next.delete(r.id);
+      } else {
+        for (const r of currentRows) next.add(r.id);
+      }
+      return { ...prev, [tab]: next };
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(currentSelection);
+    if (!ids.length) return;
+    setBulkDeleting(true);
+    try {
+      const fn = tab === 0 ? failedLeadsApi.bulkDelete : failedLeadsApi.bulkDeleteDuplicates;
+      const r = await fn(ids);
+      const { deleted = 0, requested = ids.length } = r?.data || {};
+      if (deleted < requested) {
+        alert(`Deleted ${deleted} of ${requested}. ${requested - deleted} row${requested - deleted === 1 ? '' : 's'} belonged to other users and were skipped.`);
+      }
+      setBulkConfirmOpen(false);
+      await load();
+    } catch (e) {
+      alert(e?.message || "Bulk delete failed");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const selectedCount = useMemo(() => currentSelection.size, [currentSelection]);
+
   return (
     <div className="failed-leads-container">
       <span className="failed-leads-title">Failed Lead List</span>
@@ -122,6 +169,43 @@ function FailedLeads() {
         <Tab label={`Duplicates (${summary.duplicates})`} />
       </Tabs>
 
+      {/* Bulk-action toolbar — visible only when at least one row on the
+          active tab is selected. All tenant roles can use it; the BE
+          silently skips rows the viewer isn't allowed to delete. */}
+      {selectedCount > 0 && (
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "8px 12px",
+          marginBottom: 12,
+          background: "#fef3c7",
+          border: "1px solid #fde68a",
+          borderRadius: 6,
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#92400e" }}>
+            {selectedCount} row{selectedCount === 1 ? '' : 's'} selected
+          </span>
+          <Button
+            size="small"
+            variant="contained"
+            color="error"
+            startIcon={<DeleteSweepIcon />}
+            onClick={() => setBulkConfirmOpen(true)}
+            disabled={bulkDeleting}
+          >
+            Delete selected
+          </Button>
+          <Button
+            size="small"
+            onClick={() => setSelected((prev) => ({ ...prev, [tab]: new Set() }))}
+            disabled={bulkDeleting}
+          >
+            Clear selection
+          </Button>
+        </div>
+      )}
+
       {loading && (
         <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
           <CircularProgress size={32} />
@@ -134,8 +218,12 @@ function FailedLeads() {
       {!loading && !error && tab === 0 && (
         <ValidationFailuresTable
           rows={failures}
-          onRetry={handleRetry}
           onDelete={(row) => setDeleteRow({ ...row, kind: "failure" })}
+          selected={currentSelection}
+          onToggleRow={toggleRow}
+          onToggleAll={toggleAllOnPage}
+          allSelectedOnPage={allSelectedOnPage}
+          someSelectedOnPage={someSelectedOnPage}
         />
       )}
 
@@ -143,6 +231,11 @@ function FailedLeads() {
         <DuplicatesTable
           rows={duplicates}
           onDelete={(row) => setDeleteRow({ ...row, kind: "duplicate" })}
+          selected={currentSelection}
+          onToggleRow={toggleRow}
+          onToggleAll={toggleAllOnPage}
+          allSelectedOnPage={allSelectedOnPage}
+          someSelectedOnPage={someSelectedOnPage}
         />
       )}
 
@@ -160,11 +253,34 @@ function FailedLeads() {
           <Button onClick={handleDelete} color="error" variant="contained">Delete</Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog open={bulkConfirmOpen} onClose={() => !bulkDeleting && setBulkConfirmOpen(false)}>
+        <DialogTitle>Delete {selectedCount} {tab === 0 ? 'failed row' : 'duplicate'}{selectedCount === 1 ? '' : 's'}?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {tab === 0
+              ? "The selected rows will be removed from the validation-errors list. Original lead data will not be re-imported. This cannot be undone."
+              : "The selected duplicates will be removed. Matched leads in your CRM will not be touched. This cannot be undone."}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setBulkConfirmOpen(false)} disabled={bulkDeleting}>Cancel</Button>
+          <Button
+            onClick={handleBulkDelete}
+            color="error"
+            variant="contained"
+            disabled={bulkDeleting}
+            startIcon={bulkDeleting ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <DeleteSweepIcon />}
+          >
+            {bulkDeleting ? 'Deleting…' : `Delete ${selectedCount}`}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
 
-function ValidationFailuresTable({ rows, onRetry, onDelete }) {
+function ValidationFailuresTable({ rows, onDelete, selected, onToggleRow, onToggleAll, allSelectedOnPage, someSelectedOnPage }) {
   if (!rows.length) {
     return <EmptyState message="No validation errors. Bulk uploads are clean." />;
   }
@@ -172,6 +288,14 @@ function ValidationFailuresTable({ rows, onRetry, onDelete }) {
     <table className="failed-leads-table">
       <thead>
         <tr>
+          <th style={{ width: 36 }}>
+            <Checkbox
+              size="small"
+              checked={allSelectedOnPage}
+              indeterminate={!allSelectedOnPage && someSelectedOnPage}
+              onChange={onToggleAll}
+            />
+          </th>
           <th>Row</th>
           <th>First Name</th>
           <th>Email</th>
@@ -184,7 +308,14 @@ function ValidationFailuresTable({ rows, onRetry, onDelete }) {
       </thead>
       <tbody>
         {rows.map((row) => (
-          <tr key={row.id}>
+          <tr key={row.id} className={selected.has(row.id) ? 'row-selected' : ''}>
+            <td>
+              <Checkbox
+                size="small"
+                checked={selected.has(row.id)}
+                onChange={() => onToggleRow(row.id)}
+              />
+            </td>
             <td>{row.row_number}</td>
             <td>{rowField(row.raw_row_json, "first_name", "name")}</td>
             <td>{rowField(row.raw_row_json, "email")}</td>
@@ -198,13 +329,6 @@ function ValidationFailuresTable({ rows, onRetry, onDelete }) {
             </td>
             <td>{fmt(row.import_created_at)}</td>
             <td style={{ whiteSpace: "nowrap" }}>
-              <Tooltip title={row.retried_at ? `Retried ${fmt(row.retried_at)}` : "Retry this row"}>
-                <span>
-                  <IconButton size="small" onClick={() => onRetry(row.id)} disabled={!!row.retried_at}>
-                    <ReplayIcon sx={{ color: row.retried_at ? "#bbb" : colors.primary }} />
-                  </IconButton>
-                </span>
-              </Tooltip>
               <Tooltip title="Delete row from failed list">
                 <IconButton size="small" onClick={() => onDelete(row)}>
                   <DeleteIcon sx={{ color: colors.primary }} />
@@ -218,7 +342,7 @@ function ValidationFailuresTable({ rows, onRetry, onDelete }) {
   );
 }
 
-function DuplicatesTable({ rows, onDelete }) {
+function DuplicatesTable({ rows, onDelete, selected, onToggleRow, onToggleAll, allSelectedOnPage, someSelectedOnPage }) {
   if (!rows.length) {
     return <EmptyState message="No duplicates from bulk uploads." />;
   }
@@ -226,6 +350,14 @@ function DuplicatesTable({ rows, onDelete }) {
     <table className="failed-leads-table">
       <thead>
         <tr>
+          <th style={{ width: 36 }}>
+            <Checkbox
+              size="small"
+              checked={allSelectedOnPage}
+              indeterminate={!allSelectedOnPage && someSelectedOnPage}
+              onChange={onToggleAll}
+            />
+          </th>
           <th>Row</th>
           <th>Uploaded</th>
           <th>Matched Existing Lead</th>
@@ -237,7 +369,14 @@ function DuplicatesTable({ rows, onDelete }) {
       </thead>
       <tbody>
         {rows.map((row) => (
-          <tr key={row.id}>
+          <tr key={row.id} className={selected.has(row.id) ? 'row-selected' : ''}>
+            <td>
+              <Checkbox
+                size="small"
+                checked={selected.has(row.id)}
+                onChange={() => onToggleRow(row.id)}
+              />
+            </td>
             <td>{row.row_number}</td>
             <td>
               <div style={{ fontWeight: 600 }}>

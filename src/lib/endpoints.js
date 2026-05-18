@@ -37,8 +37,6 @@ export const followUpsApi = {
   list: (params) => api.get('/follow-ups', params),
   // Per-day counts for the FollowUp Manager calendar dots.
   calendar: (params) => api.get('/follow-ups/calendar', params),
-  // Range analytics: status totals + per-lead breakdown.
-  analytics: (params) => api.get('/follow-ups/analytics', params),
   myUpcoming: () => api.get('/follow-ups/my'),
   overdue: () => api.get('/follow-ups/overdue'),
   create: (body) => api.post('/follow-ups', body),
@@ -116,6 +114,7 @@ export const dropdownsApi = {
   sources: () => api.get('/dropdowns/sources'),
   campaigns: () => api.get('/dropdowns/campaigns'),
   mediums: () => api.get('/dropdowns/mediums'),
+  primarySources: () => api.get('/dropdowns/primary-sources'),
   genders: () => api.get('/dropdowns/genders'),
 };
 
@@ -310,11 +309,15 @@ export const rawDataApi = {
 
 export const failedLeadsApi = {
   list: (params) => api.get('/failed-leads', params),
-  retry: (id) => api.post(`/failed-leads/${id}/retry`),
   update: (id, body) => api.put(`/failed-leads/${id}`, body),
   delete: (id) => api.delete(`/failed-leads/${id}`),
+  // Bulk-delete validation failures. Body: { ids: [uuid, ...] } (max 500).
+  // Returns { deleted, requested } — deleted may be less than requested
+  // for non-admin viewers if some ids belonged to other users.
+  bulkDelete: (ids) => api.post('/failed-leads/bulk-delete', { ids }),
   duplicates: (params) => api.get('/failed-leads/duplicates', params),
   deleteDuplicate: (id) => api.delete(`/failed-leads/duplicates/${id}`),
+  bulkDeleteDuplicates: (ids) => api.post('/failed-leads/duplicates/bulk-delete', { ids }),
   summary: (params) => api.get('/failed-leads/summary', params),
 };
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
     Dialog,
     DialogContent,
@@ -10,6 +10,7 @@ import {
     FormControlLabel,
     Button,
     CircularProgress,
+    LinearProgress,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -18,9 +19,27 @@ import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import "./UploadLeads.css";
 import { colors } from "../../theme/colors";
 import { bulkApi, uploadsApi } from "../../lib/endpoints";
+import { onNotification } from "../../lib/socket";
 
 const channelOptions = ["Offline", "Online", "Direct", "Facebook", "Google Ads", "LinkedIn", "Email Campaign"];
 const sourceOptions = ["Direct Walkin", "Website", "Social Media", "Professional Network", "Newsletter", "Referral"];
+const stageOptions = [
+    "01-New",
+    "02-Contacted",
+    "03-Followup",
+    "05-Qualified",
+    "07-Requirement Match",
+    "08-Interested",
+    "09-Visited",
+    "10-Enrolled",
+];
+const subStageOptions = [
+    "Not Called",
+    "Awaiting confirmation",
+    "Will join soon",
+    "Negotiation phase",
+    "Needs demo",
+];
 
 // Two visible steps. Step 3 (column mapping) was removed because the
 // canonical .xlsx template the user downloads already uses the exact column
@@ -56,6 +75,8 @@ const UploadLeads = ({ open, onClose }) => {
     const [activeStep, setActiveStep] = useState(0);
     const [channel, setChannel] = useState("Offline");
     const [source, setSource] = useState("Direct Walkin");
+    const [stage, setStage] = useState("01-New");
+    const [subStage, setSubStage] = useState("Not Called");
     const [sendWelcomeEmail, setSendWelcomeEmail] = useState(false);
     const [sendWelcomeSMS, setSendWelcomeSMS] = useState(false);
     const [uploadedFile, setUploadedFile] = useState(null);
@@ -63,7 +84,35 @@ const UploadLeads = ({ open, onClose }) => {
     const [busyLabel, setBusyLabel] = useState("");
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
+    // Live row-by-row progress streamed from the BE worker over the socket.
+    // Shape mirrors the server's payload — see bulk-import-worker.js
+    // emitProgress(). null until the first event arrives.
+    const [progress, setProgress] = useState(null);
+    // The current import_id we're tracking — set right after bulkApi.commit
+    // succeeds. We use it to filter incoming socket events so two concurrent
+    // imports in different tabs don't bleed into each other.
+    const trackedImportIdRef = useRef(null);
     const fileInputRef = useRef(null);
+
+    // Subscribe to `bulk_import.progress` events for the active import.
+    // The subscription is component-scoped: closing the dialog (which
+    // unmounts when wrapped properly) tears it down. We also clear progress
+    // state when re-opening so a previous import's final state doesn't
+    // flash on screen.
+    useEffect(() => {
+        if (!open) return undefined;
+        const unsubscribe = onNotification((evt) => {
+            if (!evt || evt.type !== 'bulk_import.progress') return;
+            const p = evt.payload || {};
+            const trackedId = trackedImportIdRef.current;
+            // Accept the event when (a) we already know our import id and it
+            // matches, or (b) we don't have one yet (race: server emits the
+            // first tick before our commit() response landed).
+            if (trackedId && p.import_id && p.import_id !== trackedId) return;
+            setProgress(p);
+        });
+        return unsubscribe;
+    }, [open]);
 
     const handleClose = () => {
         // Don't let the user close mid-upload by clicking outside the dialog —
@@ -76,21 +125,14 @@ const UploadLeads = ({ open, onClose }) => {
         setBusyLabel("");
         setResult(null);
         setError(null);
+        setProgress(null);
+        trackedImportIdRef.current = null;
         onClose();
     };
 
     const handleFileUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        // Only .xlsx is accepted — CSV is intentionally blocked because the
-        // template's dropdowns / data-validation rules don't survive a CSV.
-        if (!/\.xlsx$/i.test(file.name)) {
-            setError("Only .xlsx files are supported. Please re-save your file as Excel (.xlsx).");
-            setUploadedFile(null);
-            // Reset the input so the same file can be picked again after fixing.
-            if (fileInputRef.current) fileInputRef.current.value = "";
-            return;
-        }
         setUploadedFile(file);
         setError(null);
         setResult(null);
@@ -115,6 +157,8 @@ const UploadLeads = ({ open, onClose }) => {
         setBusy(true);
         setError(null);
         setResult(null);
+        setProgress(null);
+        trackedImportIdRef.current = null;
         try {
             // 1. Presign — server returns a signed PUT URL pointing at GCS.
             setBusyLabel("Requesting upload URL…");
@@ -151,10 +195,12 @@ const UploadLeads = ({ open, onClose }) => {
             const previewKick = await bulkApi.preview({
                 r2_key: presign.r2_key,
                 field_mapping: {},
-                // Stage / sub_stage are required per-row in the spreadsheet,
-                // so we don't ship batch defaults for them — the file is the
-                // source of truth.
-                defaults: { channel, source },
+                defaults: {
+                    channel,
+                    source,
+                    stage,
+                    sub_stage: subStage,
+                },
             });
             const previewId = previewKick?.data?.id;
             if (!previewId) throw new Error("Preview returned no id");
@@ -177,6 +223,7 @@ const UploadLeads = ({ open, onClose }) => {
                 file_size: uploadedFile.size,
             });
             const importRow = commitResp?.data;
+            trackedImportIdRef.current = importRow?.id || null;
             setResult({
                 preview,
                 importId: importRow?.id,
@@ -249,10 +296,21 @@ const UploadLeads = ({ open, onClose }) => {
                     <p>Please follow the instructions mentioned below</p>
                 </div>
                 <ul>
-                    <li>Upload an <b>.xlsx</b> file (max 30,000 rows). CSV is not supported — please convert to .xlsx.</li>
+                    <li>
+                        You can upload an .xlsx (or .csv) file with up to 30,000 rows.
+                    </li>
                     <li>You cannot upload more than 1 file at the same time.</li>
-                    <li>Every row must have at least one of <b>email / first_name / last_name</b>, at least one of <b>whatsapp_number / phone</b>, and a <b>stage</b>. Sub-stage is required only when the chosen stage has sub-stages configured.</li>
-                    <li>Duplicate detection uses email, phone, and WhatsApp number. Duplicates appear on the Failed Leads page.</li>
+                    <li>Duplicate detection uses email + WhatsApp number. Duplicates appear on the Failed Leads page.</li>
+                    <li>
+                        Owner columns: use <code>current_lead_owner_email</code> (must be a counsellor) and
+                        optionally <code>previous_lead_owner_email</code>. If a row has both <code>assigned_to_email</code>
+                        and <code>current_lead_owner_email</code> set, they must match — otherwise the row fails with
+                        <code> OWNER_MISMATCH</code>. Failures show on the Failed Leads page with the Excel row number.
+                    </li>
+                    <li>
+                        New <code>primary_source</code> column is auto-created (case-insensitive match) on first use,
+                        the same way channel / source / campaign / medium already are.
+                    </li>
                 </ul>
             </div>
 
@@ -260,7 +318,6 @@ const UploadLeads = ({ open, onClose }) => {
                 <h4>Default values for this batch</h4>
                 <p>
                     These defaults fill in any column the spreadsheet leaves blank. Per-row values in the file always win.
-                    Stage and sub-stage are required per row in the file itself, so they aren&apos;t set here.
                 </p>
 
                 <div className="upload-leads-form-grid">
@@ -292,6 +349,33 @@ const UploadLeads = ({ open, onClose }) => {
                         />
                     </div>
 
+                    <div className="upload-leads-field">
+                        <label className="upload-leads-field-label">Stage</label>
+                        <Autocomplete
+                            size="small"
+                            fullWidth
+                            options={stageOptions}
+                            value={stage}
+                            onChange={(_, val) => setStage(val)}
+                            renderInput={(params) => (
+                                <TextField {...params} placeholder="Select Stage" />
+                            )}
+                        />
+                    </div>
+
+                    <div className="upload-leads-field">
+                        <label className="upload-leads-field-label">Sub-Stage</label>
+                        <Autocomplete
+                            size="small"
+                            fullWidth
+                            options={subStageOptions}
+                            value={subStage}
+                            onChange={(_, val) => setSubStage(val)}
+                            renderInput={(params) => (
+                                <TextField {...params} placeholder="Select Sub-Stage" />
+                            )}
+                        />
+                    </div>
                 </div>
 
                 <div className="upload-leads-checkboxes">
@@ -336,10 +420,20 @@ const UploadLeads = ({ open, onClose }) => {
                 >
                     Download Template (.xlsx)
                 </Button>
+                <Button
+                    variant="text"
+                    size="small"
+                    startIcon={<FileDownloadIcon />}
+                    onClick={() => handleDownloadTemplate("csv")}
+                    sx={{ color: colors.textSecondary }}
+                    disabled={busy}
+                >
+                    Download .csv
+                </Button>
             </div>
             <input
                 type="file"
-                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 ref={fileInputRef}
                 style={{ display: "none" }}
                 onChange={handleFileUpload}
@@ -359,9 +453,59 @@ const UploadLeads = ({ open, onClose }) => {
             )}
 
             {busy && (
-                <div style={{ marginTop: 24, display: "flex", alignItems: "center", gap: 12 }}>
-                    <CircularProgress size={20} />
-                    <span style={{ fontSize: 14, color: colors.textSecondary }}>{busyLabel}</span>
+                <div style={{ marginTop: 24 }}>
+                    {/* Pre-progress placeholder: presign / upload / preview phases
+                        where the BE hasn't started emitting per-row events yet. */}
+                    {!progress && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <CircularProgress size={20} />
+                            <span style={{ fontSize: 14, color: colors.textSecondary }}>{busyLabel}</span>
+                        </div>
+                    )}
+
+                    {/* Live progress, driven by `bulk_import.progress` socket
+                        events from the worker. Shows row N of M plus a bar plus
+                        success / failed / duplicate sub-counts so the user has
+                        a sense of import quality, not just speed. */}
+                    {progress && (() => {
+                        const total = Math.max(1, Number(progress.total) || 0);
+                        const processed = Math.min(total, Number(progress.processed) || 0);
+                        const pct = Math.round((processed / total) * 100);
+                        const phaseLabel = progress.phase === 'auto_assigning'
+                            ? 'Running auto-assignment…'
+                            : progress.phase === 'completed'
+                                ? 'Done. Finalising…'
+                                : `Importing row ${processed.toLocaleString()} of ${total.toLocaleString()}`;
+                        return (
+                            <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                                    <span style={{ fontSize: 13, fontWeight: 600 }}>{phaseLabel}</span>
+                                    <span style={{ fontSize: 13, color: colors.textSecondary }}>{pct}%</span>
+                                </div>
+                                <LinearProgress
+                                    variant={progress.phase === 'auto_assigning' ? 'indeterminate' : 'determinate'}
+                                    value={pct}
+                                    sx={{
+                                        height: 8,
+                                        borderRadius: 4,
+                                        background: '#f1f5f9',
+                                        '& .MuiLinearProgress-bar': { background: colors.primary },
+                                    }}
+                                />
+                                <div style={{
+                                    display: 'flex',
+                                    gap: 16,
+                                    marginTop: 10,
+                                    fontSize: 12,
+                                    color: colors.textSecondary,
+                                }}>
+                                    <span><strong style={{ color: '#166534' }}>{(progress.success ?? 0).toLocaleString()}</strong> imported</span>
+                                    <span><strong style={{ color: '#c62828' }}>{(progress.failed ?? 0).toLocaleString()}</strong> failed</span>
+                                    <span><strong style={{ color: '#d97706' }}>{(progress.duplicates ?? 0).toLocaleString()}</strong> duplicates</span>
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
             )}
 

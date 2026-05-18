@@ -29,10 +29,14 @@ const inputStyle = {
 const SECTIONS = [
     "Lead Details",
     "Personal Details",
+    "Education",
     "Communication Details",
     "Date Filters",
     "Range Filters",
 ];
+
+const GENDER_OPTIONS = ['Male', 'Female', 'Other', 'Prefer not to say'];
+const LANGUAGE_OPTIONS = ['en', 'hi', 'mr', 'ta', 'te', 'kn', 'ml', 'gu', 'bn', 'pa'];
 
 // Empty filter shape — keys map directly onto leads list query params.
 // Anything left as '' is stripped before sending.
@@ -49,16 +53,35 @@ const blankFilter = {
     program_id: '',
     channel_id: '',
     source_id: '',
+    primary_source_id: '',
     campaign_id: '',
     medium_id: '',
+    // Booleans
+    is_cold: '',           // '' | 'true' | 'false'
+    is_converted: '',      // '' | 'true' | 'false'
     // Personal
     q: '',
     email: '',
     whatsapp_number: '',
     phone: '',
+    gender: '',
+    language: '',
     country_id: '',
     state_id: '',
     city: '',
+    district: '',
+    pincode: '',
+    // Education
+    ug_degree_id: '',
+    pg_degree_id: '',
+    ug_university_id: '',
+    pg_university_id: '',
+    ug_specialization_id: '',
+    pg_specialization_id: '',
+    ug_graduation_year: '',
+    pg_graduation_year: '',
+    // Misc
+    referral_code_used: '',
     // Date
     date_from: '',
     date_to: '',
@@ -81,8 +104,10 @@ const FilterLeadsModal = ({ open, onClose, value, onApply, onReset }) => {
     useEffect(() => {
         if (!open) return;
         const merged = { ...blankFilter, ...(value || {}) };
-        // Coerce boolean → string for the select
-        if (typeof merged.is_touched === 'boolean') merged.is_touched = String(merged.is_touched);
+        // Coerce boolean → string for the selects (the controls store '' | 'true' | 'false').
+        for (const k of ['is_touched', 'is_cold', 'is_converted']) {
+            if (typeof merged[k] === 'boolean') merged[k] = String(merged[k]);
+        }
         // Decode `flag=unassigned` → assignment='unassigned' so the dropdown reflects state.
         if (value?.flag === 'unassigned') merged.assignment = 'unassigned';
         setFilter(merged);
@@ -92,12 +117,21 @@ const FilterLeadsModal = ({ open, onClose, value, onApply, onReset }) => {
     const stages    = useDropdown('stages',    { enabled: open });
     const subStages = useDropdown('sub-stages',{ enabled: open });
     const programs  = useDropdown('programs',  { enabled: open });
-    const channels  = useDropdown('channels',  { enabled: open });
-    const sources   = useDropdown('sources',   { enabled: open });
-    const campaigns = useDropdown('campaigns', { enabled: open });
-    const mediums   = useDropdown('mediums',   { enabled: open });
-    const countries = useDropdown('countries', { enabled: open });
-    const states    = useDropdown('states',    { enabled: open });
+    const channels      = useDropdown('channels',      { enabled: open });
+    const sources       = useDropdown('sources',       { enabled: open });
+    const primarySources= useDropdown('primary-sources',{ enabled: open });
+    const campaigns     = useDropdown('campaigns',     { enabled: open });
+    const mediums       = useDropdown('mediums',       { enabled: open });
+    const countries     = useDropdown('countries',     { enabled: open });
+    const states        = useDropdown('states',        { enabled: open });
+    const degrees       = useDropdown('degrees',       { enabled: open });
+    const specializations = useDropdown('specializations', { enabled: open });
+    const universities  = useDropdown('universities',  { enabled: open });
+
+    // Education dropdowns are shared across UG and PG, but `degrees` carries a
+    // `level` ('UG' | 'PG') so we filter to the right subset per slot.
+    const ugDegrees = useMemo(() => (degrees.data || []).filter((d) => d.level !== 'PG'), [degrees.data]);
+    const pgDegrees = useMemo(() => (degrees.data || []).filter((d) => d.level !== 'UG'), [degrees.data]);
 
     useEffect(() => {
         if (!open) return;
@@ -144,12 +178,15 @@ const FilterLeadsModal = ({ open, onClose, value, onApply, onReset }) => {
         const out = {};
         for (const [k, v] of Object.entries(filter)) {
             if (v === '' || v == null) continue;
-            if (k === 'is_touched') {
-                out.is_touched = v === 'true';
+            if (k === 'is_touched' || k === 'is_cold' || k === 'is_converted') {
+                out[k] = v === 'true';
             } else if (k === 'assignment') {
                 // Only 'unassigned' has a backend flag; 'assigned' is the implicit default.
                 if (v === 'unassigned') out.flag = 'unassigned';
-            } else if (['lead_age_from', 'lead_age_to', 'lead_score_from', 'lead_score_to'].includes(k)) {
+            } else if ([
+                'lead_age_from', 'lead_age_to', 'lead_score_from', 'lead_score_to',
+                'ug_graduation_year', 'pg_graduation_year',
+            ].includes(k)) {
                 const n = Number(v);
                 if (!Number.isNaN(n)) out[k] = n;
             } else {
@@ -265,6 +302,37 @@ const FilterLeadsModal = ({ open, onClose, value, onApply, onReset }) => {
                                 {idSelect('Source', 'source_id', sources)}
                                 {idSelect('Medium', 'medium_id', mediums)}
                             </Box>
+
+                            <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+                                {idSelect('Primary Source', 'primary_source_id', primarySources)}
+                                <FormControl size="small" fullWidth sx={inputStyle}>
+                                    <InputLabel>Cold lead?</InputLabel>
+                                    <Select label="Cold lead?" value={filter.is_cold} onChange={setF('is_cold')}>
+                                        <MenuItem value=""><em>Any</em></MenuItem>
+                                        <MenuItem value="true">Cold only</MenuItem>
+                                        <MenuItem value="false">Active only</MenuItem>
+                                    </Select>
+                                </FormControl>
+                                <FormControl size="small" fullWidth sx={inputStyle}>
+                                    <InputLabel>Converted?</InputLabel>
+                                    <Select label="Converted?" value={filter.is_converted} onChange={setF('is_converted')}>
+                                        <MenuItem value=""><em>Any</em></MenuItem>
+                                        <MenuItem value="true">Converted</MenuItem>
+                                        <MenuItem value="false">Not converted</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Box>
+
+                            <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+                                <TextField
+                                    fullWidth size="small"
+                                    label="Referral code"
+                                    value={filter.referral_code_used}
+                                    onChange={setF('referral_code_used')}
+                                    sx={inputStyle}
+                                    placeholder="Partial match…"
+                                />
+                            </Box>
                         </>
                     )}
 
@@ -279,6 +347,23 @@ const FilterLeadsModal = ({ open, onClose, value, onApply, onReset }) => {
                                 <TextField fullWidth size="small" label="Phone" value={filter.phone} onChange={setF('phone')} sx={inputStyle} />
                             </Box>
                             <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+                                <FormControl size="small" fullWidth sx={inputStyle}>
+                                    <InputLabel>Gender</InputLabel>
+                                    <Select label="Gender" value={filter.gender} onChange={setF('gender')}>
+                                        <MenuItem value=""><em>Any</em></MenuItem>
+                                        {GENDER_OPTIONS.map((g) => <MenuItem key={g} value={g}>{g}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                                <FormControl size="small" fullWidth sx={inputStyle}>
+                                    <InputLabel>Language</InputLabel>
+                                    <Select label="Language" value={filter.language} onChange={setF('language')}>
+                                        <MenuItem value=""><em>Any</em></MenuItem>
+                                        {LANGUAGE_OPTIONS.map((l) => <MenuItem key={l} value={l}>{l}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                            </Box>
+
+                            <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
                                 {idSelect('Country', 'country_id', countries)}
                                 <FormControl size="small" fullWidth sx={inputStyle}>
                                     <InputLabel>State</InputLabel>
@@ -290,6 +375,49 @@ const FilterLeadsModal = ({ open, onClose, value, onApply, onReset }) => {
                                     </Select>
                                 </FormControl>
                                 <TextField fullWidth size="small" label="City" value={filter.city} onChange={setF('city')} sx={inputStyle} />
+                            </Box>
+
+                            <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+                                <TextField fullWidth size="small" label="District" value={filter.district} onChange={setF('district')} sx={inputStyle} />
+                                <TextField fullWidth size="small" label="Pincode" value={filter.pincode} onChange={setF('pincode')} sx={inputStyle} />
+                            </Box>
+                        </>
+                    )}
+
+                    {activeSection === "Education" && (
+                        <>
+                            <Typography fontSize={13} fontWeight={600} sx={{ mb: 1 }}>Undergraduate</Typography>
+                            <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+                                {idSelect('UG Degree', 'ug_degree_id', { data: ugDegrees, loading: degrees.loading })}
+                                {idSelect('UG Specialization', 'ug_specialization_id', specializations)}
+                                {idSelect('UG University', 'ug_university_id', universities)}
+                            </Box>
+                            <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+                                <TextField
+                                    type="number"
+                                    fullWidth size="small"
+                                    label="UG Graduation Year"
+                                    value={filter.ug_graduation_year}
+                                    onChange={setF('ug_graduation_year')}
+                                    sx={inputStyle}
+                                />
+                            </Box>
+
+                            <Typography fontSize={13} fontWeight={600} sx={{ mb: 1, mt: 2 }}>Postgraduate</Typography>
+                            <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+                                {idSelect('PG Degree', 'pg_degree_id', { data: pgDegrees, loading: degrees.loading })}
+                                {idSelect('PG Specialization', 'pg_specialization_id', specializations)}
+                                {idSelect('PG University', 'pg_university_id', universities)}
+                            </Box>
+                            <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+                                <TextField
+                                    type="number"
+                                    fullWidth size="small"
+                                    label="PG Graduation Year"
+                                    value={filter.pg_graduation_year}
+                                    onChange={setF('pg_graduation_year')}
+                                    sx={inputStyle}
+                                />
                             </Box>
                         </>
                     )}
