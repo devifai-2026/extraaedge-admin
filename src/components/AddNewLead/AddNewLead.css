@@ -46,6 +46,24 @@
     padding: 16px 24px !important;
 }
 
+/* Converted-lead lock: dim every input, disable pointer interaction and
+   keyboard focus on form controls. The Update button is already disabled
+   via the lockedConverted flag, and the server rejects edits anyway —
+   this just makes the read-only state visually clear. */
+.add-lead-content.locked-converted .MuiInputBase-root,
+.add-lead-content.locked-converted .MuiAutocomplete-root,
+.add-lead-content.locked-converted .MuiSelect-select,
+.add-lead-content.locked-converted .MuiCheckbox-root,
+.add-lead-content.locked-converted .MuiSwitch-root,
+.add-lead-content.locked-converted button.MuiButton-root {
+    pointer-events: none;
+    opacity: 0.7;
+}
+.add-lead-content.locked-converted .MuiInputBase-input,
+.add-lead-content.locked-converted textarea {
+    cursor: not-allowed;
+}
+
 .add-lead-mandatory-toggle {
     display: flex;
     justify-content: flex-end;
