@@ -144,3 +144,7 @@
   cursor: pointer;
   accent-color: var(--primary);
 }
+
+.failed-leads-table tr.row-selected td {
+  background: #fffbeb;
+}

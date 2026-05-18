@@ -85,15 +85,18 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
         return () => { alive = false; };
     }, [isExpanded, tab, lead?.id]);
 
-    // Lazy-load the full lead with sources[] when the Source tab is opened.
+    // Lazy-load the full lead (sources[], family, primary_source, assignment
+    // history, etc.) any time the card is expanded. Cheap because the BE
+    // already does findByIdWithRelations in one round-trip and we cache by
+    // lead.id, so re-expanding the same card is a no-op.
     useEffect(() => {
-        if (!isExpanded || tab !== 1 || !lead?.id || fullLead?.id === lead.id) return;
+        if (!isExpanded || !lead?.id || fullLead?.id === lead.id) return;
         let alive = true;
         leadsApi.get(lead.id)
             .then((r) => { if (alive) setFullLead(r?.data ?? null); })
             .catch(() => { if (alive) setFullLead(null); });
         return () => { alive = false; };
-    }, [isExpanded, tab, lead?.id, fullLead?.id]);
+    }, [isExpanded, lead?.id, fullLead?.id]);
 
     if (!lead) return null;
 
@@ -246,7 +249,20 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                     <Field label="CITY" value={lead.city} />
                                     <Field label="LEAD ADDED ON" value={fmt(lead.created_at)} />
                                     <Field label="LAST UPDATED ON" value={fmt(lead.updated_at)} />
-                                    <Field label="PREVIOUS LEAD OWNER" value={lead.previous_owner_name} />
+                                    <Field
+                                        label="PREVIOUS LEAD OWNER"
+                                        value={(() => {
+                                            // Prefer the BE-resolved previous_owner from findByIdWithRelations
+                                            // (includes email); fall back to the list-row lateral subquery name.
+                                            const po = fullLead?.previous_owner;
+                                            if (po?.assigned_to_name) {
+                                                return po.assigned_to_email
+                                                    ? `${po.assigned_to_name} (${po.assigned_to_email})`
+                                                    : po.assigned_to_name;
+                                            }
+                                            return lead.previous_owner_name || '-';
+                                        })()}
+                                    />
                                     <Field
                                         label="CURRENT LEAD OWNER"
                                         value={(() => {
@@ -278,6 +294,79 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                         <Field label="CONVERTED ON" value={fmt(lead.converted_at)} />
                                     )}
                                 </div>
+
+                                {/* Extended fields — only render once findByIdWithRelations has
+                                    returned. Hides UUIDs; resolves FK names where the BE join
+                                    surfaces them, falls back to raw text otherwise. */}
+                                {fullLead && (
+                                    <>
+                                        <div className="field-section-label">Contact</div>
+                                        <div className="grid">
+                                            <Field label="EMAIL" value={fullLead.email} />
+                                            <Field label="ALTERNATE EMAIL" value={fullLead.alternate_email} />
+                                            <Field label="PHONE" value={fullLead.phone} />
+                                            <Field label="WHATSAPP" value={fullLead.whatsapp_number} />
+                                            <Field label="ALTERNATE CONTACT" value={fullLead.alternate_contact} />
+                                            <Field label="GENDER" value={fullLead.gender} />
+                                            <Field label="LANGUAGE" value={fullLead.language} />
+                                            <Field label="ADDRESS" value={fullLead.address} />
+                                            <Field label="PINCODE" value={fullLead.pincode} />
+                                        </div>
+
+                                        {(fullLead.ug_graduation_year || fullLead.pg_graduation_year) && (
+                                            <>
+                                                <div className="field-section-label">Education</div>
+                                                <div className="grid">
+                                                    <Field label="UG GRADUATION YEAR" value={fullLead.ug_graduation_year} />
+                                                    <Field label="PG GRADUATION YEAR" value={fullLead.pg_graduation_year} />
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {fullLead.family && Object.values(fullLead.family).some(
+                                            (v) => v && typeof v === 'string',
+                                        ) && (
+                                            <>
+                                                <div className="field-section-label">Family</div>
+                                                <div className="grid">
+                                                    <Field label="FATHER" value={fullLead.family.father_name} />
+                                                    <Field label="FATHER MOBILE" value={fullLead.family.father_mobile} />
+                                                    <Field label="FATHER EMAIL" value={fullLead.family.father_email} />
+                                                    <Field label="MOTHER" value={fullLead.family.mother_name} />
+                                                    <Field label="MOTHER MOBILE" value={fullLead.family.mother_mobile} />
+                                                    <Field label="MOTHER EMAIL" value={fullLead.family.mother_email} />
+                                                    <Field label="GUARDIAN" value={fullLead.family.guardian_name} />
+                                                    <Field label="GUARDIAN MOBILE" value={fullLead.family.guardian_mobile} />
+                                                    <Field label="GUARDIAN EMAIL" value={fullLead.family.guardian_email} />
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {/* Ownership history — surfaces every reassignment, including
+                                            the previous_lead_owner_email row written by the bulk worker. */}
+                                        {fullLead.assignments && fullLead.assignments.length > 1 && (
+                                            <>
+                                                <div className="field-section-label">Ownership history</div>
+                                                <div className="ownership-history">
+                                                    {fullLead.assignments.map((a) => (
+                                                        <div key={a.id} className="ownership-row">
+                                                            <span className={`ownership-badge ${a.is_active ? 'active' : ''}`}>
+                                                                {a.is_active ? 'CURRENT' : 'PAST'}
+                                                            </span>
+                                                            <span className="ownership-name">
+                                                                {a.assigned_to_name || '—'}
+                                                                {a.assigned_to_email && (
+                                                                    <span className="ownership-email"> ({a.assigned_to_email})</span>
+                                                                )}
+                                                            </span>
+                                                            <span className="ownership-date">{fmt(a.created_at)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </>
+                                        )}
+                                    </>
+                                )}
                             </div>
                             <div className="content-chevron">
                                 <button
@@ -303,6 +392,14 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                     {tab === 1 && (
                         <div className="content-wrapper">
                             <div className={`content content-anim ${tabDir === 'prev' ? 'dir-prev' : ''}`} key={`tab-1-${tab}`}>
+                                <div className="grid" style={{ marginBottom: 12 }}>
+                                    <Field
+                                        label="PRIMARY SOURCE"
+                                        value={fullLead?.primary_source?.name || (lead.primary_source_name || '—')}
+                                    />
+                                    <Field label="REFERRAL CODE USED" value={lead.referral_code_used} />
+                                    <Field label="REFERRAL SOURCE" value={fullLead?.referral_source} />
+                                </div>
                                 <div className="source-table">
                                     <div className="table-header">
                                         <div className="table-cell">CHANNEL</div>

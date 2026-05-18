@@ -33,6 +33,7 @@ const ACCESS_LEVEL_OPTIONS = [
   { value: 'super_admin', label: 'Admin (Super Admin)' },
   { value: 'sales_manager', label: 'Sales Manager (Operations)' },
   { value: 'counsellor', label: 'Counsellor (End User)' },
+  { value: 'account_manager', label: 'Account Manager (Post-Conversion)' },
 ];
 
 const initialsColor = (name = '') => {
@@ -190,7 +191,12 @@ function UsersTab() {
                 <td style={{ padding: '14px 16px', color: '#555' }}>{u.email}</td>
                 <td style={{ padding: '14px 16px', color: '#555' }}>{u.phone || '—'}</td>
                 <td style={{ padding: '14px 16px' }}>
-                  <Chip size="small" label={u.role === 'super_admin' ? 'Admin' : u.role === 'sales_manager' ? 'Manager' : 'Counsellor'} />
+                  <Chip size="small" label={
+                    u.role === 'super_admin' ? 'Admin'
+                      : u.role === 'sales_manager' ? 'Manager'
+                      : u.role === 'account_manager' ? 'Account Mgr'
+                      : 'Counsellor'
+                  } />
                 </td>
                 <td style={{ padding: '14px 16px', color: '#555' }}>{u.role_name || '—'}</td>
                 <td style={{ padding: '14px 16px', color: '#555' }}>{reportingTo?.name || '—'}</td>

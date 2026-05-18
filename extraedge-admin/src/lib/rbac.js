@@ -13,6 +13,10 @@ export const ROLES = {
   SUPER_ADMIN: 'super_admin',
   SALES_MANAGER: 'sales_manager',
   COUNSELLOR: 'counsellor',
+  // Tenant-level role for post-conversion account management. No team,
+  // no manager — reports directly to the tenant super_admin. Visibility
+  // scope: every converted lead in the tenant (enforced server-side).
+  ACCOUNT_MANAGER: 'account_manager',
 };
 
 // Role → set of tabs the bucket can access (used for safety; final source is backend's allowed_tabs).
@@ -27,11 +31,18 @@ const ROLE_MANAGER_TABS = [
 const ROLE_COUNSELLOR_TABS = [
   'dashboard', 'leads', 'raw_data', 'failed_leads', 'followups', 'whatsapp',
 ];
+// Account managers see converted leads + the basic operational tabs.
+// Their own dedicated UI will land in a later phase; for now they share
+// the leads list (scoped to converted leads server-side).
+const ROLE_ACCOUNT_MANAGER_TABS = [
+  'dashboard', 'leads', 'followups', 'whatsapp',
+];
 
 const FALLBACK_TABS = {
   [ROLES.SUPER_ADMIN]: ROLE_ALL_TABS,
   [ROLES.SALES_MANAGER]: ROLE_MANAGER_TABS,
   [ROLES.COUNSELLOR]: ROLE_COUNSELLOR_TABS,
+  [ROLES.ACCOUNT_MANAGER]: ROLE_ACCOUNT_MANAGER_TABS,
 };
 
 // ---------- Public helpers ----------

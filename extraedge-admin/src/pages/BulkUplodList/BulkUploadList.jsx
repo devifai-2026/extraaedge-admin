@@ -7,6 +7,12 @@ import {
   FormControl,
   CircularProgress,
   Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Chip,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
@@ -159,6 +165,20 @@ const BulkUploadList = () => {
   // Tracks which row's download is currently in flight so the icon can
   // show a spinner. We don't bother with a queue — single-click flow.
   const [downloadingId, setDownloadingId] = useState(null);
+
+  // Per-row failures modal — shows OWNER_MISMATCH / CURRENT_OWNER_NOT_COUNSELLOR /
+  // PREVIOUS_OWNER_NOT_FOUND etc. with the Excel row number that produced them.
+  const [failuresModal, setFailuresModal] = useState({ open: false, importId: null, fileName: '', rows: [], loading: false, error: '' });
+  const openFailures = async (item) => {
+    setFailuresModal({ open: true, importId: item.id, fileName: item.file_name || '—', rows: [], loading: true, error: '' });
+    try {
+      const r = await bulkApi.importFailures(item.id);
+      setFailuresModal((prev) => ({ ...prev, rows: r?.data || [], loading: false }));
+    } catch (e) {
+      setFailuresModal((prev) => ({ ...prev, loading: false, error: e?.message || 'Could not load failures' }));
+    }
+  };
+  const closeFailures = () => setFailuresModal({ open: false, importId: null, fileName: '', rows: [], loading: false, error: '' });
 
   const handleDownload = async (item) => {
     if (!item?.id || !item?.file_r2_key) return;
@@ -549,7 +569,10 @@ const BulkUploadList = () => {
               <th>FILE NAME</th>
               <th>UPLOAD DATE</th>
               <th>UPLOADED BY</th>
-              <th>TOTAL RECORDS</th>
+              <th>TOTAL</th>
+              <th>SUCCESS</th>
+              <th>FAILED</th>
+              <th>DUPLICATES</th>
               <th>STAGE</th>
               <th style={{ textAlign: "right" }}>ACTIONS</th>
             </tr>
@@ -575,6 +598,11 @@ const BulkUploadList = () => {
                     )}
                   </td>
                   <td className="records-cell">{item.total_rows ?? 0}</td>
+                  <td className="records-cell">{item.success_rows ?? 0}</td>
+                  <td className="records-cell" style={{ color: (item.failed_rows ?? 0) > 0 ? '#c62828' : undefined }}>
+                    {item.failed_rows ?? 0}
+                  </td>
+                  <td className="records-cell">{item.duplicate_rows ?? 0}</td>
                   <td className="stage-cell">
                     <span className={`status-badge ${
                       item.status === "completed" ? "status-completed"
@@ -585,6 +613,13 @@ const BulkUploadList = () => {
                     </span>
                   </td>
                   <td className="actions-cell" style={{ textAlign: "right" }}>
+                    {(item.failed_rows ?? 0) > 0 && (
+                      <Tooltip title={`View ${item.failed_rows} failed row${item.failed_rows === 1 ? '' : 's'}`}>
+                        <IconButton size="small" onClick={() => openFailures(item)}>
+                          <VisibilityOutlinedIcon sx={{ fontSize: 18, color: '#c62828' }} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                     <Tooltip title={canDownload ? "Download original file" : "Original file unavailable"}>
                       <span>
                         <IconButton
@@ -764,6 +799,59 @@ const BulkUploadList = () => {
           totalCount={activeTab === 0 ? importsTotal : undefined}
         />
       )}
+
+      {/* Per-row failures dialog. Lists every row the worker rejected with the
+          Excel row number, error code (e.g. OWNER_MISMATCH) and message. */}
+      <Dialog open={failuresModal.open} onClose={closeFailures} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ fontSize: 16, fontWeight: 600 }}>
+          Failed rows — {failuresModal.fileName}
+        </DialogTitle>
+        <DialogContent dividers sx={{ maxHeight: '60vh' }}>
+          {failuresModal.loading && (
+            <div style={{ padding: 24, textAlign: 'center' }}><CircularProgress size={24} /></div>
+          )}
+          {!failuresModal.loading && failuresModal.error && (
+            <div style={{ color: '#c62828', fontSize: 13 }}>{failuresModal.error}</div>
+          )}
+          {!failuresModal.loading && !failuresModal.error && failuresModal.rows.length === 0 && (
+            <div style={{ color: colors.midGrey, fontSize: 13 }}>No failed rows recorded for this import.</div>
+          )}
+          {!failuresModal.loading && !failuresModal.error && failuresModal.rows.length > 0 && (
+            <table className="bulk-table" style={{ width: '100%' }}>
+              <thead>
+                <tr>
+                  <th style={{ width: 70 }}>ROW</th>
+                  <th style={{ width: 220 }}>ERROR CODE</th>
+                  <th>MESSAGE</th>
+                </tr>
+              </thead>
+              <tbody>
+                {failuresModal.rows.map((f) => (
+                  <tr key={f.id}>
+                    <td className="records-cell">{f.row_number}</td>
+                    <td>
+                      <Chip
+                        size="small"
+                        label={f.error_code || 'UNKNOWN'}
+                        sx={{
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                          background: '#fee2e2',
+                          color: '#991b1b',
+                        }}
+                      />
+                    </td>
+                    <td style={{ fontSize: 13 }}>{f.error_message || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeFailures}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };
