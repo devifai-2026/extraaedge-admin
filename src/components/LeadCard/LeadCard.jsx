@@ -51,7 +51,8 @@ const fmt = (v) => {
 const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => {
     const [tab, setTab] = useState(0);
     const [tabDir, setTabDir] = useState('next'); // 'next' | 'prev' — drives the slide direction
-    const TAB_COUNT = 3;
+    // Tabs: 0 details, 1 source/parents, 2 followup (current + 5 past slots), 3 full follow-up history.
+    const TAB_COUNT = 4;
     const goToTab = (next) => {
         setTabDir(next > tab ? 'next' : 'prev');
         setTab(((next % TAB_COUNT) + TAB_COUNT) % TAB_COUNT);
@@ -68,6 +69,9 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
     const [openAddNote, setOpenAddNote] = useState(false);
     const [anchorEl, setAnchorEl] = useState(null);
     const [followUp, setFollowUp] = useState(null);
+    // All past (status != 'planned') follow-ups for this lead, most-recent first.
+    // The slots view shows the first 5; tab 3 (full history) shows the whole list.
+    const [pastFollowUps, setPastFollowUps] = useState([]);
     const [fullLead, setFullLead] = useState(null);
 
     const openMenu = Boolean(anchorEl);
@@ -82,6 +86,31 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
         followUpsApi.list({ lead_id: lead.id, status: 'planned', limit: 1 })
             .then((r) => { if (alive) setFollowUp(r?.data?.[0] ?? null); })
             .catch(() => { if (alive) setFollowUp(null); });
+        return () => { alive = false; };
+    }, [isExpanded, tab, lead?.id]);
+
+    // Lazy-load completed/missed/cancelled follow-ups for the slots view (tab 2)
+    // and the full-history tab (tab 3). We try every "non-planned" status the
+    // followUpsApi exposes and merge — gives us the equivalent of the CSV's
+    // 5-slot history plus anything older.
+    useEffect(() => {
+        if (!isExpanded || (tab !== 2 && tab !== 3) || !lead?.id) return;
+        let alive = true;
+        Promise.all([
+            followUpsApi.list({ lead_id: lead.id, status: 'done', limit: 50 }).catch(() => ({ data: [] })),
+            followUpsApi.list({ lead_id: lead.id, status: 'missed', limit: 50 }).catch(() => ({ data: [] })),
+            followUpsApi.list({ lead_id: lead.id, status: 'cancelled', limit: 50 }).catch(() => ({ data: [] })),
+        ])
+            .then(([done, missed, cancelled]) => {
+                if (!alive) return;
+                const merged = [
+                    ...(done?.data || []),
+                    ...(missed?.data || []),
+                    ...(cancelled?.data || []),
+                ].sort((a, b) => new Date(b.next_action_datetime || 0) - new Date(a.next_action_datetime || 0));
+                setPastFollowUps(merged);
+            })
+            .catch(() => { if (alive) setPastFollowUps([]); });
         return () => { alive = false; };
     }, [isExpanded, tab, lead?.id]);
 
@@ -468,8 +497,79 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                     </div>
                                     <div className="followup-section">
                                         <div className="followup-label">FOLLOWUP REMARKS</div>
-                                        <div className="followup-value followup-remarks">{followUp?.notes || followUp?.remarks || '-'}</div>
+                                        <div className="followup-value followup-remarks">{followUp?.notes || followUp?.remarks || followUp?.comment || '-'}</div>
                                     </div>
+                                </div>
+
+                                {/* Past attempts — CSV-parity slots view. Renders exactly 5
+                                    rows so layout is stable even when there's no history. */}
+                                <div className="followup-container" style={{ marginTop: 12, gridTemplateColumns: '1fr' }}>
+                                    {[0, 1, 2, 3, 4].map((idx) => {
+                                        const f = pastFollowUps[idx];
+                                        return (
+                                            <div className="followup-section" key={idx} style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, paddingBottom: 6, borderBottom: '1px dashed #eee' }}>
+                                                <div>
+                                                    <div className="followup-label">NEXT ACTION DATE {idx + 1}</div>
+                                                    <div className="followup-value">{f?.next_action_datetime ? fmt(f.next_action_datetime) : '-'}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="followup-label">COMMENT {idx + 1}</div>
+                                                    <div className="followup-value followup-remarks">{f?.comment || f?.notes || '-'}</div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <div className="content-chevron">
+                                <button
+                                    type="button"
+                                    className="content-chevron-btn"
+                                    aria-label="Previous section"
+                                    onClick={() => cycleTab(-1)}
+                                >
+                                    <ChevronLeftIcon />
+                                </button>
+                                <button
+                                    type="button"
+                                    className="content-chevron-btn"
+                                    aria-label="Next section"
+                                    onClick={() => cycleTab(1)}
+                                >
+                                    <ChevronRightIcon />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {tab === 3 && (
+                        <div className="content-wrapper">
+                            <div className={`content content-anim ${tabDir === 'prev' ? 'dir-prev' : ''}`} key={`tab-3-${tab}`}>
+                                <div className="followup-section" style={{ paddingBottom: 6 }}>
+                                    <div className="followup-label">FULL FOLLOW-UP HISTORY</div>
+                                    <div className="followup-value" style={{ fontSize: 12, color: '#777' }}>
+                                        {pastFollowUps.length === 0
+                                            ? '— No past follow-ups yet'
+                                            : `${pastFollowUps.length} past attempt${pastFollowUps.length === 1 ? '' : 's'}`}
+                                    </div>
+                                </div>
+                                <div style={{ maxHeight: 320, overflowY: 'auto', marginTop: 8 }}>
+                                    {pastFollowUps.map((f) => (
+                                        <div
+                                            key={f.id}
+                                            style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: '180px 80px 1fr',
+                                                gap: 12,
+                                                padding: '8px 0',
+                                                borderBottom: '1px solid #eee',
+                                            }}
+                                        >
+                                            <div style={{ fontSize: 13 }}>{fmt(f.next_action_datetime)}</div>
+                                            <div style={{ fontSize: 12, textTransform: 'uppercase', color: '#666' }}>{f.status || ''}</div>
+                                            <div style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>{f.comment || f.notes || '-'}</div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                             <div className="content-chevron">

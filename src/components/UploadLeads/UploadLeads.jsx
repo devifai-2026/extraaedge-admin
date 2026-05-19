@@ -296,6 +296,16 @@ const UploadLeads = ({ open, onClose }) => {
                     <li>You cannot upload more than 1 file at the same time.</li>
                     <li>Every row must have at least one of <b>email / first_name / last_name</b>, at least one of <b>whatsapp_number / phone</b>, and a <b>stage</b>. Sub-stage is required only when the chosen stage has sub-stages configured.</li>
                     <li>Duplicate detection uses email, phone, and WhatsApp number. Duplicates appear on the Failed Leads page.</li>
+                    <li>
+                        <b>Follow-up history:</b> use <code>followup_scheduled_on</code> / <code>followup_comments</code> for the upcoming
+                        planned follow-up, and <code>next_action_date_1..5</code> / <code>comment_1..5</code> for up to 5 past attempts
+                        (most recent first). Past attempts are stored as completed follow-ups.
+                    </li>
+                    <li>
+                        <b>Audit timestamps:</b> <code>lead_created_on</code> and <code>lead_updated_on</code> are optional. If provided,
+                        they override the server&apos;s default <code>now()</code>. Format: <code>DD-MM-YYYY HH:mm:ss</code>
+                        (e.g. <code>14-04-2026 13:07:56</code>).
+                    </li>
                 </ul>
             </div>
 

@@ -68,8 +68,22 @@ const blankForm = {
     stage_id: "",
     sub_stage_id: "",
     next_action_datetime: "",
+    next_action_comment: "",
     remarks: "",
     closure_remarks: "",
+    // CSV-parity: optional audit timestamps. Blank → server uses now().
+    // Format on the wire: ISO string. UI uses datetime-local inputs.
+    created_at: "",
+    updated_at: "",
+    // CSV-parity: up to 5 past follow-up attempts (most recent first).
+    // Each entry: { next_action_datetime: "YYYY-MM-DDTHH:mm", comment: "" }.
+    past_followups: [
+        { next_action_datetime: "", comment: "" },
+        { next_action_datetime: "", comment: "" },
+        { next_action_datetime: "", comment: "" },
+        { next_action_datetime: "", comment: "" },
+        { next_action_datetime: "", comment: "" },
+    ],
     // Family
     family: {
         father_name: "",
@@ -91,6 +105,35 @@ const blankForm = {
 };
 
 const valueOf = (custom_values, key) => custom_values?.[key] ?? '';
+
+// Slice an ISO timestamp down to the shape <input type="datetime-local"> expects:
+// "YYYY-MM-DDTHH:mm". Anything past the minute is dropped.
+const toLocalDtInput = (iso) => {
+    if (!iso) return '';
+    try {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return '';
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch {
+        return '';
+    }
+};
+
+// Take whatever past-followups array the API gave us (most-recent-first) and
+// pad/truncate to exactly 5 slots so the UI always renders the same number of
+// rows. Each slot becomes { next_action_datetime, comment } strings.
+const hydratePastSlots = (past = []) => {
+    const slots = [];
+    for (let n = 0; n < 5; n += 1) {
+        const f = past?.[n];
+        slots.push({
+            next_action_datetime: f?.next_action_datetime ? toLocalDtInput(f.next_action_datetime) : '',
+            comment: f?.comment || '',
+        });
+    }
+    return slots;
+};
 
 const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
     const isEditMode = Boolean(leadData?.id);
@@ -271,6 +314,14 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                         medium_id: primarySource.medium_id || '',
                     },
                     custom_values: lead.custom_values || {},
+                    // datetime-local needs "YYYY-MM-DDTHH:mm". The API returns ISO,
+                    // so slice off everything after the minute.
+                    created_at: lead.created_at ? toLocalDtInput(lead.created_at) : '',
+                    updated_at: lead.updated_at ? toLocalDtInput(lead.updated_at) : '',
+                    // Hydrate the 5 history slots from the most-recent past follow-ups
+                    // the API returns. Slots beyond what exists stay blank so the
+                    // user can add more.
+                    past_followups: hydratePastSlots(lead.past_followups),
                 });
                 setActiveTab(0);
                 setSubmitError('');
@@ -313,6 +364,17 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
     const setSourceField = (field) => (e) => {
         const val = e.target.value;
         setFormData((prev) => ({ ...prev, source: { ...prev.source, [field]: val } }));
+    };
+
+    // Update a single slot in the past_followups array. `idx` is the slot
+    // index (0..4); `field` is 'next_action_datetime' or 'comment'.
+    const setPastFollowupField = (idx, field) => (e) => {
+        const val = e.target.value;
+        setFormData((prev) => {
+            const next = [...(prev.past_followups || [])];
+            next[idx] = { ...(next[idx] || {}), [field]: val };
+            return { ...prev, past_followups: next };
+        });
     };
 
     const setCustomValue = (key) => (e) => {
@@ -360,6 +422,40 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
             if (v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)) cv[k] = v;
         }
         if (Object.keys(cv).length) p.custom_values = cv;
+
+        // Optional audit timestamps. Only send when the user typed something —
+        // otherwise we want the server to default to now() (or keep existing
+        // values on edit).
+        if (formData.created_at) p.created_at = new Date(formData.created_at).toISOString();
+        if (formData.updated_at) p.updated_at = new Date(formData.updated_at).toISOString();
+
+        // Past follow-up history (up to 5 slots). Each slot with a datetime
+        // becomes a followups[] entry with status='done'. The upcoming
+        // follow-up is handled separately by /stage today on edit, and by the
+        // existing next_action_datetime path on create — we add it here too
+        // so freshly-created leads can land with a planned follow-up.
+        //
+        // On CREATE we send the whole array. On EDIT we only send slots that
+        // actually have a datetime, so we don't accidentally wipe the
+        // existing rows (the backend doesn't currently replace, it appends —
+        // see repo.insertLead; on update, follow-ups are not touched).
+        const followups = [];
+        for (const slot of formData.past_followups || []) {
+            if (!slot?.next_action_datetime) continue;
+            followups.push({
+                next_action_datetime: new Date(slot.next_action_datetime).toISOString(),
+                comment: slot.comment || null,
+                status: 'done',
+            });
+        }
+        if (!isEditMode && formData.next_action_datetime) {
+            followups.push({
+                next_action_datetime: new Date(formData.next_action_datetime).toISOString(),
+                comment: formData.next_action_comment || null,
+                status: 'planned',
+            });
+        }
+        if (followups.length && !isEditMode) p.followups = followups;
 
         return p;
     };
@@ -819,13 +915,10 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                                 </div>
 
 
-                                {/* When the picked stage is a follow-up stage, offer an
-                                    optional next-action datetime so the lead lands in the
-                                    counsellor's Follow-up Manager view automatically. */}
+                                {/* Upcoming follow-up (was conditional on stage matching /follow/i;
+                                    now always shown so any lead can be scheduled). Comment field
+                                    captures the equivalent of the CSV's "Follow up Comments" column. */}
                                 {(() => {
-                                    const picked = (stages.data || []).find((s) => s.id === formData.stage_id);
-                                    const isFollowup = picked?.name && /follow/i.test(picked.name);
-                                    if (!isFollowup) return null;
                                     const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
                                     const minStr = now.toISOString().slice(0, 16);
                                     const value = formData.next_action_datetime || '';
@@ -833,7 +926,7 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                                     return (
                                         <div className="add-lead-form-grid">
                                             <TextField
-                                                label="Follow-up at"
+                                                label="Followup Scheduled On"
                                                 size="small"
                                                 type="datetime-local"
                                                 value={value}
@@ -843,8 +936,16 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                                                 error={isPast}
                                                 helperText={isPast
                                                     ? 'Pick a future date and time.'
-                                                    : 'Optional. Schedules a planned follow-up so the lead shows up in Follow-up Manager.'}
+                                                    : 'Optional. Schedules a planned follow-up — lead shows up in Follow-up Manager.'}
                                                 fullWidth
+                                            />
+                                            <TextField
+                                                label="Follow up Comments"
+                                                size="small"
+                                                value={formData.next_action_comment || ''}
+                                                onChange={setField('next_action_comment')}
+                                                fullWidth
+                                                helperText="Comment for the scheduled follow-up."
                                             />
                                         </div>
                                     );
@@ -855,6 +956,67 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                                         <TextField label="Closure Remarks" required size="small" value={formData.closure_remarks} onChange={setField('closure_remarks')} fullWidth />
                                     )}
                                     <TextField label="Remarks" required={!isEditMode} size="small" multiline minRows={2} value={formData.remarks} onChange={setField('remarks')} fullWidth />
+                                </div>
+
+                                {/* Past follow-up attempts (CSV parity: NextActionDate 1..5
+                                    + Comment 1..5). Stored as completed lead_followups rows
+                                    on save. Only sent on CREATE — edits preserve existing
+                                    follow-up history. */}
+                                {!isEditMode && (
+                                    <>
+                                        <div className="add-lead-section-title">Past Follow-up Attempts (most recent first)</div>
+                                        {(formData.past_followups || []).map((slot, idx) => (
+                                            <div key={idx} className="add-lead-form-grid">
+                                                <TextField
+                                                    label={`Next Action Date ${idx + 1}`}
+                                                    size="small"
+                                                    type="datetime-local"
+                                                    value={slot.next_action_datetime || ''}
+                                                    onChange={setPastFollowupField(idx, 'next_action_datetime')}
+                                                    InputLabelProps={{ shrink: true }}
+                                                    inputProps={{ style: { paddingTop: 8 } }}
+                                                    fullWidth
+                                                />
+                                                <TextField
+                                                    label={`Comment ${idx + 1}`}
+                                                    size="small"
+                                                    value={slot.comment || ''}
+                                                    onChange={setPastFollowupField(idx, 'comment')}
+                                                    fullWidth
+                                                    multiline
+                                                    maxRows={3}
+                                                />
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
+
+                                {/* Audit timestamps. Optional — leave blank to let the server
+                                    use now() (or, on edit, keep whatever is already in DB). */}
+                                <div className="add-lead-section-title">Audit Timestamps (optional)</div>
+                                <div className="add-lead-form-grid">
+                                    <TextField
+                                        label="Lead Created On"
+                                        size="small"
+                                        type="datetime-local"
+                                        value={formData.created_at || ''}
+                                        onChange={setField('created_at')}
+                                        InputLabelProps={{ shrink: true }}
+                                        inputProps={{ style: { paddingTop: 8 } }}
+                                        helperText="Leave blank to use now()."
+                                        fullWidth
+                                    />
+                                    <TextField
+                                        label="Updated On"
+                                        size="small"
+                                        type="datetime-local"
+                                        value={formData.updated_at || ''}
+                                        onChange={setField('updated_at')}
+                                        InputLabelProps={{ shrink: true }}
+                                        inputProps={{ style: { paddingTop: 8 } }}
+                                        helperText="Leave blank to use now()."
+                                        fullWidth
+                                    />
                                 </div>
                             </>
                         )}
