@@ -5,33 +5,59 @@
   overflow: hidden;
   background: var(--white);
   position: relative;
-  width: 97%
+  width: 97%;
+  /* Prevent the card itself from forcing the page wider when its inner
+     grid would otherwise demand more width than the column gives it. */
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
-/* HEADER
-   Fixed grid so the chip / comm-stats / activity / actions columns line up
-   row-to-row regardless of name length, chip count, or score width. */
+/* HEADER — two-row layout for readability.
+   Row 1 (identity):  checkbox · name/phone · stage block (right-aligned)
+   Row 2 (toolbar):   comm-stats + score/age · action icons (right-aligned)
+
+   Each row is a flex container — wraps naturally on narrow viewports so
+   nothing overlaps. The previous fixed-pixel sub-grid was the source of
+   the "chips overflow the email" bug. */
 .card-header {
-  display: grid;
-  grid-template-columns:
-    minmax(220px, 1fr)   /* col 1: checkbox + name/phone (flexes) */
-    auto                 /* col 2: middle wrapper (status + stats + activity) */
-    auto;                /* col 3: action buttons */
-  align-items: center;
-  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 16px;
   background: var(--bg-card);
-  gap: 16px;
   border-bottom: 1px solid var(--border-grey);
+  min-width: 0;
 }
 
-/* The middle wrapper is a 4-column sub-grid: status | comm-stats | divider | activity.
-   Each track has a fixed width so the same icon/text appears at the same x in every card. */
-.card-header > div:nth-child(2) {
-  display: grid !important;
-  grid-template-columns: 180px 180px 1px 180px;
+.card-header-row {
+  display: flex;
   align-items: center;
   gap: 16px;
-  justify-content: center;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+/* Row 1: identity. Checkbox + name/phone column (flex grow) + status block (right). */
+.card-header-identity {
+  flex-wrap: wrap;
+}
+
+/* Row 2: toolbar. comm-stats (flex grow) + actions (right). */
+.card-header-toolbar {
+  justify-content: space-between;
+  border-top: 1px dashed var(--scroll-grey, #e5e7eb);
+  padding-top: 8px;
+}
+
+/* Status block on the right of row 1 — stage chip + sub-stage + flag + converted. */
+.status-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 .card-checkbox {
@@ -42,19 +68,32 @@
 .left {
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
-  min-width: 120px;
+  /* Allow this column to actually shrink — flex-shrink: 0 was forcing the
+     name + badges to spill out and overlap the next column. */
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .name-row {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;          /* enables ellipsis on .name child */
+  flex-wrap: wrap;       /* badges wrap below the name on very narrow widths */
 }
 
 .name {
   font-weight: 600 !important;
   font-size: 14px !important;
+  /* Single-line ellipsis when the row is intact; wrap to next line when
+     the badges drop down (handled by .name-row flex-wrap). */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 0 1 auto;
+  max-width: 100%;
 }
 
 .name-badge {
@@ -70,6 +109,7 @@
   font-weight: 600;
   line-height: 1;
   color: var(--white);
+  flex-shrink: 0;        /* never compress the count chips when row is tight */
 }
 
 .name-badge svg {
@@ -88,42 +128,61 @@
 .phone {
   font-size: 12px !important;
   color: var(--text-grey);
+  /* Same ellipsis rule as .name so a long fallback (long email shown when
+     phone is blank) doesn't widen the row. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
-/* STATUS */
-.status {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
+/* STATUS chip (stage) + sub-stage text — used inside .status-block (row 1). */
 .status-chip {
   background: var(--dark-grey) !important;
   color: var(--white) !important;
   font-size: 11px !important;
   height: 22px !important;
   border: 1px solid var(--text-secondary) !important;
+  flex-shrink: 0;
 }
 
-.status .MuiChip-root {
+.status-block .MuiChip-root {
   margin: 0 !important;
 }
 
+/* Sub-stage now sits inline, NOT a wrapping orphan line. */
 .sub-status {
-  flex-basis: 100%;
-  text-align: center;
   font-size: 11px;
   color: var(--text-grey);
+  white-space: nowrap;
 }
 
-/* COMMUNICATION STATS */
+/* Flag pill (Fresh / Untouched / Cold / Junk / etc).
+   Was an absolute-positioned badge in the card corner — moved inline here. */
+.flag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 11px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--white);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Toolbar row stats — comm-stats + score/age inline.
+   flex-wrap lets things drop to a second line on narrow widths instead of
+   forcing horizontal scroll. */
 .comm-stats {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
+  gap: 14px;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .stat-item {
@@ -139,31 +198,13 @@
   color: var(--text-grey);
 }
 
-/* HEADER DIVIDER */
+/* Inline vertical separator inside the toolbar row. */
 .header-divider {
+  display: inline-block;
   width: 1px;
-  height: 30px;
-  background: var(--scroll-grey);
-  justify-self: center;
-}
-
-/* ACTIVITY ICONS */
-.activity-icons {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-}
-
-.activity-badge .MuiBadge-badge {
-  font-size: 9px;
-  min-width: 16px;
-  height: 16px;
-}
-
-.activity-icon {
-  font-size: 20px !important;
-  color: var(--text-secondary);
+  height: 18px;
+  background: var(--scroll-grey, #e5e7eb);
+  margin: 0 2px;
 }
 
 .view-all {
@@ -174,11 +215,14 @@
   font-weight: 500;
 }
 
-/* ACTIONS */
+/* Action buttons on the right of the toolbar row. */
 .actions {
   display: flex;
   align-items: center;
   gap: 2px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .action-btn {
@@ -189,24 +233,7 @@
   color: var(--success) !important;
 }
 
-/* UNTOUCHED BADGE */
-.untouched-badge {
-  position: absolute;
-  top: 0;
-  right: 0;
-  background: var(--primary-dark);
-  color: var(--white);
-  font-size: 11px;
-  font-weight: 500;
-  padding: 4px 12px;
-  border-radius: 0 8px 0 8px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.untouched-badge.fresh { background: #2e7d32; }
-.untouched-badge.untouched { background: var(--primary-dark); }
-
+/* The status dot inside the flag pill. */
 .untouched-dot {
   width: 6px;
   height: 6px;
@@ -505,4 +532,43 @@
   margin-left: auto;
   font-size: 12px;
   color: #6b7280;
+}
+
+/* ============================================================
+   Responsive breakpoints
+   ============================================================
+   The header rows are flex containers with flex-wrap: wrap, so they
+   already adapt naturally. These media queries just tighten spacing
+   on phones and let the card use the full viewport width.
+   ============================================================ */
+
+@media (max-width: 768px) {
+  .card {
+    width: 100%;
+  }
+  .card-header {
+    padding: 12px;
+    gap: 8px;
+  }
+  .status-block {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+  /* Hide noisier secondary stats on phones — they're still in the
+     expanded card / timeline so nothing is lost. */
+  .comm-stats .stat-item:nth-child(n+3) {
+    display: none;
+  }
+  .actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  /* On very small phones, hide the comm-stats entirely; just keep the
+     score + age + view-all + action icons. */
+  .comm-stats .stat-icon {
+    display: none;
+  }
 }

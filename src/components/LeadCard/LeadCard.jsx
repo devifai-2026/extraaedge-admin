@@ -106,9 +106,13 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
 
     return (
         <div className="card">
-            {/* HEADER */}
+            {/* HEADER — clean two-row layout to keep things readable:
+                Row 1 (identity): checkbox · name + count chips · stage/sub-stage · flag
+                Row 2 (toolbar):  comm-stats · score · age · "View all" · action icons
+                Removed the absolute-positioned untouched-badge (it was overlapping
+                chips on narrow widths). The flag is now inline next to the stage chip. */}
             <div className="card-header">
-                <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                <div className="card-header-row card-header-identity">
                     <Checkbox
                         size="small"
                         className="card-checkbox"
@@ -122,31 +126,37 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                 className="name"
                                 onClick={() => setOpenEditLead(true)}
                                 style={{ cursor: 'pointer' }}
-                                title="Click to edit"
+                                title={lead.name || lead.email || lead.phone || 'Unnamed'}
                             >
                                 {lead.name || lead.email || lead.phone || 'Unnamed'}
                             </Typography>
-                            <Tooltip title={`${lead.missed_calls_count ?? 0} missed call(s)`}>
-                                <span className="name-badge orange">
-                                    <PhoneMissedIcon />
-                                    {lead.missed_calls_count ?? 0}
-                                </span>
-                            </Tooltip>
-                            <Tooltip title={`${lead.unread_messages_count ?? 0} unread message(s)`}>
-                                <span className="name-badge green">
-                                    <MarkChatUnreadIcon />
-                                    {lead.unread_messages_count ?? 0}
-                                </span>
-                            </Tooltip>
+                            {(lead.missed_calls_count ?? 0) > 0 && (
+                                <Tooltip title={`${lead.missed_calls_count} missed call(s)`}>
+                                    <span className="name-badge orange">
+                                        <PhoneMissedIcon />
+                                        {lead.missed_calls_count}
+                                    </span>
+                                </Tooltip>
+                            )}
+                            {(lead.unread_messages_count ?? 0) > 0 && (
+                                <Tooltip title={`${lead.unread_messages_count} unread message(s)`}>
+                                    <span className="name-badge green">
+                                        <MarkChatUnreadIcon />
+                                        {lead.unread_messages_count}
+                                    </span>
+                                </Tooltip>
+                            )}
                         </div>
-                        <Typography className="phone">{lead.phone || lead.whatsapp_number || lead.email || '-'}</Typography>
+                        <Typography className="phone" title={lead.phone || lead.whatsapp_number || lead.email || ''}>
+                            {lead.phone || lead.whatsapp_number || lead.email || '-'}
+                        </Typography>
                     </div>
-                </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-                    <div className="status">
+                    <div className="status-block">
                         <Chip label={stageLabel} size="small" className="status-chip" />
-                        {subStageLabel && <span className="sub-status">{subStageLabel}</span>}
+                        {subStageLabel && subStageLabel !== '—' && (
+                            <span className="sub-status">{subStageLabel}</span>
+                        )}
                         {lead.is_converted && (
                             <Tooltip title={lead.converted_at ? `Converted on ${formatTimestamp(lead.converted_at)}` : 'Converted'}>
                                 <Chip
@@ -156,8 +166,19 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                 />
                             </Tooltip>
                         )}
+                        {flag && (
+                            <span
+                                className="flag-pill"
+                                style={{ background: TONE_BG[flag.tone] || TONE_BG.neutral }}
+                            >
+                                {flag.text}
+                                <span className="untouched-dot" />
+                            </span>
+                        )}
                     </div>
+                </div>
 
+                <div className="card-header-row card-header-toolbar">
                     <div className="comm-stats">
                         <Tooltip title="Total calls">
                             <span className="stat-item"><CallIcon className="stat-icon" /> 0</span>
@@ -175,11 +196,7 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                 <SmsIcon className="stat-icon" /> 0
                             </span>
                         </Tooltip>
-                    </div>
-
-                    <div className="header-divider" />
-
-                    <div className="activity-icons">
+                        <span className="header-divider" />
                         <Tooltip title={`Lead score${lead.lead_score != null ? ` (${Number(lead.lead_score).toFixed(0)})` : ''}`}>
                             <span className="stat-item" style={{ cursor: 'default', fontWeight: 600 }}>
                                 ★ {lead.lead_score != null ? Number(lead.lead_score).toFixed(0) : 0}
@@ -192,40 +209,34 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                         </Tooltip>
                         <span className="view-all" onClick={() => setOpenTimeline(true)} style={{ cursor: "pointer" }}>View all</span>
                     </div>
-                </div>
 
-                <div className="actions">
-                    <Tooltip title="Video call">
-                        <IconButton size="small" className="action-btn" onClick={() => setOpenVideo(true)}><VideoCallIcon /></IconButton>
-                    </Tooltip>
-                    <Tooltip title="Call">
-                        <IconButton size="small" className="action-btn" onClick={() => setOpenCall(true)}><CallIcon /></IconButton>
-                    </Tooltip>
-                    <Tooltip title="SMS">
-                        <IconButton size="small" className="action-btn"><SmsIcon /></IconButton>
-                    </Tooltip>
-                    <Tooltip title="Email">
-                        <IconButton size="small" className="action-btn" onClick={() => setOpenEmail(true)}><EmailIcon /></IconButton>
-                    </Tooltip>
-                    <Tooltip title="WhatsApp">
-                        <IconButton size="small" className="action-btn whatsapp" onClick={() => setOpenWhatsapp(true)}>
-                            <WhatsAppIcon sx={{ color: colors.primary }} />
+                    <div className="actions">
+                        <Tooltip title="Video call">
+                            <IconButton size="small" className="action-btn" onClick={() => setOpenVideo(true)}><VideoCallIcon /></IconButton>
+                        </Tooltip>
+                        <Tooltip title="Call">
+                            <IconButton size="small" className="action-btn" onClick={() => setOpenCall(true)}><CallIcon /></IconButton>
+                        </Tooltip>
+                        <Tooltip title="SMS">
+                            <IconButton size="small" className="action-btn"><SmsIcon /></IconButton>
+                        </Tooltip>
+                        <Tooltip title="Email">
+                            <IconButton size="small" className="action-btn" onClick={() => setOpenEmail(true)}><EmailIcon /></IconButton>
+                        </Tooltip>
+                        <Tooltip title="WhatsApp">
+                            <IconButton size="small" className="action-btn whatsapp" onClick={() => setOpenWhatsapp(true)}>
+                                <WhatsAppIcon sx={{ color: colors.primary }} />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Reassign">
+                            <IconButton size="small" className="action-btn" onClick={onReassign}><SwapHorizIcon /></IconButton>
+                        </Tooltip>
+                        <IconButton size="small" className="action-btn" onClick={handleMenuClick}><MoreVertIcon /></IconButton>
+                        <IconButton size="small" className="action-btn" onClick={() => setIsExpanded(!isExpanded)}>
+                            {isExpanded ? <ExpandLessIcon /> : <ChevronRightIcon />}
                         </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Reassign">
-                        <IconButton size="small" className="action-btn" onClick={onReassign}><SwapHorizIcon /></IconButton>
-                    </Tooltip>
-                    <IconButton size="small" className="action-btn" onClick={handleMenuClick}><MoreVertIcon /></IconButton>
-                    <IconButton size="small" className="action-btn" onClick={() => setIsExpanded(!isExpanded)}>
-                        {isExpanded ? <ExpandLessIcon /> : <ChevronRightIcon />}
-                    </IconButton>
-                </div>
-
-                {flag && (
-                    <div className="untouched-badge" style={{ background: TONE_BG[flag.tone] || TONE_BG.neutral }}>
-                        {flag.text} <span className="untouched-dot" />
                     </div>
-                )}
+                </div>
             </div>
 
             {isExpanded && (
