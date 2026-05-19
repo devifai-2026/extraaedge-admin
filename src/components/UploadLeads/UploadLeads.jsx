@@ -37,24 +37,29 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // runs in-process so for typical sub-30k row files the first poll usually
 // already has results. We start at 250ms and back off after a few tries
 // to keep network noise low if a job ever takes a long time.
-const waitForPreview = async (previewId, { timeoutMs = 30000 } = {}) => {
+// Polls the preview row until its row-counts are populated (worker has
+// finished its pass over the sheet) or the timeout expires. The optional
+// onTick callback fires after every poll with the current attempt count so
+// the dialog can render "Validating rows… (N)" instead of a frozen label.
+const waitForPreview = async (previewId, { timeoutMs = 30000, onTick } = {}) => {
     const deadline = Date.now() + timeoutMs;
     let last = null;
-    let interval = 250;
+    let interval = 150;
     let polls = 0;
     while (Date.now() < deadline) {
         const r = await bulkApi.getPreview(previewId);
         last = r?.data;
         if (last && (Number(last.total_rows) > 0 || Number(last.invalid_rows) > 0)) return last;
-        await sleep(interval);
         polls += 1;
-        if (polls === 4) interval = 1000;   // back off after 1s of fast polling
-        if (polls === 12) interval = 2000;  // back off again after ~10s total
+        if (onTick) try { onTick(polls); } catch { /* ignore */ }
+        await sleep(interval);
+        if (polls === 6)  interval = 500;   // back off after ~1s of fast polling
+        if (polls === 14) interval = 1500;  // back off again after ~5s total
     }
     return last;
 };
 
-const UploadLeads = ({ open, onClose }) => {
+const UploadLeads = ({ open, onClose, onUploaded }) => {
     const [activeStep, setActiveStep] = useState(0);
     const [channel, setChannel] = useState("Offline");
     const [source, setSource] = useState("Direct Walkin");
@@ -98,6 +103,12 @@ const UploadLeads = ({ open, onClose }) => {
         // the import job is already in flight server-side, so closing here
         // wouldn't cancel it, but resetting state would orphan the result.
         if (busy) return;
+        // If the user is closing AFTER a successful import, kick the parent
+        // to refetch one more time. We already called onUploaded right after
+        // commit; this catch-up handles the case where auto-assignment
+        // finished in the background between then and now (so the list
+        // shows the correct owner instead of "Unassigned").
+        const hadSuccessfulImport = !!result;
         setActiveStep(0);
         setUploadedFile(null);
         setBusy(false);
@@ -107,6 +118,9 @@ const UploadLeads = ({ open, onClose }) => {
         setProgress(null);
         trackedImportIdRef.current = null;
         onClose();
+        if (hadSuccessfulImport) {
+            try { onUploaded?.(); } catch { /* parent errors must not break close */ }
+        }
     };
 
     const handleFileUpload = (e) => {
@@ -192,8 +206,12 @@ const UploadLeads = ({ open, onClose }) => {
             if (!previewId) throw new Error("Preview returned no id");
 
             // 4. Poll the preview until it has counts. Cheap fan-out
-            // because the worker is fast for sub-30k rows.
-            const preview = await waitForPreview(previewId);
+            // because the worker is fast for sub-30k rows. onTick updates
+            // the busy label so the user sees "Validating rows… (3)" rather
+            // than a label that never changes for 30 seconds.
+            const preview = await waitForPreview(previewId, {
+                onTick: (n) => setBusyLabel(`Validating rows… (${n})`),
+            });
 
             // 5. Commit. duplicate_handling = 'skip' is the default and matches
             // your "show duplicates on /failedleads" requirement. Pass the
@@ -210,11 +228,75 @@ const UploadLeads = ({ open, onClose }) => {
             });
             const importRow = commitResp?.data;
             trackedImportIdRef.current = importRow?.id || null;
+
+            // Socket-driven progress is best-effort: if the worker finishes
+            // before the first event reaches us (very small files), or the
+            // socket isn't connected in this environment, we'd otherwise
+            // stay stuck in the spinner state forever. Synthesize a
+            // "completed" progress tick from the preview counts so the bar
+            // renders at 100% with the actual import stats. Real socket
+            // events still take precedence — useEffect will overwrite this.
+            setProgress({
+                import_id: importRow?.id,
+                total: Number(preview?.total_rows) || 0,
+                processed: Number(preview?.total_rows) || 0,
+                success: Number(preview?.valid_rows) || 0,
+                failed: Number(preview?.invalid_rows) || 0,
+                duplicates: Number(preview?.duplicate_rows) || 0,
+                phase: 'completed',
+            });
+
             setResult({
                 preview,
                 importId: importRow?.id,
+                final: null,
             });
             setBusyLabel("Import queued. Auto-assignment will run shortly.");
+
+            // Tell the parent (LeadList) that new leads are now in the DB so
+            // it can refetch in the background. We do this BEFORE the user
+            // dismisses the dialog so the list is already fresh by the time
+            // they click "Done" — no manual reload needed.
+            //
+            // Auto-assignment runs server-side after this point; the parent
+            // typically subscribes to socket events too (bulk_import.progress
+            // phase=completed) to catch the final assignment state, but
+            // firing now covers the common case where the user closes the
+            // dialog immediately after seeing the success panel.
+            try { onUploaded?.(); } catch { /* parent errors must not break the dialog */ }
+
+            // Poll the bulk_imports row for authoritative final counts.
+            //
+            // preview.valid_rows is the PRE-resolver count — it only checked
+            // basic format (email regex, phone digits, identity present).
+            // Resolver failures (OWNER_MISMATCH, COUNTRY_NOT_FOUND, etc.)
+            // happen later and bump bulk_imports.failed_rows, which is the
+            // only count the user can trust as "actually inserted".
+            //
+            // We poll for up to ~6s post-commit; tiny files complete in <1s,
+            // and even mid-sized imports settle inside this window. If the
+            // poll times out the panel falls back to the preview numbers
+            // and a warning that final stats may still be updating.
+            (async () => {
+                const importId = importRow?.id;
+                if (!importId) return;
+                const deadline = Date.now() + 6000;
+                let interval = 300;
+                while (Date.now() < deadline) {
+                    try {
+                        const r = await bulkApi.import(importId);
+                        const row = r?.data;
+                        if (row && row.status === 'completed') {
+                            setResult((prev) => prev ? { ...prev, final: row } : prev);
+                            return;
+                        }
+                    } catch { /* keep polling */ }
+                    await sleep(interval);
+                    if (interval < 1000) interval = Math.min(1000, interval + 100);
+                }
+                // Timed out — leave final null; UI shows the preview numbers
+                // with a "stats may still be updating" hint.
+            })();
         } catch (e) {
             setError(e?.message || "Import failed");
         } finally {
@@ -284,10 +366,11 @@ const UploadLeads = ({ open, onClose }) => {
                 <ul>
                     <li>Upload an <b>.xlsx</b> file (max 30,000 rows). CSV is not supported — please convert to .xlsx.</li>
                     <li>
-                        Owner columns: use <code>current_lead_owner_email</code> (must be a counsellor) and
-                        optionally <code>previous_lead_owner_email</code>. If a row has both <code>assigned_to_email</code>
-                        and <code>current_lead_owner_email</code> set, they must match — otherwise the row fails with
-                        <code> OWNER_MISMATCH</code>. Failures show on the Failed Leads page with the Excel row number.
+                        Owner columns: <code>current_lead_owner_email</code> and <code>assigned_to_email</code> behave the same way and accept ANY active user email —
+                        counsellor email assigns the lead directly, sales-manager email round-robins across their team,
+                        super-admin email round-robins across the tenant. If both columns are set they must point to the
+                        SAME user (else <code>OWNER_MISMATCH</code>). Leave both blank to let the auto-assignment rule pick.
+                        Use <code>previous_lead_owner_email</code> (optional) to record a prior owner in the lead's history.
                     </li>
                     <li>
                         New <code>primary_source</code> column is auto-created (case-insensitive match) on first use,
@@ -482,29 +565,68 @@ const UploadLeads = ({ open, onClose }) => {
                 </div>
             )}
 
-            {result && (
-                <div style={{
-                    marginTop: 24,
-                    padding: 12,
-                    background: "#f0fdf4",
-                    border: "1px solid #bbf7d0",
-                    borderRadius: 6,
-                    fontSize: 13,
-                }}>
-                    <div style={{ fontWeight: 600, color: "#166534", marginBottom: 6 }}>
-                        Import queued
+            {result && (() => {
+                // Prefer the final bulk_imports row (authoritative — includes
+                // resolver failures like OWNER_MISMATCH that the pre-resolver
+                // "preview" pass can't see). Fall back to preview while the
+                // post-commit poll is still in flight.
+                const final = result.final;
+                const total       = final?.total_rows       ?? result.preview?.total_rows       ?? 0;
+                const imported    = final?.success_rows     ?? result.preview?.valid_rows       ?? 0;
+                const failed      = final?.failed_rows      ?? result.preview?.invalid_rows     ?? 0;
+                const duplicates  = final?.duplicate_rows   ?? result.preview?.duplicate_rows   ?? 0;
+                const hasFinal = Boolean(final);
+                const anyFailed = failed > 0;
+
+                // Tone the banner red when ANY row failed, green otherwise.
+                // Mixed outcomes (some imported, some failed) still get the
+                // red treatment so the user doesn't miss the failures — a
+                // hidden 1-of-1-failed import is exactly the bug this fixes.
+                const bg     = anyFailed ? '#fff1f2' : '#f0fdf4';
+                const border = anyFailed ? '#fecdd3' : '#bbf7d0';
+                const heading = anyFailed
+                    ? (imported > 0 ? 'Import finished with errors' : 'Import failed — no rows inserted')
+                    : 'Import complete';
+                const headingColor = anyFailed ? '#9f1239' : '#166534';
+                const bodyColor    = anyFailed ? '#9f1239' : '#166534';
+
+                return (
+                    <div style={{
+                        marginTop: 24,
+                        padding: 12,
+                        background: bg,
+                        border: `1px solid ${border}`,
+                        borderRadius: 6,
+                        fontSize: 13,
+                    }}>
+                        <div style={{ fontWeight: 600, color: headingColor, marginBottom: 6 }}>
+                            {heading}
+                        </div>
+                        <div style={{ color: bodyColor }}>
+                            <strong>{total}</strong> row{total === 1 ? '' : 's'} ·{' '}
+                            <span style={{ color: '#15803d', fontWeight: 600 }}>{imported} imported</span> ·{' '}
+                            <span style={{ color: anyFailed ? '#b91c1c' : bodyColor, fontWeight: anyFailed ? 700 : 400 }}>
+                                {failed} failed
+                            </span> ·{' '}
+                            <span style={{ color: '#b45309' }}>{duplicates} duplicate{duplicates === 1 ? '' : 's'}</span>
+                        </div>
+                        {anyFailed && (
+                            <div style={{ color: '#9f1239', marginTop: 6, fontWeight: 500 }}>
+                                Open the <strong>Failed Leads</strong> page to see exactly which rows failed and why
+                                (errors include OWNER_MISMATCH, INVALID_EMAIL, STAGE_NOT_FOUND, etc.).
+                            </div>
+                        )}
+                        {!hasFinal && (
+                            <div style={{ color: '#92400e', marginTop: 6, fontStyle: 'italic' }}>
+                                Final counts still updating — refresh in a moment if numbers change.
+                            </div>
+                        )}
+                        <div style={{ color: bodyColor, marginTop: 6 }}>
+                            Auto-assignment runs after the import finishes.
+                        </div>
                     </div>
-                    <div style={{ color: "#166534" }}>
-                        {result.preview?.total_rows ?? "?"} rows ·{" "}
-                        {result.preview?.valid_rows ?? "?"} valid ·{" "}
-                        {result.preview?.invalid_rows ?? 0} invalid ·{" "}
-                        {result.preview?.duplicate_rows ?? 0} duplicates
-                    </div>
-                    <div style={{ color: "#166534", marginTop: 6 }}>
-                        Auto-assignment runs after the import finishes. Check the Failed Leads page for any rejected rows.
-                    </div>
-                </div>
-            )}
+                );
+            })()}
         </div>
     );
 

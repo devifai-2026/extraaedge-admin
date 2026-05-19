@@ -157,3 +157,18 @@
 .add-lead-add-btn:hover {
     background-color: var(--primary-dark) !important;
 }
+
+/* Required-field asterisks (the * MUI appends to <TextField required ... />
+ * labels) need to read as a real "this field is required" cue, not a faint
+ * grey character users skim past. Scope is the AddNewLead dialog only —
+ * other forms in the app are free to style their own way.
+ *
+ * Targets both the floating label asterisk and the legend asterisk that
+ * shows inside the outlined notch when the label has shrunk up. */
+.add-lead-dialog .MuiFormLabel-asterisk,
+.add-lead-dialog .MuiInputLabel-asterisk,
+.add-lead-dialog legend .MuiFormLabel-asterisk {
+    color: #d32f2f !important;
+    font-weight: 600;
+}
+

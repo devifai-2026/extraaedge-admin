@@ -19,6 +19,12 @@ export const leadsApi = {
   delete: (id) => api.delete(`/leads/${id}`),
   changeStage: (id, body) => api.post(`/leads/${id}/stage`, body),
   bulkAssign: (body) => api.post('/leads/bulk-assign', body),
+  // Bulk hard-delete. Body: { ids: [uuid,...] }. Returns { deleted, deleted_ids }.
+  // Super-admin only at the API layer — non-super-admin callers get 403.
+  // The server CASCADEs every dependent row (followups, notes, activities,
+  // assignments, family, attribution, custom values, tags, calls, payments,
+  // referral edges) so the deletion is total.
+  bulkDelete: (ids) => api.post('/leads/bulk-delete', { ids }),
   reassign: (body) => api.post('/lead-assignments', body),
   // Run the active assignment rule against every unassigned lead in the tenant.
   // Returns { found, assigned, skipped }. Admin / sales-manager only at the API layer.

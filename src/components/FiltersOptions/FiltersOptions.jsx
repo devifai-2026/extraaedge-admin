@@ -8,6 +8,10 @@ import ViewListIcon from "@mui/icons-material/ViewList";
 import ViewModuleIcon from "@mui/icons-material/ViewModule";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
+// MUI v9 ships the outline-style icon as `DeleteOutlineOutlined`. The
+// older short name `DeleteOutline` isn't in this package's exports map,
+// so importing it explodes at Vite resolve time.
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import { Tooltip, CircularProgress } from "@mui/material";
 import { isRole, ROLES } from "../../lib/rbac";
 import { leadsApi } from "../../lib/endpoints";
@@ -42,10 +46,26 @@ const SORT_OPTIONS = [
     { key: 'score_desc',         label: 'Lead Score' },
 ];
 
-const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onReassignSelected, onReassignAll, sort, onSortChange, advancedFilter, onApplyFilter, onResetFilter, viewMode = 'card', onViewModeChange, unassignedCount = 0 }) => {
+const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onReassignSelected, onReassignAll, onBulkDelete, sort, onSortChange, advancedFilter, onApplyFilter, onResetFilter, viewMode = 'card', onViewModeChange, unassignedCount = 0 }) => {
     // Auto-assign button is for super-admin and sales-manager only —
     // counsellors don't manage assignments themselves.
     const canAutoAssign = isRole(ROLES.SUPER_ADMIN, ROLES.SALES_MANAGER);
+    // Bulk delete is super-admin ONLY. The button doesn't render for other
+    // roles, and the BE refuses non-super-admin callers anyway (defence in
+    // depth — the FE check is just to hide the affordance).
+    const canBulkDelete = isRole(ROLES.SUPER_ADMIN);
+    const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const handleConfirmBulkDelete = async () => {
+        if (deleting) return;
+        setDeleting(true);
+        try {
+            await onBulkDelete?.();
+            setOpenDeleteConfirm(false);
+        } finally {
+            setDeleting(false);
+        }
+    };
     const [autoAssigning, setAutoAssigning] = useState(false);
     const handleAutoAssign = async () => {
         if (autoAssigning) return;
@@ -152,6 +172,31 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                             </Tooltip>
                         )}
 
+                        {canBulkDelete && (
+                            <Tooltip title={
+                                selectedCount > 0
+                                    ? `Permanently delete ${selectedCount} selected lead${selectedCount === 1 ? '' : 's'} (cannot be undone)`
+                                    : 'Select one or more leads to enable delete'
+                            }>
+                                <span>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        color="error"
+                                        startIcon={<DeleteOutlineIcon fontSize="small" />}
+                                        onClick={() => setOpenDeleteConfirm(true)}
+                                        disabled={selectedCount === 0 || deleting}
+                                        sx={{
+                                            textTransform: 'none', fontSize: 12, ml: 0.5,
+                                            '&:hover': { background: '#fdecea' },
+                                        }}
+                                    >
+                                        Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                        )}
+
                         <Tooltip title={viewMode === 'table' ? 'Switch to card view' : 'Switch to table view'}>
                             <IconButton
                                 size="small"
@@ -204,6 +249,49 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                         className='assign-btn-filter'
                     >
                         Assign all {totalInFilter} in view
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ================= BULK DELETE CONFIRMATION ================= */}
+            {/* Destructive op — explicit double-confirmation so a misclick can't
+                wipe leads. The body spells out exactly what gets removed because
+                FK CASCADEs make this irreversible across many related tables. */}
+            <Dialog open={openDeleteConfirm} onClose={() => !deleting && setOpenDeleteConfirm(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ color: '#d32f2f', fontWeight: 700 }}>
+                    Delete {selectedCount} lead{selectedCount === 1 ? '' : 's'}?
+                </DialogTitle>
+                <DialogContent>
+                    <Typography sx={{ mb: 1.5 }}>
+                        This will permanently delete <b>{selectedCount}</b> lead{selectedCount === 1 ? '' : 's'} and every related record.
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        For each lead, the following will also be removed from the database:
+                    </Typography>
+                    <Typography component="ul" variant="body2" color="text.secondary" sx={{ pl: 2.5, mb: 1.5, '& li': { mb: 0.25 } }}>
+                        <li>All follow-ups (upcoming and past)</li>
+                        <li>All notes and activities (timeline history)</li>
+                        <li>Ownership history (assignments and reassignments)</li>
+                        <li>Parent / family details</li>
+                        <li>Source attribution (channel / source / campaign / medium)</li>
+                        <li>Custom-field values and tags</li>
+                        <li>Call logs, recordings, and message log entries</li>
+                        <li>Payments, payment links, and referral edges</li>
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#d32f2f', fontWeight: 600 }}>
+                        This action cannot be undone.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setOpenDeleteConfirm(false)} disabled={deleting}>Cancel</Button>
+                    <Button
+                        onClick={handleConfirmBulkDelete}
+                        variant="contained"
+                        color="error"
+                        disabled={deleting || selectedCount === 0}
+                        startIcon={deleting ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <DeleteOutlineIcon fontSize="small" />}
+                    >
+                        {deleting ? 'Deleting…' : `Yes, delete ${selectedCount} lead${selectedCount === 1 ? '' : 's'}`}
                     </Button>
                 </DialogActions>
             </Dialog>

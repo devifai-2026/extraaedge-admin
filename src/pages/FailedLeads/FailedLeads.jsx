@@ -65,15 +65,26 @@ function FailedLeads() {
   const [selected, setSelected] = useState({ 0: new Set(), 1: new Set() });
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  // Date range filter, applied to BOTH tabs and the summary counts.
+  // The BE filters bulk_imports.created_at; date_to is inclusive end-of-day.
+  // Stored as "YYYY-MM-DD" strings — what <input type="date"> emits — so we
+  // can hand them straight to the API without timezone gymnastics.
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
+      // Same filter shape goes to all three endpoints so summary counts
+      // always match what the lists actually display.
+      const filterParams = {};
+      if (dateFrom) filterParams.date_from = dateFrom;
+      if (dateTo)   filterParams.date_to   = dateTo;
       const [s, f, d] = await Promise.all([
-        failedLeadsApi.summary(),
-        failedLeadsApi.list({ page, limit: PAGE_SIZE }),
-        failedLeadsApi.duplicates({ page, limit: PAGE_SIZE }),
+        failedLeadsApi.summary(filterParams),
+        failedLeadsApi.list({ ...filterParams, page, limit: PAGE_SIZE }),
+        failedLeadsApi.duplicates({ ...filterParams, page, limit: PAGE_SIZE }),
       ]);
       setSummary(s?.data ?? { failures: 0, duplicates: 0 });
       setFailures(f?.data ?? []);
@@ -86,9 +97,16 @@ function FailedLeads() {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, dateFrom, dateTo]);
 
   useEffect(() => { load(); }, [load]);
+
+  const clearDateFilter = () => {
+    setDateFrom("");
+    setDateTo("");
+    setPage(1);
+  };
+  const hasDateFilter = Boolean(dateFrom || dateTo);
 
   const handleDelete = async () => {
     if (!deleteRow) return;
@@ -168,6 +186,58 @@ function FailedLeads() {
         <Tab label={`Validation Errors (${summary.failures})`} />
         <Tab label={`Duplicates (${summary.duplicates})`} />
       </Tabs>
+
+      {/* Date-range filter. Applies to BOTH tabs and to the counts on the
+          tab labels — so a counsellor scanning a specific batch can narrow
+          down to just that day's uploads. BE filters bulk_imports.created_at
+          inclusive on both bounds (date_to extends to end-of-day). */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        flexWrap: 'wrap',
+        padding: '8px 0',
+        marginBottom: 12,
+      }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#555' }}>Filter by upload date:</span>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }}>
+          From
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+            max={dateTo || undefined}
+            style={{
+              padding: '4px 8px',
+              border: '1px solid rgba(0,0,0,0.23)',
+              borderRadius: 4,
+              fontSize: 13,
+              fontFamily: 'inherit',
+            }}
+          />
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }}>
+          To
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+            min={dateFrom || undefined}
+            style={{
+              padding: '4px 8px',
+              border: '1px solid rgba(0,0,0,0.23)',
+              borderRadius: 4,
+              fontSize: 13,
+              fontFamily: 'inherit',
+            }}
+          />
+        </label>
+        {hasDateFilter && (
+          <Button size="small" onClick={clearDateFilter} sx={{ textTransform: 'none' }}>
+            Clear
+          </Button>
+        )}
+      </div>
 
       {/* Bulk-action toolbar — visible only when at least one row on the
           active tab is selected. All tenant roles can use it; the BE

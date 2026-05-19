@@ -665,7 +665,7 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
             onClose={handleCancel}
             maxWidth="md"
             fullWidth
-            PaperProps={{ className: "add-lead-dialog" }}
+            slotProps={{ paper: { className: "add-lead-dialog" } }}
         >
             <DialogTitle className="add-lead-title" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -739,9 +739,9 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                             <TextField label="Applicant Name" required size="small" value={formData.name} onChange={setField('name')} fullWidth />
                             {!mandatoryOnly && <TextField label="Email Id" size="small" value={formData.email} onChange={setField('email')} fullWidth />}
                             {!mandatoryOnly && <TextField label="Alternate Email Id" size="small" value={formData.alternate_email} onChange={setField('alternate_email')} fullWidth />}
-                            <TextField label="WhatsApp Number" required size="small" value={formData.whatsapp_number} onChange={setField('whatsapp_number')} fullWidth inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 }} />
-                            {!mandatoryOnly && <TextField label="Phone" size="small" value={formData.phone} onChange={setField('phone')} fullWidth inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 }} />}
-                            {!mandatoryOnly && <TextField label="Alternate Contact Number" size="small" value={formData.alternate_contact} onChange={setField('alternate_contact')} fullWidth inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 }} />}
+                            <TextField label="WhatsApp Number" required size="small" value={formData.whatsapp_number} onChange={setField('whatsapp_number')} fullWidth slotProps={{ htmlInput: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 } }} />
+                            {!mandatoryOnly && <TextField label="Phone" size="small" value={formData.phone} onChange={setField('phone')} fullWidth slotProps={{ htmlInput: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 } }} />}
+                            {!mandatoryOnly && <TextField label="Alternate Contact Number" size="small" value={formData.alternate_contact} onChange={setField('alternate_contact')} fullWidth slotProps={{ htmlInput: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 } }} />}
 
                             {!mandatoryOnly && idSelect({ label: 'Under Graduation Degree',  value: formData.ug_degree_id,         onChange: setField('ug_degree_id'),         options: degrees.data,      loading: degrees.loading,      addNew: { type: 'degrees',         assignTo: 'ug_degree_id' } })}
                             {!mandatoryOnly && idSelect({ label: 'UG Specialization',        value: formData.ug_specialization_id, onChange: setField('ug_specialization_id'), options: specs.data,        loading: specs.loading,        addNew: { type: 'specializations', assignTo: 'ug_specialization_id' } })}
@@ -758,7 +758,7 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                                         // Only allow 4-digit years in the 1950–2100 range while typing.
                                         if (v === '' || /^\d{0,4}$/.test(v)) setField('ug_graduation_year')({ target: { value: v } });
                                     }}
-                                    inputProps={{ min: 1950, max: 2100, step: 1 }}
+                                    slotProps={{ htmlInput: { min: 1950, max: 2100, step: 1 } }}
                                     fullWidth
                                 />
                             )}
@@ -776,7 +776,7 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                                         const v = e.target.value;
                                         if (v === '' || /^\d{0,4}$/.test(v)) setField('pg_graduation_year')({ target: { value: v } });
                                     }}
-                                    inputProps={{ min: 1950, max: 2100, step: 1 }}
+                                    slotProps={{ htmlInput: { min: 1950, max: 2100, step: 1 } }}
                                     fullWidth
                                 />
                             )}
@@ -919,26 +919,42 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                                     now always shown so any lead can be scheduled). Comment field
                                     captures the equivalent of the CSV's "Follow up Comments" column. */}
                                 {(() => {
+                                    // Only show the upcoming-followup inputs when the chosen
+                                    // stage is a Followup-type stage (or the lead's current
+                                    // stage already is one). For any other stage, scheduling
+                                    // a follow-up doesn't fit the workflow.
+                                    const picked = (stages.data || []).find((s) => s.id === formData.stage_id);
+                                    const isFollowupStage = picked?.name && /follow/i.test(picked.name);
+                                    if (!isFollowupStage) return null;
                                     const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
                                     const minStr = now.toISOString().slice(0, 16);
                                     const value = formData.next_action_datetime || '';
                                     const isPast = value && new Date(value).getTime() < Date.now();
                                     return (
                                         <div className="add-lead-form-grid">
-                                            <TextField
-                                                label="Followup Scheduled On"
-                                                size="small"
-                                                type="datetime-local"
-                                                value={value}
-                                                onChange={setField('next_action_datetime')}
-                                                InputLabelProps={{ shrink: true }}
-                                                inputProps={{ min: minStr, style: { paddingTop: 8 } }}
-                                                error={isPast}
-                                                helperText={isPast
-                                                    ? 'Pick a future date and time.'
-                                                    : 'Optional. Schedules a planned follow-up — lead shows up in Follow-up Manager.'}
-                                                fullWidth
-                                            />
+                                            {/* Native input avoids the MUI floating-label / browser
+                                                dd/mm/yyyy placeholder overlap that was visible in
+                                                the previous TextField-based render. */}
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                <label style={{ fontSize: 12, color: '#555', fontWeight: 500 }}>Followup Scheduled On</label>
+                                                <input
+                                                    type="datetime-local"
+                                                    value={value}
+                                                    onChange={setField('next_action_datetime')}
+                                                    min={minStr}
+                                                    style={{
+                                                        height: 40, padding: '8px 12px',
+                                                        border: `1px solid ${isPast ? '#d32f2f' : 'rgba(0,0,0,0.23)'}`,
+                                                        borderRadius: 4,
+                                                        fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', width: '100%',
+                                                    }}
+                                                />
+                                                <span style={{ fontSize: 11, color: isPast ? '#d32f2f' : '#888' }}>
+                                                    {isPast
+                                                        ? 'Pick a future date and time.'
+                                                        : 'Optional. Schedules a planned follow-up — lead shows up in Follow-up Manager.'}
+                                                </span>
+                                            </div>
                                             <TextField
                                                 label="Follow up Comments"
                                                 size="small"
@@ -959,65 +975,95 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                                 </div>
 
                                 {/* Past follow-up attempts (CSV parity: NextActionDate 1..5
-                                    + Comment 1..5). Stored as completed lead_followups rows
-                                    on save. Only sent on CREATE — edits preserve existing
-                                    follow-up history. */}
-                                {!isEditMode && (
-                                    <>
-                                        <div className="add-lead-section-title">Past Follow-up Attempts (most recent first)</div>
-                                        {(formData.past_followups || []).map((slot, idx) => (
-                                            <div key={idx} className="add-lead-form-grid">
-                                                <TextField
-                                                    label={`Next Action Date ${idx + 1}`}
-                                                    size="small"
-                                                    type="datetime-local"
-                                                    value={slot.next_action_datetime || ''}
-                                                    onChange={setPastFollowupField(idx, 'next_action_datetime')}
-                                                    InputLabelProps={{ shrink: true }}
-                                                    inputProps={{ style: { paddingTop: 8 } }}
-                                                    fullWidth
-                                                />
-                                                <TextField
-                                                    label={`Comment ${idx + 1}`}
-                                                    size="small"
-                                                    value={slot.comment || ''}
-                                                    onChange={setPastFollowupField(idx, 'comment')}
-                                                    fullWidth
-                                                    multiline
-                                                    maxRows={3}
-                                                />
-                                            </div>
-                                        ))}
-                                    </>
-                                )}
+                                    + Comment 1..5) AND audit timestamps. Both blocks are only
+                                    relevant when the lead is being placed into a Followup
+                                    stage — for any other stage, scheduling history doesn't
+                                    apply, and the form stays focused on the current action.
+                                    Gate: picked stage name matches /follow/i, OR the existing
+                                    lead is already in such a stage. */}
+                                {(() => {
+                                    const picked = (stages.data || []).find((s) => s.id === formData.stage_id);
+                                    const isFollowupStage = picked?.name && /follow/i.test(picked.name);
+                                    if (!isFollowupStage) return null;
+                                    return (
+                                        <>
+                                            {!isEditMode && (
+                                                <>
+                                                    <div className="add-lead-section-title">Past Follow-up Attempts (most recent first)</div>
+                                                    {(formData.past_followups || []).map((slot, idx) => (
+                                                        <div key={idx} className="add-lead-form-grid">
+                                                            {/* Native <label> + datetime-local — sidesteps the MUI floating-label
+                                                                overlap with the browser's dd/mm/yyyy placeholder. */}
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                                <label style={{ fontSize: 12, color: '#555', fontWeight: 500 }}>
+                                                                    Next Action Date {idx + 1}
+                                                                </label>
+                                                                <input
+                                                                    type="datetime-local"
+                                                                    value={slot.next_action_datetime || ''}
+                                                                    onChange={setPastFollowupField(idx, 'next_action_datetime')}
+                                                                    style={{
+                                                                        height: 40,
+                                                                        padding: '8px 12px',
+                                                                        border: '1px solid rgba(0,0,0,0.23)',
+                                                                        borderRadius: 4,
+                                                                        fontSize: 14,
+                                                                        fontFamily: 'inherit',
+                                                                        boxSizing: 'border-box',
+                                                                        width: '100%',
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <TextField
+                                                                label={`Comment ${idx + 1}`}
+                                                                size="small"
+                                                                value={slot.comment || ''}
+                                                                onChange={setPastFollowupField(idx, 'comment')}
+                                                                fullWidth
+                                                                multiline
+                                                                maxRows={3}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </>
+                                            )}
 
-                                {/* Audit timestamps. Optional — leave blank to let the server
-                                    use now() (or, on edit, keep whatever is already in DB). */}
-                                <div className="add-lead-section-title">Audit Timestamps (optional)</div>
-                                <div className="add-lead-form-grid">
-                                    <TextField
-                                        label="Lead Created On"
-                                        size="small"
-                                        type="datetime-local"
-                                        value={formData.created_at || ''}
-                                        onChange={setField('created_at')}
-                                        InputLabelProps={{ shrink: true }}
-                                        inputProps={{ style: { paddingTop: 8 } }}
-                                        helperText="Leave blank to use now()."
-                                        fullWidth
-                                    />
-                                    <TextField
-                                        label="Updated On"
-                                        size="small"
-                                        type="datetime-local"
-                                        value={formData.updated_at || ''}
-                                        onChange={setField('updated_at')}
-                                        InputLabelProps={{ shrink: true }}
-                                        inputProps={{ style: { paddingTop: 8 } }}
-                                        helperText="Leave blank to use now()."
-                                        fullWidth
-                                    />
-                                </div>
+                                            {/* Audit timestamps. Optional — leave blank to let the server
+                                                use now() (or, on edit, keep whatever is already in DB). */}
+                                            <div className="add-lead-section-title">Audit Timestamps (optional)</div>
+                                            <div className="add-lead-form-grid">
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                    <label style={{ fontSize: 12, color: '#555', fontWeight: 500 }}>Lead Created On</label>
+                                                    <input
+                                                        type="datetime-local"
+                                                        value={formData.created_at || ''}
+                                                        onChange={setField('created_at')}
+                                                        style={{
+                                                            height: 40, padding: '8px 12px',
+                                                            border: '1px solid rgba(0,0,0,0.23)', borderRadius: 4,
+                                                            fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', width: '100%',
+                                                        }}
+                                                    />
+                                                    <span style={{ fontSize: 11, color: '#888' }}>If left blank, today&apos;s date and time will be used automatically.</span>
+                                                </div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                    <label style={{ fontSize: 12, color: '#555', fontWeight: 500 }}>Updated On</label>
+                                                    <input
+                                                        type="datetime-local"
+                                                        value={formData.updated_at || ''}
+                                                        onChange={setField('updated_at')}
+                                                        style={{
+                                                            height: 40, padding: '8px 12px',
+                                                            border: '1px solid rgba(0,0,0,0.23)', borderRadius: 4,
+                                                            fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', width: '100%',
+                                                        }}
+                                                    />
+                                                    <span style={{ fontSize: 11, color: '#888' }}>If left blank, today&apos;s date and time will be used automatically.</span>
+                                                </div>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
                             </>
                         )}
                     </>
@@ -1029,8 +1075,8 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                         <div className="add-lead-form-grid">
                             <TextField label="Father's Full Name" size="small" value={formData.family.father_name} onChange={setFamilyField('father_name')} fullWidth />
                             <TextField label="Mother's Full Name" size="small" value={formData.family.mother_name} onChange={setFamilyField('mother_name')} fullWidth />
-                            <TextField label="Father's Mobile No." size="small" value={formData.family.father_mobile} onChange={setFamilyField('father_mobile')} fullWidth inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 }} />
-                            <TextField label="Mother's Mobile No." size="small" value={formData.family.mother_mobile} onChange={setFamilyField('mother_mobile')} fullWidth inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 }} />
+                            <TextField label="Father's Mobile No." size="small" value={formData.family.father_mobile} onChange={setFamilyField('father_mobile')} fullWidth slotProps={{ htmlInput: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 } }} />
+                            <TextField label="Mother's Mobile No." size="small" value={formData.family.mother_mobile} onChange={setFamilyField('mother_mobile')} fullWidth slotProps={{ htmlInput: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 } }} />
                             <TextField label="Father's Email Id" size="small" value={formData.family.father_email} onChange={setFamilyField('father_email')} fullWidth />
                             <TextField label="Mother's Email Id" size="small" value={formData.family.mother_email} onChange={setFamilyField('mother_email')} fullWidth />
                         </div>
@@ -1050,7 +1096,7 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                             <TextField label="District" size="small" value={formData.district} onChange={setField('district')} fullWidth />
                             <TextField label="City" size="small" value={formData.city} onChange={setField('city')} fullWidth />
                             <TextField label="Address" size="small" value={formData.address} onChange={setField('address')} fullWidth />
-                            <TextField label="Pincode" size="small" value={formData.pincode} onChange={setField('pincode')} fullWidth inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 10 }} />
+                            <TextField label="Pincode" size="small" value={formData.pincode} onChange={setField('pincode')} fullWidth slotProps={{ htmlInput: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 10 } }} />
                         </div>
                     </>
                 )}

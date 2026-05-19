@@ -14,6 +14,7 @@ import TabsSection from "../../components/TabsSection/TabsSection";
 import FiltersOptions from "../../components/FiltersOptions/FiltersOptions";
 import ReferLeadsDrawer from "../../components/ReferLeadsDrawer/ReferLeadsDrawer";
 import { leadsApi } from "../../lib/endpoints";
+import { onNotification } from "../../lib/socket";
 
 const PAGE_SIZE = 20;
 
@@ -121,6 +122,40 @@ const LeadList = () => {
 
     useEffect(() => { setPage(1); setSelectedIds(new Set()); }, [activeStageId]);
 
+    // Auto-refresh on bulk-import lifecycle events. Two signals matter:
+    //   • bulk_import.progress with phase='completed' — worker finished the
+    //     import pass; new leads are now in the DB.
+    //   • bulk_import.completed — fanned out to super_admins when someone
+    //     else's upload finishes (so admins watching the list see new leads
+    //     appear in real time).
+    // Both lead to the same action: bump reloadKey so the list refetches.
+    // The 200ms debounce avoids stampeding the server when many events
+    // arrive together (e.g. several uploads completing within a second).
+    useEffect(() => {
+        let scheduled = null;
+        const triggerReload = () => {
+            if (scheduled) return;
+            scheduled = setTimeout(() => {
+                scheduled = null;
+                setReloadKey((k) => k + 1);
+            }, 200);
+        };
+        const unsub = onNotification((evt) => {
+            if (!evt) return;
+            if (evt.type === 'bulk_import.completed') {
+                triggerReload();
+                return;
+            }
+            if (evt.type === 'bulk_import.progress' && evt.payload?.phase === 'completed') {
+                triggerReload();
+            }
+        });
+        return () => {
+            if (scheduled) clearTimeout(scheduled);
+            unsub();
+        };
+    }, []);
+
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
     const toggleSelect = (id) => {
@@ -151,6 +186,30 @@ const LeadList = () => {
         if (msg) setToast({ severity: 'success', text: msg });
     };
 
+    // Bulk hard-delete the currently selected leads. Super-admin only — the
+    // FiltersOptions toolbar hides the Delete button for everyone else, and
+    // the BE refuses non-super-admin callers. On success we clear the
+    // selection set and bump reloadKey so the list refetches without the
+    // deleted rows. The confirmation dialog inside FiltersOptions has
+    // already gathered explicit user consent before this fires.
+    const handleBulkDelete = async () => {
+        const ids = Array.from(selectedIds);
+        if (ids.length === 0) return;
+        try {
+            const r = await leadsApi.bulkDelete(ids);
+            const deleted = r?.data?.deleted ?? ids.length;
+            setSelectedIds(new Set());
+            setReloadKey((k) => k + 1);
+            setToast({
+                severity: 'success',
+                text: `Deleted ${deleted} lead${deleted === 1 ? '' : 's'} and all related records.`,
+            });
+        } catch (e) {
+            setToast({ severity: 'error', text: e?.message || 'Bulk delete failed' });
+            throw e; // bubble so the confirm dialog's spinner stops on error
+        }
+    };
+
     return (
         <div className="lead-list-maincontainer">
             <TabsSection
@@ -164,6 +223,7 @@ const LeadList = () => {
                 totalInFilter={total}
                 onReassignSelected={() => openBulkRefer('selected')}
                 onReassignAll={() => openBulkRefer('filter')}
+                onBulkDelete={handleBulkDelete}
                 sort={sort}
                 onSortChange={(s) => { setSort(s); setPage(1); }}
                 advancedFilter={advancedFilter}
@@ -281,7 +341,19 @@ const LeadList = () => {
             <UploadLeads
                 open={uploadLeadOpen}
                 onClose={() => setUploadLeadOpen(false)}
-                onUploaded={() => { setUploadLeadOpen(false); setReloadKey((k) => k + 1); }}
+                onUploaded={() => {
+                    // onUploaded fires twice per upload: once right after the
+                    // commit response (so the list is fresh by the time the
+                    // user clicks Done) and again on dialog close. Always
+                    // refetch — but only toast when the dialog is actually
+                    // closed, otherwise the bottom Snackbar would float over
+                    // the dialog's action buttons and steal clicks for a few
+                    // seconds, making Next / Cancel feel broken.
+                    setReloadKey((k) => k + 1);
+                    if (!uploadLeadOpen) {
+                        setToast({ severity: 'success', text: 'Bulk upload complete — leads list refreshed.' });
+                    }
+                }}
             />
             <ReferLeadsDrawer
                 open={referOpen}
@@ -294,11 +366,17 @@ const LeadList = () => {
                 onDone={onReferDone}
             />
 
+            {/* Anchor the toast at the top-right so it never overlaps with the
+                DialogActions row of an open modal (which sits bottom-center).
+                Previously a Snackbar fired while UploadLeads was still open
+                covered the Next / Cancel buttons; the user reported the
+                buttons "didn't work for a few seconds" until autoHide cleared
+                the toast. */}
             <Snackbar
                 open={!!toast}
                 autoHideDuration={3000}
                 onClose={() => setToast(null)}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
                 {toast && <Alert severity={toast.severity}>{toast.text}</Alert>}
             </Snackbar>

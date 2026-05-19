@@ -103,11 +103,21 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
         ])
             .then(([done, missed, cancelled]) => {
                 if (!alive) return;
+                // Order rule: rows that came from a CSV slot (slot_index 1..5)
+                // keep slot order regardless of date. Everything else (ad-hoc
+                // follow-ups, slot_index null) sorts most-recent-first AFTER
+                // the slot rows. This makes the "Past Follow-up Attempts"
+                // grid match the user's spreadsheet 1:1.
                 const merged = [
                     ...(done?.data || []),
                     ...(missed?.data || []),
                     ...(cancelled?.data || []),
-                ].sort((a, b) => new Date(b.next_action_datetime || 0) - new Date(a.next_action_datetime || 0));
+                ].sort((a, b) => {
+                    const sa = Number.isInteger(a.slot_index) ? a.slot_index : Infinity;
+                    const sb = Number.isInteger(b.slot_index) ? b.slot_index : Infinity;
+                    if (sa !== sb) return sa - sb;
+                    return new Date(b.next_action_datetime || 0) - new Date(a.next_action_datetime || 0);
+                });
                 setPastFollowUps(merged);
             })
             .catch(() => { if (alive) setPastFollowUps([]); });
@@ -502,10 +512,31 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                 </div>
 
                                 {/* Past attempts — CSV-parity slots view. Renders exactly 5
-                                    rows so layout is stable even when there's no history. */}
+                                    fixed rows so layout is stable even when there's no
+                                    history. Each slot is filled by the follow-up whose
+                                    slot_index matches (1..5). Ad-hoc follow-ups without a
+                                    slot_index fall through to unfilled slots in order. */}
+                                {(() => {
+                                    const slottedByIndex = new Map();
+                                    const adhoc = [];
+                                    for (const f of pastFollowUps) {
+                                        if (Number.isInteger(f.slot_index) && f.slot_index >= 1 && f.slot_index <= 5) {
+                                            // First-write wins per slot — duplicates (which we
+                                            // intentionally don't dedupe at the BE) all keep their
+                                            // own slot, so this just resolves the rare case where
+                                            // two ad-hoc edits happened to share a slot_index.
+                                            if (!slottedByIndex.has(f.slot_index)) slottedByIndex.set(f.slot_index, f);
+                                        } else {
+                                            adhoc.push(f);
+                                        }
+                                    }
+                                    return (
                                 <div className="followup-container" style={{ marginTop: 12, gridTemplateColumns: '1fr' }}>
                                     {[0, 1, 2, 3, 4].map((idx) => {
-                                        const f = pastFollowUps[idx];
+                                        const slot = idx + 1;
+                                        // Prefer the row with this slot_index; otherwise pull an
+                                        // ad-hoc follow-up into the next free slot.
+                                        const f = slottedByIndex.get(slot) ?? adhoc.shift();
                                         return (
                                             <div className="followup-section" key={idx} style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, paddingBottom: 6, borderBottom: '1px dashed #eee' }}>
                                                 <div>
@@ -520,6 +551,8 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                         );
                                     })}
                                 </div>
+                                    );
+                                })()}
                             </div>
                             <div className="content-chevron">
                                 <button
