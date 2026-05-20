@@ -211,7 +211,9 @@ const LeadsTable = ({ leads, selectedIds, onToggleSelect, onToggleSelectAll, onR
                   <Tooltip title="Call"><IconButton size="small"><CallIcon fontSize="small" /></IconButton></Tooltip>
                   <Tooltip title="WhatsApp"><IconButton size="small"><WhatsAppIcon fontSize="small" /></IconButton></Tooltip>
                   <Tooltip title="Email"><IconButton size="small"><EmailIcon fontSize="small" /></IconButton></Tooltip>
-                  <Tooltip title="Reassign"><IconButton size="small" onClick={() => onReassign?.(lead)}><SwapHorizIcon fontSize="small" /></IconButton></Tooltip>
+                  {!isRole(ROLES.COUNSELLOR) && (
+                    <Tooltip title="Reassign"><IconButton size="small" onClick={() => onReassign?.(lead)}><SwapHorizIcon fontSize="small" /></IconButton></Tooltip>
+                  )}
                   {canDelete && (
                     <Tooltip title="Delete lead (permanent)">
                       <IconButton size="small" onClick={() => handleDelete(lead)} sx={{ color: '#dc2626' }}>
@@ -234,7 +236,9 @@ const LeadsTable = ({ leads, selectedIds, onToggleSelect, onToggleSelectAll, onR
       >
         <MenuItem onClick={() => { setEditLead(menu.lead); setMenu({ anchor: null, lead: null }); }}>Edit Lead</MenuItem>
         <MenuItem onClick={() => { setTimelineLead(menu.lead); setMenu({ anchor: null, lead: null }); }}>View Timeline</MenuItem>
-        <MenuItem onClick={() => { onReassign?.(menu.lead); setMenu({ anchor: null, lead: null }); }}>Reassign</MenuItem>
+        {!isRole(ROLES.COUNSELLOR) && (
+          <MenuItem onClick={() => { onReassign?.(menu.lead); setMenu({ anchor: null, lead: null }); }}>Reassign</MenuItem>
+        )}
         {canDelete && (
           <MenuItem
             onClick={() => { const lead = menu.lead; setMenu({ anchor: null, lead: null }); handleDelete(lead); }}

@@ -33,6 +33,7 @@ import { leadsApi, usersApi, uploadsApi } from "../../lib/endpoints";
 import { auth } from "../../lib/api";
 import { useDropdown } from "../../lib/useDropdowns";
 import QuickCreateDialog from "../QuickCreateDialog/QuickCreateDialog";
+import SubStageReviewModal from "./SubStageReviewModal";
 import { isRole, ROLES } from "../../lib/rbac";
 
 
@@ -75,15 +76,14 @@ const blankForm = {
     // Format on the wire: ISO string. UI uses datetime-local inputs.
     created_at: "",
     updated_at: "",
-    // CSV-parity: up to 5 past follow-up attempts (most recent first).
-    // Each entry: { next_action_datetime: "YYYY-MM-DDTHH:mm", comment: "" }.
-    past_followups: [
-        { next_action_datetime: "", comment: "" },
-        { next_action_datetime: "", comment: "" },
-        { next_action_datetime: "", comment: "" },
-        { next_action_datetime: "", comment: "" },
-        { next_action_datetime: "", comment: "" },
-    ],
+    // Per-stage follow-up history: { [stage_id]: [5 slot objects] }.
+    // Each slot: { next_action_datetime: "YYYY-MM-DDTHH:mm", comment, sub_stage_id }.
+    // When the user picks a stage_id we lazily seed an empty 5-slot array for it
+    // so previously-entered stages are retained in memory as the user toggles
+    // between stages within the form. On submit, every populated row across
+    // every stage is sent to the API. The sub-stage review modal lets the user
+    // assign a sub_stage_id per filled row before submission.
+    followups_by_stage: {},
     // Family
     family: {
         father_name: "",
@@ -120,19 +120,40 @@ const toLocalDtInput = (iso) => {
     }
 };
 
-// Take whatever past-followups array the API gave us (most-recent-first) and
-// pad/truncate to exactly 5 slots so the UI always renders the same number of
-// rows. Each slot becomes { next_action_datetime, comment } strings.
-const hydratePastSlots = (past = []) => {
-    const slots = [];
-    for (let n = 0; n < 5; n += 1) {
-        const f = past?.[n];
-        slots.push({
-            next_action_datetime: f?.next_action_datetime ? toLocalDtInput(f.next_action_datetime) : '',
-            comment: f?.comment || '',
-        });
+// Build an empty 5-slot array. Used to seed a new stage in the
+// followups_by_stage map.
+const emptySlots = () => ([
+    { next_action_datetime: '', comment: '', sub_stage_id: '' },
+    { next_action_datetime: '', comment: '', sub_stage_id: '' },
+    { next_action_datetime: '', comment: '', sub_stage_id: '' },
+    { next_action_datetime: '', comment: '', sub_stage_id: '' },
+    { next_action_datetime: '', comment: '', sub_stage_id: '' },
+]);
+
+// Convert the backend's followups_by_stage shape into the form's editable
+// shape. Backend gives us { stage_id: [row|null, ...5] } where rows have ISO
+// datetimes; we convert each row to datetime-local strings and ensure exactly
+// 5 slots per stage.
+const hydrateFollowupsByStage = (byStage = {}) => {
+    const out = {};
+    for (const [stageId, rows] of Object.entries(byStage || {})) {
+        const slots = emptySlots();
+        for (let n = 0; n < 5; n += 1) {
+            const r = rows?.[n];
+            if (!r) continue;
+            slots[n] = {
+                next_action_datetime: r.next_action_datetime ? toLocalDtInput(r.next_action_datetime) : '',
+                comment: r.comment || '',
+                sub_stage_id: r.sub_stage_id || '',
+                // Read-only fields surfaced from the backend so the form
+                // can show "Done — <reason>" for closed slots.
+                status: r.status || '',
+                completion_reason: r.completion_reason || '',
+            };
+        }
+        out[stageId] = slots;
     }
-    return slots;
+    return out;
 };
 
 const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
@@ -143,6 +164,16 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState('');
     const [hydrating, setHydrating] = useState(false);
+    // Fresh copy of the lead loaded by leadsApi.get on open and re-fetched
+    // after in-dialog mutations like reassign. The Current Counsellor /
+    // Current Manager fields read from this so they always reflect the
+    // latest server state, not the stale `leadData` prop from the list.
+    const [freshLead, setFreshLead] = useState(null);
+    // Sub-stage review modal state. When the user clicks Save, if there are
+    // filled follow-up rows we open this modal so they can pick a sub-stage
+    // per row before the payload actually hits the API.
+    const [reviewOpen, setReviewOpen] = useState(false);
+    const [reviewRows, setReviewRows] = useState([]);
 
     // Once a lead has crossed into a success stage (converted_at !== null),
     // only super_admin can keep editing. The backend enforces the same rule
@@ -180,19 +211,32 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
     // The candidate list shown to counsellors comes from /users/team —
     // returns the counsellor's own peers + managers — which matches what
     // the server will accept.
-    const canReassign = isEditMode;
+    // Reassign UI is hidden from counsellors — they can't reassign anyone
+    // (server-side scope on POST /lead-assignments enforces the same).
+    const canReassign = isEditMode && !isRole(ROLES.COUNSELLOR);
     const [reassignList, setReassignList] = useState([]);     // [{id,name,email,manager_id}]
     const [reassignTo, setReassignTo] = useState('');         // chosen user id
     const [reassignReason, setReassignReason] = useState(''); // free-text
     const [reassigning, setReassigning] = useState(false);
     const [reassignErr, setReassignErr] = useState('');
+    // Manager preview for the picked counsellor. Loaded lazily when
+    // reassignTo changes; null until resolved or if the user has no
+    // primary manager.
+    const [pickedManagerName, setPickedManagerName] = useState('');
+    // Name of the current owner's reporting manager. Resolved from the
+    // freshLead's assigned_to → users.manager_id lookup after each load /
+    // reassign.
+    const [currentManagerName, setCurrentManagerName] = useState('');
 
     useEffect(() => {
         if (!open || !canReassign) return;
         // Admins see every active counsellor; managers + counsellors get
         // their team-scoped list from the server.
+        // Backend caps `limit` at 200 (listUsersQuery zod schema). Asking for
+        // more produced a 400 that the .catch below swallowed, leaving the
+        // dropdown empty.
         const loader = isRole(ROLES.SUPER_ADMIN)
-            ? usersApi.list({ role: 'counsellor', limit: 500 })
+            ? usersApi.list({ role: 'counsellor', limit: 200 })
             : usersApi.myTeam();
         loader
             .then((r) => {
@@ -202,8 +246,50 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                 );
                 setReassignList(rows);
             })
-            .catch(() => setReassignList([]));
+            .catch((err) => {
+                // Surface the failure to the dev console — previously this
+                // swallowed errors silently and left the dropdown empty
+                // (e.g. when limit > 200 hit the zod cap).
+                console.warn('Reassign list load failed:', err?.message || err);
+                setReassignList([]);
+            });
     }, [open, canReassign, leadData?.assigned_to]);
+
+    // When a new counsellor is picked, resolve and show their reporting
+    // manager so the admin can verify the auto-link before confirming.
+    // Cleared when no counsellor is picked.
+    useEffect(() => {
+        if (!reassignTo) { setPickedManagerName(''); return; }
+        const picked = reassignList.find((u) => u.id === reassignTo);
+        const mgrId = picked?.manager_id;
+        if (!mgrId) { setPickedManagerName(''); return; }
+        let alive = true;
+        usersApi.get(mgrId)
+            .then((r) => { if (alive) setPickedManagerName(r?.data?.name || r?.data?.email || ''); })
+            .catch(() => { if (alive) setPickedManagerName(''); });
+        return () => { alive = false; };
+    }, [reassignTo, reassignList]);
+
+    // Resolve current owner's manager name whenever the lead refreshes (open,
+    // reassign). Two-hop lookup: freshLead.assigned_to → users.manager_id →
+    // users.name. Cleared if there's no assignee or the user has no manager.
+    useEffect(() => {
+        const assignee = freshLead?.assigned_to;
+        if (!assignee) { setCurrentManagerName(''); return; }
+        let alive = true;
+        usersApi.get(assignee)
+            .then((r) => {
+                const mgrId = r?.data?.manager_id;
+                if (!mgrId) { if (alive) setCurrentManagerName(''); return null; }
+                return usersApi.get(mgrId);
+            })
+            .then((r2) => {
+                if (!r2 || !alive) return;
+                setCurrentManagerName(r2?.data?.name || r2?.data?.email || '');
+            })
+            .catch(() => { if (alive) setCurrentManagerName(''); });
+        return () => { alive = false; };
+    }, [freshLead?.assigned_to]);
 
     const handleReassign = async () => {
         setReassignErr('');
@@ -217,9 +303,16 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                 assignment_type: 'reassign',
                 reason: reassignReason.trim() || undefined,
             });
-            // Close the dialog so the parent reloads — keeps the screen tidy.
+            // Refresh in-dialog state instead of closing — Current Counsellor
+            // and Current Manager should immediately reflect the new owner.
+            // Parent gets onSaved so its list also refreshes in the background.
+            try {
+                const r = await leadsApi.get(leadData.id);
+                setFreshLead(r?.data || null);
+            } catch { /* non-fatal — onSaved will refresh on next open */ }
+            setReassignTo('');
+            setReassignReason('');
             onSaved?.();
-            onClose?.(null);
         } catch (e) {
             setReassignErr(e?.message || 'Reassign failed');
         } finally {
@@ -269,6 +362,7 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
             .then((r) => {
                 if (!alive) return;
                 const lead = r?.data || {};
+                setFreshLead(lead);
                 const family = lead.family || {};
                 const primarySource = (lead.sources || [])[0] || {};
                 setFormData({
@@ -318,10 +412,19 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                     // so slice off everything after the minute.
                     created_at: lead.created_at ? toLocalDtInput(lead.created_at) : '',
                     updated_at: lead.updated_at ? toLocalDtInput(lead.updated_at) : '',
-                    // Hydrate the 5 history slots from the most-recent past follow-ups
-                    // the API returns. Slots beyond what exists stay blank so the
-                    // user can add more.
-                    past_followups: hydratePastSlots(lead.past_followups),
+                    // Upcoming planned follow-up: API returns it in
+                    // `upcoming_followups[]` (status='planned', no slot_index).
+                    // Hydrate the first one into the "Followup Scheduled On"
+                    // field so the user can see/edit it in the form.
+                    next_action_datetime: lead.upcoming_followups?.[0]?.next_action_datetime
+                        ? toLocalDtInput(lead.upcoming_followups[0].next_action_datetime)
+                        : '',
+                    next_action_comment: lead.upcoming_followups?.[0]?.comment || '',
+                    // Per-stage 5-slot history. Backend returns followups_by_stage
+                    // as { stage_id: [row|null × 5] }; we hydrate every stage the
+                    // lead currently has rows for so the user sees the full
+                    // history when toggling between stages.
+                    followups_by_stage: hydrateFollowupsByStage(lead.followups_by_stage),
                 });
                 setActiveTab(0);
                 setSubmitError('');
@@ -366,14 +469,17 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
         setFormData((prev) => ({ ...prev, source: { ...prev.source, [field]: val } }));
     };
 
-    // Update a single slot in the past_followups array. `idx` is the slot
-    // index (0..4); `field` is 'next_action_datetime' or 'comment'.
-    const setPastFollowupField = (idx, field) => (e) => {
+    // Update a single slot for the given stage. Lazily seeds a 5-slot array
+    // for the stage if it hasn't been touched yet, so the user can edit any
+    // stage without explicit init.
+    const setSlotField = (stageId, idx, field) => (e) => {
         const val = e.target.value;
         setFormData((prev) => {
-            const next = [...(prev.past_followups || [])];
-            next[idx] = { ...(next[idx] || {}), [field]: val };
-            return { ...prev, past_followups: next };
+            const byStage = { ...(prev.followups_by_stage || {}) };
+            const slots = byStage[stageId] ? [...byStage[stageId]] : emptySlots();
+            slots[idx] = { ...(slots[idx] || {}), [field]: val };
+            byStage[stageId] = slots;
+            return { ...prev, followups_by_stage: byStage };
         });
     };
 
@@ -429,35 +535,127 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
         if (formData.created_at) p.created_at = new Date(formData.created_at).toISOString();
         if (formData.updated_at) p.updated_at = new Date(formData.updated_at).toISOString();
 
-        // Past follow-up history (up to 5 slots). Each slot with a datetime
-        // becomes a followups[] entry with status='done'. The upcoming
-        // follow-up is handled separately by /stage today on edit, and by the
-        // existing next_action_datetime path on create — we add it here too
-        // so freshly-created leads can land with a planned follow-up.
+        // Per-stage follow-up history. Each (stage, slot) row with a datetime
+        // becomes a followups[] entry with status='done', slot_index, and
+        // stage_id (required by backend for slot rows). sub_stage_id is
+        // assigned via the review modal — buildPayload reads from the
+        // already-confirmed `formData.followups_by_stage` map.
         //
-        // On CREATE we send the whole array. On EDIT we only send slots that
-        // actually have a datetime, so we don't accidentally wipe the
-        // existing rows (the backend doesn't currently replace, it appends —
-        // see repo.insertLead; on update, follow-ups are not touched).
+        // The upcoming planned follow-up still uses the separate
+        // next_action_datetime field (kept for back-compat with /stage
+        // endpoint behavior); it's emitted on CREATE only.
+        // Status is date-driven, not hard-coded: a future datetime means the
+        // followup is still planned, a past datetime means it's already done.
+        // Avoids the previous bug where every slot row was stamped 'done'
+        // regardless of whether the action had actually happened yet.
         const followups = [];
-        for (const slot of formData.past_followups || []) {
-            if (!slot?.next_action_datetime) continue;
-            followups.push({
-                next_action_datetime: new Date(slot.next_action_datetime).toISOString(),
-                comment: slot.comment || null,
-                status: 'done',
-            });
+        const nowMs = Date.now();
+        for (const [stageId, slots] of Object.entries(formData.followups_by_stage || {})) {
+            if (!stageId) continue;
+            for (let i = 0; i < slots.length; i += 1) {
+                const slot = slots[i];
+                if (!slot?.next_action_datetime) continue;
+                const dt = new Date(slot.next_action_datetime);
+                followups.push({
+                    stage_id: stageId,
+                    sub_stage_id: slot.sub_stage_id || null,
+                    slot_index: i + 1,
+                    next_action_datetime: dt.toISOString(),
+                    comment: slot.comment || null,
+                    status: dt.getTime() > nowMs ? 'planned' : 'done',
+                });
+            }
         }
-        if (!isEditMode && formData.next_action_datetime) {
+        if (!isEditMode && formData.next_action_datetime && formData.stage_id) {
             followups.push({
+                stage_id: formData.stage_id,
+                sub_stage_id: formData.sub_stage_id || null,
                 next_action_datetime: new Date(formData.next_action_datetime).toISOString(),
                 comment: formData.next_action_comment || null,
                 status: 'planned',
             });
         }
-        if (followups.length && !isEditMode) p.followups = followups;
+        if (followups.length) p.followups = followups;
 
         return p;
+    };
+
+    // Build the review-modal rows from current form state. Each row carries
+    // enough context (stage name, slot, date, comment) to be reviewed, plus
+    // the current sub_stage_id (pre-filled if already set on the slot, or
+    // inherited from the form's top-level sub_stage_id when the row's stage
+    // matches the currently-selected stage).
+    const buildReviewRows = () => {
+        const out = [];
+        const stagesData = stages.data || [];
+        for (const [stageId, slots] of Object.entries(formData.followups_by_stage || {})) {
+            if (!stageId) continue;
+            const stage = stagesData.find((s) => s.id === stageId);
+            if (!stage || stage.is_success) continue;
+            for (let i = 0; i < slots.length; i += 1) {
+                const slot = slots[i];
+                if (!slot?.next_action_datetime) continue;
+                out.push({
+                    stage_id: stageId,
+                    stage_name: stage.name,
+                    slot_index: i + 1,
+                    next_action_datetime: slot.next_action_datetime,
+                    comment: slot.comment || '',
+                    sub_stage_id: slot.sub_stage_id
+                        || (stageId === formData.stage_id ? formData.sub_stage_id : '')
+                        || '',
+                });
+            }
+        }
+        return out;
+    };
+
+    // Perform the actual save. Called either directly (no followup rows to
+    // review) or from the review modal's onConfirm (rows now carry the
+    // user-picked sub_stage_id).
+    const performSave = async (reviewedRows) => {
+        setSubmitting(true);
+        try {
+            const payload = buildPayload();
+            // Merge reviewed sub_stage_id back into payload.followups by
+            // (stage_id, slot_index). Planned rows (no slot_index) are
+            // left as-is.
+            if (Array.isArray(payload.followups) && reviewedRows?.length) {
+                const bySlot = new Map(
+                    reviewedRows.map((r) => [`${r.stage_id}|${r.slot_index}`, r.sub_stage_id || null]),
+                );
+                payload.followups = payload.followups.map((f) => {
+                    if (!f.slot_index) return f;
+                    const k = `${f.stage_id}|${f.slot_index}`;
+                    return bySlot.has(k) ? { ...f, sub_stage_id: bySlot.get(k) } : f;
+                });
+            }
+            if (isEditMode) {
+                await leadsApi.update(leadData.id, payload);
+                // If stage was changed via this dialog, also call /stage so the timeline gets a stage_changed entry.
+                if (payload.stage_id && payload.stage_id !== leadData.stage_id) {
+                    await leadsApi.changeStage(leadData.id, {
+                        stage_id: payload.stage_id,
+                        sub_stage_id: payload.sub_stage_id,
+                        remarks: payload.closure_remarks || payload.remarks,
+                        ...(formData.next_action_datetime
+                            ? { next_action_datetime: new Date(formData.next_action_datetime).toISOString() }
+                            : {}),
+                    });
+                }
+                onSaved?.();
+            } else {
+                await leadsApi.create(payload);
+                onCreated?.();
+            }
+            setFormData(blankForm);
+            setReviewOpen(false);
+            onClose?.(null);
+        } catch (e) {
+            setSubmitError(e.message || 'Save failed');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const handleSubmit = async () => {
@@ -475,9 +673,7 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                 return;
             }
         }
-        // Reject past-dated follow-ups before any network call. The picker
-        // already enforces `min` natively but DevTools editing or browsers
-        // that ignore `min` would otherwise let it through.
+        // Reject past-dated planned follow-ups before any network call.
         if (
             formData.next_action_datetime &&
             new Date(formData.next_action_datetime).getTime() < Date.now()
@@ -485,36 +681,17 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
             setSubmitError('Follow-up date and time must be in the future');
             return;
         }
-        setSubmitting(true);
-        try {
-            const payload = buildPayload();
-            if (isEditMode) {
-                await leadsApi.update(leadData.id, payload);
-                // If stage was changed via this dialog, also call /stage so the timeline gets a stage_changed entry.
-                if (payload.stage_id && payload.stage_id !== leadData.stage_id) {
-                    await leadsApi.changeStage(leadData.id, {
-                        stage_id: payload.stage_id,
-                        sub_stage_id: payload.sub_stage_id,
-                        remarks: payload.closure_remarks || payload.remarks,
-                        // If the user filled in the follow-up datetime, ship
-                        // it; backend creates the lead_followups row.
-                        ...(formData.next_action_datetime
-                            ? { next_action_datetime: new Date(formData.next_action_datetime).toISOString() }
-                            : {}),
-                    });
-                }
-                onSaved?.();
-            } else {
-                await leadsApi.create(payload);
-                onCreated?.();
-            }
-            setFormData(blankForm);
-            onClose?.(null);
-        } catch (e) {
-            setSubmitError(e.message || 'Save failed');
-        } finally {
-            setSubmitting(false);
+        // If there are filled follow-up rows, open the sub-stage review modal
+        // first. The user picks a sub-stage per row and the modal calls
+        // performSave with the reviewed rows. If no rows, skip straight to
+        // save with an empty review.
+        const rows = buildReviewRows();
+        if (rows.length) {
+            setReviewRows(rows);
+            setReviewOpen(true);
+            return;
         }
+        await performSave([]);
     };
 
     const handleCancel = () => {
@@ -793,18 +970,32 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                         {canReassign && !lockedConverted && (
                             <>
                                 <div className="add-lead-section-title">Reassign Lead</div>
-                                <div className="add-lead-form-grid" style={{ alignItems: 'center' }}>
-                                    <TextField
-                                        size="small" label="Current Counsellor" fullWidth
-                                        value={leadData?.assigned_to_name || 'Unassigned'}
-                                        InputProps={{ readOnly: true }}
-                                    />
-                                    <TextField
-                                        size="small" label="Current Manager" fullWidth
-                                        value={leadData?.manager_name || '—'}
-                                        InputProps={{ readOnly: true }}
-                                    />
-                                </div>
+                                {(() => {
+                                    // Prefer freshLead (re-fetched after reassign / on open)
+                                    // over the stale list-row prop.
+                                    const counsellor =
+                                        freshLead?.current_owner?.assigned_to_name
+                                        || freshLead?.assigned_to_name
+                                        || leadData?.assigned_to_name
+                                        || 'Unassigned';
+                                    const manager =
+                                        currentManagerName
+                                        || freshLead?.manager_name
+                                        || leadData?.manager_name
+                                        || '—';
+                                    return (
+                                        <div className="add-lead-form-grid" style={{ alignItems: 'center' }}>
+                                            <TextField
+                                                size="small" label="Current Counsellor" fullWidth disabled
+                                                value={counsellor}
+                                            />
+                                            <TextField
+                                                size="small" label="Current Manager" fullWidth disabled
+                                                value={manager}
+                                            />
+                                        </div>
+                                    );
+                                })()}
                                 <div className="add-lead-form-grid" style={{ alignItems: 'center' }}>
                                     <Autocomplete
                                         size="small"
@@ -821,7 +1012,11 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                                                 helperText={
                                                     reassignList.length === 0
                                                         ? 'No eligible counsellors available.'
-                                                        : 'The new owner\'s manager will be linked automatically.'
+                                                        : reassignTo && pickedManagerName
+                                                            ? `Reports to: ${pickedManagerName} (linked automatically).`
+                                                            : reassignTo
+                                                                ? 'This counsellor has no reporting manager set.'
+                                                                : 'The new owner\'s manager will be linked automatically.'
                                                 }
                                             />
                                         )}
@@ -838,10 +1033,13 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
                                     <Button
                                         variant="contained"
-                                        color="warning"
                                         onClick={handleReassign}
                                         disabled={reassigning || !reassignTo || reassignTo === leadData?.assigned_to}
-                                        sx={{ textTransform: 'none' }}
+                                        sx={{
+                                            textTransform: 'none',
+                                            backgroundColor: 'var(--primary)',
+                                            '&:hover': { backgroundColor: 'var(--primary)', filter: 'brightness(0.92)' },
+                                        }}
                                     >
                                         {reassigning ? 'Reassigning…' : 'Reassign now'}
                                     </Button>
@@ -915,17 +1113,12 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                                 </div>
 
 
-                                {/* Upcoming follow-up (was conditional on stage matching /follow/i;
-                                    now always shown so any lead can be scheduled). Comment field
-                                    captures the equivalent of the CSV's "Follow up Comments" column. */}
+                                {/* Upcoming follow-up — shown for every stage EXCEPT the
+                                    tenant's success ("Converted") stage. Converted leads own
+                                    no followups by policy. */}
                                 {(() => {
-                                    // Only show the upcoming-followup inputs when the chosen
-                                    // stage is a Followup-type stage (or the lead's current
-                                    // stage already is one). For any other stage, scheduling
-                                    // a follow-up doesn't fit the workflow.
                                     const picked = (stages.data || []).find((s) => s.id === formData.stage_id);
-                                    const isFollowupStage = picked?.name && /follow/i.test(picked.name);
-                                    if (!isFollowupStage) return null;
+                                    if (!picked || picked.is_success) return null;
                                     const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
                                     const minStr = now.toISOString().slice(0, 16);
                                     const value = formData.next_action_datetime || '';
@@ -974,59 +1167,80 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                                     <TextField label="Remarks" required={!isEditMode} size="small" multiline minRows={2} value={formData.remarks} onChange={setField('remarks')} fullWidth />
                                 </div>
 
-                                {/* Past follow-up attempts (CSV parity: NextActionDate 1..5
-                                    + Comment 1..5) AND audit timestamps. Both blocks are only
-                                    relevant when the lead is being placed into a Followup
-                                    stage — for any other stage, scheduling history doesn't
-                                    apply, and the form stays focused on the current action.
-                                    Gate: picked stage name matches /follow/i, OR the existing
-                                    lead is already in such a stage. */}
+                                {/* Per-stage 5-slot follow-up history. Shown for every stage
+                                    EXCEPT the success ("Converted") stage. Works in both Add
+                                    and Edit modes. Slots are scoped to the currently-selected
+                                    stage_id; switching stages reveals that stage's own 5 slots
+                                    (any rows the user typed for a previously-selected stage
+                                    stay in state until submit). */}
                                 {(() => {
                                     const picked = (stages.data || []).find((s) => s.id === formData.stage_id);
-                                    const isFollowupStage = picked?.name && /follow/i.test(picked.name);
-                                    if (!isFollowupStage) return null;
+                                    if (!picked || picked.is_success) return null;
+                                    const stageId = formData.stage_id;
+                                    const slots = (formData.followups_by_stage || {})[stageId] || emptySlots();
                                     return (
                                         <>
-                                            {!isEditMode && (
-                                                <>
-                                                    <div className="add-lead-section-title">Past Follow-up Attempts (most recent first)</div>
-                                                    {(formData.past_followups || []).map((slot, idx) => (
-                                                        <div key={idx} className="add-lead-form-grid">
-                                                            {/* Native <label> + datetime-local — sidesteps the MUI floating-label
-                                                                overlap with the browser's dd/mm/yyyy placeholder. */}
-                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                                                <label style={{ fontSize: 12, color: '#555', fontWeight: 500 }}>
-                                                                    Next Action Date {idx + 1}
-                                                                </label>
-                                                                <input
-                                                                    type="datetime-local"
-                                                                    value={slot.next_action_datetime || ''}
-                                                                    onChange={setPastFollowupField(idx, 'next_action_datetime')}
-                                                                    style={{
-                                                                        height: 40,
-                                                                        padding: '8px 12px',
-                                                                        border: '1px solid rgba(0,0,0,0.23)',
-                                                                        borderRadius: 4,
-                                                                        fontSize: 14,
-                                                                        fontFamily: 'inherit',
-                                                                        boxSizing: 'border-box',
-                                                                        width: '100%',
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                            <TextField
-                                                                label={`Comment ${idx + 1}`}
-                                                                size="small"
-                                                                value={slot.comment || ''}
-                                                                onChange={setPastFollowupField(idx, 'comment')}
-                                                                fullWidth
-                                                                multiline
-                                                                maxRows={3}
+                                            <div className="add-lead-section-title">
+                                                Follow-up Attempts for {picked.name} (5 slots, most recent first)
+                                            </div>
+                                            {slots.map((slot, idx) => {
+                                                const isDone = slot.status === 'done';
+                                                return (
+                                                <div key={`${stageId}-${idx}`}>
+                                                    <div className="add-lead-form-grid">
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                            <label style={{ fontSize: 12, color: '#555', fontWeight: 500 }}>
+                                                                Next Action Date {idx + 1}
+                                                                {isDone && (
+                                                                    <span style={{
+                                                                        marginLeft: 8, fontSize: 10, fontWeight: 700,
+                                                                        background: '#e8f5e9', color: '#1b5e20',
+                                                                        padding: '2px 6px', borderRadius: 4,
+                                                                    }}>DONE</span>
+                                                                )}
+                                                            </label>
+                                                            <input
+                                                                type="datetime-local"
+                                                                value={slot.next_action_datetime || ''}
+                                                                onChange={setSlotField(stageId, idx, 'next_action_datetime')}
+                                                                disabled={isDone}
+                                                                style={{
+                                                                    height: 40,
+                                                                    padding: '8px 12px',
+                                                                    border: '1px solid rgba(0,0,0,0.23)',
+                                                                    borderRadius: 4,
+                                                                    fontSize: 14,
+                                                                    fontFamily: 'inherit',
+                                                                    boxSizing: 'border-box',
+                                                                    width: '100%',
+                                                                    background: isDone ? '#f5f5f5' : 'white',
+                                                                }}
                                                             />
                                                         </div>
-                                                    ))}
-                                                </>
-                                            )}
+                                                        <TextField
+                                                            label={`Comment ${idx + 1}`}
+                                                            size="small"
+                                                            value={slot.comment || ''}
+                                                            onChange={setSlotField(stageId, idx, 'comment')}
+                                                            fullWidth
+                                                            multiline
+                                                            maxRows={3}
+                                                            disabled={isDone}
+                                                        />
+                                                    </div>
+                                                    {isDone && slot.completion_reason && (
+                                                        <div style={{
+                                                            marginTop: -8, marginBottom: 16,
+                                                            padding: '8px 12px',
+                                                            background: '#f0fdf4', borderLeft: '3px solid #43A047',
+                                                            borderRadius: 4, fontSize: 12, color: '#1b5e20',
+                                                        }}>
+                                                            <strong>Closure remark:</strong> {slot.completion_reason}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                );
+                                            })}
 
                                             {/* Audit timestamps. Optional — leave blank to let the server
                                                 use now() (or, on edit, keep whatever is already in DB). */}
@@ -1165,6 +1379,15 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                 type={quickCreate.type}
                 onClose={closeQuickCreate}
                 onCreated={handleQuickCreated}
+            />
+            {/* Sub-stage review modal. Opens on submit when there are filled
+                follow-up rows; on confirm, performSave fires the API call. */}
+            <SubStageReviewModal
+                open={reviewOpen}
+                rows={reviewRows}
+                subStages={subStages.data || []}
+                onCancel={() => setReviewOpen(false)}
+                onConfirm={(rows) => performSave(rows)}
             />
         </Dialog>
     );

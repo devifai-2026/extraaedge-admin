@@ -31,11 +31,20 @@ const ROLE_MANAGER_TABS = [
 const ROLE_COUNSELLOR_TABS = [
   'dashboard', 'leads', 'raw_data', 'failed_leads', 'followups', 'whatsapp',
 ];
-// Account managers see converted leads + the basic operational tabs.
-// Their own dedicated UI will land in a later phase; for now they share
-// the leads list (scoped to converted leads server-side).
+// Account managers get a dedicated Accounts module — separate sidebar
+// entirely from counsellors / managers. They never see /leadlist or
+// /followupmanager (those are sales-team surfaces).
 const ROLE_ACCOUNT_MANAGER_TABS = [
-  'dashboard', 'leads', 'followups', 'whatsapp',
+  'accounts.dashboard',
+  'accounts.pending_admissions',
+  'accounts.this_month_admissions',
+  'accounts.total_admissions',
+  'accounts.approvals',
+  'accounts.attendings',
+  'accounts.break',
+  'accounts.report',
+  'accounts.pay_schedule',
+  'accounts.collection_receipt_wise',
 ];
 
 const FALLBACK_TABS = {
@@ -94,6 +103,17 @@ const TAB_TO_ROUTE = {
   connected_accounts: '/connectedaccounts',
   third_party_integration: '/connectedaccounts',
   reports: '/dashboard',
+  // Accounts module — account_manager only
+  'accounts.dashboard':              '/accounts/dashboard',
+  'accounts.pending_admissions':     '/accounts/pending-admissions',
+  'accounts.this_month_admissions':  '/accounts/this-month-admissions',
+  'accounts.total_admissions':       '/accounts/total-admissions',
+  'accounts.approvals':              '/accounts/approvals',
+  'accounts.attendings':             '/accounts/attendings',
+  'accounts.break':                  '/accounts/break',
+  'accounts.report':                 '/accounts/report',
+  'accounts.pay_schedule':           '/accounts/pay-schedule',
+  'accounts.collection_receipt_wise':'/accounts/collection-receipt-wise',
 };
 
 // First route the current user is allowed to land on. Used by login and
@@ -107,8 +127,14 @@ export const firstAllowedRoute = () => {
     : (FALLBACK_TABS[currentRole()] || []);
 
   // Walk the canonical sidebar order so the user lands on the most
-  // dashboard-y thing they can access.
-  const order = ['dashboard', 'leads', 'raw_data', 'failed_leads', 'followups', 'whatsapp', 'bulk_upload'];
+  // dashboard-y thing they can access. Accounts-module keys are listed
+  // first because account_managers have NO overlap with sales tabs —
+  // their landing page is their own dashboard, not /leadlist.
+  const order = [
+    'accounts.dashboard',
+    'dashboard', 'leads', 'raw_data', 'failed_leads',
+    'followups', 'whatsapp', 'bulk_upload',
+  ];
   for (const key of order) {
     if (candidates.includes('*') || candidates.includes(key)) {
       const route = TAB_TO_ROUTE[key];

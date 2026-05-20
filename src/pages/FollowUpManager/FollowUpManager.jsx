@@ -12,6 +12,7 @@ import {
   IconButton, Box, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText,
   TextField, InputAdornment, Chip, CircularProgress, Autocomplete,
   Collapse, Table, TableBody, TableCell, TableHead, TableRow, Button,
+  Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -26,6 +27,8 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import EventIcon from '@mui/icons-material/Event';
 import PersonIcon from '@mui/icons-material/Person';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { followUpsApi, usersApi } from '../../lib/endpoints';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../../lib/endpoints';
@@ -136,7 +139,7 @@ function FollowupCalendar({ selectedDate, onDateSelect, dayBuckets, loading }) {
           const bucket = dayBuckets.get(dateStr);
           const dow = (firstDayOfWeek + day - 1) % 7;
           const tooltip = bucket
-            ? `${bucket.total} follow-up${bucket.total === 1 ? '' : 's'}${bucket.planned ? ` · ${bucket.planned} planned` : ''}${bucket.done ? ` · ${bucket.done} done` : ''}${bucket.missed ? ` · ${bucket.missed} missed` : ''}`
+            ? `${bucket.total} follow-up${bucket.total === 1 ? '' : 's'}${bucket.planned ? ` · ${bucket.planned} planned` : ''}${bucket.done ? ` · ${bucket.done} done` : ''}${bucket.missed ? ` · ${bucket.missed} missed` : ''}${bucket.cancelled ? ` · ${bucket.cancelled} cancelled` : ''}`
             : '';
           return (
             <Tooltip title={tooltip} arrow placement="top" key={day} disableHoverListener={!bucket}>
@@ -147,9 +150,10 @@ function FollowupCalendar({ selectedDate, onDateSelect, dayBuckets, loading }) {
                 <span className="calendar-cell-num">{day}</span>
                 {bucket && (
                   <div className="calendar-dots">
-                    {bucket.planned > 0 && <span className="calendar-dot dot-planned" />}
-                    {bucket.done    > 0 && <span className="calendar-dot dot-done" />}
-                    {bucket.missed  > 0 && <span className="calendar-dot dot-missed" />}
+                    {bucket.planned   > 0 && <span className="calendar-dot dot-planned" />}
+                    {bucket.done      > 0 && <span className="calendar-dot dot-done" />}
+                    {bucket.missed    > 0 && <span className="calendar-dot dot-missed" />}
+                    {bucket.cancelled > 0 && <span className="calendar-dot dot-cancelled" />}
                   </div>
                 )}
               </div>
@@ -163,6 +167,7 @@ function FollowupCalendar({ selectedDate, onDateSelect, dayBuckets, loading }) {
         <span><span className="calendar-dot dot-planned" /> Planned</span>
         <span><span className="calendar-dot dot-done" /> Done</span>
         <span><span className="calendar-dot dot-missed" /> Missed</span>
+        <span><span className="calendar-dot dot-cancelled" /> Cancelled</span>
       </div>
     </div>
   );
@@ -316,14 +321,22 @@ export default function FollowUpManager() {
     return m;
   }, [calendarData]);
 
-  // Status counts for tabs (for the selected day)
+  // Status counts for tabs (for the selected day). MUST come from the
+  // calendar-buckets endpoint (unfiltered per-status totals for the day),
+  // not from the already-filtered `followups` list — otherwise picking the
+  // "Done" tab on a day that only has planned rows would show every chip
+  // as 0 and hide the fact that the day has any followups at all.
   const tabCounts = useMemo(() => {
-    const counts = { all: followups.length, planned: 0, done: 0, missed: 0, cancelled: 0 };
-    for (const f of followups) {
-      if (counts[f.status] !== undefined) counts[f.status] += 1;
-    }
-    return counts;
-  }, [followups]);
+    const bucket = dayBuckets.get(selectedDateStr);
+    if (!bucket) return { all: 0, planned: 0, done: 0, missed: 0, cancelled: 0 };
+    return {
+      all: bucket.total || 0,
+      planned: bucket.planned || 0,
+      done: bucket.done || 0,
+      missed: bucket.missed || 0,
+      cancelled: bucket.cancelled || 0,
+    };
+  }, [dayBuckets, selectedDateStr]);
 
   const onCalendarSelect = (d) => {
     setSelectedDate(d);
@@ -541,7 +554,13 @@ export default function FollowUpManager() {
               </p>
             </div>
           )}
-          {!loading && followups.map((f) => <FollowupRow key={f.id} f={f} onChanged={reloadList} />)}
+          {!loading && followups.map((f) => (
+            <FollowupRow
+              key={f.id}
+              f={f}
+              onChanged={() => { reloadList(); reloadCalendar(); }}
+            />
+          ))}
         </div>
       </div>
 
@@ -557,79 +576,314 @@ export default function FollowUpManager() {
   );
 }
 
-// Single follow-up row in the list. Shows lead, time, status, owner.
+// Single follow-up row in the list. Shows a coloured status dot + label,
+// plus per-status actions:
+//   • planned (yellow)  → reschedule, mark done, cancel
+//   • missed  (red)     → reschedule, mark done, cancel
+//   • done    (green)   → locked, no actions
+//   • cancelled (grey)  → locked, no actions
 function FollowupRow({ f, onChanged }) {
   const [busy, setBusy] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleAt, setRescheduleAt] = useState('');
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [doneOpen, setDoneOpen] = useState(false);
+  const [doneReason, setDoneReason] = useState('');
   const navigate = useNavigate();
-  const statusColor = {
-    planned:   { bg: '#fff3e0', fg: '#e65100' },
-    done:      { bg: '#e8f5e9', fg: '#1b5e20' },
-    missed:    { bg: '#ffebee', fg: '#b71c1c' },
-    cancelled: { bg: '#eeeeee', fg: '#555' },
-  }[f.status] || { bg: '#f5f5f5', fg: '#555' };
 
-  const complete = async () => {
+  const STATUS_META = {
+    planned:   { color: '#FB8C00', label: 'Planned'   },
+    done:      { color: '#43A047', label: 'Done'      },
+    missed:    { color: '#E53935', label: 'Missed'    },
+    cancelled: { color: '#9E9E9E', label: 'Cancelled' },
+  };
+  const meta = STATUS_META[f.status] || { color: '#9E9E9E', label: f.status };
+  const canAct = f.status === 'planned' || f.status === 'missed';
+
+  const wrap = async (op) => {
     setBusy(true);
-    try { await followUpsApi.complete(f.id); onChanged?.(); }
+    try { await op(); onChanged?.(); }
     catch (e) { alert(e.message || 'Failed'); }
     finally { setBusy(false); }
   };
 
-  // Open the lead's edit dialog by deep-linking to LeadList with ?focus=<id>;
-  // LeadList already handles the param and pops AddNewLead in edit mode.
+  // Date-only comparison (ignores time of day): if today is BEFORE the
+  // scheduled date, surface an "early done" warning inside the same
+  // reason modal. The reason itself is always required because product
+  // wants every closure to carry a remark for audit + timeline.
+  const isEarlyDone = (() => {
+    if (!f.next_action_datetime) return false;
+    const scheduled = new Date(f.next_action_datetime);
+    const today = new Date();
+    const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return dayKey(today) < dayKey(scheduled);
+  })();
+
+  const complete = () => {
+    setDoneReason('');
+    setDoneOpen(true);
+  };
+
+  const confirmDone = async () => {
+    const reason = doneReason.trim();
+    if (!reason) return;
+    await wrap(() => followUpsApi.complete(f.id, reason));
+    setDoneOpen(false);
+    setDoneReason('');
+  };
+
+  const openReschedule = () => {
+    // Seed the picker with the existing datetime so users can nudge it
+    // forward, not re-type the whole thing.
+    if (f.next_action_datetime) {
+      const d = new Date(f.next_action_datetime);
+      const pad = (n) => String(n).padStart(2, '0');
+      setRescheduleAt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    } else {
+      setRescheduleAt('');
+    }
+    setRescheduleOpen(true);
+  };
+
+  const confirmReschedule = async () => {
+    if (!rescheduleAt) return;
+    const iso = new Date(rescheduleAt).toISOString();
+    await wrap(() => followUpsApi.reschedule(f.id, iso));
+    setRescheduleOpen(false);
+  };
+
+  const confirmCancel = async () => {
+    await wrap(() => followUpsApi.cancel(f.id, cancelReason || undefined));
+    setCancelOpen(false);
+    setCancelReason('');
+  };
+
+  // Open the lead's edit dialog by deep-linking to LeadList with ?focus=<id>.
   const openLead = () => {
     if (f.lead_id) navigate(`/leadlist?focus=${f.lead_id}`);
   };
 
   return (
-    <div
-      className="followup-row"
-      onClick={openLead}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter') openLead(); }}
-      style={{ cursor: f.lead_id ? 'pointer' : 'default' }}
-    >
-      <div className="followup-row-time">
-        <EventIcon fontSize="small" sx={{ color: '#888' }} />
-        <span>{fmtTime(f.next_action_datetime)}</span>
-      </div>
-      <div className="followup-row-main">
-        <div className="followup-row-lead">
-          <span style={{ fontWeight: 600 }}>{f.lead_name || '—'}</span>
-          <span style={{ color: '#888', fontSize: 12 }}>
-            {[f.lead_phone, f.lead_program_name].filter(Boolean).join(' · ')}
+    <>
+      <div
+        className="followup-row"
+        onClick={openLead}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter') openLead(); }}
+        style={{ cursor: f.lead_id ? 'pointer' : 'default' }}
+      >
+        <div className="followup-row-time">
+          <EventIcon fontSize="small" sx={{ color: '#888' }} />
+          <span>{fmtTime(f.next_action_datetime)}</span>
+        </div>
+        <div className="followup-row-main">
+          <div className="followup-row-lead">
+            <span style={{ fontWeight: 600 }}>{f.lead_name || '—'}</span>
+            <span style={{ color: '#888', fontSize: 12 }}>
+              {[f.lead_phone, f.lead_program_name].filter(Boolean).join(' · ')}
+            </span>
+          </div>
+          <div className="followup-row-meta">
+            {f.lead_stage_name && <Chip size="small" label={f.lead_stage_name} sx={{ height: 22, fontSize: 11 }} />}
+            {f.lead_assigned_to_name && (
+              <span style={{ fontSize: 12, color: '#666' }}>
+                <PersonIcon sx={{ fontSize: 14, verticalAlign: 'middle', mr: 0.3 }} />
+                {f.lead_assigned_to_name}
+              </span>
+            )}
+            {f.comment && (
+              <span style={{ fontSize: 12, color: '#444', fontStyle: 'italic', marginLeft: 8 }}>&quot;{f.comment}&quot;</span>
+            )}
+          </div>
+        </div>
+        <div className="followup-row-actions" onClick={(e) => e.stopPropagation()}>
+          {/* Coloured dot + label badge */}
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '2px 10px 2px 8px', borderRadius: 999,
+            background: `${meta.color}14`, color: meta.color,
+            fontSize: 11, fontWeight: 700,
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: meta.color,
+              boxShadow: `0 0 0 3px ${meta.color}22`,
+            }} />
+            {meta.label}
           </span>
-        </div>
-        <div className="followup-row-meta">
-          {f.lead_stage_name && <Chip size="small" label={f.lead_stage_name} sx={{ height: 22, fontSize: 11 }} />}
-          {f.lead_assigned_to_name && (
-            <span style={{ fontSize: 12, color: '#666' }}>
-              <PersonIcon sx={{ fontSize: 14, verticalAlign: 'middle', mr: 0.3 }} />
-              {f.lead_assigned_to_name}
-            </span>
-          )}
-          {f.comment && (
-            <span style={{ fontSize: 12, color: '#444', fontStyle: 'italic', marginLeft: 8 }}>"{f.comment}"</span>
+          {canAct && (
+            <>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={complete}
+                disabled={busy}
+                startIcon={<CheckCircleIcon fontSize="small" />}
+                sx={{
+                  textTransform: 'none',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: '#1b5e20',
+                  borderColor: '#a5d6a7',
+                  bgcolor: '#e8f5e9',
+                  '&:hover': { bgcolor: '#c8e6c9', borderColor: '#43A047' },
+                }}
+              >
+                Mark done
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={openReschedule}
+                disabled={busy}
+                startIcon={<ScheduleIcon fontSize="small" />}
+                sx={{
+                  textTransform: 'none',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: '#0d47a1',
+                  borderColor: '#90caf9',
+                  bgcolor: '#e3f2fd',
+                  '&:hover': { bgcolor: '#bbdefb', borderColor: '#1976d2' },
+                }}
+              >
+                Reschedule
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => setCancelOpen(true)}
+                disabled={busy}
+                startIcon={<CancelOutlinedIcon fontSize="small" />}
+                sx={{
+                  textTransform: 'none',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: '#b71c1c',
+                  borderColor: '#ef9a9a',
+                  bgcolor: '#ffebee',
+                  '&:hover': { bgcolor: '#ffcdd2', borderColor: '#E53935' },
+                }}
+              >
+                Cancel
+              </Button>
+            </>
           )}
         </div>
       </div>
-      <div className="followup-row-actions" onClick={(e) => e.stopPropagation()}>
-        <Chip
-          size="small"
-          label={f.status}
-          sx={{ height: 22, fontSize: 11, background: statusColor.bg, color: statusColor.fg, fontWeight: 600 }}
-        />
-        {f.status === 'planned' && (
-          <Tooltip title="Mark as done">
-            <span>
-              <IconButton size="small" onClick={complete} disabled={busy} sx={{ color: '#43A047' }}>
-                <CheckCircleIcon fontSize="small" />
-              </IconButton>
-            </span>
-          </Tooltip>
-        )}
-      </div>
-    </div>
+
+      {/* Mark-done modal — always opens (reason is mandatory). When the
+          scheduled date is still in the future we add an inline warning
+          so the user doesn't accidentally close a future follow-up. The
+          reason is stored on lead_followups.completion_reason and shown
+          in the lead timeline, LeadCard followups view, and the Edit
+          Lead form's slot grid. */}
+      <Dialog open={doneOpen} onClose={() => setDoneOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Mark follow-up as done</DialogTitle>
+        <DialogContent>
+          {isEarlyDone && (
+            <p style={{ fontSize: 12, color: '#b45309', background: '#fef3c7', padding: '6px 10px', borderRadius: 6, marginTop: 0 }}>
+              Heads up — this follow-up is scheduled for{' '}
+              <strong>
+                {f.next_action_datetime
+                  ? new Date(f.next_action_datetime).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : 'a future date'}
+              </strong>
+              . Marking it done now will close it early.
+            </p>
+          )}
+          <p style={{ fontSize: 13, color: '#555', marginTop: 8, marginBottom: 8 }}>
+            What happened on this follow-up? Once marked done, the row is
+            locked.
+          </p>
+          <TextField
+            label="Remark (required)"
+            value={doneReason}
+            onChange={(e) => setDoneReason(e.target.value)}
+            fullWidth
+            size="small"
+            multiline
+            minRows={3}
+            autoFocus
+            placeholder="e.g. Spoke to parent, decided to enrol"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDoneOpen(false)}>Cancel</Button>
+          <Button
+            onClick={confirmDone}
+            variant="contained"
+            color="success"
+            disabled={busy || !doneReason.trim()}
+          >
+            Mark done
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Reschedule modal — datetime-local input seeded with the current
+          scheduled time. Confirms via POST /follow-ups/:id/reschedule. */}
+      <Dialog open={rescheduleOpen} onClose={() => setRescheduleOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Reschedule follow-up</DialogTitle>
+        <DialogContent>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+            <label style={{ fontSize: 12, color: '#555', fontWeight: 500 }}>New date and time</label>
+            <input
+              type="datetime-local"
+              value={rescheduleAt}
+              onChange={(e) => setRescheduleAt(e.target.value)}
+              style={{
+                height: 40, padding: '8px 12px',
+                border: '1px solid rgba(0,0,0,0.23)', borderRadius: 4,
+                fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', width: '100%',
+              }}
+            />
+          </div>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRescheduleOpen(false)}>Cancel</Button>
+          <Button onClick={confirmReschedule} variant="contained" disabled={!rescheduleAt || busy}>
+            Reschedule
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Cancel modal — soft-delete + notifyChain on confirm. The reason is
+          optional but recommended; it's stored in lead_activities and sent
+          in the socket notification payload. */}
+      <Dialog open={cancelOpen} onClose={() => setCancelOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Cancel follow-up</DialogTitle>
+        <DialogContent>
+          <p style={{ fontSize: 13, color: '#555', marginTop: 0 }}>
+            Why are you cancelling? Your manager and their managers will be
+            notified, and this reason will appear in the lead timeline.
+          </p>
+          <TextField
+            label="Reason (required)"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            fullWidth
+            size="small"
+            multiline
+            minRows={3}
+            autoFocus
+            placeholder="e.g. Lead asked us to stop contacting them"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCancelOpen(false)}>Back</Button>
+          <Button
+            onClick={confirmCancel}
+            variant="contained"
+            color="error"
+            disabled={busy || !cancelReason.trim()}
+          >
+            Cancel follow-up
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

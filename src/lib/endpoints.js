@@ -49,7 +49,7 @@ export const followUpsApi = {
   overdue: () => api.get('/follow-ups/overdue'),
   create: (body) => api.post('/follow-ups', body),
   update: (id, body, ifMatch) => api.put(`/follow-ups/${id}`, body, ifMatch),
-  complete: (id) => api.post(`/follow-ups/${id}/complete`),
+  complete: (id, reason) => api.post(`/follow-ups/${id}/complete`, reason ? { completion_reason: reason } : {}),
   reschedule: (id, next_action_datetime) => api.post(`/follow-ups/${id}/reschedule`, { next_action_datetime }),
   // Cancel keeps the row (status='cancelled') so reports + timeline see it.
   // Use delete for hard-removal.
@@ -362,10 +362,53 @@ export const subscriptionApi = {
   setPlan: (plan_id) => api.put('/subscription/plan', { plan_id }),
 };
 
+// Accounts / Admissions module. Only visible to account_manager + super_admin.
+// All routes live under /api/v1/admissions.
+export const admissionsApi = {
+  // Dashboard summary cards + chart data
+  dashboard: (params) => api.get('/admissions/dashboard', params),
+
+  // Pending admissions queue (converted leads w/o admission + pending_approval)
+  pendingAdmissions: () => api.get('/admissions/pending-admissions'),
+  pendingAdmissionsCount: () => api.get('/admissions/pending-admissions/count'),
+
+  // List + detail
+  list: (params) => api.get('/admissions', params),
+  get: (id) => api.get(`/admissions/${id}`),
+  create: (body) => api.post('/admissions', body),
+  update: (id, body) => api.put(`/admissions/${id}`, body),
+  delete: (id) => api.delete(`/admissions/${id}`),
+
+  // Status transitions
+  approve: (id) => api.post(`/admissions/${id}/approve`),
+  break: (id, reason) => api.post(`/admissions/${id}/break`, reason ? { reason } : {}),
+  resume: (id) => api.post(`/admissions/${id}/resume`),
+  complete: (id) => api.post(`/admissions/${id}/complete`),
+
+  // Receipts (per-admission CRUD + flat list)
+  createReceipt: (admissionId, body) => api.post(`/admissions/${admissionId}/receipts`, body),
+  listReceipts: (params) => api.get('/admissions/receipts', params),
+  deleteReceipt: (id) => api.delete(`/admissions/receipts/${id}`),
+
+  // Reports
+  paySchedule: (params) => api.get('/admissions/reports/pay-schedule', params),
+  collectionReceiptWise: (params) => api.get('/admissions/reports/collection-receipt-wise', params),
+
+  // Centers (super_admin manages; account_manager reads via list)
+  centers: {
+    list: () => api.get('/admissions/centers'),
+    create: (body) => api.post('/admissions/centers', body),
+    update: (id, body) => api.put(`/admissions/centers/${id}`, body),
+    delete: (id) => api.delete(`/admissions/centers/${id}`),
+  },
+};
+
 export const notificationsApi = {
   list: (params) => api.get('/notifications', params),
   markRead: (id) => api.post(`/notifications/${id}/read`),
   markAllRead: () => api.post('/notifications/read-all'),
+  // Hard-delete every notification row for the calling user.
+  deleteAll: () => api.delete('/notifications'),
 };
 
 export const workSessionsApi = {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
@@ -20,7 +20,17 @@ import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
 import IntegrationInstructionsIcon from '@mui/icons-material/IntegrationInstructions';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import SchoolIcon from '@mui/icons-material/School';
+import ChecklistIcon from '@mui/icons-material/Checklist';
+import HowToRegIcon from '@mui/icons-material/HowToReg';
+import PauseCircleIcon from '@mui/icons-material/PauseCircle';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import PaymentsIcon from '@mui/icons-material/Payments';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import PendingActionsIcon from '@mui/icons-material/PendingActions';
 import { hasTab } from '../../lib/rbac';
+import { admissionsApi } from '../../lib/endpoints';
+import { onNotification } from '../../lib/socket';
 
 // Each menu item declares the tab key it maps to (matches DEFAULT_TAB_KEYS on backend).
 // Items are filtered against the user's allowed_tabs from /auth/login.
@@ -40,6 +50,22 @@ const menuItems = [
   { id: 13, label: 'Basic Settings', icon: SettingsIcon, path: '/settings', tab: 'settings.email_templates' },
   { id: 14, label: 'Advanced Settings', icon: SettingsSuggestIcon, path: '/advancedsettings', tab: 'advanced.users_roles' },
   { id: 15, label: 'Third Party Integration', icon: IntegrationInstructionsIcon, path: '/thirdpartyintegration', tab: 'third_party_integration' },
+
+  // ---------- Accounts module (account_manager role) ----------
+  // These items only appear for users whose role grants the corresponding
+  // 'accounts.*' tab key. Filtering happens in visibleItems() via hasTab().
+  { id: 100, label: 'Dashboard',              icon: DashboardIcon,       path: '/accounts/dashboard',                  tab: 'accounts.dashboard' },
+  // `badgeKey: 'pending_admissions'` flags this item as one whose badge
+  // we should pull live from the API + socket. See Sidebar() below.
+  { id: 109, label: 'Pending Admissions',     icon: PendingActionsIcon,  path: '/accounts/pending-admissions',         tab: 'accounts.pending_admissions', badgeKey: 'pending_admissions' },
+  { id: 101, label: 'This Month Admissions',  icon: SchoolIcon,          path: '/accounts/this-month-admissions',      tab: 'accounts.this_month_admissions' },
+  { id: 102, label: 'Total Admissions',       icon: SchoolIcon,          path: '/accounts/total-admissions',           tab: 'accounts.total_admissions' },
+  { id: 103, label: 'Approvals',              icon: ChecklistIcon,       path: '/accounts/approvals',                  tab: 'accounts.approvals' },
+  { id: 104, label: 'Attendings',             icon: HowToRegIcon,        path: '/accounts/attendings',                 tab: 'accounts.attendings' },
+  { id: 105, label: 'Break',                  icon: PauseCircleIcon,     path: '/accounts/break',                      tab: 'accounts.break' },
+  { id: 106, label: 'Report',                 icon: AssessmentIcon,      path: '/accounts/report',                     tab: 'accounts.report' },
+  { id: 107, label: 'Pay Schedule',           icon: PaymentsIcon,        path: '/accounts/pay-schedule',               tab: 'accounts.pay_schedule' },
+  { id: 108, label: 'Collection Receipt-wise',icon: ReceiptLongIcon,     path: '/accounts/collection-receipt-wise',    tab: 'accounts.collection_receipt_wise' },
 ];
 
 const bottomMenuItems = [
@@ -51,6 +77,30 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
+  // Live badge counters keyed by `badgeKey` on the menu item. Only one
+  // counter today (pending_admissions) but the shape makes adding more
+  // a one-line change. Skipped entirely when the user can't see the
+  // corresponding tab so we don't probe the API as a counsellor.
+  const [badges, setBadges] = useState({});
+  useEffect(() => {
+    if (!hasTab('accounts.pending_admissions')) return undefined;
+    let alive = true;
+    const refresh = async () => {
+      try {
+        const r = await admissionsApi.pendingAdmissionsCount();
+        if (alive) setBadges((b) => ({ ...b, pending_admissions: r?.data?.pending || 0 }));
+      } catch { /* ignore */ }
+    };
+    refresh();
+    // Socket: backend emits 'admission.pending' on every lead conversion
+    // / stub insert; bump count immediately for a snappy badge.
+    const off = onNotification((evt) => {
+      if (evt?.type === 'admission.pending') refresh();
+    });
+    // Polling fallback in case the socket drops or backfills are missed.
+    const t = setInterval(refresh, 60_000);
+    return () => { alive = false; off(); clearInterval(t); };
+  }, []);
 
   const handleMenuClick = (item) => {
     if (item.action === 'modal') {
@@ -68,6 +118,11 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
       {visibleItems(items).map((item) => {
         const IconComponent = item.icon;
         const isActive = !item.action && location.pathname === item.path;
+        // Two badge sources: a static `item.badge` (legacy) or a
+        // live-counter keyed by `item.badgeKey`. Hide when 0 so the
+        // sidebar doesn't carry "0" forever once the queue clears.
+        const live = item.badgeKey ? badges[item.badgeKey] : null;
+        const badgeValue = item.badge ?? (live > 0 ? live : null);
         return (
           <li key={item.id}>
             <button
@@ -80,11 +135,29 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
               }}
               title={collapsed ? item.label : ''}
             >
-              <span className="menu-icon">
+              <span className="menu-icon" style={{ position: 'relative' }}>
                 <IconComponent />
+                {/* When the sidebar is collapsed we still want the user to
+                    see something's pending — show a tiny red dot on the
+                    icon itself instead of the (hidden) right-side badge. */}
+                {collapsed && badgeValue && (
+                  <span style={{
+                    position: 'absolute', top: -2, right: -2,
+                    minWidth: 8, height: 8, borderRadius: '50%',
+                    background: '#dc2626',
+                    boxShadow: '0 0 0 2px white',
+                  }} />
+                )}
               </span>
               {!collapsed && <span className="menu-label">{item.label}</span>}
-              {!collapsed && item.badge && <span className="badge">{item.badge}</span>}
+              {!collapsed && badgeValue != null && (
+                <span className="badge" style={{
+                  background: '#dc2626', color: '#fff',
+                  borderRadius: 10, padding: '2px 7px',
+                  fontSize: 11, fontWeight: 700, marginLeft: 'auto',
+                  fontVariantNumeric: 'tabular-nums',
+                }}>{badgeValue}</span>
+              )}
             </button>
           </li>
         );

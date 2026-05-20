@@ -129,10 +129,14 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
 
                     <Box sx={{ display: "flex", gap: 1 }}>
 
-                        {/* GROUP MODAL */}
-                        <IconButton size="small" onClick={() => setOpenAssign(true)}>
-                            <GroupIcon sx={{ color: colors.primary }} />
-                        </IconButton>
+                        {/* GROUP / bulk-reassign opener — hidden for counsellors
+                            who cannot reassign leads. Server enforces the same
+                            scope on POST /lead-assignments. */}
+                        {!isRole(ROLES.COUNSELLOR) && (
+                            <IconButton size="small" onClick={() => setOpenAssign(true)}>
+                                <GroupIcon sx={{ color: colors.primary }} />
+                            </IconButton>
+                        )}
 
                         {/* WHATSAPP MODAL */}
                         <IconButton size="small" onClick={() => setOpenWhatsapp(true)}>

@@ -88,6 +88,11 @@
     grid-template-columns: 1fr 1fr;
     gap: 16px;
     margin-bottom: 20px;
+    /* Align the actual input controls to the bottom of each row so
+       label-above-input cells line up with MUI floating-label cells.
+       Without this the native-label column ends up taller than the
+       MUI column and the inputs drift out of horizontal alignment. */
+    align-items: end;
 }
 
 .add-lead-form-grid .MuiOutlinedInput-root {

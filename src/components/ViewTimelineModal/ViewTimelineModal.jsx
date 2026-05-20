@@ -45,12 +45,49 @@ const categoryOf = (row) => {
 };
 
 const iconFor = (row) => {
-  if (row.kind === 'activity' && row.subtype === 'stage_changed') return <SwapHorizIcon className="card-icon status-card" />;
-  if (row.kind === 'note') return <ChatBubbleOutlineIcon className="card-icon flag-card" />;
-  if (row.kind === 'call') return <FlagIcon className="card-icon flag-card" />;
-  if (row.kind === 'message') return <FlagIcon className="card-icon flag-card" />;
-  if (row.kind === 'activity') return <HistoryIcon className="card-icon history-card" />;
-  return <FlagIcon className="card-icon flag-card" />;
+  if (row.kind === 'activity' && row.subtype === 'stage_changed') return <SwapHorizIcon className="card-icon" />;
+  if (row.kind === 'activity' && ['assigned', 'reassign', 'auto_assign', 'refer'].includes(row.subtype)) return <PersonOutlineIcon className="card-icon" />;
+  if (row.kind === 'note') return <ChatBubbleOutlineIcon className="card-icon" />;
+  if (row.kind === 'call') return <FlagIcon className="card-icon" />;
+  if (row.kind === 'message') return <FlagIcon className="card-icon" />;
+  if (row.kind === 'activity') return <HistoryIcon className="card-icon" />;
+  return <FlagIcon className="card-icon" />;
+};
+
+// Map UI category → CSS accent class (border, icon chip, rail dot color).
+const accentClassFor = (row) => {
+  const cat = categoryOf(row);
+  if (cat === 'Lead Status Journey') return 'cat-status';
+  if (cat === 'Counselor Activity') return 'cat-counsel';
+  if (cat === 'Lead Activity') return 'cat-activity';
+  return 'cat-history';
+};
+
+// Short uppercase tag shown under the title, e.g. "STAGE · UPDATE",
+// "COUNSELOR · REASSIGN". Keeps cards scannable when there are many.
+const subtitleFor = (row) => {
+  if (row.kind === 'activity') {
+    if (row.subtype === 'stage_changed') return 'Status journey';
+    if (row.subtype === 'lead_created') return 'Lead history';
+    if (row.subtype === 'reassign') return 'Counselor · reassign';
+    if (row.subtype === 'assigned') return 'Counselor · assigned';
+    if (row.subtype === 'auto_assign') return 'Counselor · auto-assign';
+    if (row.subtype === 'refer') return 'Counselor · referral';
+    if (row.subtype === 'call_recording_uploaded') return 'Lead activity · recording';
+    return 'Lead history';
+  }
+  if (row.kind === 'note') return 'Counselor · note';
+  if (row.kind === 'call') return `Lead activity · ${row.subtype || 'call'}`;
+  if (row.kind === 'message') return `Lead activity · ${row.subtype || 'message'}`;
+  return 'Event';
+};
+
+// Build the actor's initials for the footer avatar. Falls back to "?".
+const initialsOf = (name) => {
+  if (!name) return '?';
+  const parts = String(name).trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
 
 const titleFor = (row) => {
@@ -410,77 +447,121 @@ const DayGroup = ({ day, rows, initialExpanded = true, leadId }) => {
       </div>
       {expanded && (
         <div className="date-group-content">
-          {rows.map((row) => (
-            <div className="timeline-card" key={`${row.kind}-${row.id}`}>
-              <div className="timeline-card-header">
-                <div className="timeline-card-icon-title">
-                  {iconFor(row)}
-                  <span className="timeline-card-title">{titleFor(row)}</span>
-                </div>
-                <span className="timeline-card-time">{fmtTime(row.created_at)}</span>
-              </div>
-              <div className="timeline-card-body">
-                {/* For stage_changed events, prefer joined names from backend, falling back to body */}
-                {row.kind === 'activity' && row.subtype === 'stage_changed' ? (
-                  <div className="timeline-card-row">
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      label={row.from_stage_name || row.from_sub_stage_name || 'Unset'}
-                    />
-                    <span className="arrow" style={{ margin: '0 8px' }}>→</span>
-                    <Chip
-                      size="small"
-                      label={row.to_stage_name || row.to_sub_stage_name || 'Unset'}
-                      sx={{ background: '#2e7d32', color: '#fff' }}
-                    />
+          {rows.map((row) => {
+            // For assignment-type rows, body is "Lead reassign" / similar — the
+            // subtitle conveys that already, so we don't repeat it as body text.
+            const isAssignmentRow = row.kind === 'activity'
+              && ['assigned', 'reassign', 'auto_assign', 'refer'].includes(row.subtype);
+            return (
+              <div className={`timeline-card ${accentClassFor(row)}`} key={`${row.kind}-${row.id}`}>
+                <div className="timeline-card-header">
+                  <div className="timeline-card-icon-title">
+                    <span className="card-icon-chip">{iconFor(row)}</span>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="timeline-card-title">{titleFor(row)}</div>
+                      <div className="timeline-card-subtitle">{subtitleFor(row)}</div>
+                    </div>
                   </div>
-                ) : (
-                  row.body && (
+                  <span className="timeline-card-time">{fmtTime(row.created_at)}</span>
+                </div>
+                <div className="timeline-card-body">
+                  {row.kind === 'activity' && row.subtype === 'stage_changed' ? (
                     <div className="timeline-card-row">
-                      <ChatBubbleOutlineIcon className="card-meta-icon" />
-                      <span>{String(row.body)}</span>
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        label={row.from_stage_name || row.from_sub_stage_name || 'Unset'}
+                      />
+                      <span className="arrow" style={{ margin: '0 8px' }}>→</span>
+                      <Chip
+                        size="small"
+                        label={row.to_stage_name || row.to_sub_stage_name || 'Unset'}
+                        sx={{ background: '#10b981', color: '#fff', fontWeight: 600 }}
+                      />
                     </div>
-                  )
-                )}
-                {/* Assignment events: show assignee + their reporting manager. */}
-                {row.kind === 'activity'
-                  && ['assigned', 'reassign', 'auto_assign', 'refer'].includes(row.subtype)
-                  && row.assignee_name && (
-                  <>
-                    <div className="timeline-card-row">
-                      <PersonOutlineIcon className="card-meta-icon" />
-                      <span>
-                        Assigned to <strong>{row.assignee_name}</strong>
-                        {row.assignee_email && (
-                          <span style={{ color: '#666' }}> ({row.assignee_email})</span>
-                        )}
-                      </span>
-                    </div>
-                    {row.assignee_manager_name && (
+                  ) : (
+                    row.body && !isAssignmentRow && (
                       <div className="timeline-card-row">
-                        <PersonOutlineIcon className="card-meta-icon" style={{ opacity: 0.6 }} />
-                        <span style={{ fontSize: 12, color: '#666' }}>
-                          Reporting to <strong>{row.assignee_manager_name}</strong>
-                          {row.assignee_manager_email && ` (${row.assignee_manager_email})`}
+                        <ChatBubbleOutlineIcon className="card-meta-icon" />
+                        <span>{String(row.body)}</span>
+                      </div>
+                    )
+                  )}
+                  {isAssignmentRow && row.assignee_name && (
+                    <>
+                      {row.subtype === 'reassign' && row.from_user_name && (
+                        <div className="timeline-card-row">
+                          <PersonOutlineIcon className="card-meta-icon" />
+                          <span>
+                            <span style={{ color: '#9ca3af', fontWeight: 500 }}>Previous owner</span>
+                            {' '}<strong>{row.from_user_name}</strong>
+                            {row.from_user_email && <span style={{ color: '#9ca3af' }}> · {row.from_user_email}</span>}
+                          </span>
+                        </div>
+                      )}
+                      <div className="timeline-card-row">
+                        <PersonOutlineIcon className="card-meta-icon" />
+                        <span>
+                          <span style={{ color: '#9ca3af', fontWeight: 500 }}>Current owner</span>
+                          {' '}<strong>{row.assignee_name}</strong>
+                          {row.assignee_email && <span style={{ color: '#9ca3af' }}> · {row.assignee_email}</span>}
                         </span>
                       </div>
-                    )}
-                  </>
-                )}
-                {/* Call-recording uploads: show stage tag + inline play. */}
-                {row.kind === 'activity' && row.subtype === 'call_recording_uploaded' && (
-                  <RecordingPlayer leadId={leadId} row={row} />
-                )}
+                      {row.assignee_manager_name && (
+                        <div className="timeline-card-row">
+                          <PersonOutlineIcon className="card-meta-icon" />
+                          <span>
+                            <span style={{ color: '#9ca3af', fontWeight: 500 }}>Reporting to</span>
+                            {' '}<strong>{row.assignee_manager_name}</strong>
+                            {row.assignee_manager_email && <span style={{ color: '#9ca3af' }}> · {row.assignee_manager_email}</span>}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {row.kind === 'activity' && row.subtype === 'call_recording_uploaded' && (
+                    <RecordingPlayer leadId={leadId} row={row} />
+                  )}
+                  {/* Follow-up close events: surface the user's remark as a
+                      distinct callout so it stands out from the generic body
+                      ("Follow-up completed" / "Follow-up cancelled"). */}
+                  {row.kind === 'activity'
+                    && ['follow_up_completed', 'follow_up_cancelled'].includes(row.subtype)
+                    && (row.metadata_json?.completion_reason || row.metadata_json?.reason) && (
+                    <div className="timeline-card-row" style={{ alignItems: 'flex-start' }}>
+                      <ChatBubbleOutlineIcon className="card-meta-icon" style={{ marginTop: 2 }} />
+                      <div style={{
+                        background: row.subtype === 'follow_up_cancelled' ? '#fef2f2' : '#f0fdf4',
+                        borderLeft: `3px solid ${row.subtype === 'follow_up_cancelled' ? '#dc2626' : '#43A047'}`,
+                        padding: '6px 10px',
+                        borderRadius: 4,
+                        flex: 1,
+                        fontSize: 12,
+                        color: row.subtype === 'follow_up_cancelled' ? '#991b1b' : '#1b5e20',
+                      }}>
+                        <strong>Reason:</strong>{' '}
+                        {row.metadata_json.completion_reason || row.metadata_json.reason}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 {row.user_name && (
-                  <div className="timeline-card-row">
-                    <PersonOutlineIcon className="card-meta-icon" />
-                    <span>{row.user_name}</span>
+                  <div className="timeline-card-footer">
+                    <span className="timeline-card-avatar">{initialsOf(row.user_name)}</span>
+                    <span>
+                      <span className="timeline-card-actor-label">
+                        {row.subtype === 'reassign' ? 'Reassigned by'
+                          : row.subtype === 'assigned' ? 'Assigned by'
+                          : row.subtype === 'auto_assign' ? 'Triggered by'
+                          : 'By'}
+                      </span>{' '}
+                      <span className="timeline-card-actor-name">{row.user_name}</span>
+                    </span>
                   </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

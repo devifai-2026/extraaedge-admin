@@ -43,6 +43,15 @@ const SEED_GROUPS = [
       { label: 'University', type: 'universities' },
     ],
   },
+  // The Accounts module (account_manager) consumes admission_centers via a
+  // dedicated endpoint, not the generic /dropdowns. We special-case the card
+  // here so super_admin can still curate the list from the same hub.
+  {
+    title: 'Accounts',
+    items: [
+      { label: 'Admission Centers', type: 'admission_centers', path: '/advancedsettings/admission-centers' },
+    ],
+  },
 ];
 
 export default function DropdownsHub() {
@@ -62,7 +71,10 @@ export default function DropdownsHub() {
       .catch(() => setCustomFields([]))
       .finally(() => setLoading(false));
 
-    const seedTypes = SEED_GROUPS.flatMap((g) => g.items.map((i) => i.type));
+    const seedTypes = SEED_GROUPS.flatMap((g) => g.items.map((i) => i.type))
+      // admission_centers has its own endpoint, not the generic /dropdowns —
+      // the count probe below would 404 on it.
+      .filter((t) => t !== 'admission_centers');
     Promise.all(seedTypes.map(async (type) => {
       try {
         const r = type === 'programs' ? await programsApi.list() : await dropdownsApi.list(type);
@@ -87,8 +99,9 @@ export default function DropdownsHub() {
             {g.items.map((it) => {
               const c = seedCounts[it.type];
               const hint = c == null ? null : `${c} options`;
+              const path = it.path || `/advancedsettings/dropdowns/${it.type}`;
               return (
-                <Card key={it.type} label={it.label} hint={hint} onClick={() => navigate(`/advancedsettings/dropdowns/${it.type}`)} />
+                <Card key={it.type} label={it.label} hint={hint} onClick={() => navigate(path)} />
               );
             })}
           </Group>

@@ -355,9 +355,10 @@
   height: 6px;
   border-radius: 50%;
 }
-.dot-planned { background: #FB8C00; }
-.dot-done    { background: #43A047; }
-.dot-missed  { background: #E53935; }
+.dot-planned   { background: #FB8C00; }
+.dot-done      { background: #43A047; }
+.dot-missed    { background: #E53935; }
+.dot-cancelled { background: #9E9E9E; }
 
 /* Legend below calendar */
 .calendar-legend {

@@ -12,6 +12,8 @@ import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import SwapVertIcon from '@mui/icons-material/SwapVert';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import { usersApi, customRolesApi, programsApi, authApi } from '../../lib/endpoints';
 import { auth } from '../../lib/api';
 import { isRole, ROLES } from '../../lib/rbac';
@@ -26,9 +28,33 @@ const TAB_KEYS = [
   'settings.lead_score', 'settings.assignment_rules',
   'advanced.dropdowns', 'advanced.users_roles', 'advanced.communications', 'advanced.subscription',
   'third_party_integration', 'reports', 'analytics',
+  // Accounts module (account_manager role). super_admins toggle these
+  // per role from the Roles & Tabs editor.
+  'accounts.dashboard',
+  'accounts.pending_admissions',
+  'accounts.this_month_admissions',
+  'accounts.total_admissions',
+  'accounts.approvals',
+  'accounts.attendings',
+  'accounts.break',
+  'accounts.report',
+  'accounts.pay_schedule',
+  'accounts.collection_receipt_wise',
 ];
 const PERM_LEVELS = ['hidden', 'read_only', 'full'];
 const blankTabPerms = () => Object.fromEntries(TAB_KEYS.map((k) => [k, 'hidden']));
+
+// Whether a tab key applies to a given role scope.
+// account_manager → only accounts.* tabs are applicable.
+// Every other scope (counsellor / sales_manager / super_admin / custom)
+// → every tab EXCEPT accounts.* is applicable; the Accounts module is
+// a dedicated bucket and granting it to a counsellor would land them on
+// a page that expects role=account_manager scoping.
+const isTabApplicable = (tabKey, scope) => {
+  const isAccounts = tabKey.startsWith('accounts.');
+  if (scope === 'account_manager') return isAccounts;
+  return !isAccounts;
+};
 
 const ACCESS_LEVEL_OPTIONS = [
   { value: 'super_admin', label: 'Admin (Super Admin)' },
@@ -98,6 +124,11 @@ function UsersTab() {
   const [addOpen, setAddOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [activeUser, setActiveUser] = useState(null);
+  // Delete confirmation modal. Soft-delete via the existing DELETE
+  // /users/:id endpoint — backend sets users.deleted_at; row stays in
+  // DB so foreign-key history (lead_assignments etc.) survives.
+  const [deleteUser, setDeleteUser] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const canManage = isRole(ROLES.SUPER_ADMIN);
 
   const allUsers = data?.data || [];
@@ -214,9 +245,42 @@ function UsersTab() {
                     </span>
                   </Tooltip>
                 </td>
-                <td style={{ padding: '14px 16px' }}>
+                <td style={{ padding: '14px 16px', whiteSpace: 'nowrap' }}>
+                  <Tooltip title="Edit user">
+                    <span>
+                      <IconButton
+                        size="small"
+                        disabled={!canManage}
+                        onClick={() => openProfile(u)}
+                        sx={{ color: '#1565C0' }}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                   <Tooltip title="Reset password">
-                    <span><IconButton size="small" disabled={!canManage} onClick={() => openResetPassword(u)} sx={{ color: '#E53935' }}><LockOutlinedIcon fontSize="small" /></IconButton></span>
+                    <span>
+                      <IconButton
+                        size="small"
+                        disabled={!canManage}
+                        onClick={() => openResetPassword(u)}
+                        sx={{ color: '#E53935' }}
+                      >
+                        <LockOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="Delete user">
+                    <span>
+                      <IconButton
+                        size="small"
+                        disabled={!canManage || u.id === auth.getUser()?.id}
+                        onClick={() => setDeleteUser(u)}
+                        sx={{ color: '#dc2626' }}
+                      >
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </span>
                   </Tooltip>
                 </td>
               </tr>
@@ -246,6 +310,44 @@ function UsersTab() {
         user={activeUser}
         onClose={() => { setResetOpen(false); setActiveUser(null); }}
       />
+
+      {/* Delete confirmation — DELETE /users/:id soft-deletes the row.
+          Self-delete is blocked by both the button (disabled if u.id ===
+          current user) and the dialog (extra confirm gate). */}
+      <Dialog open={Boolean(deleteUser)} onClose={() => setDeleteUser(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ color: '#dc2626', fontWeight: 700 }}>
+          Delete user {deleteUser?.name || deleteUser?.email}?
+        </DialogTitle>
+        <DialogContent>
+          <p style={{ fontSize: 13, color: '#555', marginTop: 0 }}>
+            They&apos;ll lose access immediately. Their assignment history
+            and lead ownership records stay intact for audit. You can
+            re-create them later under the same email if needed.
+          </p>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteUser(null)} disabled={deleting}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={deleting}
+            onClick={async () => {
+              setDeleting(true);
+              try {
+                await usersApi.delete(deleteUser.id);
+                setDeleteUser(null);
+                reload();
+              } catch (e) {
+                alert(e?.message || 'Delete failed');
+              } finally {
+                setDeleting(false);
+              }
+            }}
+          >
+            {deleting ? 'Deleting…' : 'Delete user'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
@@ -768,9 +870,26 @@ function RolesTab() {
           </div>
 
           <h4 style={{ margin: '12px 0 4px' }}>Tabs this role can see</h4>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            <Button size="small" onClick={() => setEditing({ ...editing, tab_permissions: Object.fromEntries(TAB_KEYS.map((k) => [k, 'full'])) })}>Allow all</Button>
+          {/* Bulk actions operate ONLY on tabs applicable to the role's
+              scope — clicking "Allow all" on an account_manager role
+              won't accidentally grant Lead Manager etc. */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+            <Button
+              size="small"
+              onClick={() => setEditing({
+                ...editing,
+                tab_permissions: Object.fromEntries(TAB_KEYS.map((k) => [
+                  k,
+                  isTabApplicable(k, editing.scope) ? 'full' : 'hidden',
+                ])),
+              })}
+            >
+              Allow all applicable
+            </Button>
             <Button size="small" onClick={() => setEditing({ ...editing, tab_permissions: blankTabPerms() })}>Hide all</Button>
+            <span style={{ fontSize: 11, color: '#888', marginLeft: 'auto' }}>
+              Scope: <code style={{ fontSize: 11 }}>{editing.scope}</code>
+            </span>
           </div>
 
           <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fafafa', border: '1px solid #eee', borderRadius: 4 }}>
@@ -778,20 +897,46 @@ function RolesTab() {
               <tr><th style={{ textAlign: 'left', padding: '8px 12px', fontSize: 12, color: '#666', width: '60%' }}>Tab</th><th style={{ textAlign: 'left', padding: '8px 12px', fontSize: 12, color: '#666' }}>Access level</th></tr>
             </thead>
             <tbody>
-              {TAB_KEYS.map((key) => (
-                <tr key={key} style={{ borderTop: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontSize: 12 }}>{key}</td>
-                  <td style={{ padding: '6px 12px' }}>
-                    <select
-                      value={editing.tab_permissions[key] || 'hidden'}
-                      onChange={(e) => setEditing({ ...editing, tab_permissions: { ...editing.tab_permissions, [key]: e.target.value } })}
-                      style={{ padding: 4, border: '1px solid #ccc', borderRadius: 4 }}
-                    >
-                      {PERM_LEVELS.map((lvl) => <option key={lvl} value={lvl}>{lvl}</option>)}
-                    </select>
-                  </td>
-                </tr>
-              ))}
+              {/* Sort applicable tabs to the top so admins see what matters
+                  for this role first; non-applicable rows sink to the bottom
+                  greyed out but still visible for context. */}
+              {[...TAB_KEYS].sort((a, b) => {
+                const aOk = isTabApplicable(a, editing.scope);
+                const bOk = isTabApplicable(b, editing.scope);
+                if (aOk === bOk) return 0;
+                return aOk ? -1 : 1;
+              }).map((key) => {
+                const applicable = isTabApplicable(key, editing.scope);
+                return (
+                  <tr key={key} style={{ borderTop: '1px solid #f0f0f0', opacity: applicable ? 1 : 0.45 }}>
+                    <td style={{ padding: '6px 12px', fontFamily: 'monospace', fontSize: 12 }}>
+                      {key}
+                      {!applicable && (
+                        <span style={{
+                          marginLeft: 8, fontSize: 10, fontWeight: 600,
+                          color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.04,
+                        }}>
+                          not applicable
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '6px 12px' }}>
+                      <select
+                        value={editing.tab_permissions[key] || 'hidden'}
+                        onChange={(e) => setEditing({ ...editing, tab_permissions: { ...editing.tab_permissions, [key]: e.target.value } })}
+                        disabled={!applicable}
+                        style={{
+                          padding: 4, border: '1px solid #ccc', borderRadius: 4,
+                          background: applicable ? '#fff' : '#f3f4f6',
+                          cursor: applicable ? 'pointer' : 'not-allowed',
+                        }}
+                      >
+                        {PERM_LEVELS.map((lvl) => <option key={lvl} value={lvl}>{lvl}</option>)}
+                      </select>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 

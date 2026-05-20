@@ -379,8 +379,14 @@ function Header() {
                                 title={socketLive ? 'Notifications (live)' : 'Notifications (offline)'}
                                 onClick={(e) => setAnchorNotification(e.currentTarget)}
                             >
+                                {/* Badge = unread notifications only. Upcoming
+                                    follow-ups live in the Follow-up Manager
+                                    and surface their own count in the popover
+                                    tab label, not on the bell. This keeps
+                                    "Mark all read" / "Delete all" intuitive:
+                                    pressing them takes the badge to 0. */}
                                 <Badge
-                                    badgeContent={unreadCount + followUps.length}
+                                    badgeContent={unreadCount}
                                     color="error"
                                     max={99}
                                 >
@@ -403,15 +409,33 @@ function Header() {
                                         .catch(() => {})
                                 }}
                                 onClear={() => {
-                                    // "Clear all" is the only action that wipes
-                                    // notifications. Reset state + localStorage
-                                    // so a reload won't bring them back.
+                                    // "Clear all" wipes the popover UI only.
+                                    // Unread badge is untouched; DB rows stay.
+                                    // A page reload may restore the items if
+                                    // they were persisted via socket → DB.
+                                    setLiveEvents([])
+                                    try { localStorage.removeItem(NOTIF_KEY) } catch { /* ignore */ }
+                                }}
+                                onDeleteAll={async () => {
+                                    // "Delete all" wipes UI + zeros badge + hits
+                                    // DELETE /notifications so the rows are
+                                    // physically removed for this user.
                                     setLiveEvents([])
                                     setUnreadCount(0)
                                     try {
                                         localStorage.removeItem(NOTIF_KEY)
                                         localStorage.removeItem(NOTIF_UNREAD_KEY)
                                     } catch { /* ignore */ }
+                                    try {
+                                        await notificationsApi.deleteAll()
+                                    } catch { /* non-fatal; UI already cleared */ }
+                                }}
+                                onMarkAllRead={() => {
+                                    // Zero the bell badge after the API confirms
+                                    // every persisted row is now read. Live
+                                    // events stay in the list (read, but visible).
+                                    setUnreadCount(0)
+                                    try { localStorage.removeItem(NOTIF_UNREAD_KEY) } catch { /* ignore */ }
                                 }}
                                 onNavigateLead={(leadId) => {
                                     setAnchorNotification(null)
@@ -612,7 +636,7 @@ function Header() {
               stage_changed). Newest first; click to open the lead.
      Follow-ups → today's planned follow-ups loaded over REST.
    ============================================================== */
-function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLive, onClear, onNavigateLead, onFollowUpsChanged }) {
+function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLive, onClear, onDeleteAll, onMarkAllRead, onNavigateLead, onFollowUpsChanged }) {
     const [tab, setTab] = useState('live')
     // Track which followup is mid-action so we can disable buttons + show
     // a spinner without yanking the row out of the list.
@@ -709,7 +733,7 @@ function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLi
             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
-            <Box sx={{ width: 380, maxHeight: 480, display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ width: 380, maxHeight: 520, display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ px: 2, py: 1.5, borderBottom: `1px solid ${colors.borderGrey}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Notifications</Typography>
                     <span style={{
@@ -722,6 +746,64 @@ function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLi
                         }} />
                         {socketLive ? 'Live' : 'Offline'}
                     </span>
+                </Box>
+
+                {/* Bulk-action toolbar — three actions with distinct
+                    semantics so the user can pick the right level of
+                    cleanup:
+                      • Mark all read → flips read flag in DB, badge → 0,
+                        rows STAY visible (local-only sweep on UI).
+                      • Clear all     → wipes the popover UI only. Badge
+                        stays. DB rows stay. A reload may restore the
+                        items if they exist in DB.
+                      • Delete all    → wipes UI, badge → 0, AND hits
+                        DELETE /notifications so the rows are gone for
+                        this user permanently. Live-tab only — the
+                        Follow-ups tab manages its own destructive
+                        actions inside the Follow-up Manager. */}
+                <Box sx={{
+                    px: 2, py: 0.75,
+                    display: 'flex', gap: 6, justifyContent: 'flex-end',
+                    borderBottom: `1px solid ${colors.borderGrey}`,
+                    background: '#fafafa',
+                }}>
+                    <button
+                        onClick={async () => {
+                            try { await notificationsApi.markAllRead(); } catch { /* non-fatal */ }
+                            onMarkAllRead?.();
+                        }}
+                        style={{
+                            background: 'transparent', border: '1px solid #d1d5db',
+                            color: '#374151', fontSize: 11, padding: '3px 10px',
+                            borderRadius: 4, cursor: 'pointer', fontWeight: 600,
+                        }}
+                    >
+                        Mark all read
+                    </button>
+                    <button
+                        onClick={onClear}
+                        disabled={tab === 'live' ? liveEvents.length === 0 : followUps.length === 0}
+                        style={{
+                            background: 'transparent', border: '1px solid #d1d5db',
+                            color: '#374151', fontSize: 11, padding: '3px 10px',
+                            borderRadius: 4, cursor: 'pointer', fontWeight: 600,
+                        }}
+                    >
+                        Clear all
+                    </button>
+                    {tab === 'live' && (
+                        <button
+                            onClick={onDeleteAll}
+                            disabled={liveEvents.length === 0}
+                            style={{
+                                background: 'transparent', border: '1px solid #fecaca',
+                                color: '#b91c1c', fontSize: 11, padding: '3px 10px',
+                                borderRadius: 4, cursor: 'pointer', fontWeight: 600,
+                            }}
+                        >
+                            Delete all
+                        </button>
+                    )}
                 </Box>
 
                 <Box sx={{ display: 'flex', borderBottom: `1px solid ${colors.borderGrey}` }}>

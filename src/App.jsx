@@ -29,6 +29,25 @@ import UserProfile from './pages/UserProfile/UserProfile'
 import Tickets from './pages/Tickets/Tickets'
 import OrgTree from './pages/OrgTree/OrgTree'
 import Profile from './pages/Profile/Profile'
+// Accounts module (account_manager role) — separate sidebar from the
+// sales-team surfaces. All routes live under /accounts/*.
+import AccountsDashboard from './pages/Accounts/AccountsDashboard'
+import {
+  ApprovalsPage,
+  AttendingsPage,
+  BreakPage,
+  ThisMonthAdmissionsPage,
+  TotalAdmissionsPage,
+} from './pages/Accounts/AdmissionsList'
+import NewAdmission from './pages/Accounts/NewAdmission'
+import AdmissionDetail from './pages/Accounts/AdmissionDetail'
+import PendingAdmissions from './pages/Accounts/PendingAdmissions'
+import {
+  PaySchedulePage,
+  CollectionReceiptWisePage,
+  AdmissionsReportPage,
+} from './pages/Accounts/Reports'
+import AdmissionCenters from './pages/AdvancedSettings/AdmissionCenters'
 
 // Each route declares the backend tab key it requires.
 // `<ProtectedRoute tab="...">` redirects to /dashboard if user lacks access.
@@ -66,6 +85,25 @@ function App() {
         <Route path="/thirdpartyintegration" element={<ProtectedRoute tab="third_party_integration"><Layout><ThirdPartyIntegration /></Layout></ProtectedRoute>} />
         <Route path="/tickets" element={<ProtectedRoute><Layout><Tickets /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/org-tree" element={<ProtectedRoute tab="advanced.users_roles"><Layout><OrgTree /></Layout></ProtectedRoute>} />
+        {/* Admission centers (Accounts module dropdown — managed by super_admin) */}
+        <Route path="/advancedsettings/admission-centers" element={<ProtectedRoute tab="advanced.dropdowns"><Layout><AdmissionCenters /></Layout></ProtectedRoute>} />
+
+        {/* ---------- Accounts module (account_manager) ---------- */}
+        <Route path="/accounts/dashboard"                element={<ProtectedRoute tab="accounts.dashboard"><Layout><AccountsDashboard /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/pending-admissions"       element={<ProtectedRoute tab="accounts.pending_admissions"><Layout><PendingAdmissions /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/this-month-admissions"    element={<ProtectedRoute tab="accounts.this_month_admissions"><Layout><ThisMonthAdmissionsPage /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/total-admissions"         element={<ProtectedRoute tab="accounts.total_admissions"><Layout><TotalAdmissionsPage /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/approvals"                element={<ProtectedRoute tab="accounts.approvals"><Layout><ApprovalsPage /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/attendings"               element={<ProtectedRoute tab="accounts.attendings"><Layout><AttendingsPage /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/break"                    element={<ProtectedRoute tab="accounts.break"><Layout><BreakPage /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/report"                   element={<ProtectedRoute tab="accounts.report"><Layout><AdmissionsReportPage /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/pay-schedule"             element={<ProtectedRoute tab="accounts.pay_schedule"><Layout><PaySchedulePage /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/collection-receipt-wise"  element={<ProtectedRoute tab="accounts.collection_receipt_wise"><Layout><CollectionReceiptWisePage /></Layout></ProtectedRoute>} />
+        {/* Admission form — `:leadId?` is optional; when present we hydrate from /leads/:id */}
+        <Route path="/accounts/new-admission"            element={<ProtectedRoute tab="accounts.approvals"><Layout><NewAdmission /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/new-admission/:leadId"    element={<ProtectedRoute tab="accounts.approvals"><Layout><NewAdmission /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/admission/:id"            element={<ProtectedRoute tab="accounts.approvals"><Layout><AdmissionDetail /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/admission/:id/edit"       element={<ProtectedRoute tab="accounts.approvals"><Layout><NewAdmission /></Layout></ProtectedRoute>} />
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

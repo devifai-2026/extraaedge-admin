@@ -33,7 +33,9 @@ import AddNewLead from "../AddNewLead/AddNewLead";
 import AddFollowUpDrawer from "../AddFollowUpDrawer/AddFollowUpDrawer";
 import AddNoteDrawer from "../AddNoteDrawer/AddNoteDrawer";
 import { followUpsApi, leadsApi } from "../../lib/endpoints";
+import { useDropdown } from "../../lib/useDropdowns";
 import { flagForLead, TONE_BG, formatLeadAge, formatTimestamp } from "../../lib/leadFlags";
+import { isRole, ROLES } from "../../lib/rbac";
 
 import "./LeadCard.css";
 
@@ -73,6 +75,9 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
     // The slots view shows the first 5; tab 3 (full history) shows the whole list.
     const [pastFollowUps, setPastFollowUps] = useState([]);
     const [fullLead, setFullLead] = useState(null);
+    // Stages list: used to label per-stage follow-up sections and to skip
+    // is_success stages in the slot view.
+    const stagesList = useDropdown('stages', { enabled: isExpanded });
 
     const openMenu = Boolean(anchorEl);
 
@@ -267,9 +272,14 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                 <WhatsAppIcon sx={{ color: colors.primary }} />
                             </IconButton>
                         </Tooltip>
-                        <Tooltip title="Reassign">
-                            <IconButton size="small" className="action-btn" onClick={onReassign}><SwapHorizIcon /></IconButton>
-                        </Tooltip>
+                        {/* Refer / reassign action — hidden for counsellors who
+                            cannot reassign leads they own. Server enforces the
+                            same restriction on POST /lead-assignments. */}
+                        {!isRole(ROLES.COUNSELLOR) && (
+                            <Tooltip title="Reassign">
+                                <IconButton size="small" className="action-btn" onClick={onReassign}><SwapHorizIcon /></IconButton>
+                            </Tooltip>
+                        )}
                         <IconButton size="small" className="action-btn" onClick={handleMenuClick}><MoreVertIcon /></IconButton>
                         <IconButton size="small" className="action-btn" onClick={() => setIsExpanded(!isExpanded)}>
                             {isExpanded ? <ExpandLessIcon /> : <ChevronRightIcon />}
@@ -511,47 +521,98 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                     </div>
                                 </div>
 
-                                {/* Past attempts — CSV-parity slots view. Renders exactly 5
-                                    fixed rows so layout is stable even when there's no
-                                    history. Each slot is filled by the follow-up whose
-                                    slot_index matches (1..5). Ad-hoc follow-ups without a
-                                    slot_index fall through to unfilled slots in order. */}
+                                {/* Per-stage 5-slot view. Each stage the lead has rows for
+                                    gets its own labeled block of 5 fixed rows. Rows scoped to
+                                    is_success ("Converted") stages are hidden. Ad-hoc rows
+                                    (no slot_index / stage_id) fall under an "Other" section. */}
                                 {(() => {
-                                    const slottedByIndex = new Map();
+                                    const stagesById = new Map((stagesList.data || []).map((s) => [s.id, s]));
+                                    const byStage = new Map();
                                     const adhoc = [];
                                     for (const f of pastFollowUps) {
-                                        if (Number.isInteger(f.slot_index) && f.slot_index >= 1 && f.slot_index <= 5) {
-                                            // First-write wins per slot — duplicates (which we
-                                            // intentionally don't dedupe at the BE) all keep their
-                                            // own slot, so this just resolves the rare case where
-                                            // two ad-hoc edits happened to share a slot_index.
-                                            if (!slottedByIndex.has(f.slot_index)) slottedByIndex.set(f.slot_index, f);
+                                        if (f.stage_id && Number.isInteger(f.slot_index)
+                                            && f.slot_index >= 1 && f.slot_index <= 5) {
+                                            const stage = stagesById.get(f.stage_id);
+                                            if (stage?.is_success) continue;
+                                            if (!byStage.has(f.stage_id)) byStage.set(f.stage_id, new Map());
+                                            const slots = byStage.get(f.stage_id);
+                                            if (!slots.has(f.slot_index)) slots.set(f.slot_index, f);
                                         } else {
                                             adhoc.push(f);
                                         }
                                     }
-                                    return (
-                                <div className="followup-container" style={{ marginTop: 12, gridTemplateColumns: '1fr' }}>
-                                    {[0, 1, 2, 3, 4].map((idx) => {
-                                        const slot = idx + 1;
-                                        // Prefer the row with this slot_index; otherwise pull an
-                                        // ad-hoc follow-up into the next free slot.
-                                        const f = slottedByIndex.get(slot) ?? adhoc.shift();
+                                    const sections = [...byStage.entries()].map(([stageId, slots]) => ({
+                                        stage_id: stageId,
+                                        stage_name: stagesById.get(stageId)?.name || 'Unknown stage',
+                                        slots,
+                                    }));
+                                    if (adhoc.length) sections.push({ stage_id: null, stage_name: 'Other', slots: null, adhoc });
+                                    if (sections.length === 0) {
                                         return (
-                                            <div className="followup-section" key={idx} style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, paddingBottom: 6, borderBottom: '1px dashed #eee' }}>
-                                                <div>
-                                                    <div className="followup-label">NEXT ACTION DATE {idx + 1}</div>
-                                                    <div className="followup-value">{f?.next_action_datetime ? fmt(f.next_action_datetime) : '-'}</div>
-                                                </div>
-                                                <div>
-                                                    <div className="followup-label">COMMENT {idx + 1}</div>
-                                                    <div className="followup-value followup-remarks">{f?.comment || f?.notes || '-'}</div>
-                                                </div>
+                                            <div className="followup-container" style={{ marginTop: 12, gridTemplateColumns: '1fr' }}>
+                                                <div className="followup-value" style={{ color: '#999' }}>— No past attempts yet</div>
                                             </div>
                                         );
-                                    })}
-                                </div>
-                                    );
+                                    }
+                                    return sections.map((section) => (
+                                        <div key={section.stage_id || 'adhoc'} className="followup-container"
+                                             style={{ marginTop: 12, gridTemplateColumns: '1fr' }}>
+                                            <div className="followup-section" style={{ paddingBottom: 4 }}>
+                                                <div className="followup-label" style={{ fontWeight: 600 }}>
+                                                    {section.stage_name}
+                                                </div>
+                                            </div>
+                                            {section.adhoc
+                                                ? section.adhoc.map((f) => (
+                                                    <div className="followup-section" key={f.id}
+                                                         style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, paddingBottom: 6, borderBottom: '1px dashed #eee' }}>
+                                                        <div>
+                                                            <div className="followup-label">DATE</div>
+                                                            <div className="followup-value">{f.next_action_datetime ? fmt(f.next_action_datetime) : '-'}</div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="followup-label">COMMENT</div>
+                                                            <div className="followup-value followup-remarks">{f.comment || f.notes || '-'}</div>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                                : [0, 1, 2, 3, 4].map((idx) => {
+                                                    const f = section.slots.get(idx + 1);
+                                                    const isDone = f?.status === 'done';
+                                                    return (
+                                                        <div className="followup-section" key={idx}
+                                                             style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 12, paddingBottom: 6, borderBottom: '1px dashed #eee' }}>
+                                                            <div>
+                                                                <div className="followup-label">
+                                                                    NEXT ACTION DATE {idx + 1}
+                                                                    {isDone && (
+                                                                        <span style={{
+                                                                            marginLeft: 6, fontSize: 9, fontWeight: 700,
+                                                                            background: '#e8f5e9', color: '#1b5e20',
+                                                                            padding: '1px 5px', borderRadius: 3,
+                                                                        }}>DONE</span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="followup-value">{f?.next_action_datetime ? fmt(f.next_action_datetime) : '-'}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="followup-label">COMMENT {idx + 1}</div>
+                                                                <div className="followup-value followup-remarks">{f?.comment || f?.notes || '-'}</div>
+                                                                {isDone && f?.completion_reason && (
+                                                                    <div style={{
+                                                                        marginTop: 4, fontSize: 11, color: '#1b5e20',
+                                                                        background: '#f0fdf4', borderLeft: '3px solid #43A047',
+                                                                        padding: '4px 8px', borderRadius: 3,
+                                                                    }}>
+                                                                        <strong>Closure:</strong> {f.completion_reason}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                        </div>
+                                    ));
                                 })()}
                             </div>
                             <div className="content-chevron">
@@ -650,7 +711,9 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                 transformOrigin={{ vertical: "top", horizontal: "right" }}
             >
                 <MenuItem onClick={() => { handleMenuClose(); setOpenEditLead(true); }}>Edit Lead</MenuItem>
-                <MenuItem onClick={() => { handleMenuClose(); onReassign?.(); }}>Reassign</MenuItem>
+                {!isRole(ROLES.COUNSELLOR) && (
+                    <MenuItem onClick={() => { handleMenuClose(); onReassign?.(); }}>Reassign</MenuItem>
+                )}
                 <MenuItem onClick={() => { handleMenuClose(); setOpenFollowUp(true); }}>Add Follow Up</MenuItem>
                 <MenuItem onClick={() => { handleMenuClose(); setOpenAddNote(true); }}>Add Note</MenuItem>
             </Menu>
