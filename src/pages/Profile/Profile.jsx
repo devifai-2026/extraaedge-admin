@@ -1,9 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Box, Typography, Button, TextField, CircularProgress, Alert, Tooltip } from "@mui/material";
+import { Box, Typography, Button, TextField, CircularProgress, Alert, Tooltip, Chip } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { auth } from "../../lib/api";
-import { usersApi } from "../../lib/endpoints";
+import { authApi, usersApi } from "../../lib/endpoints";
 import { applyTheme } from "../../theme/applyTheme";
+import AvatarUploader from "../../components/AvatarUploader/AvatarUploader";
+
+// Broadcast that the cached user blob changed (avatar, name, etc.) so any
+// component watching this event can re-read auth.getUser() without a full
+// page reload. Header listens for this to swap the navbar avatar live.
+const broadcastUserUpdate = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('ee:user-updated'));
+  }
+};
 
 // Six curated presets + a Custom slot. The product-owner spec said preset
 // + custom hex; these are the presets — keep them tasteful and accessible
@@ -22,22 +32,88 @@ const PRESETS = [
 const HEX_RE = /^#[0-9a-fA-F]{6}$/u;
 
 export default function Profile() {
-  // Snapshot the user blob once at mount. auth.getUser() does a JSON.parse
-  // on every call; recreating the object on each render would also trip
-  // the useMemo dependency below into running every time.
-  const user = useMemo(() => auth.getUser() || {}, []);
+  // Cached user blob primes the UI so it renders instantly; we then refetch
+  // the live theme from /auth/me to pick up any change made on another
+  // browser. The "saved" copy below is the authoritative baseline.
+  const cached = useMemo(() => auth.getUser() || {}, []);
 
-  // Local state mirrors the user's stored theme. Re-uses the user object
-  // from localStorage so the page renders instantly on open; it'll match
-  // the server unless someone changes the theme from another browser.
-  const [preset, setPreset] = useState(user.theme_preset || "default");
-  const [primary, setPrimary] = useState(user.theme_primary || PRESETS[0].primary);
-  const [primaryDark, setPrimaryDark] = useState(user.theme_primary_dark || PRESETS[0].primaryDark);
-  const [primaryLight, setPrimaryLight] = useState(user.theme_primary_light || PRESETS[0].primaryLight);
+  // The currently-saved theme (server truth). Drives the "Current" chip
+  // and the hasChanges diff. Starts from cache, gets replaced after fetch.
+  const [saved, setSaved] = useState({
+    theme_preset: cached.theme_preset || "default",
+    theme_primary: cached.theme_primary || PRESETS[0].primary,
+    theme_primary_dark: cached.theme_primary_dark || PRESETS[0].primaryDark,
+    theme_primary_light: cached.theme_primary_light || PRESETS[0].primaryLight,
+  });
+
+  // Editable working copy. Starts equal to `saved`; user edits diverge it.
+  const [preset, setPreset] = useState(saved.theme_preset);
+  const [primary, setPrimary] = useState(saved.theme_primary);
+  const [primaryDark, setPrimaryDark] = useState(saved.theme_primary_dark);
+  const [primaryLight, setPrimaryLight] = useState(saved.theme_primary_light);
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [savedAt, setSavedAt] = useState(null);
+  const [loadingSaved, setLoadingSaved] = useState(true);
+
+  // Current avatar — `avatar_url` is the freshly-signed download URL the
+  // server returns (5-min TTL). We keep both so a later "Save" can know
+  // whether the key changed even when the URL refreshes.
+  const [avatar, setAvatar] = useState({
+    avatar_r2_key: cached.avatar_r2_key || null,
+    avatar_url: cached.avatar_url || null,
+  });
+
+  // Fetch the live theme from the server on mount. If it differs from the
+  // cached blob (e.g. user changed theme on another browser), it replaces
+  // both the "saved" baseline and the editable working copy so the user
+  // sees their actual current theme — not a stale one.
+  useEffect(() => {
+    let cancelled = false;
+    authApi.me()
+      .then((r) => {
+        if (cancelled) return;
+        const u = r?.data?.user;
+        if (!u) return;
+        const live = {
+          theme_preset: u.theme_preset || "default",
+          theme_primary: u.theme_primary || PRESETS[0].primary,
+          theme_primary_dark: u.theme_primary_dark || PRESETS[0].primaryDark,
+          theme_primary_light: u.theme_primary_light || PRESETS[0].primaryLight,
+        };
+        setSaved(live);
+        setPreset(live.theme_preset);
+        setPrimary(live.theme_primary);
+        setPrimaryDark(live.theme_primary_dark);
+        setPrimaryLight(live.theme_primary_light);
+        setAvatar({
+          avatar_r2_key: u.avatar_r2_key || null,
+          avatar_url: u.avatar_url || null,
+        });
+        // Sync localStorage so other tabs / next reload start from truth.
+        const stored = auth.getUser() || {};
+        auth.setSession({
+          user: {
+            ...stored,
+            ...live,
+            avatar_r2_key: u.avatar_r2_key || null,
+            avatar_url: u.avatar_url || null,
+          },
+        });
+        broadcastUserUpdate();
+      })
+      .catch(() => { /* keep cached values on failure */ })
+      .finally(() => { if (!cancelled) setLoadingSaved(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Pretty-name the currently-saved preset for the header chip.
+  const savedPresetLabel = useMemo(() => {
+    if (saved.theme_preset === "custom") return "Custom";
+    const match = PRESETS.find((p) => p.id === saved.theme_preset);
+    return match?.label || "Default Red";
+  }, [saved.theme_preset]);
 
   const isCustom = preset === "custom";
   const allHexValid = HEX_RE.test(primary) && HEX_RE.test(primaryDark) && HEX_RE.test(primaryLight);
@@ -82,18 +158,19 @@ export default function Profile() {
         theme_primary_light: primaryLight,
       };
       const r = await usersApi.updateMyTheme(body);
+      const next = {
+        theme_preset: r?.data?.theme_preset ?? body.theme_preset,
+        theme_primary: r?.data?.theme_primary ?? body.theme_primary,
+        theme_primary_dark: r?.data?.theme_primary_dark ?? body.theme_primary_dark,
+        theme_primary_light: r?.data?.theme_primary_light ?? body.theme_primary_light,
+      };
+      // Refresh the "Current" baseline so the chip + hasChanges diff
+      // both line up with what's now persisted.
+      setSaved(next);
       // Update the cached user blob so the next page load (without a
       // round-trip to /auth/me) still picks up the new theme.
       const stored = auth.getUser() || {};
-      auth.setSession({
-        user: {
-          ...stored,
-          theme_preset: r?.data?.theme_preset ?? body.theme_preset,
-          theme_primary: r?.data?.theme_primary ?? body.theme_primary,
-          theme_primary_dark: r?.data?.theme_primary_dark ?? body.theme_primary_dark,
-          theme_primary_light: r?.data?.theme_primary_light ?? body.theme_primary_light,
-        },
-      });
+      auth.setSession({ user: { ...stored, ...next } });
       setSavedAt(new Date());
     } catch (e) {
       setSaveError(e?.message || "Save failed");
@@ -103,11 +180,11 @@ export default function Profile() {
   };
 
   const hasChanges = useMemo(() => (
-    preset !== (user.theme_preset || "default")
-    || primary !== (user.theme_primary || PRESETS[0].primary)
-    || primaryDark !== (user.theme_primary_dark || PRESETS[0].primaryDark)
-    || primaryLight !== (user.theme_primary_light || PRESETS[0].primaryLight)
-  ), [preset, primary, primaryDark, primaryLight, user]);
+    preset !== saved.theme_preset
+    || primary !== saved.theme_primary
+    || primaryDark !== saved.theme_primary_dark
+    || primaryLight !== saved.theme_primary_light
+  ), [preset, primary, primaryDark, primaryLight, saved]);
 
   return (
     <Box sx={{ p: 3, maxWidth: 720 }}>
@@ -116,8 +193,53 @@ export default function Profile() {
         Personal preferences for your view of the CRM. Changes apply only to you.
       </Typography>
 
+      <Box sx={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 2, p: 3, mb: 3 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>Profile Photo</Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
+          Shown next to your name in the navbar and on lead activity. Square photos work best.
+        </Typography>
+        <AvatarUploader
+          currentUrl={avatar.avatar_url}
+          currentName={cached.name || cached.email}
+          onUpdated={(next) => {
+            setAvatar(next);
+            const stored = auth.getUser() || {};
+            auth.setSession({
+              user: {
+                ...stored,
+                avatar_r2_key: next.avatar_r2_key,
+                avatar_url: next.avatar_url,
+              },
+            });
+            broadcastUserUpdate();
+          }}
+        />
+      </Box>
+
       <Box sx={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 2, p: 3 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>Theme</Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 0.5, flexWrap: "wrap" }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Theme</Typography>
+          {/* Live indicator of the currently-persisted theme, so the user
+              can see at a glance what's saved before they start tweaking. */}
+          <Chip
+            size="small"
+            label={
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                <Typography sx={{ fontSize: 11, color: "#475569", fontWeight: 600 }}>
+                  {loadingSaved ? "Loading…" : `Current: ${savedPresetLabel}`}
+                </Typography>
+                {!loadingSaved && (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.25 }}>
+                    <Swatch color={saved.theme_primary} small />
+                    <Swatch color={saved.theme_primary_dark} small />
+                    <Swatch color={saved.theme_primary_light} small />
+                  </Box>
+                )}
+              </Box>
+            }
+            sx={{ background: "#f1f5f9", height: 24, "& .MuiChip-label": { px: 1 } }}
+          />
+        </Box>
         <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
           Pick a color set or roll your own. Preview is live as you change values; click Save to keep it.
         </Typography>

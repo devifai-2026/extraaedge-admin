@@ -19,7 +19,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import CloseIcon from '@mui/icons-material/Close';
 import { colors } from '../../theme/colors';
-import { auth, analyticsApi, usersApi, followUpsApi, leadsApi, notificationsApi } from '../../lib/endpoints';
+import { auth, analyticsApi, usersApi, followUpsApi, leadsApi, notificationsApi, admissionsApi } from '../../lib/endpoints';
 import { useNavigate } from 'react-router-dom';
 import DateRangePicker from '../../components/DatePicker/DatePicker';
 import ChartCard from '../../components/ChartCard/ChartCard';
@@ -139,6 +139,7 @@ const Kpi = ({ label, value, hint, accent }) => (
 );
 
 export default function AnalyticsDashboard() {
+  const navigate = useNavigate();
   const sessionUser = auth.getUser() || {};
   const role = sessionUser.role || ROLES.COUNSELLOR;
   const isAdmin = role === ROLES.SUPER_ADMIN;
@@ -163,10 +164,17 @@ export default function AnalyticsDashboard() {
   const [comms, setComms] = useState([]);
   const [myFollowups, setMyFollowups] = useState([]);
   const [myLeadsToday, setMyLeadsToday] = useState(0);
+  // Tenant-wide admission state + dashboard sub-cards for admin/manager.
+  // Reuses the Accounts Dashboard's chart endpoints so we don't duplicate
+  // SQL — three calls in parallel (snapshot + admissions trend + status
+  // donut + top courses).
+  const [admStatus, setAdmStatus] = useState(null); // lead-status snapshot
+  const [admCharts, setAdmCharts] = useState(null); // dashboardWithCharts
 
   const [loading, setLoading] = useState({
     summary: true, funnel: true, timeline: true, programWise: true,
     channelSource: true, programStatus: true, coldEnq: true, perfTeam: true, comms: true,
+    admissions: true,
   });
   const [openSummaryModal, setOpenSummaryModal] = useState(false);
   const [lastSynced, setLastSynced] = useState(new Date());
@@ -229,6 +237,20 @@ export default function AnalyticsDashboard() {
       .then((r) => setFunnel(r?.data || []))
       .catch(() => setFunnel([]))
       .finally(() => flag('funnel', false));
+
+    // Admissions section — admin & manager only. Snapshot + charts run
+    // in parallel; counsellors skip the network roundtrip entirely.
+    if (!isCounsellor) {
+      flag('admissions', true);
+      Promise.all([
+        admissionsApi.leadStatusSnapshot().then((r) => r?.data || null).catch(() => null),
+        admissionsApi.dashboard({ trend_days: 30 }).then((r) => r?.data || null).catch(() => null),
+      ])
+        .then(([snap, charts]) => { setAdmStatus(snap); setAdmCharts(charts); })
+        .finally(() => flag('admissions', false));
+    } else {
+      flag('admissions', false);
+    }
 
     flag('timeline', true);
     analyticsApi.leadsTimeline(params)
@@ -519,6 +541,120 @@ export default function AnalyticsDashboard() {
           </ResponsiveContainer>
         </ChartCard>
       </Box>
+
+      {/* ============ ADMISSIONS (admin + manager) ============
+          Tenant-wide post-conversion view: status counts + daily trend
+          + status donut + top courses. Counsellors skip this section. */}
+      {!isCounsellor && (
+        <Box sx={{ mt: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a' }}>Admissions</Typography>
+              <Typography variant="caption" sx={{ color: '#64748b' }}>
+                Post-conversion pipeline across the tenant. Last 30 days for trends.
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => navigate('/admission-pipeline')}
+              sx={{ textTransform: 'none' }}
+            >
+              Open full pipeline →
+            </Button>
+          </Box>
+
+          {/* Status KPI row */}
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+            <Kpi label="Pending Approval" value={admStatus?.counts?.pending_approval ?? '—'} accent="#f59e0b" />
+            <Kpi label="Attending"        value={admStatus?.counts?.attending ?? '—'}        accent="#10b981" />
+            <Kpi label="On Break"         value={admStatus?.counts?.on_break ?? '—'}         accent="#fb923c" />
+            <Kpi label="Completed"        value={admStatus?.counts?.completed ?? '—'}        accent="#3b82f6" />
+            <Kpi label="Rejected"         value={admStatus?.counts?.rejected ?? '—'}         accent="#ef4444" />
+            <Kpi
+              label="Unrouted (converted, no admission)"
+              value={admStatus?.unrouted_converted ?? '—'}
+              hint="Lead converted but accounts hasn't created an admission yet."
+              accent="#64748b"
+            />
+          </Box>
+
+          {/* Trend chart */}
+          <ChartCard
+            title="Admissions Trend · 30d"
+            loading={loading.admissions}
+            lastSynced={lastSynced}
+            onRefresh={reloadAll}
+            csvRows={admCharts?.charts?.admissions_trend || []}
+            fullHeight={260}
+          >
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={(admCharts?.charts?.admissions_trend || []).map((d) => ({ ...d, day: fmtDate(d.day) }))}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                <RTooltip />
+                <Line type="monotone" dataKey="count" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          {/* Status donut + Top courses side by side */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
+            <ChartCard
+              title="Status Breakdown"
+              loading={loading.admissions}
+              lastSynced={lastSynced}
+              onRefresh={reloadAll}
+              csvRows={admCharts?.charts?.status_breakdown || []}
+              fullHeight={260}
+            >
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={admCharts?.charts?.status_breakdown || []}
+                    dataKey="count"
+                    nameKey="status"
+                    cx="50%" cy="50%"
+                    innerRadius={50} outerRadius={90}
+                    label
+                  >
+                    {(admCharts?.charts?.status_breakdown || []).map((entry, idx) => (
+                      <Cell key={entry.status} fill={STAGE_PALETTE[idx % STAGE_PALETTE.length]} />
+                    ))}
+                  </Pie>
+                  <RTooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
+
+            <ChartCard
+              title="Top Programmes · 30d"
+              loading={loading.admissions}
+              lastSynced={lastSynced}
+              onRefresh={reloadAll}
+              csvRows={admCharts?.charts?.course_breakdown || []}
+              fullHeight={260}
+            >
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={admCharts?.charts?.course_breakdown || []} layout="vertical" margin={{ left: 50 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
+                  <YAxis dataKey="program_name" type="category" tick={{ fontSize: 12 }} width={140} />
+                  <RTooltip />
+                  <Bar dataKey="count" name="Admissions">
+                    {(admCharts?.charts?.course_breakdown || []).map((entry, idx) => (
+                      <Cell key={entry.program_name} fill={STAGE_PALETTE[idx % STAGE_PALETTE.length]} />
+                    ))}
+                    <LabelList dataKey="count" position="right" fontSize={12} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </Box>
+        </Box>
+      )}
 
       {/* ============ PROGRAM-WISE TABLE (everyone) ============ */}
       <Box sx={{ mt: 2 }}>

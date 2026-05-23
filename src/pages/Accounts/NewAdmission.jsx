@@ -10,6 +10,7 @@ import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import UploadIcon from '@mui/icons-material/Upload';
 import { useDropdown } from '../../lib/useDropdowns';
 import { admissionsApi, leadsApi, uploadsApi } from '../../lib/endpoints';
+import { isRole, ROLES } from '../../lib/rbac';
 import './Accounts.css';
 
 // Free-text fallback for mode_of_training when there's no enum source.
@@ -18,6 +19,9 @@ const TRAINING_MODES = ['Online', 'Offline', 'Hybrid'];
 const blankEducation = () => ({
   examination: '', stream: '', college_name: '',
   board_university: '', year_of_passing: '', percentage: '',
+  // 'percent' (0–100) or 'cgpa' (0–10). The grade value still lives in
+  // `percentage` either way — grade_unit just tells you how to read it.
+  grade_unit: 'percent',
 });
 
 // Form ingests an optional :leadId route param. When present we pre-fill
@@ -33,6 +37,13 @@ const NewAdmission = () => {
   const [submitting, setSubmitting] = useState(false);
   const [hydrating, setHydrating] = useState(false);
   const [error, setError] = useState('');
+
+  // Account managers can run the rest of the admission flow but they
+  // don't own pricing — Course Fees + Mode of Payment are set by the
+  // accounts/admin team via the per-lead fee offer page. Lock the Fees
+  // section for them so they can't accidentally re-write the offer.
+  const isAccountManager = isRole(ROLES.ACCOUNT_MANAGER);
+  const feesReadOnly = isAccountManager;
 
   const [form, setForm] = useState({
     lead_id: null,
@@ -107,6 +118,7 @@ const NewAdmission = () => {
             board_university: e.board_university || '',
             year_of_passing: e.year_of_passing || '',
             percentage: e.percentage || '',
+            grade_unit: e.grade_unit || 'percent',
           })) : [blankEducation()],
         });
       })
@@ -120,7 +132,29 @@ const NewAdmission = () => {
     const v = e.target.value;
     setForm((p) => ({
       ...p,
-      education: p.education.map((row, i) => (i === idx ? { ...row, [k]: v } : row)),
+      education: p.education.map((row, i) => {
+        if (i !== idx) return row;
+        const next = { ...row, [k]: v };
+        // Grade-unit toggle: clamp/clear the value if it no longer fits
+        // the new scale (mirrors PublicAdmission setEdu).
+        if (k === 'grade_unit') {
+          const cap = v === 'cgpa' ? 10 : 100;
+          const num = Number(next.percentage);
+          if (next.percentage !== '' && !Number.isNaN(num) && num > cap) {
+            next.percentage = '';
+          }
+        }
+        if (k === 'percentage' && v !== '') {
+          const num = Number(v);
+          if (Number.isNaN(num) || num < 0) {
+            next.percentage = '';
+          } else {
+            const cap = row.grade_unit === 'cgpa' ? 10 : 100;
+            if (num > cap) next.percentage = String(cap);
+          }
+        }
+        return next;
+      }),
     }));
   };
   const addEdu = () => setForm((p) => ({ ...p, education: [...p.education, blankEducation()] }));
@@ -295,7 +329,7 @@ const NewAdmission = () => {
                 <th>College</th>
                 <th>Board / University</th>
                 <th>Year</th>
-                <th>%</th>
+                <th>Grade</th>
                 <th />
               </tr>
             </thead>
@@ -307,7 +341,36 @@ const NewAdmission = () => {
                   <td><TextField size="small" value={row.college_name} onChange={setEdu(idx, 'college_name')} fullWidth /></td>
                   <td><TextField size="small" value={row.board_university} onChange={setEdu(idx, 'board_university')} fullWidth /></td>
                   <td><TextField size="small" type="number" value={row.year_of_passing} onChange={setEdu(idx, 'year_of_passing')} fullWidth /></td>
-                  <td><TextField size="small" type="number" value={row.percentage} onChange={setEdu(idx, 'percentage')} fullWidth /></td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+                      <TextField
+                        size="small"
+                        type="number"
+                        value={row.percentage}
+                        onChange={setEdu(idx, 'percentage')}
+                        placeholder={row.grade_unit === 'cgpa' ? '0–10' : '0–100'}
+                        fullWidth
+                        inputProps={{
+                          min: 0,
+                          max: row.grade_unit === 'cgpa' ? 10 : 100,
+                          step: row.grade_unit === 'cgpa' ? 0.01 : 'any',
+                        }}
+                      />
+                      <select
+                        value={row.grade_unit || 'percent'}
+                        onChange={(e) => setEdu(idx, 'grade_unit')({ target: { value: e.target.value } })}
+                        style={{
+                          border: '1px solid #d1d5db', borderRadius: 4,
+                          background: '#fff', fontSize: 12, padding: '0 6px',
+                          color: '#475569', cursor: 'pointer', minWidth: 64,
+                        }}
+                        aria-label="Grade unit"
+                      >
+                        <option value="percent">%</option>
+                        <option value="cgpa">CGPA</option>
+                      </select>
+                    </div>
+                  </td>
                   <td>
                     <Tooltip title="Remove row">
                       <span>
@@ -326,14 +389,36 @@ const NewAdmission = () => {
           </Button>
         </Section>
 
-        <Section title="Fees">
+        <Section title={feesReadOnly ? 'Fees (read-only)' : 'Fees'}>
+          {feesReadOnly && (
+            <div style={{
+              background: '#fff7ed', border: '1px solid #fed7aa',
+              borderRadius: 6, padding: '8px 12px', marginBottom: 10,
+              fontSize: 12, color: '#9a3412',
+            }}>
+              Course fees are set by the admin / accounts team via the
+              per-lead fee offer. Contact them if pricing needs to change.
+            </div>
+          )}
           <Grid>
-            <Field label="Course Fees *">
-              <TextField type="number" value={form.total_fees} onChange={set('total_fees')} size="small" fullWidth />
+            <Field label={`Course Fees${feesReadOnly ? '' : ' *'}`}>
+              <TextField
+                type="number"
+                value={form.total_fees}
+                onChange={set('total_fees')}
+                size="small"
+                fullWidth
+                disabled={feesReadOnly}
+                InputProps={{ readOnly: feesReadOnly }}
+              />
             </Field>
-            <Field label="Mode Of Payment *">
-              <FormControl size="small" fullWidth>
-                <Select value={form.mode_of_payment} onChange={set('mode_of_payment')}>
+            <Field label={`Mode Of Payment${feesReadOnly ? '' : ' *'}`}>
+              <FormControl size="small" fullWidth disabled={feesReadOnly}>
+                <Select
+                  value={form.mode_of_payment}
+                  onChange={set('mode_of_payment')}
+                  readOnly={feesReadOnly}
+                >
                   <MenuItem value="Installment">Installment</MenuItem>
                   <MenuItem value="Full">Full</MenuItem>
                 </Select>
@@ -342,22 +427,19 @@ const NewAdmission = () => {
           </Grid>
         </Section>
 
-        <Section title="Photos (optional)">
-          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-            <PhotoSlot
-              label="Click Your Selfie"
-              icon={<PhotoCameraIcon />}
-              r2_key={form.selfie_r2_key}
-              onPick={uploadPhoto('selfie_r2_key')}
-              capture="user"
-            />
-            <PhotoSlot
-              label="Upload Photo From Gallery"
-              icon={<UploadIcon />}
-              r2_key={form.photo_r2_key}
-              onPick={uploadPhoto('photo_r2_key')}
-            />
-          </div>
+        <Section title="Photo (optional)">
+          {/* Single preview tile + two pick options. On a phone the
+              "Take photo" input opens the front camera via
+              capture="user"; on desktop browsers ignore the attribute
+              and fall through to the regular file picker. Both options
+              write to the same photo_r2_key — there's no real reason
+              to keep selfie + passport as separate columns now that
+              the public form already consolidated them. */}
+          <PhotoSlot
+            r2_key={form.photo_r2_key}
+            onPick={uploadPhoto('photo_r2_key')}
+            onClear={() => setForm((p) => ({ ...p, photo_r2_key: null }))}
+          />
         </Section>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>
@@ -398,8 +480,12 @@ const Field = ({ label, children }) => (
   </div>
 );
 
-const PhotoSlot = ({ label, icon, r2_key, onPick, capture }) => {
-  const inputId = useMemo(() => `photo-${label.replace(/\s+/g, '-').toLowerCase()}`, [label]);
+// One preview tile + two pick options (Take photo / Upload from gallery),
+// both writing to the same r2_key. The capture="user" attribute on the
+// camera input opens the front camera on mobile; desktop browsers
+// ignore it and behave like a regular file picker, so the same two
+// buttons work everywhere.
+const PhotoSlot = ({ r2_key, onPick, onClear }) => {
   // Map r2_key → signed URL. Keyed on the value of r2_key itself so a
   // cleared key naturally drops the preview (no effect-driven setState
   // needed). The Map persists across re-renders via useState's lazy init.
@@ -423,27 +509,58 @@ const PhotoSlot = ({ label, icon, r2_key, onPick, capture }) => {
   }, [r2_key, urlCache]);
   const previewUrl = r2_key ? urlCache.get(r2_key) : null;
   return (
-    <div className="admission-photo-block">
-      <div className="admission-photo-thumb">
-        {previewUrl ? <img src={previewUrl} alt={label} /> : <span>No photo</span>}
+    <div className="admission-photo-block" style={{ alignItems: 'flex-start', gap: 16 }}>
+      <div className="admission-photo-thumb" style={{ width: 120, height: 120 }}>
+        {previewUrl
+          ? <img src={previewUrl} alt="Uploaded photo" style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#f1f5f9' }} />
+          : <span>No photo</span>}
       </div>
-      <div>
-        <Button
-          variant="outlined"
-          component="label"
-          startIcon={icon}
-          sx={{ textTransform: 'none' }}
-        >
-          {label}
-          <input
-            id={inputId}
-            type="file"
-            accept="image/*"
-            capture={capture}
-            hidden
-            onChange={(e) => { onPick(e); e.target.value = ''; }}
-          />
-        </Button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Button
+            variant="contained"
+            component="label"
+            startIcon={<PhotoCameraIcon />}
+            size="small"
+            sx={{ textTransform: 'none', bgcolor: 'var(--primary)' }}
+          >
+            Take photo
+            <input
+              type="file"
+              accept="image/*"
+              capture="user"
+              hidden
+              onChange={(e) => { onPick(e); e.target.value = ''; }}
+            />
+          </Button>
+          <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, letterSpacing: 0.5 }}>OR</span>
+          <Button
+            variant="outlined"
+            component="label"
+            startIcon={<UploadIcon />}
+            size="small"
+            sx={{ textTransform: 'none' }}
+          >
+            Upload from gallery
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => { onPick(e); e.target.value = ''; }}
+            />
+          </Button>
+        </div>
+        <div style={{ fontSize: 11, color: '#94a3b8' }}>JPEG, PNG or WEBP.</div>
+        {r2_key && onClear && (
+          <Button
+            size="small"
+            startIcon={<DeleteOutlineIcon fontSize="small" />}
+            onClick={onClear}
+            sx={{ textTransform: 'none', color: '#dc2626', alignSelf: 'flex-start' }}
+          >
+            Remove photo
+          </Button>
+        )}
       </div>
     </div>
   );

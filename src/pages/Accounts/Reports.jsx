@@ -24,7 +24,7 @@ const ReportFilters = ({ values, onChange, onRun, loading }) => {
         <span className="accounts-filter-label">To Date</span>
         <TextField type="date" size="small" value={values.date_to} onChange={(e) => onChange({ ...values, date_to: e.target.value })} />
       </div>
-      <div className="accounts-filter-field" style={{ minWidth: 200 }}>
+      <div className="accounts-filter-field accounts-filter-field-wide">
         <span className="accounts-filter-label">Course</span>
         <FormControl size="small" fullWidth>
           <Select value={values.program_id || ''} onChange={(e) => onChange({ ...values, program_id: e.target.value || '' })} displayEmpty>

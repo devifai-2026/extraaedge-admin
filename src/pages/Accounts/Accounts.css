@@ -1,52 +1,113 @@
-/* Shared styles for the Accounts module pages. Visual language matches
-   the rest of the admin app (Inter, indigo primary, soft shadows). */
+/* Shared styles for the Accounts module pages. Mobile-first: the base
+   rules target small screens (~360px+) and progressively enhance for
+   tablet (640px+) and desktop (1024px+) under media queries.
+   Vertical page scroll is supplied by .layout-content; these styles add
+   per-component horizontal scroll so wide tables stay usable on phones. */
 
 .accounts-page {
-  padding: 20px 28px;
+  /* Tight padding on phones, breathe out on bigger screens. */
+  padding: 14px 12px 24px;
   background: #f9fafb;
-  min-height: calc(100vh - 64px);
+  /* The page is inside .layout-content (overflow-y: auto), so it doesn't
+     need its own min-height — but keep a sensible floor so empty states
+     don't collapse to nothing on mobile. */
+  min-height: 100%;
+  /* Belt-and-suspenders: never bleed out horizontally on mobile. */
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+@media (min-width: 640px) {
+  .accounts-page { padding: 18px 20px 28px; }
+}
+@media (min-width: 1024px) {
+  .accounts-page { padding: 20px 28px; }
 }
 
 .accounts-page-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 18px;
+  /* Stack the title + primary action on phones; row-align on tablet+. */
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+@media (min-width: 640px) {
+  .accounts-page-head {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
 }
 
 .accounts-page-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   color: #111827;
   letter-spacing: -0.01em;
 }
 
+@media (min-width: 640px) {
+  .accounts-page-title { font-size: 20px; }
+}
+
 .accounts-page-subtitle {
-  font-size: 13px;
+  font-size: 12.5px;
   color: #6b7280;
   margin-top: 2px;
 }
 
-/* Filter bar — sits above the table */
+@media (min-width: 640px) {
+  .accounts-page-subtitle { font-size: 13px; }
+}
+
+/* Filter bar — sits above the table. On mobile the fields stack one-per-row
+   for thumb-friendly tap targets; on tablet+ they wrap horizontally. */
 .accounts-filter-bar {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  align-items: flex-end;
-  padding: 12px 14px;
+  align-items: stretch;
+  padding: 12px;
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   box-shadow: 0 1px 2px rgba(20, 24, 40, 0.04);
+}
+
+@media (min-width: 640px) {
+  .accounts-filter-bar {
+    align-items: flex-end;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
 }
 
 .accounts-filter-field {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 160px;
+  /* Fill the row on phones; min-width applies at tablet+. */
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .accounts-filter-field {
+    flex: 0 1 auto;
+    min-width: 160px;
+  }
+  /* Wider variant for selects with longer option labels (e.g. course
+     name). Still wraps cleanly on phones because it inherits the base
+     `flex: 1 1 100%` from .accounts-filter-field. */
+  .accounts-filter-field-wide {
+    min-width: 200px;
+  }
 }
 
 .accounts-filter-label {
@@ -57,16 +118,25 @@
   letter-spacing: 0.04em;
 }
 
-/* KPI card row — used on the Dashboard + atop reports */
+/* KPI card row — 2-up on phones (~145px min keeps 2 cards in a 320px
+   viewport), then auto-fits more per row as space allows. */
 .accounts-kpi-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+@media (min-width: 640px) {
+  .accounts-kpi-row {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+  }
 }
 
 .accounts-kpi-card {
-  padding: 14px 16px;
+  padding: 12px 14px;
   background: #fff;
   border-radius: 10px;
   border: 1px solid #e5e7eb;
@@ -74,20 +144,32 @@
   box-shadow: 0 1px 2px rgba(20, 24, 40, 0.04);
 }
 
+@media (min-width: 640px) {
+  .accounts-kpi-card { padding: 14px 16px; }
+}
+
 .accounts-kpi-label {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
+@media (min-width: 640px) {
+  .accounts-kpi-label { font-size: 11px; }
+}
+
 .accounts-kpi-value {
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 700;
   color: #111827;
   margin-top: 2px;
   font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 640px) {
+  .accounts-kpi-value { font-size: 22px; }
 }
 
 .accounts-kpi-sub {
@@ -96,26 +178,51 @@
   margin-top: 4px;
 }
 
-/* Table shell */
+/* Table shell. The card itself stays rounded + bordered, but the inner
+   table is allowed to scroll horizontally when it's wider than the
+   viewport (the typical mobile case for our 6–8 column tables). */
 .accounts-table-card {
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  overflow: hidden;
+  /* Horizontal scroll for wide tables on small screens. Vertical content
+     scroll is handled by the parent .layout-content. -webkit-overflow-
+     scrolling makes iOS momentum-scroll feel native. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 1px 2px rgba(20, 24, 40, 0.04);
 }
 
+/* Subtle scrollbar — visible enough to signal "this scrolls" on mobile
+   Safari/Chrome without being heavy. */
+.accounts-table-card::-webkit-scrollbar { height: 6px; }
+.accounts-table-card::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
 .accounts-table {
+  /* Don't force 100% — let the table size to its content so columns can
+     reach a comfortable width and the card scrolls if needed. */
   width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
 }
 
 .accounts-table th,
 .accounts-table td {
-  padding: 10px 14px;
+  padding: 10px 12px;
   font-size: 13px;
   text-align: left;
   border-bottom: 1px solid #eef0f3;
+  /* Stop awkward two-letter line breaks in narrow columns. */
+  white-space: nowrap;
+}
+
+@media (min-width: 1024px) {
+  .accounts-table th,
+  .accounts-table td { padding: 10px 14px; }
 }
 
 .accounts-table th {
@@ -125,6 +232,11 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  /* Sticky header inside the horizontally-scrolling card; offset 0 since
+     the page itself scrolls. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .accounts-table tr:hover td {

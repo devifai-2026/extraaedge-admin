@@ -48,6 +48,11 @@ import {
   AdmissionsReportPage,
 } from './pages/Accounts/Reports'
 import AdmissionCenters from './pages/AdvancedSettings/AdmissionCenters'
+// Public, unauthenticated student-facing admission form. NOT wrapped in
+// Layout/ProtectedRoute — the token in the URL is the credential.
+import PublicAdmission from './pages/PublicAdmission/PublicAdmission'
+import PublicReceipt from './pages/PublicReceipt/PublicReceipt'
+import AdmissionPipeline from './pages/AdmissionPipeline/AdmissionPipeline'
 
 // Each route declares the backend tab key it requires.
 // `<ProtectedRoute tab="...">` redirects to /dashboard if user lacks access.
@@ -56,6 +61,13 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Login />} />
+
+        {/* Public student admission form — outside auth + outside Layout.
+            The :token comes from the BE share-link generator. */}
+        <Route path="/apply/:token" element={<PublicAdmission />} />
+
+        {/* Public receipt view — share URL the accounts team copies. */}
+        <Route path="/r/:token" element={<PublicReceipt />} />
 
         <Route path="/dashboard"            element={<ProtectedRoute tab="dashboard"><Layout><AnalyticsDashboard /></Layout></ProtectedRoute>} />
         <Route path="/leadlist"             element={<ProtectedRoute tab="leads"><Layout><LeadList /></Layout></ProtectedRoute>} />
@@ -83,6 +95,8 @@ function App() {
         <Route path="/advancedsettings/assignment-rules" element={<ProtectedRoute tab="settings.assignment_rules"><Layout><AssignmentRules /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/subscription" element={<ProtectedRoute tab="advanced.subscription"><Layout><SubscriptionPage /></Layout></ProtectedRoute>} />
         <Route path="/thirdpartyintegration" element={<ProtectedRoute tab="third_party_integration"><Layout><ThirdPartyIntegration /></Layout></ProtectedRoute>} />
+        {/* Admin: post-conversion admission pipeline overview. */}
+        <Route path="/admission-pipeline" element={<ProtectedRoute tab="admissions.pipeline"><Layout><AdmissionPipeline /></Layout></ProtectedRoute>} />
         <Route path="/tickets" element={<ProtectedRoute><Layout><Tickets /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/org-tree" element={<ProtectedRoute tab="advanced.users_roles"><Layout><OrgTree /></Layout></ProtectedRoute>} />
         {/* Admission centers (Accounts module dropdown — managed by super_admin) */}

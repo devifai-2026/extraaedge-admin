@@ -76,7 +76,10 @@ export const hasTab = (tabKey) => {
   if (!tabKey) return true;
   const allowed = auth.getAllowedTabs();
   if (Array.isArray(allowed)) {
-    return allowed.includes(tabKey);
+    // `'*'` is a wildcard the backend may return for super_admin. Honor
+    // it so new tabs added to the codebase work without forcing a
+    // re-seed of the role's stored tab_permissions JSON.
+    return allowed.includes('*') || allowed.includes(tabKey);
   }
   // No allowed_tabs at all → fall back to the bucket for the role.
   const role = currentRole();

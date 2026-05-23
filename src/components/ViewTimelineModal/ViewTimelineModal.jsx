@@ -33,10 +33,16 @@ import "./ViewTimelineModal.css";
 
 // Map a backend timeline row to a UI category.
 const categoryOf = (row) => {
+  // Admission events get their own bucket so admins / accounts staff can
+  // filter to them without losing the rest of the lead history.
+  if (row.kind === 'admission') return 'Accounts Activity';
   if (row.kind === 'activity') {
     if (row.subtype === 'stage_changed') return 'Lead Status Journey';
     if (['assigned', 'reassign', 'auto_assign', 'refer'].includes(row.subtype)) return 'Counselor Activity';
     if (row.subtype === 'call_recording_uploaded') return 'Lead Activity';
+    // Pre-admission accounts workflow (configure offer / mint share link)
+    // belongs in the accounts bucket so admins can scope to it.
+    if (['fee_offer_saved', 'share_link_minted'].includes(row.subtype)) return 'Accounts Activity';
     return 'Lead History';
   }
   if (row.kind === 'note') return 'Counselor Activity';
@@ -45,6 +51,7 @@ const categoryOf = (row) => {
 };
 
 const iconFor = (row) => {
+  if (row.kind === 'admission') return <FlagIcon className="card-icon" />;
   if (row.kind === 'activity' && row.subtype === 'stage_changed') return <SwapHorizIcon className="card-icon" />;
   if (row.kind === 'activity' && ['assigned', 'reassign', 'auto_assign', 'refer'].includes(row.subtype)) return <PersonOutlineIcon className="card-icon" />;
   if (row.kind === 'note') return <ChatBubbleOutlineIcon className="card-icon" />;
@@ -60,12 +67,25 @@ const accentClassFor = (row) => {
   if (cat === 'Lead Status Journey') return 'cat-status';
   if (cat === 'Counselor Activity') return 'cat-counsel';
   if (cat === 'Lead Activity') return 'cat-activity';
+  if (cat === 'Accounts Activity') return 'cat-status'; // reuse the status palette
   return 'cat-history';
 };
 
 // Short uppercase tag shown under the title, e.g. "STAGE · UPDATE",
 // "COUNSELOR · REASSIGN". Keeps cards scannable when there are many.
 const subtitleFor = (row) => {
+  if (row.kind === 'admission') {
+    const map = {
+      created: 'Accounts · admission created',
+      status_changed: 'Accounts · status changed',
+      receipt_added: 'Accounts · receipt added',
+      receipt_deleted: 'Accounts · receipt removed',
+      field_edited: 'Accounts · field edited',
+      photo_uploaded: 'Accounts · photo uploaded',
+      note_added: 'Accounts · note added',
+    };
+    return map[row.subtype] || `Accounts · ${row.subtype || 'event'}`;
+  }
   if (row.kind === 'activity') {
     if (row.subtype === 'stage_changed') return 'Status journey';
     if (row.subtype === 'lead_created') return 'Lead history';
@@ -74,6 +94,8 @@ const subtitleFor = (row) => {
     if (row.subtype === 'auto_assign') return 'Counselor · auto-assign';
     if (row.subtype === 'refer') return 'Counselor · referral';
     if (row.subtype === 'call_recording_uploaded') return 'Lead activity · recording';
+    if (row.subtype === 'fee_offer_saved') return 'Accounts · fee offer';
+    if (row.subtype === 'share_link_minted') return 'Accounts · share link';
     return 'Lead history';
   }
   if (row.kind === 'note') return 'Counselor · note';
@@ -91,6 +113,18 @@ const initialsOf = (name) => {
 };
 
 const titleFor = (row) => {
+  if (row.kind === 'admission') {
+    const map = {
+      created: 'Admission created',
+      status_changed: 'Admission status changed',
+      receipt_added: 'Receipt added',
+      receipt_deleted: 'Receipt removed',
+      field_edited: 'Admission edited',
+      photo_uploaded: 'Photo uploaded',
+      note_added: 'Note added',
+    };
+    return map[row.subtype] || row.subtype || 'Admission event';
+  }
   if (row.kind === 'activity') {
     if (row.subtype === 'stage_changed') return 'Stage changed';
     if (row.subtype === 'lead_created') return 'Lead created';
@@ -98,6 +132,12 @@ const titleFor = (row) => {
     if (row.subtype === 'auto_assign') return 'Auto-assigned';
     if (row.subtype === 'refer') return 'Lead referred';
     if (row.subtype === 'call_recording_uploaded') return 'Call recording uploaded';
+    if (row.subtype === 'fee_offer_saved') {
+      return row.metadata_json?.is_update ? 'Fee offer updated' : 'Fee offer configured';
+    }
+    if (row.subtype === 'share_link_minted') {
+      return row.metadata_json?.is_regenerate ? 'Share link regenerated' : 'Share link minted';
+    }
     return row.subtype || 'Activity';
   }
   if (row.kind === 'note') return 'Note';
@@ -124,7 +164,7 @@ const fmtDayKey = (iso) => {
 // short label for an activity-filter menu (counts events of the given category)
 const labelWithCount = (rows, cat) => `${cat} (${rows.filter((r) => categoryOf(r) === cat).length})`;
 
-const CATEGORIES = ["Lead Activity", "Counselor Activity", "Lead History", "Lead Status Journey"];
+const CATEGORIES = ["Lead Activity", "Counselor Activity", "Lead History", "Lead Status Journey", "Accounts Activity"];
 
 const ViewTimelineModal = ({ open, onClose, lead }) => {
   const [activeFilters, setActiveFilters] = useState([...CATEGORIES]);
@@ -465,22 +505,200 @@ const DayGroup = ({ day, rows, initialExpanded = true, leadId }) => {
                   <span className="timeline-card-time">{fmtTime(row.created_at)}</span>
                 </div>
                 <div className="timeline-card-body">
-                  {row.kind === 'activity' && row.subtype === 'stage_changed' ? (
-                    <div className="timeline-card-row">
-                      <Chip
-                        size="small"
-                        variant="outlined"
-                        label={row.from_stage_name || row.from_sub_stage_name || 'Unset'}
-                      />
-                      <span className="arrow" style={{ margin: '0 8px' }}>→</span>
-                      <Chip
-                        size="small"
-                        label={row.to_stage_name || row.to_sub_stage_name || 'Unset'}
-                        sx={{ background: '#10b981', color: '#fff', fontWeight: 600 }}
-                      />
-                    </div>
-                  ) : (
-                    row.body && !isAssignmentRow && (
+                  {/* Admission events — render kind-specific details so
+                      "Receipt added" shows the amount, "Status changed"
+                      shows the prev → next pill, etc. The generic body
+                      below is suppressed for these rows so we don't print
+                      the summary twice. */}
+                  {row.kind === 'admission' && (() => {
+                    const md = row.metadata_json || {};
+                    const prev = md.prev_status;
+                    const next = md.next_status;
+                    if (row.subtype === 'status_changed' && (prev || next)) {
+                      return (
+                        <div className="timeline-card-row">
+                          <Chip size="small" variant="outlined" label={prev || 'Unset'} />
+                          <span className="arrow" style={{ margin: '0 8px' }}>→</span>
+                          <Chip
+                            size="small"
+                            label={next || 'Unset'}
+                            sx={{ background: '#3b82f6', color: '#fff', fontWeight: 600 }}
+                          />
+                        </div>
+                      );
+                    }
+                    if (row.subtype === 'created' && next) {
+                      return (
+                        <div className="timeline-card-row">
+                          <span style={{ color: '#9ca3af' }}>Status:&nbsp;</span>
+                          <Chip
+                            size="small"
+                            label={next}
+                            sx={{ background: '#10b981', color: '#fff', fontWeight: 600 }}
+                          />
+                        </div>
+                      );
+                    }
+                    if (row.subtype === 'receipt_added' || row.subtype === 'receipt_deleted') {
+                      const isAdd = row.subtype === 'receipt_added';
+                      return (
+                        <div className="timeline-card-row" style={{ alignItems: 'flex-start' }}>
+                          <ChatBubbleOutlineIcon className="card-meta-icon" />
+                          <div style={{
+                            background: isAdd ? '#f0fdf4' : '#fef2f2',
+                            borderLeft: `3px solid ${isAdd ? '#16a34a' : '#dc2626'}`,
+                            padding: '6px 10px', borderRadius: 4, fontSize: 12,
+                            color: isAdd ? '#15803d' : '#991b1b',
+                            display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center',
+                          }}>
+                            {md.receipt_no && <span>Receipt <strong>#{md.receipt_no}</strong> · </span>}
+                            {md.receipt_kind === 'installment' && <span>Installment {md.installment_no} · </span>}
+                            {md.receipt_kind === 'registration' && <span>Registration · </span>}
+                            <span>Amount <strong>₹{Number(md.amount || 0).toLocaleString('en-IN')}</strong></span>
+                            {md.mode_of_payment && <span> via <strong>{md.mode_of_payment}</strong></span>}
+                            {isAdd && md.share_token && (
+                              <a
+                                href={`/r/${md.share_token}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{
+                                  marginLeft: 'auto', fontWeight: 700,
+                                  color: '#15803d', textDecoration: 'underline',
+                                }}
+                              >
+                                View receipt ↗
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (row.subtype === 'field_edited' && md.changes) {
+                      const keys = Object.keys(md.changes);
+                      return (
+                        <div style={{ fontSize: 11, color: '#475569', marginTop: 4, lineHeight: 1.6 }}>
+                          {keys.slice(0, 4).map((k) => (
+                            <div key={k}>
+                              <strong>{k}</strong>: {String(md.changes[k]?.from ?? '—')} → {String(md.changes[k]?.to ?? '—')}
+                            </div>
+                          ))}
+                          {keys.length > 4 && (
+                            <div style={{ fontStyle: 'italic' }}>+{keys.length - 4} more</div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return row.body ? (
+                      <div className="timeline-card-row">
+                        <ChatBubbleOutlineIcon className="card-meta-icon" />
+                        <span>{String(row.body)}</span>
+                      </div>
+                    ) : null;
+                  })()}
+
+                  {/* Pre-admission accounts events — the audit rows for
+                      configuring the per-lead fee offer and minting the
+                      public share link. Both live in lead_activities (not
+                      admission_events) because they happen BEFORE an
+                      admission row exists. */}
+                  {row.kind === 'activity' && row.subtype === 'fee_offer_saved' && (() => {
+                    const md = row.metadata_json || {};
+                    return (
+                      <div className="timeline-card-row" style={{ alignItems: 'flex-start' }}>
+                        <ChatBubbleOutlineIcon className="card-meta-icon" />
+                        <div style={{
+                          background: '#fff7ed', borderLeft: '3px solid #E87B2F',
+                          padding: '6px 10px', borderRadius: 4, fontSize: 12, color: '#9a3412',
+                        }}>
+                          Course fees <strong>₹{Number(md.course_fees || 0).toLocaleString('en-IN')}</strong>
+                          {md.registration_amount != null && (
+                            <> · Registration <strong>₹{Number(md.registration_amount).toLocaleString('en-IN')}</strong></>
+                          )}
+                          {md.payment_mode && <> · <strong>{md.payment_mode}</strong></>}
+                          {Number(md.installments_count) > 0 && (
+                            <> · {md.installments_count} installment{md.installments_count > 1 ? 's' : ''}</>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {row.kind === 'activity' && row.subtype === 'share_link_minted' && (() => {
+                    const md = row.metadata_json || {};
+                    const exp = md.expires_at ? new Date(md.expires_at) : null;
+                    return (
+                      <div className="timeline-card-row" style={{ alignItems: 'flex-start' }}>
+                        <ChatBubbleOutlineIcon className="card-meta-icon" />
+                        <div style={{
+                          background: '#eef2ff', borderLeft: '3px solid #4f46e5',
+                          padding: '6px 10px', borderRadius: 4, fontSize: 12, color: '#3730a3',
+                        }}>
+                          Public admission form link
+                          {md.ttl_hours ? <> · valid {md.ttl_hours}h</> : null}
+                          {exp ? <> · expires {exp.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</> : null}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {row.kind === 'activity' && row.subtype === 'stage_changed' ? (() => {
+                    // The activity stores from/to for both stage and sub-stage.
+                    // If the parent stage didn't move, show the sub-stage delta
+                    // instead (and label the row so it's clear). If neither
+                    // moved (legacy data), show a no-op badge instead of
+                    // "Enrolled → Enrolled".
+                    const stageMoved = (row.from_stage_name || '') !== (row.to_stage_name || '');
+                    const subMoved = (row.from_sub_stage_name || '') !== (row.to_sub_stage_name || '');
+                    if (stageMoved) {
+                      return (
+                        <div className="timeline-card-row">
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            label={row.from_stage_name || 'Unset'}
+                          />
+                          <span className="arrow" style={{ margin: '0 8px' }}>→</span>
+                          <Chip
+                            size="small"
+                            label={row.to_stage_name || 'Unset'}
+                            sx={{ background: '#10b981', color: '#fff', fontWeight: 600 }}
+                          />
+                          {subMoved && (
+                            <span style={{ marginLeft: 12, fontSize: 11, color: '#6b7280' }}>
+                              Sub-stage: <strong>{row.from_sub_stage_name || '—'}</strong>
+                              {' → '}<strong>{row.to_sub_stage_name || '—'}</strong>
+                            </span>
+                          )}
+                        </div>
+                      );
+                    }
+                    if (subMoved) {
+                      return (
+                        <div className="timeline-card-row">
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            label={row.from_sub_stage_name || '—'}
+                          />
+                          <span className="arrow" style={{ margin: '0 8px' }}>→</span>
+                          <Chip
+                            size="small"
+                            label={row.to_sub_stage_name || '—'}
+                            sx={{ background: '#10b981', color: '#fff', fontWeight: 600 }}
+                          />
+                          <span style={{ marginLeft: 12, fontSize: 11, color: '#6b7280' }}>
+                            within <strong>{row.to_stage_name || row.from_stage_name || 'stage'}</strong>
+                          </span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="timeline-card-row" style={{ color: '#9ca3af', fontSize: 12, fontStyle: 'italic' }}>
+                        Stage re-saved (no change)
+                      </div>
+                    );
+                  })() : (
+                    row.body && !isAssignmentRow && row.kind !== 'admission' && (
                       <div className="timeline-card-row">
                         <ChatBubbleOutlineIcon className="card-meta-icon" />
                         <span>{String(row.body)}</span>

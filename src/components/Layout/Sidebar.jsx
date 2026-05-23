@@ -28,6 +28,9 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
+import InsightsIcon from '@mui/icons-material/Insights';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { hasTab } from '../../lib/rbac';
 import { admissionsApi } from '../../lib/endpoints';
 import { onNotification } from '../../lib/socket';
@@ -50,22 +53,37 @@ const menuItems = [
   { id: 13, label: 'Basic Settings', icon: SettingsIcon, path: '/settings', tab: 'settings.email_templates' },
   { id: 14, label: 'Advanced Settings', icon: SettingsSuggestIcon, path: '/advancedsettings', tab: 'advanced.users_roles' },
   { id: 15, label: 'Third Party Integration', icon: IntegrationInstructionsIcon, path: '/thirdpartyintegration', tab: 'third_party_integration' },
+  // Tenant-wide post-conversion pipeline view for admins. Sits in the
+  // main sidebar (not Accounts) so super_admins see admission status
+  // alongside lead-pipeline items without context-switching.
+  { id: 18, label: 'Admission Pipeline', icon: SchoolIcon, path: '/admission-pipeline', tab: 'admissions.pipeline' },
 
   // ---------- Accounts module (account_manager role) ----------
-  // These items only appear for users whose role grants the corresponding
-  // 'accounts.*' tab key. Filtering happens in visibleItems() via hasTab().
-  { id: 100, label: 'Dashboard',              icon: DashboardIcon,       path: '/accounts/dashboard',                  tab: 'accounts.dashboard' },
-  // `badgeKey: 'pending_admissions'` flags this item as one whose badge
-  // we should pull live from the API + socket. See Sidebar() below.
-  { id: 109, label: 'Pending Admissions',     icon: PendingActionsIcon,  path: '/accounts/pending-admissions',         tab: 'accounts.pending_admissions', badgeKey: 'pending_admissions' },
-  { id: 101, label: 'This Month Admissions',  icon: SchoolIcon,          path: '/accounts/this-month-admissions',      tab: 'accounts.this_month_admissions' },
-  { id: 102, label: 'Total Admissions',       icon: SchoolIcon,          path: '/accounts/total-admissions',           tab: 'accounts.total_admissions' },
-  { id: 103, label: 'Approvals',              icon: ChecklistIcon,       path: '/accounts/approvals',                  tab: 'accounts.approvals' },
-  { id: 104, label: 'Attendings',             icon: HowToRegIcon,        path: '/accounts/attendings',                 tab: 'accounts.attendings' },
-  { id: 105, label: 'Break',                  icon: PauseCircleIcon,     path: '/accounts/break',                      tab: 'accounts.break' },
-  { id: 106, label: 'Report',                 icon: AssessmentIcon,      path: '/accounts/report',                     tab: 'accounts.report' },
-  { id: 107, label: 'Pay Schedule',           icon: PaymentsIcon,        path: '/accounts/pay-schedule',               tab: 'accounts.pay_schedule' },
-  { id: 108, label: 'Collection Receipt-wise',icon: ReceiptLongIcon,     path: '/accounts/collection-receipt-wise',    tab: 'accounts.collection_receipt_wise' },
+  // All Accounts items collapse under a single "Accounts Insights" parent
+  // that expands inline. Per-child RBAC still applies (each child carries
+  // its own `tab` key) and the parent is hidden entirely when the user has
+  // access to zero children. Pending Admissions keeps its live badge; when
+  // the parent is collapsed, that badge bubbles up to the parent row.
+  {
+    id: 99,
+    label: 'Accounts Insights',
+    icon: InsightsIcon,
+    group: 'accounts',
+    children: [
+      { id: 100, label: 'Dashboard',              icon: DashboardIcon,       path: '/accounts/dashboard',                  tab: 'accounts.dashboard' },
+      // `badgeKey: 'pending_admissions'` flags this item as one whose badge
+      // we should pull live from the API + socket. See Sidebar() below.
+      { id: 109, label: 'Pending Admissions',     icon: PendingActionsIcon,  path: '/accounts/pending-admissions',         tab: 'accounts.pending_admissions', badgeKey: 'pending_admissions' },
+      { id: 101, label: 'This Month Admissions',  icon: SchoolIcon,          path: '/accounts/this-month-admissions',      tab: 'accounts.this_month_admissions' },
+      { id: 102, label: 'Total Admissions',       icon: SchoolIcon,          path: '/accounts/total-admissions',           tab: 'accounts.total_admissions' },
+      { id: 103, label: 'Approvals',              icon: ChecklistIcon,       path: '/accounts/approvals',                  tab: 'accounts.approvals' },
+      { id: 104, label: 'Attendings',             icon: HowToRegIcon,        path: '/accounts/attendings',                 tab: 'accounts.attendings' },
+      { id: 105, label: 'Break',                  icon: PauseCircleIcon,     path: '/accounts/break',                      tab: 'accounts.break' },
+      { id: 106, label: 'Report',                 icon: AssessmentIcon,      path: '/accounts/report',                     tab: 'accounts.report' },
+      { id: 107, label: 'Pay Schedule',           icon: PaymentsIcon,        path: '/accounts/pay-schedule',               tab: 'accounts.pay_schedule' },
+      { id: 108, label: 'Collection Receipt-wise',icon: ReceiptLongIcon,     path: '/accounts/collection-receipt-wise',    tab: 'accounts.collection_receipt_wise' },
+    ],
+  },
 ];
 
 const bottomMenuItems = [
@@ -82,6 +100,10 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
   // a one-line change. Skipped entirely when the user can't see the
   // corresponding tab so we don't probe the API as a counsellor.
   const [badges, setBadges] = useState({});
+  // Which group accordions are currently open. Persisted across renders
+  // but not across reloads — opening behaviour is driven by current route
+  // (auto-open the group containing the active child).
+  const [openGroups, setOpenGroups] = useState({});
   useEffect(() => {
     if (!hasTab('accounts.pending_admissions')) return undefined;
     let alive = true;
@@ -97,8 +119,11 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
     const off = onNotification((evt) => {
       if (evt?.type === 'admission.pending') refresh();
     });
-    // Polling fallback in case the socket drops or backfills are missed.
-    const t = setInterval(refresh, 60_000);
+    // 10-second poll. Faster than the old 60s fallback because the socket
+    // can drop quietly (e.g. on tab sleep / VPN reconnect) and accounts
+    // managers actively watch this badge — staleness is more visible
+    // than the bandwidth cost of one tiny COUNT query.
+    const t = setInterval(refresh, 10_000);
     return () => { alive = false; off(); clearInterval(t); };
   }, []);
 
@@ -110,57 +135,119 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
     }
   };
 
-  // Hide items the user's role doesn't have access to (allowed_tabs from /auth/login).
-  const visibleItems = (items) => items.filter((item) => !item.tab || hasTab(item.tab));
+  // Hide items the user's role doesn't have access to (allowed_tabs from
+  // /auth/login). For group items, also strip children the user can't see
+  // and drop the group entirely if nothing's left under it.
+  const visibleItems = (items) =>
+    items
+      .map((item) => {
+        if (!item.children) return item;
+        const kids = item.children.filter((c) => !c.tab || hasTab(c.tab));
+        return kids.length ? { ...item, children: kids } : null;
+      })
+      .filter(Boolean)
+      .filter((item) => item.children || !item.tab || hasTab(item.tab));
+
+  const liveBadge = (item) => {
+    const live = item.badgeKey ? badges[item.badgeKey] : null;
+    return item.badge ?? (live > 0 ? live : null);
+  };
+
+  // Sum of child badges — shown on the parent row when the group is
+  // collapsed (or the sidebar is in mini mode), so pending counts don't
+  // disappear behind a closed accordion.
+  const groupBadge = (item) =>
+    item.children?.reduce((sum, c) => {
+      const v = liveBadge(c);
+      return typeof v === 'number' ? sum + v : sum;
+    }, 0) || null;
+
+  const renderItemButton = (item, { depth = 0, isGroup = false, isOpen = false } = {}) => {
+    const IconComponent = item.icon;
+    const isActive = !item.action && !isGroup && location.pathname === item.path;
+    const badgeValue = isGroup && (!isOpen || collapsed) ? groupBadge(item) : liveBadge(item);
+    const onClick = () => {
+      if (isGroup) {
+        // In collapsed (mini) mode the accordion can't expand inline —
+        // jump to the first visible child instead so the click isn't a
+        // no-op. In expanded mode, toggle.
+        if (collapsed) {
+          const first = item.children?.[0];
+          if (first?.path) navigate(first.path);
+          return;
+        }
+        setOpenGroups((g) => ({ ...g, [item.id]: !g[item.id] }));
+        return;
+      }
+      handleMenuClick(item);
+    };
+    return (
+      <button
+        className={`menu-item ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`}
+        onClick={onClick}
+        style={{
+          backgroundColor: isActive ? colors.primary : 'transparent',
+          color: isActive ? colors.white : colors.textDark,
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          paddingLeft: !collapsed && depth > 0 ? 20 + depth * 20 : undefined,
+        }}
+        title={collapsed ? item.label : ''}
+      >
+        <span className="menu-icon" style={{ position: 'relative' }}>
+          <IconComponent />
+          {/* When the sidebar is collapsed we still want the user to
+              see something's pending — show a tiny red dot on the
+              icon itself instead of the (hidden) right-side badge. */}
+          {collapsed && badgeValue ? (
+            <span style={{
+              position: 'absolute', top: -2, right: -2,
+              minWidth: 8, height: 8, borderRadius: '50%',
+              background: '#dc2626',
+              boxShadow: '0 0 0 2px white',
+            }} />
+          ) : null}
+        </span>
+        {!collapsed && <span className="menu-label">{item.label}</span>}
+        {!collapsed && badgeValue != null && badgeValue !== 0 && (
+          <span className="badge" style={{
+            background: '#dc2626', color: '#fff',
+            borderRadius: 10, padding: '2px 7px',
+            fontSize: 11, fontWeight: 700, marginLeft: 'auto',
+            fontVariantNumeric: 'tabular-nums',
+          }}>{badgeValue}</span>
+        )}
+        {!collapsed && isGroup && (
+          <span style={{ marginLeft: badgeValue ? 6 : 'auto', display: 'flex', alignItems: 'center' }}>
+            {isOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+          </span>
+        )}
+      </button>
+    );
+  };
 
   const renderMenuItems = (items) => (
     <ul className="menu-list">
       {visibleItems(items).map((item) => {
-        const IconComponent = item.icon;
-        const isActive = !item.action && location.pathname === item.path;
-        // Two badge sources: a static `item.badge` (legacy) or a
-        // live-counter keyed by `item.badgeKey`. Hide when 0 so the
-        // sidebar doesn't carry "0" forever once the queue clears.
-        const live = item.badgeKey ? badges[item.badgeKey] : null;
-        const badgeValue = item.badge ?? (live > 0 ? live : null);
-        return (
-          <li key={item.id}>
-            <button
-              className={`menu-item ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`}
-              onClick={() => handleMenuClick(item)}
-              style={{
-                backgroundColor: isActive ? colors.primary : 'transparent',
-                color: isActive ? colors.white : colors.textDark,
-                justifyContent: collapsed ? 'center' : 'flex-start',
-              }}
-              title={collapsed ? item.label : ''}
-            >
-              <span className="menu-icon" style={{ position: 'relative' }}>
-                <IconComponent />
-                {/* When the sidebar is collapsed we still want the user to
-                    see something's pending — show a tiny red dot on the
-                    icon itself instead of the (hidden) right-side badge. */}
-                {collapsed && badgeValue && (
-                  <span style={{
-                    position: 'absolute', top: -2, right: -2,
-                    minWidth: 8, height: 8, borderRadius: '50%',
-                    background: '#dc2626',
-                    boxShadow: '0 0 0 2px white',
-                  }} />
-                )}
-              </span>
-              {!collapsed && <span className="menu-label">{item.label}</span>}
-              {!collapsed && badgeValue != null && (
-                <span className="badge" style={{
-                  background: '#dc2626', color: '#fff',
-                  borderRadius: 10, padding: '2px 7px',
-                  fontSize: 11, fontWeight: 700, marginLeft: 'auto',
-                  fontVariantNumeric: 'tabular-nums',
-                }}>{badgeValue}</span>
+        if (item.children) {
+          // Auto-expand the group when we're sitting on one of its
+          // children, even if the user hasn't toggled it open this
+          // session. Explicit close (openGroups[id] === false) wins.
+          const onChildRoute = item.children.some((c) => c.path === location.pathname);
+          const isOpen = openGroups[item.id] ?? onChildRoute;
+          return (
+            <li key={item.id}>
+              {renderItemButton(item, { isGroup: true, isOpen })}
+              {!collapsed && isOpen && (
+                <ul className="menu-list">
+                  {item.children.map((child) => (
+                    <li key={child.id}>{renderItemButton(child, { depth: 1 })}</li>
+                  ))}
+                </ul>
               )}
-            </button>
-          </li>
-        );
+            </li>
+          );
+        }
+        return <li key={item.id}>{renderItemButton(item)}</li>;
       })}
     </ul>
   );

@@ -156,9 +156,31 @@ const TYPE_CONFIG = {
     columns: [
       { key: 'name', label: 'Program' },
       { key: 'is_active', label: 'Activated', render: (r) => r.is_active ? 'True' : 'False' },
-      { key: 'category', label: 'Category', render: (r) => r.category || '—' },
       { key: 'type', label: 'Type', render: (r) => r.type || '—' },
-      { key: 'price', label: 'Price', render: (r) => (r.price != null ? `${r.currency || ''} ${r.price}`.trim() : '—') },
+      // Total Fees = course_fees + registration_amount. Shown only when
+      // course_fees is set; registration_amount defaults to 0 if null so
+      // programs that haven't been re-saved with a registration component
+      // still render a sensible total.
+      {
+        key: 'total_fees',
+        label: 'Total Fees',
+        render: (r) => {
+          if (r.course_fees == null) return '—';
+          const total = Number(r.course_fees) + Number(r.registration_amount || 0);
+          return total.toFixed(2);
+        },
+      },
+      // Payment Type comes straight from the API (`payment_mode` enum:
+      // 'full' | 'installment'). Capitalised for display; em dash when
+      // the program has no fee structure configured yet.
+      {
+        key: 'payment_mode',
+        label: 'Payment Type',
+        render: (r) => {
+          if (!r.payment_mode) return '—';
+          return r.payment_mode === 'full' ? 'Full' : 'Installment';
+        },
+      },
     ],
     fields: [
       { key: 'name', label: 'Name', required: true },
@@ -167,16 +189,51 @@ const TYPE_CONFIG = {
       // Backend constrains these via z.enum — show as dropdowns so the user can't type invalid values.
       { key: 'category', label: 'Category', type: 'enum', options: ['', 'abroad', 'domestic', 'coaching'] },
       { key: 'type',     label: 'Type',     type: 'enum', options: ['', 'online', 'offline', 'hybrid'] },
-      { key: 'price', label: 'Price', type: 'number' },
-      { key: 'currency', label: 'Currency (e.g. INR, USD)' },
-      { key: 'discount_price', label: 'Discount Price', type: 'number' },
       { key: 'duration_value', label: 'Duration', type: 'number' },
       { key: 'duration_unit', label: 'Duration Unit', type: 'enum', options: ['', 'days', 'months', 'years'] },
       { key: 'eligibility', label: 'Eligibility' },
       { key: 'intake_month', label: 'Intake Month' },
       { key: 'country', label: 'Country' },
+      // Optional fee structure: total course fees + registration component
+      // + payment mode + per-installment amounts (up to 4). Rendered as
+      // one custom sub-form; the four backend columns are flattened on
+      // submit in onSave().
+      { key: '__fees', label: 'Fees Payment Breakup', type: 'program-fees' },
     ],
   },
+};
+
+// Empty fee-structure model used by openAdd and as a fallback. We keep
+// 4 installment slots in state at all times so the table renders the
+// "1st / 2nd / 3rd / 4th" columns the spec calls for even before the
+// admin starts typing; empty rows are dropped on submit.
+const EMPTY_FEES = {
+  course_fees: '',
+  registration_amount: '',
+  payment_mode: '',
+  fee_installments: [
+    { installment_no: 1, amount: '' },
+    { installment_no: 2, amount: '' },
+    { installment_no: 3, amount: '' },
+    { installment_no: 4, amount: '' },
+  ],
+};
+
+// Pull the fee structure out of a fetched program row into the editable
+// shape above. Missing values (existing rows that haven't been re-saved)
+// fall back to the empty defaults.
+const hydrateFees = (row) => {
+  const stored = Array.isArray(row.fee_installments) ? row.fee_installments : [];
+  const byNo = new Map(stored.map((r) => [Number(r.installment_no), r]));
+  return {
+    course_fees: row.course_fees != null ? String(row.course_fees) : '',
+    registration_amount: row.registration_amount != null ? String(row.registration_amount) : '',
+    payment_mode: row.payment_mode || '',
+    fee_installments: [1, 2, 3, 4].map((n) => {
+      const r = byNo.get(n);
+      return { installment_no: n, amount: r?.amount != null ? String(r.amount) : '' };
+    }),
+  };
 };
 
 export default function DropdownDetail() {
@@ -315,7 +372,13 @@ export default function DropdownDetail() {
     } else if (cfg) {
       // Booleans default to true (most common case: a new dropdown row should
       // be active). Other fields start empty — required ones are validated on submit.
-      setForm(Object.fromEntries(effectiveFields.map((f) => [f.key, f.type === 'bool' ? true : ''])));
+      // program-fees gets its own structured default so the breakup table
+      // renders 4 empty slots immediately.
+      setForm(Object.fromEntries(effectiveFields.map((f) => {
+        if (f.type === 'bool') return [f.key, true];
+        if (f.type === 'program-fees') return [f.key, { ...EMPTY_FEES, fee_installments: EMPTY_FEES.fee_installments.map((r) => ({ ...r })) }];
+        return [f.key, ''];
+      })));
     }
     setDialogOpen(true);
   };
@@ -328,6 +391,7 @@ export default function DropdownDetail() {
       setForm(Object.fromEntries(
         effectiveFields.map((f) => {
           if (f.type === 'bool') return [f.key, row[f.key] === true];
+          if (f.type === 'program-fees') return [f.key, hydrateFees(row)];
           return [f.key, row[f.key] != null ? String(row[f.key]) : ''];
         })
       ));
@@ -350,6 +414,29 @@ export default function DropdownDetail() {
       if (!form.name?.trim()) { alert('Value is required'); return; }
     } else {
       for (const f of effectiveFields) {
+        if (f.type === 'program-fees') {
+          // Whole structure is optional. If the admin touched payment_mode
+          // we validate the math here so they see the error before the
+          // server roundtrip; the BE re-runs the same check.
+          const fees = form[f.key] || {};
+          if (fees.payment_mode === 'installment') {
+            const cf = Number(fees.course_fees);
+            if (!cf || Number.isNaN(cf)) { alert('Course Fees is required when Mode is Installment.'); return; }
+            const reg = Number(fees.registration_amount || 0);
+            const slots = (fees.fee_installments || [])
+              .map((r) => Number(r.amount || 0))
+              .filter((n) => n > 0);
+            if (!slots.length) { alert('Add at least one installment amount.'); return; }
+            const sum = reg + slots.reduce((a, b) => a + b, 0);
+            if (Math.abs(sum - cf) > 0.01) {
+              alert(`Registration + installments (${sum.toFixed(2)}) must equal course fees (${cf.toFixed(2)}).`);
+              return;
+            }
+          } else if (fees.payment_mode === 'full') {
+            if (!fees.course_fees) { alert('Course Fees is required when Mode is Full.'); return; }
+          }
+          continue;
+        }
         if (f.required && !form[f.key]) { alert(`${f.label} is required`); return; }
         // Number lower-bound check (defaults to 0; allow override via f.min on the field config).
         if (f.type === 'number' && form[f.key] !== '' && form[f.key] != null) {
@@ -368,19 +455,31 @@ export default function DropdownDetail() {
         if (isEdit) await apiUpdate(editingRow, body);
         else await apiCreate(body);
       } else {
-        const payload = Object.fromEntries(
-          effectiveFields
-            .filter((f) => {
-              const v = form[f.key];
-              if (f.type === 'bool') return typeof v === 'boolean'; // include true and false
-              return v !== '' && v != null;
-            })
-            .map((f) => {
-              if (f.type === 'number') return [f.key, Number(form[f.key])];
-              if (f.type === 'bool')   return [f.key, !!form[f.key]];
-              return [f.key, form[f.key]];
-            })
-        );
+        const payload = {};
+        for (const f of effectiveFields) {
+          // program-fees is a synthetic field — flatten its nested shape
+          // into the four real DB columns the BE expects. We send nulls
+          // explicitly when the admin clears the structure so existing
+          // values can be reset instead of stickily retained.
+          if (f.type === 'program-fees') {
+            const fees = form[f.key] || {};
+            const hasAny = fees.course_fees !== '' || fees.registration_amount !== '' || fees.payment_mode;
+            if (!hasAny) continue;
+            payload.course_fees = fees.course_fees !== '' ? Number(fees.course_fees) : null;
+            payload.registration_amount = fees.registration_amount !== '' ? Number(fees.registration_amount) : null;
+            payload.payment_mode = fees.payment_mode || null;
+            const installments = (fees.fee_installments || [])
+              .filter((r) => r.amount !== '' && r.amount != null && Number(r.amount) > 0)
+              .map((r) => ({ installment_no: Number(r.installment_no), amount: Number(r.amount) }));
+            payload.fee_installments = fees.payment_mode === 'installment' ? installments : null;
+            continue;
+          }
+          const v = form[f.key];
+          if (f.type === 'bool') { payload[f.key] = !!v; continue; }
+          if (v === '' || v == null) continue;
+          if (f.type === 'number') payload[f.key] = Number(v);
+          else payload[f.key] = v;
+        }
         if (isEdit) await apiUpdate(editingRow, payload);
         else await apiCreate(payload);
       }
@@ -439,7 +538,7 @@ export default function DropdownDetail() {
         emptyMessage={`No ${heading.toLowerCase()} values yet`}
       />
 
-      <Dialog open={dialogOpen} onClose={() => { setDialogOpen(false); setEditingRow(null); }} maxWidth="sm" fullWidth>
+      <Dialog open={dialogOpen} onClose={() => { setDialogOpen(false); setEditingRow(null); }} maxWidth={cfg?.api === 'programs' ? 'md' : 'sm'} fullWidth>
         <DialogTitle>{editingRow ? `Edit ${heading}` : `Add ${heading}`}</DialogTitle>
         <DialogContent>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 8 }}>
@@ -453,6 +552,16 @@ export default function DropdownDetail() {
               </>
             )}
             {!isCustomField && effectiveFields.map((f) => {
+              if (f.type === 'program-fees') {
+                return (
+                  <ProgramFeesField
+                    key={f.key}
+                    label={f.label}
+                    value={form[f.key] || EMPTY_FEES}
+                    onChange={(next) => setForm({ ...form, [f.key]: next })}
+                  />
+                );
+              }
               if (f.type === 'stage-select') {
                 return (
                   <div key={f.key}>
@@ -564,6 +673,157 @@ export default function DropdownDetail() {
           </Button>
         </DialogActions>
       </Dialog>
+    </div>
+  );
+}
+
+// ---------- Fees Payment Breakup sub-form ----------
+//
+// Renders four logical inputs (course fees, registration, payment mode)
+// plus a horizontal "1st / 2nd / 3rd / 4th Installment" amount table
+// that's only shown when payment_mode === 'installment'.
+//
+// Live math: shows the running total (registration + Σ installments)
+// next to the course-fees value with a red/green delta so the admin
+// gets instant feedback before clicking Save.
+function ProgramFeesField({ label, value, onChange }) {
+  const v = value || EMPTY_FEES;
+  const cf = Number(v.course_fees || 0);
+  const reg = Number(v.registration_amount || 0);
+  const inst = (v.fee_installments || []).reduce((acc, r) => acc + Number(r.amount || 0), 0);
+  const total = reg + inst;
+  const delta = cf - total;
+  const isInstallment = v.payment_mode === 'installment';
+  const sumOk = Math.abs(delta) < 0.01;
+
+  const setKey = (k) => (e) => onChange({ ...v, [k]: e.target.value });
+  const setMode = (e) => {
+    const next = e.target.value;
+    // Clearing installments when switching to Full mode keeps the model honest;
+    // we don't show the table but a stale array would still post to the API.
+    onChange({
+      ...v,
+      payment_mode: next,
+      fee_installments: next === 'installment' ? v.fee_installments : EMPTY_FEES.fee_installments.map((r) => ({ ...r })),
+    });
+  };
+  const setInstallment = (idx) => (e) => {
+    const amount = e.target.value;
+    onChange({
+      ...v,
+      fee_installments: v.fee_installments.map((r, i) => (i === idx ? { ...r, amount } : r)),
+    });
+  };
+
+  // One-click helper: divide (course_fees − registration) evenly across
+  // 4 slots so the admin doesn't have to do the math by hand.
+  const distributeEvenly = () => {
+    if (!cf) return;
+    const remaining = Math.max(0, cf - reg);
+    const slotCount = 4;
+    // Round to 2 decimals; put any rounding residual on slot 1 so the sum
+    // matches the course fees exactly.
+    const per = Math.round((remaining / slotCount) * 100) / 100;
+    const residual = Math.round((remaining - per * slotCount) * 100) / 100;
+    const next = v.fee_installments.map((r, i) => ({
+      ...r,
+      amount: String(i === 0 ? (per + residual).toFixed(2) : per.toFixed(2)),
+    }));
+    onChange({ ...v, fee_installments: next });
+  };
+
+  return (
+    <div style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: 12, background: '#fafafa' }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 10 }}>
+        {label}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+        <TextField
+          size="small" label="Course Fees" type="number" fullWidth
+          value={v.course_fees ?? ''} onChange={setKey('course_fees')}
+          inputProps={{ min: 0, step: 'any' }}
+        />
+        <TextField
+          size="small" label="Registration Amount" type="number" fullWidth
+          value={v.registration_amount ?? ''} onChange={setKey('registration_amount')}
+          inputProps={{ min: 0, step: 'any' }}
+          helperText="Paid at registration."
+        />
+        <TextField
+          size="small" label="Payment Mode" select fullWidth
+          value={v.payment_mode || ''} onChange={setMode}
+        >
+          <MenuItem value=""><em>— None —</em></MenuItem>
+          <MenuItem value="full">Full</MenuItem>
+          <MenuItem value="installment">Installment</MenuItem>
+        </TextField>
+      </div>
+
+      {isInstallment && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>
+              Fees Payment Breakup
+            </div>
+            <Button size="small" onClick={distributeEvenly} sx={{ textTransform: 'none', color: '#E53935' }} disabled={!cf}>
+              Distribute evenly
+            </Button>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6 }}>
+              <thead>
+                <tr>
+                  {['1st Installment', '2nd Installment', '3rd Installment', '4th Installment'].map((h) => (
+                    <th key={h} style={{ textAlign: 'left', padding: '8px 10px', fontWeight: 600, color: '#475569', background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {v.fee_installments.map((row, idx) => (
+                    <td key={row.installment_no} style={{ padding: 8, verticalAlign: 'top' }}>
+                      <TextField
+                        size="small"
+                        type="number"
+                        fullWidth
+                        placeholder="Amount"
+                        value={row.amount ?? ''}
+                        onChange={setInstallment(idx)}
+                        inputProps={{ min: 0, step: 'any' }}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Live total + delta. Red when over/under, green when matches. */}
+          <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+            <span style={{ color: '#475569' }}>
+              Registration + Installments = <strong>{total.toFixed(2)}</strong>
+              {cf > 0 && (
+                <>
+                  {' '}/ Course Fees <strong>{cf.toFixed(2)}</strong>
+                </>
+              )}
+            </span>
+            {cf > 0 && (
+              <span style={{ color: sumOk ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                {sumOk
+                  ? '✓ Matches course fees'
+                  : delta > 0
+                    ? `Short by ${delta.toFixed(2)}`
+                    : `Over by ${Math.abs(delta).toFixed(2)}`}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

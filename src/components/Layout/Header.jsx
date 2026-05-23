@@ -9,9 +9,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import AddIcon from '@mui/icons-material/Add';
 import PhoneIcon from '@mui/icons-material/Phone';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import QuickAdd from '../QuickAdd/QuickAdd'
 import './Header.css'
@@ -80,13 +78,6 @@ function Header() {
             // cached perms until next login. Not fatal.
         }
     }
-
-    // Search context: 'applicant' or 'application'
-    const [searchContext, setSearchContext] = useState('applicant')
-    const [showContextMenu, setShowContextMenu] = useState(false)
-
-    // Global Search dropdown state (you can add actual menu items later)
-    const [showGlobalMenu, setShowGlobalMenu] = useState(false)
 
     // Notification dropdown state
     const [showNotifications, setShowNotifications] = useState(false)
@@ -186,6 +177,12 @@ function Header() {
     }, [anchorNotification])
 
     // Debounced global search against /leads?q=…
+    //
+    // Two guards against the "sometimes shows, sometimes doesn't" bug:
+    //  1. Debounce timer is cleared on re-run / unmount.
+    //  2. `cancelled` flag prevents an older in-flight response from
+    //     overwriting the results of a newer query that already returned
+    //     (classic out-of-order fetch race when the user keeps typing).
     useEffect(() => {
         if (searchTimer.current) clearTimeout(searchTimer.current)
         const q = searchQuery.trim()
@@ -194,14 +191,18 @@ function Header() {
             setSearchLoading(false)
             return
         }
+        let cancelled = false
         setSearchLoading(true)
         searchTimer.current = setTimeout(() => {
             leadsApi.list({ q, limit: 10 })
-                .then((r) => setSearchResults(r?.data || []))
-                .catch(() => setSearchResults([]))
-                .finally(() => setSearchLoading(false))
+                .then((r) => { if (!cancelled) setSearchResults(r?.data || []) })
+                .catch(() => { if (!cancelled) setSearchResults([]) })
+                .finally(() => { if (!cancelled) setSearchLoading(false) })
         }, 300)
-        return () => { if (searchTimer.current) clearTimeout(searchTimer.current) }
+        return () => {
+            cancelled = true
+            if (searchTimer.current) clearTimeout(searchTimer.current)
+        }
     }, [searchQuery])
 
     // Close results when clicking outside
@@ -209,7 +210,6 @@ function Header() {
         const onClick = (e) => {
             if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target)) {
                 setShowSearchResults(false)
-                setShowGlobalMenu(false)
             }
         }
         document.addEventListener('mousedown', onClick)
@@ -242,14 +242,25 @@ function Header() {
         navigate('/')
     }
 
-    const sessionUser = auth.getUser()
+    // Re-read the cached user blob whenever Profile (or anywhere else)
+    // dispatches 'ee:user-updated'. Without this, changing the avatar on
+    // the Profile page wouldn't repaint the navbar until a full reload.
+    const [sessionUser, setSessionUser] = useState(() => auth.getUser())
     const sessionTenant = auth.getTenant()
+    useEffect(() => {
+        const refresh = () => setSessionUser(auth.getUser())
+        window.addEventListener('ee:user-updated', refresh)
+        return () => window.removeEventListener('ee:user-updated', refresh)
+    }, [])
 
-    const getPlaceholder = () => {
-        return searchContext === 'applicant'
-            ? 'Search by Applicant Name, Email Id or WhatsApp #'
-            : 'Search by Application Name, Email Id or WhatsApp #'
-    }
+    // Two-letter initials fallback when the user has no avatar uploaded.
+    const userInitials = (sessionUser?.name || sessionUser?.email || '?')
+        .split(/[\s@]+/)
+        .map((s) => s[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join('')
+        .toUpperCase()
 
     const handleUserClick = (event) => {
         setAnchorEl(event.currentTarget);
@@ -274,30 +285,11 @@ function Header() {
 
             <div className='main-container'>
                 <div className="header-search-wrapper" ref={searchWrapperRef} style={{ position: 'relative' }}>
-                    <div>
-                        <div className="global-search-dropdown">
-                            <button
-                                className="global-search-btn"
-                                onClick={() => setShowGlobalMenu(!showGlobalMenu)}
-                            >
-                                Global Search
-                                <ExpandMoreIcon sx={{ fontSize: 18, marginLeft: '4px' }} />
-                            </button>
-                            {showGlobalMenu && (
-                                <div className="global-menu" style={{ zIndex: 1300 }}>
-                                    <div className="menu-item" onClick={() => { setSearchContext('applicant'); setShowGlobalMenu(false); }}>Applicant Name</div>
-                                    <div className="menu-item" onClick={() => { setSearchContext('applicant'); setShowGlobalMenu(false); }}>WhatsApp Number</div>
-                                    <div className="menu-item" onClick={() => { setSearchContext('applicant'); setShowGlobalMenu(false); }}>Email Id</div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
                     <div className="search-input-wrapper-header" style={{ position: 'relative' }}>
                         <input
                             type="text"
                             className="search-input"
-                            placeholder={getPlaceholder()}
+                            placeholder="Search by Name, Email or Phone / WhatsApp #"
                             style={{ color: colors.textDark }}
                             value={searchQuery}
                             onChange={(e) => { setSearchQuery(e.target.value); setShowSearchResults(true); }}
@@ -520,12 +512,24 @@ function Header() {
                     <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
                         <WorkTimer />
                         <div>
-                            {/* USER BUTTON */}
+                            {/* USER BUTTON — shows the uploaded photo when present;
+                                falls back to initials on the brand color. */}
                             <button
                                 className="header-btn user-btn"
                                 onClick={handleUserClick}
+                                style={{ padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
                             >
-                                <AccountCircleIcon sx={{ fontSize: 40 }} />
+                                <Avatar
+                                    src={sessionUser?.avatar_url || undefined}
+                                    sx={{
+                                        width: 36, height: 36,
+                                        fontSize: 14, fontWeight: 700,
+                                        bgcolor: 'var(--primary)',
+                                        color: '#fff',
+                                    }}
+                                >
+                                    {!sessionUser?.avatar_url ? userInitials : null}
+                                </Avatar>
                             </button>
 
                             {/* USER MENU */}
@@ -570,7 +574,12 @@ function Header() {
                             >
                                 {/* USER INFO */}
                                 <Box sx={{ px: 2, py: 1.5, display: "flex", gap: 1 }}>
-                                    <Avatar sx={{ width: 40, height: 40 }} />
+                                    <Avatar
+                                        src={sessionUser?.avatar_url || undefined}
+                                        sx={{ width: 40, height: 40, bgcolor: 'var(--primary)', color: '#fff', fontWeight: 700 }}
+                                    >
+                                        {!sessionUser?.avatar_url ? userInitials : null}
+                                    </Avatar>
                                     <Box>
                                         <Typography fontWeight={600} fontSize={14}>
                                             {sessionUser?.name || sessionUser?.email || 'User'}
@@ -587,11 +596,6 @@ function Header() {
                                 </Box>
 
                                 <Divider />
-
-                                {/* OPTION */}
-                                <MenuItem onClick={handleUserClose}>
-                                    Request a feature
-                                </MenuItem>
 
                                 {/* PROFILE — open to every authenticated tenant role */}
                                 <MenuItem

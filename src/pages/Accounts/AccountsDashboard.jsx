@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  CircularProgress, Select, MenuItem, FormControl,
+  CircularProgress, Select, MenuItem, FormControl, Chip, Button,
 } from '@mui/material';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {
   ResponsiveContainer,
   LineChart, Line,
@@ -40,9 +42,11 @@ const STATUS_LABEL = {
 };
 
 const AccountsDashboard = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [trendDays, setTrendDays] = useState(30);
+  const [emi, setEmi] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -60,6 +64,25 @@ const AccountsDashboard = () => {
     load();
     return () => { alive = false; };
   }, [trendDays]);
+
+  // EMI digest loads once on mount + auto-refreshes every 60s. Decoupled
+  // from the trend-window dropdown because the upcoming/overdue windows
+  // are calendar-relative, not slider-relative.
+  useEffect(() => {
+    let alive = true;
+    const fetchEmi = () =>
+      admissionsApi.emiDigest(7)
+        .then((r) => { if (alive) setEmi(r?.data || []); })
+        .catch(() => { /* leave previous data in place on transient errors */ });
+    fetchEmi();
+    const t = setInterval(fetchEmi, 60_000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+
+  // Split EMI rows into overdue (>=24h late) vs upcoming. days_until_due
+  // is the BE-computed signed integer; -1 or lower means past the date.
+  const emiOverdue = useMemo(() => (emi || []).filter((r) => r.days_until_due <= -1), [emi]);
+  const emiUpcoming = useMemo(() => (emi || []).filter((r) => r.days_until_due >= 0), [emi]);
 
   if (loading && !data) {
     return <div className="accounts-page"><div className="accounts-empty"><CircularProgress size={20} /></div></div>;
@@ -99,8 +122,33 @@ const AccountsDashboard = () => {
         <Kpi label="Collection this month" value={`₹ ${fmtMoney(d.this_month_collection)}`} accent={COLORS.blue} sub="Receipts dated this month" wide />
       </div>
 
+      {/* ---------------- EMI digest ---------------- */}
+      {/* Two side-by-side cards: overdue + upcoming. Auto-refreshes
+          every minute so accounts always sees the live picture without
+          a manual reload. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 12, marginBottom: 14 }}>
+        <EmiCard
+          title="Overdue installments"
+          subtitle={`${emiOverdue.length} unpaid, due date past`}
+          accent={COLORS.red}
+          rows={emiOverdue}
+          emptyText="🎉 Nothing overdue."
+          navigate={navigate}
+          mode="overdue"
+        />
+        <EmiCard
+          title="Upcoming · next 7 days"
+          subtitle={`${emiUpcoming.length} due in the coming week`}
+          accent={COLORS.amber}
+          rows={emiUpcoming}
+          emptyText="No installments due in the next 7 days."
+          navigate={navigate}
+          mode="upcoming"
+        />
+      </div>
+
       {/* ---------------- Trend row: admissions + collection ---------------- */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 12, marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: 12, marginBottom: 14 }}>
         <ChartCard title="Admissions trend" subtitle={`Daily admissions · last ${trendDays} days`}>
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={charts.admissions_trend || []} margin={{ top: 10, right: 14, bottom: 0, left: -10 }}>
@@ -253,6 +301,101 @@ const TrendTooltip = ({ active, payload, label, prefix = '', suffix = '', moneyK
     }}>
       <div style={{ color: '#6b7280', marginBottom: 2 }}>{niceLabel}</div>
       <div style={{ fontWeight: 700, color: '#111827' }}>{display}</div>
+    </div>
+  );
+};
+
+// ---------------- EMI digest card ----------------
+// Renders a list of overdue OR upcoming installments. We keep the row
+// shape simple (student • slot • amount • due date • action) because
+// accounts typically scans top-to-bottom looking for who to call. The
+// "Open" button deep-links to the AdmissionDetail page where they can
+// capture the receipt against the right slot.
+const EmiCard = ({ title, subtitle, accent, rows, emptyText, navigate, mode }) => {
+  const totalDue = rows.reduce((s, r) => s + Number(r.amount || 0), 0);
+  return (
+    <div className="accounts-table-card" style={{ padding: 16, borderTop: `3px solid ${accent}` }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>{title}</div>
+          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{subtitle}</div>
+        </div>
+        {rows.length > 0 && (
+          <div style={{ fontSize: 12, color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' }}>
+            ₹ {fmtMoney(totalDue)} total
+          </div>
+        )}
+      </div>
+      {rows.length === 0 ? (
+        <div style={{ padding: '24px 8px', textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>
+          {emptyText}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 320, overflowY: 'auto' }}>
+          {rows.slice(0, 30).map((r) => (
+            <EmiRow key={`${r.admission_id}-${r.installment_no}`} r={r} mode={mode} navigate={navigate} />
+          ))}
+          {rows.length > 30 && (
+            <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', paddingTop: 4 }}>
+              + {rows.length - 30} more · scroll above to see all
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const EmiRow = ({ r, mode, navigate }) => {
+  const due = r.due_date ? new Date(r.due_date) : null;
+  const dueLabel = due
+    ? due.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+    : '—';
+  const daysLabel = (() => {
+    if (mode === 'overdue') {
+      const n = Math.abs(r.days_until_due);
+      return `${n} day${n === 1 ? '' : 's'} overdue`;
+    }
+    if (r.days_until_due === 0) return 'Due today';
+    return `In ${r.days_until_due} day${r.days_until_due === 1 ? '' : 's'}`;
+  })();
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '8px 10px', borderRadius: 6,
+        background: mode === 'overdue' ? '#fef2f2' : '#fffbeb',
+        border: `1px solid ${mode === 'overdue' ? '#fecaca' : '#fde68a'}`,
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {r.student_name || r.email || '—'}
+        </div>
+        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+          {r.program_name || '—'} · Installment {r.installment_no}
+        </div>
+      </div>
+      <div style={{ textAlign: 'right', minWidth: 100 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>₹ {fmtMoney(r.amount)}</div>
+        <Chip
+          size="small"
+          label={`${daysLabel} · ${dueLabel}`}
+          sx={{
+            mt: 0.4, height: 18, fontSize: 10, fontWeight: 600,
+            bgcolor: mode === 'overdue' ? '#fee2e2' : '#fef3c7',
+            color:   mode === 'overdue' ? '#991b1b' : '#92400e',
+          }}
+        />
+      </div>
+      <Button
+        size="small"
+        endIcon={<OpenInNewIcon fontSize="inherit" />}
+        onClick={() => navigate(`/accounts/admission/${r.admission_id}`)}
+        sx={{ textTransform: 'none', minWidth: 0, fontSize: 11, color: '#475569' }}
+      >
+        Capture
+      </Button>
     </div>
   );
 };

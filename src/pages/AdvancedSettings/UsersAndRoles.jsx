@@ -14,6 +14,7 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import SwapVertIcon from '@mui/icons-material/SwapVert';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
+import LoginIcon from '@mui/icons-material/Login';
 import { usersApi, customRolesApi, programsApi, authApi } from '../../lib/endpoints';
 import { auth } from '../../lib/api';
 import { isRole, ROLES } from '../../lib/rbac';
@@ -166,6 +167,36 @@ function UsersTab() {
     navigate(`/users/${u.id}`);
   };
 
+  // Org-admin "Login as user". One confirm prompt so it isn't a single
+  // accidental click. On accept we swap the entire session out — the
+  // admin's tokens are gone in this browser tab from that point on.
+  // No audit trail (explicit product decision); see auth/service.sudoLoginAs.
+  const loginAsUser = async (u) => {
+    if (!u?.id) return;
+    const ok = window.confirm(
+      `Log in as "${u.name || u.email}"?\n\n`
+      + `Your own admin session in this tab will be replaced. To return, log out and sign in again with your admin credentials.`
+    );
+    if (!ok) return;
+    try {
+      const r = await usersApi.sudoLogin(u.id);
+      const data = r?.data;
+      if (!data?.access_token) throw new Error('No token returned');
+      auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        user: data.user,
+        tenant: data.tenant,
+        allowed_tabs: data.allowed_tabs,
+      });
+      // Hard reload so every cached component re-reads the new session
+      // (sidebar, header avatar, dashboard role gates, etc.).
+      window.location.href = '/dashboard';
+    } catch (e) {
+      alert(e.message || 'Login-as failed');
+    }
+  };
+
   if (loading) return <CircularProgress />;
   if (error) return <div style={{ color: '#d32f2f' }}>{error}</div>;
 
@@ -270,6 +301,20 @@ function UsersTab() {
                       </IconButton>
                     </span>
                   </Tooltip>
+                  {/* Login as user — org-admin only. Disabled for the
+                      admin's own row (no-op) and for inactive users. */}
+                  <Tooltip title="Login as this user">
+                    <span>
+                      <IconButton
+                        size="small"
+                        disabled={!canManage || !u.is_active || u.id === auth.getUser()?.id}
+                        onClick={() => loginAsUser(u)}
+                        sx={{ color: '#0f766e' }}
+                      >
+                        <LoginIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                   <Tooltip title="Delete user">
                     <span>
                       <IconButton
@@ -367,6 +412,7 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
         name: user.name || '',
         email: user.email || '',
         phone: user.phone || '',
+        designation: user.designation || '',
         role: user.role || 'counsellor',
         role_id: user.role_id || '',
         // Seed multi-manager from manager_ids (preferred) or fall back to
@@ -396,6 +442,9 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
         email: form.email.trim(),
         is_active: form.is_active,
         ...(form.phone ? { phone: form.phone.trim() } : { phone: null }),
+        // Designation is freeform text shown in the org tree + lead drawer.
+        // Send null when cleared so it actually wipes server-side.
+        designation: form.designation?.trim() || null,
         ...(form.role_id ? { role_id: form.role_id } : { role: form.role }),
         // Multi-manager. First entry becomes primary manager_id server-side.
         manager_ids: Array.isArray(form.manager_ids) ? form.manager_ids : [],
@@ -427,6 +476,14 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
           <TextField size="small" label="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={!canManage} />
           <TextField size="small" type="email" label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled={!canManage} />
           <TextField size="small" label="WhatsApp Number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} disabled={!canManage} />
+          <TextField
+            size="small"
+            label="Official Designation"
+            placeholder="e.g. Senior Counsellor"
+            value={form.designation || ''}
+            onChange={(e) => setForm({ ...form, designation: e.target.value })}
+            disabled={!canManage}
+          />
 
           {/* Combined Role picker: lists every role the tenant has — system
               and custom alike. Server derives the role bucket from the

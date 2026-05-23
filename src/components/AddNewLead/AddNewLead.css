@@ -25,6 +25,24 @@
     min-height: 40px;
 }
 
+.add-lead-tabs-wrapper .MuiTabs-scroller {
+    overflow-x: auto !important;
+    scrollbar-width: thin;
+}
+
+.add-lead-tabs-wrapper .MuiTabs-scroller::-webkit-scrollbar {
+    height: 6px;
+}
+
+.add-lead-tabs-wrapper .MuiTabs-scroller::-webkit-scrollbar-thumb {
+    background: var(--border-grey);
+    border-radius: 3px;
+}
+
+.add-lead-tabs-wrapper .MuiTabs-scrollButtons.Mui-disabled {
+    opacity: 0.3;
+}
+
 .add-lead-tab {
     text-transform: none !important;
     font-size: 13px !important;
@@ -49,13 +67,17 @@
 /* Converted-lead lock: dim every input, disable pointer interaction and
    keyboard focus on form controls. The Update button is already disabled
    via the lockedConverted flag, and the server rejects edits anyway —
-   this just makes the read-only state visually clear. */
+   this just makes the read-only state visually clear.
+
+   Buttons tagged with .always-clickable opt out — these are read-only
+   actions (View admission form, Download PDF, navigation chips) that
+   should keep working in viewOnly mode. */
 .add-lead-content.locked-converted .MuiInputBase-root,
 .add-lead-content.locked-converted .MuiAutocomplete-root,
 .add-lead-content.locked-converted .MuiSelect-select,
 .add-lead-content.locked-converted .MuiCheckbox-root,
 .add-lead-content.locked-converted .MuiSwitch-root,
-.add-lead-content.locked-converted button.MuiButton-root {
+.add-lead-content.locked-converted button.MuiButton-root:not(.always-clickable) {
     pointer-events: none;
     opacity: 0.7;
 }

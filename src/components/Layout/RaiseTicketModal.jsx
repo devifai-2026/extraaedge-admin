@@ -26,6 +26,11 @@ function RaiseTicketModal({ open, onClose, onSubmitted }) {
   // super_admins auto-escalate to the Product Owner; the in-tenant picker
   // is hidden for them so the form doesn't suggest an alternate target.
   const isSuperAdmin = isRole(ROLES.SUPER_ADMIN);
+  // account_managers ticket their org admins (super_admins). Backend
+  // /tickets/contacts already returns only super_admins for them, so the
+  // existing picker just renders the right shortlist — we only need a
+  // role-aware label.
+  const isAccountManager = isRole(ROLES.ACCOUNT_MANAGER);
   const [form, setForm] = useState(blankForm);
   const [contacts, setContacts] = useState([]);
   const [files, setFiles] = useState([]);
@@ -116,21 +121,35 @@ function RaiseTicketModal({ open, onClose, onSubmitted }) {
                 This ticket will be auto-escalated to the Product Owner.
               </div>
             ) : (
-              <div className="ticket-field">
-                <label>Assign to (your reporting chain)</label>
-                <Autocomplete
-                  size="small"
-                  options={contacts}
-                  getOptionLabel={(o) => (o ? `${o.name || o.email} · ${String(o.role || '').replace('_', ' ')}` : '')}
-                  value={targetValue}
-                  onChange={(_e, picked) => setField('target_user_id')(picked?.id || '')}
-                  isOptionEqualToValue={(a, b) => a?.id === b?.id}
-                  noOptionsText="No contacts available — escalation will fall back to defaults"
-                  renderInput={(params) => (
-                    <TextField {...params} placeholder="Type to search…" />
-                  )}
-                />
-              </div>
+              <>
+                {isAccountManager && (
+                  <div className="ticket-field" style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 6, padding: 10, fontSize: 13 }}>
+                    Your tickets go directly to your organisation admin.
+                    Pick which admin should receive this one below.
+                  </div>
+                )}
+                <div className="ticket-field">
+                  <label>
+                    {isAccountManager ? 'Send to (org admin)' : 'Assign to (your reporting chain)'}
+                  </label>
+                  <Autocomplete
+                    size="small"
+                    options={contacts}
+                    getOptionLabel={(o) => (o ? `${o.name || o.email} · ${String(o.role || '').replace('_', ' ')}` : '')}
+                    value={targetValue}
+                    onChange={(_e, picked) => setField('target_user_id')(picked?.id || '')}
+                    isOptionEqualToValue={(a, b) => a?.id === b?.id}
+                    noOptionsText={
+                      isAccountManager
+                        ? 'No org admin available — contact support'
+                        : 'No contacts available — escalation will fall back to defaults'
+                    }
+                    renderInput={(params) => (
+                      <TextField {...params} placeholder="Type to search…" />
+                    )}
+                  />
+                </div>
+              </>
             )}
 
             <div className="ticket-field">

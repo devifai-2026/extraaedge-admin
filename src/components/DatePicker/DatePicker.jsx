@@ -3,7 +3,6 @@ import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Paper from '@mui/material/Paper';
@@ -125,6 +124,13 @@ const DateRangePicker = ({ onApply, primaryColor = colors.primary }) => {
   const renderCalendar = (monthDate) => {
     const days = getDaysInMonth(monthDate);
     const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    // Native 7-col CSS grid instead of MUI Grid: MUI v9 removed the
+    // <Grid item xs={1}> API, which collapsed every cell into a single
+    // inline row (visible as "MonTueWed…" and dates running together).
+    const gridSx = {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+    };
     return (
       <Box sx={{ flex: 1, minWidth: 280 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -136,44 +142,42 @@ const DateRangePicker = ({ onApply, primaryColor = colors.primary }) => {
             →
           </IconButton>
         </Box>
-        <Grid container columns={7} sx={{ textAlign: 'center', mb: 1 }}>
+        <Box sx={{ ...gridSx, textAlign: 'center', mb: 1 }}>
           {weekDays.map((day) => (
-            <Grid item xs={1} key={day}>
-              <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
-                {day}
-              </Typography>
-            </Grid>
+            <Typography key={day} variant="caption" sx={{ fontWeight: 'bold' }}>
+              {day}
+            </Typography>
           ))}
-        </Grid>
-        <Grid container columns={7} spacing={0.5}>
+        </Box>
+        <Box sx={{ ...gridSx, gap: 0.5 }}>
           {days.map((day, idx) => {
             const isCurrentMonth = day.getMonth() === monthDate.getMonth();
             const isSelected = isInRange(day);
             const isEdge = isStartOrEnd(day);
             return (
-              <Grid item xs={1} key={idx}>
-                <Button
-                  onClick={() => handleDateClick(day)}
-                  sx={{
-                    minWidth: 36,
-                    height: 36,
-                    p: 0,
-                    borderRadius: '4px',
-                    backgroundColor: isEdge
-                      ? primaryColor
-                      : isSelected
-                      ? colors.primaryLight
-                      : 'transparent',
-                    color: isEdge ? colors.white : isCurrentMonth ? 'inherit' : colors.scrollGrey,
-                    '&:hover': { backgroundColor: colors.hoverGrey },
-                  }}
-                >
-                  {format(day, 'd')}
-                </Button>
-              </Grid>
+              <Button
+                key={idx}
+                onClick={() => handleDateClick(day)}
+                sx={{
+                  minWidth: 0,
+                  width: '100%',
+                  height: 36,
+                  p: 0,
+                  borderRadius: '4px',
+                  backgroundColor: isEdge
+                    ? primaryColor
+                    : isSelected
+                    ? colors.primaryLight
+                    : 'transparent',
+                  color: isEdge ? colors.white : isCurrentMonth ? 'inherit' : colors.scrollGrey,
+                  '&:hover': { backgroundColor: colors.hoverGrey },
+                }}
+              >
+                {format(day, 'd')}
+              </Button>
             );
           })}
-        </Grid>
+        </Box>
       </Box>
     );
   };

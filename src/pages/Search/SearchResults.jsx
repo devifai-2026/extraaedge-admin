@@ -37,21 +37,26 @@ export default function SearchResults() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
-  // Fetch on debounced query change
+  // Fetch on debounced query change. `cancelled` guards against an older
+  // in-flight request resolving after a newer one — that race was part of
+  // the "search sometimes shows results, sometimes doesn't" symptom.
   useEffect(() => {
     const needle = (debouncedQ || '').trim();
     if (needle.length < 2) {
       setResults([]); setTotal(0); setError('');
       return;
     }
+    let cancelled = false;
     setLoading(true); setError('');
     leadsApi.list({ q: needle, limit: 50 })
       .then((r) => {
+        if (cancelled) return;
         setResults(r?.data || []);
         setTotal(r?.meta?.total ?? 0);
       })
-      .catch((e) => setError(e.message || 'Search failed'))
-      .finally(() => setLoading(false));
+      .catch((e) => { if (!cancelled) setError(e.message || 'Search failed'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [debouncedQ]);
 
   const grouped = useMemo(() => {

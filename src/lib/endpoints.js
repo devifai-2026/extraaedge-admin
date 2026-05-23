@@ -1,6 +1,24 @@
 // Domain-specific API helpers. Single source of truth for backend endpoint paths.
 import { api, auth } from './api';
 
+// Unauthenticated student-facing admission flow. Reuses the regular `api`
+// helper — the bearer token, if any, is harmless on these routes (the BE
+// router doesn't run authRequired here). Used by /apply/:token.
+export const publicAdmissionsApi = {
+  prefill: (token) => api.get(`/public/admissions/${token}`),
+  submit:  (token, body) => api.post(`/public/admissions/${token}/submit`, body),
+  // Token-scoped photo upload: presign → direct PUT to GCS → confirm.
+  uploadPresign: (token, body) => api.post(`/public/admissions/${token}/upload-presign`, body),
+  uploadConfirm: (token, body) => api.post(`/public/admissions/${token}/upload-confirm`, body),
+  signedUrl:     (token, r2_key) => api.get(`/public/admissions/${token}/signed-url`, { r2_key }),
+};
+
+// Public receipt by share-token. Same trust model as publicAdmissions:
+// the token is the credential, no auth header needed.
+export const publicReceiptsApi = {
+  lookup: (token) => api.get(`/public/receipts/${token}`),
+};
+
 export const authApi = {
   login: ({ email, password, tenant_slug }) => api.post('/auth/login', { email, password, ...(tenant_slug ? { tenant_slug } : {}) }),
   logout: () => api.post('/auth/logout'),
@@ -78,6 +96,10 @@ export const usersApi = {
   update: (id, body) => api.put(`/users/${id}`, body),
   delete: (id) => api.delete(`/users/${id}`),
   resetPassword: (id, new_password) => api.post(`/users/${id}/reset-password`, { new_password }),
+  // Org-admin "Login as user". Returns the same payload as /auth/login.
+  // The FE swaps it into auth.setSession(...) and reloads — the admin's
+  // own session is gone in that browser tab from that point on.
+  sudoLogin: (id) => api.post(`/users/${id}/sudo-login`),
   setPermissions: (id, permissions_json) => api.put(`/users/${id}/permissions`, { permissions_json }),
   // Per-user views used by the user-profile page.
   leads: (id, params) => api.get(`/users/${id}/leads`, params),
@@ -88,6 +110,10 @@ export const usersApi = {
   //   { theme_preset, theme_primary, theme_primary_dark, theme_primary_light }
   // Any field can be null to reset that piece to system default.
   updateMyTheme: (body) => api.put('/users/me/theme', body),
+  // Set / clear the current user's avatar. Pass { avatar_r2_key: null }
+  // to clear. Returns { avatar_r2_key, avatar_url } where avatar_url is a
+  // freshly-signed download URL the navbar can render immediately.
+  updateMyAvatar: (body) => api.put('/users/me/avatar', body),
 };
 
 export const teamsApi = {
@@ -200,7 +226,14 @@ export const integrationsApi = {
 export const uploadsApi = {
   presign: (body) => api.post('/uploads/presign', body),
   confirm: (body) => api.post('/uploads/confirm', body),
-  signedUrl: (id) => api.get(`/uploads/${id}/signed-url`),
+  // Two flavours of signed-url:
+  //   - signedUrlById:  GET /uploads/:id/signed-url    (id = uploaded_files.id UUID)
+  //   - signedUrl:      GET /uploads/by-key/signed-url (r2_key querystring)
+  // Most call sites (admission photos, recordings preview) only know the
+  // r2_key, so signedUrl is the default. The legacy by-id form stays for
+  // callers that already have the UUID handy.
+  signedUrl: (r2Key) => api.get('/uploads/by-key/signed-url', { r2_key: r2Key }),
+  signedUrlById: (id) => api.get(`/uploads/${id}/signed-url`),
 };
 
 export const bulkApi = {
@@ -362,6 +395,14 @@ export const subscriptionApi = {
   setPlan: (plan_id) => api.put('/subscription/plan', { plan_id }),
 };
 
+// Per-lead customised fee offer. The accounts team configures this
+// before a public share-link can be generated; the public form binds
+// to it so the student sees the agreed fees (read-only).
+export const leadFeeOffersApi = {
+  get:    (leadId) => api.get(`/lead-fee-offers/${leadId}`),
+  upsert: (leadId, body) => api.put(`/lead-fee-offers/${leadId}`, body),
+};
+
 // Accounts / Admissions module. Only visible to account_manager + super_admin.
 // All routes live under /api/v1/admissions.
 export const admissionsApi = {
@@ -371,6 +412,19 @@ export const admissionsApi = {
   // Pending admissions queue (converted leads w/o admission + pending_approval)
   pendingAdmissions: () => api.get('/admissions/pending-admissions'),
   pendingAdmissionsCount: () => api.get('/admissions/pending-admissions/count'),
+  // Tenant-wide admission pipeline snapshot: status counts + list of every
+  // converted lead with their current admission state. Feeds the Admission
+  // Pipeline sidebar page + the dashboard cards.
+  leadStatusSnapshot: () => api.get('/admissions/lead-status-snapshot'),
+  // Append-only event log for one admission. Drives the timeline tab.
+  timeline: (id) => api.get(`/admissions/${id}/timeline`),
+  // Lead-drawer Admission Timeline tab uses this — resolves lead→admission
+  // server-side and returns the events in one hop.
+  timelineByLead: (leadId) => api.get(`/admissions/by-lead/${leadId}/timeline`),
+  // Mint a fresh 24h public share-link for the student to fill the admission
+  // form themselves. Returns { token, expires_at } — the FE turns that into
+  // a full URL using window.location.origin.
+  generateShareLink: (leadId) => api.post(`/admissions/share-link/${leadId}`),
 
   // List + detail
   list: (params) => api.get('/admissions', params),
@@ -381,6 +435,8 @@ export const admissionsApi = {
 
   // Status transitions
   approve: (id) => api.post(`/admissions/${id}/approve`),
+  reject: (id, reason) => api.post(`/admissions/${id}/reject`, reason ? { reason } : {}),
+  emiDigest: (days = 7) => api.get(`/admissions/emi-digest`, { days }),
   break: (id, reason) => api.post(`/admissions/${id}/break`, reason ? { reason } : {}),
   resume: (id) => api.post(`/admissions/${id}/resume`),
   complete: (id) => api.post(`/admissions/${id}/complete`),

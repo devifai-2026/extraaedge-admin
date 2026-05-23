@@ -1,27 +1,48 @@
-import React, { useCallback, useEffect, useState } from 'react';
+// Per-admission detail page — read view + receipt management.
+//
+// Sections:
+//   1. Header with name, status, primary actions (Edit / Verify & Approve).
+//   2. KPI strip: total / paid / pending.
+//   3. Photo + identity + address + counsellor/manager/source.
+//   4. Education table.
+//   5. Fee schedule: per-installment row with paid status + receipt link.
+//      Registration shown above the installment table when present.
+//   6. Receipts table with public share-link + view buttons.
+//
+// Receipts can be tagged to a specific installment slot OR the one-time
+// registration amount OR generic Misc. The AddReceiptDialog reads the
+// schedule + existing receipts so it can pre-fill amounts and gate
+// already-paid slots.
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Button, TextField, MenuItem, Select, FormControl, CircularProgress, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Tooltip,
+  Chip, Snackbar, RadioGroup, FormControlLabel, Radio, InputLabel,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { admissionsApi } from '../../lib/endpoints';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import { admissionsApi, uploadsApi } from '../../lib/endpoints';
 import { fullName, fmtDate, fmtMoney } from './utils';
 import StatusPill from './StatusPill';
+import VerifyAdmissionDialog from '../../components/VerifyAdmissionDialog/VerifyAdmissionDialog';
 import './Accounts.css';
 
-// Per-admission detail page. Shows the student snapshot, education,
-// fee schedule + receipts, plus a money "Add receipt" workflow.
 const AdmissionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(null); // null | {kind, installment_no?, suggestedAmount?}
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [photoUrl, setPhotoUrl] = useState(null);
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -31,12 +52,97 @@ const AdmissionDetail = () => {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // Wrap in an async IIFE so the synchronous-setState-in-effect lint
-  // rule isn't tripped. reload() itself does the actual fetch.
   useEffect(() => { (async () => { await reload(); })(); }, [reload]);
+
+  // Photo signed URL — fetched once per photo_r2_key. Best-effort.
+  useEffect(() => {
+    if (!data?.photo_r2_key) { setPhotoUrl(null); return undefined; }
+    let alive = true;
+    uploadsApi.signedUrl(data.photo_r2_key)
+      .then((r) => { if (alive) setPhotoUrl(r?.data?.url || null); })
+      .catch(() => { /* placeholder stays */ });
+    return () => { alive = false; };
+  }, [data?.photo_r2_key]);
+
+  // Index receipts by what they paid for, so the schedule row can show
+  // "Paid" vs "Pending" and the AddReceipt dialog can grey out slots
+  // that are already covered.
+  const paidIndex = useMemo(() => {
+    const idx = { registration: null, installments: {} };
+    for (const r of data?.receipts || []) {
+      if (r.receipt_kind === 'registration') idx.registration = r;
+      else if (r.receipt_kind === 'installment' && r.installment_no != null) {
+        idx.installments[r.installment_no] = r;
+      }
+    }
+    return idx;
+  }, [data?.receipts]);
+
+  const installments = useMemo(() => Array.isArray(data?.fee_schedule) ? data.fee_schedule : [], [data]);
+  const offerRegistration = useMemo(() => {
+    // Prefer the server-supplied `registration_amount` (sourced from the
+    // per-lead fee offer). Fall back to the legacy total − Σ installments
+    // synthesis when the BE hasn't surfaced one (very old admissions).
+    if (data?.registration_amount != null) {
+      const n = Number(data.registration_amount);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
+    if (!installments.length) return null;
+    const total = Number(data?.total_fees || 0);
+    const sumInst = installments.reduce((s, r) => s + Number(r.amount || 0), 0);
+    const reg = total - sumInst;
+    return reg > 0.01 ? reg : null;
+  }, [installments, data]);
+
+  // Full-mode admissions still have something to capture: total_fees
+  // minus whatever the offer's registration_amount carved out. We
+  // surface this as a single "Course Fees" row so accounts can tag a
+  // receipt to it (receipt_kind='misc'). Empty for installment-mode —
+  // the per-slot rows already cover the course amount end-to-end.
+  const fullModeCourseBalance = useMemo(() => {
+    if (data?.mode_of_payment !== 'Full') return null;
+    const total = Number(data?.total_fees || 0);
+    if (!Number.isFinite(total) || total <= 0) return null;
+    const reg = offerRegistration || 0;
+    const balance = total - reg;
+    return balance > 0.01 ? balance : null;
+  }, [data?.mode_of_payment, data?.total_fees, offerRegistration]);
+
+  const copyReceiptLink = useCallback(async (r) => {
+    if (!r?.share_token) {
+      setToast({ severity: 'error', text: 'Old receipt — re-create it to mint a share link.' });
+      return;
+    }
+    const url = `${window.location.origin}/r/${r.share_token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setToast({ severity: 'success', text: `Receipt link copied:\n${url}` });
+    } catch {
+      setToast({ severity: 'info', text: `Copy this link manually:\n${url}` });
+    }
+  }, []);
+
+  // Has the lump-sum Course Fees row been captured? We treat the first
+  // 'misc' receipt as the course-balance payment. (No DB enum dedicated
+  // to this yet — misc covers it cleanly.) MUST live above the early
+  // returns so the hook order stays stable across loading → ready.
+  const courseBalancePaid = useMemo(
+    () => (data?.receipts || []).find((r) => r.receipt_kind === 'misc') || null,
+    [data?.receipts],
+  );
 
   if (loading) return <div className="accounts-page"><div className="accounts-empty"><CircularProgress size={20} /></div></div>;
   if (!data) return <div className="accounts-page"><Alert severity="error">{error || 'Not found'}</Alert></div>;
+
+  const isInstallmentMode = data.mode_of_payment === 'Installment' && installments.length > 0;
+  // Show the Fee Schedule section whenever there is *something* to
+  // track money against — installment slots, a registration line, or
+  // the Full-mode course balance. Without this, Full-mode admissions
+  // had no surface to tag the registration receipt (the section was
+  // hidden entirely).
+  const showFeeSchedule = isInstallmentMode
+    || offerRegistration != null
+    || fullModeCourseBalance != null;
 
   return (
     <div className="accounts-page">
@@ -57,7 +163,7 @@ const AdmissionDetail = () => {
               variant="contained"
               color="success"
               startIcon={<CheckCircleIcon />}
-              onClick={async () => { await admissionsApi.approve(id); await reload(); }}
+              onClick={() => setVerifyOpen(true)}
               sx={{ textTransform: 'none' }}
             >
               Verify &amp; Approve
@@ -81,17 +187,36 @@ const AdmissionDetail = () => {
         </div>
       </div>
 
+      {/* Identity card — photo on the left, KV grid on the right. */}
       <div className="accounts-table-card" style={{ marginBottom: 16, padding: 16 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-          <KV label="Email" value={data.email} />
-          <KV label="WhatsApp" value={data.whatsapp_number} />
-          <KV label="Alt Contact" value={data.alternate_contact} />
-          <KV label="Mode of Training" value={data.mode_of_training} />
-          <KV label="Center" value={data.center_name} />
-          <KV label="Counsellor" value={data.guided_by_counsellor_name} />
-          <KV label="Manager" value={data.guided_by_manager_name} />
-          <KV label="Source" value={data.source} />
-          <KV label="Address" value={data.address} />
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          {photoUrl ? (
+            <img
+              src={photoUrl}
+              alt={fullName(data)}
+              style={{ width: 120, height: 120, borderRadius: 8, objectFit: 'contain', background: '#f1f5f9', border: '1px solid #e5e7eb', flexShrink: 0 }}
+            />
+          ) : data.photo_r2_key ? (
+            <div style={{ width: 120, height: 120, borderRadius: 8, background: '#f1f5f9', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <CircularProgress size={20} />
+            </div>
+          ) : (
+            <div style={{ width: 120, height: 120, borderRadius: 8, background: '#f1f5f9', border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 11, flexShrink: 0 }}>
+              No photo
+            </div>
+          )}
+          <div style={{ flex: 1, minWidth: 240, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            <KV label="Email" value={data.email} />
+            <KV label="WhatsApp" value={data.whatsapp_number} />
+            <KV label="Alt Contact" value={data.alternate_contact} />
+            <KV label="Mode of Training" value={data.mode_of_training} />
+            <KV label="Mode of Payment" value={data.mode_of_payment} />
+            <KV label="Center" value={data.center_name} />
+            <KV label="Counsellor" value={data.guided_by_counsellor_name} />
+            <KV label="Manager" value={data.guided_by_manager_name} />
+            <KV label="Source" value={data.source} />
+            <KV label="Address" value={data.address} fullSpan />
+          </div>
         </div>
       </div>
 
@@ -100,7 +225,7 @@ const AdmissionDetail = () => {
           <table className="accounts-table">
             <thead><tr>
               <th>Examination</th><th>Stream</th><th>College</th>
-              <th>Board / University</th><th>Year</th><th>%</th>
+              <th>Board / University</th><th>Year</th><th>Grade</th>
             </tr></thead>
             <tbody>
               {data.education.map((e) => (
@@ -110,9 +235,123 @@ const AdmissionDetail = () => {
                   <td>{e.college_name || '—'}</td>
                   <td>{e.board_university || '—'}</td>
                   <td>{e.year_of_passing || '—'}</td>
-                  <td>{e.percentage || '—'}</td>
+                  <td>
+                    {e.percentage != null && e.percentage !== ''
+                      ? `${e.percentage} ${e.grade_unit === 'cgpa' ? 'CGPA' : '%'}`
+                      : '—'}
+                  </td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </Section>
+      )}
+
+      {/* Fee schedule with per-row paid status. Renders whenever there
+          is something to track:
+            • Installment-mode → registration (if any) + per-slot rows.
+            • Full-mode        → registration (if any) + a single
+                                 Course Fees row covering the rest.
+          Each row carries a Pending / Paid chip and a Capture CTA. */}
+      {showFeeSchedule && (
+        <Section
+          title="Fee Schedule"
+          right={
+            <Button startIcon={<AddIcon />} onClick={() => setReceiptOpen({ kind: 'misc' })} variant="outlined" sx={{ textTransform: 'none' }}>
+              Add receipt
+            </Button>
+          }
+        >
+          <table className="accounts-table">
+            <thead><tr>
+              <th>Slot</th>
+              <th>Due Date</th>
+              <th style={{ textAlign: 'right' }}>Amount</th>
+              <th>Status</th>
+              <th style={{ textAlign: 'right' }}>Action</th>
+            </tr></thead>
+            <tbody>
+              {/* Registration row — from the offer's registration_amount */}
+              {offerRegistration != null && (
+                <tr>
+                  <td><strong>Registration</strong></td>
+                  <td>—</td>
+                  <td style={{ textAlign: 'right' }}>₹ {fmtMoney(offerRegistration)}</td>
+                  <td>
+                    {paidIndex.registration ? (
+                      <Chip size="small" label="Paid" sx={{ bgcolor: '#dcfce7', color: '#166534', fontWeight: 600, height: 22, fontSize: 11 }} />
+                    ) : (
+                      <Chip size="small" label="Pending" sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600, height: 22, fontSize: 11 }} />
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    {!paidIndex.registration && (
+                      <Button
+                        size="small"
+                        onClick={() => setReceiptOpen({ kind: 'registration', suggestedAmount: offerRegistration })}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        Capture
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              )}
+              {/* Full-mode lump sum row — only when there's no installment
+                  schedule. Tagged as misc on receipt creation. */}
+              {fullModeCourseBalance != null && !isInstallmentMode && (
+                <tr>
+                  <td><strong>Course Fees</strong></td>
+                  <td>—</td>
+                  <td style={{ textAlign: 'right' }}>₹ {fmtMoney(fullModeCourseBalance)}</td>
+                  <td>
+                    {courseBalancePaid ? (
+                      <Chip size="small" label="Paid" sx={{ bgcolor: '#dcfce7', color: '#166534', fontWeight: 600, height: 22, fontSize: 11 }} />
+                    ) : (
+                      <Chip size="small" label="Pending" sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600, height: 22, fontSize: 11 }} />
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    {!courseBalancePaid && (
+                      <Button
+                        size="small"
+                        onClick={() => setReceiptOpen({ kind: 'misc', suggestedAmount: fullModeCourseBalance })}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        Capture
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              )}
+              {installments.map((s) => {
+                const paid = paidIndex.installments[s.installment_no];
+                return (
+                  <tr key={s.id || s.installment_no}>
+                    <td>Installment {s.installment_no}</td>
+                    <td>{fmtDate(s.due_date)}</td>
+                    <td style={{ textAlign: 'right' }}>₹ {fmtMoney(s.amount)}</td>
+                    <td>
+                      {paid ? (
+                        <Chip size="small" label="Paid" sx={{ bgcolor: '#dcfce7', color: '#166534', fontWeight: 600, height: 22, fontSize: 11 }} />
+                      ) : (
+                        <Chip size="small" label="Pending" sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600, height: 22, fontSize: 11 }} />
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {!paid && (
+                        <Button
+                          size="small"
+                          onClick={() => setReceiptOpen({ kind: 'installment', installment_no: s.installment_no, suggestedAmount: s.amount })}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          Capture
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </Section>
@@ -121,7 +360,7 @@ const AdmissionDetail = () => {
       <Section
         title="Receipts"
         right={
-          <Button startIcon={<AddIcon />} onClick={() => setReceiptOpen(true)} variant="outlined" sx={{ textTransform: 'none' }}>
+          <Button startIcon={<AddIcon />} onClick={() => setReceiptOpen({ kind: 'misc' })} variant="outlined" sx={{ textTransform: 'none' }}>
             Add receipt
           </Button>
         }
@@ -131,18 +370,54 @@ const AdmissionDetail = () => {
         ) : (
           <table className="accounts-table">
             <thead><tr>
-              <th>Receipt No.</th><th>Date</th><th>Mode</th>
-              <th style={{ textAlign: 'right' }}>Amount</th><th>Notes</th><th />
+              <th>Receipt No.</th><th>Date</th><th>For</th><th>Mode</th>
+              <th style={{ textAlign: 'right' }}>Amount</th><th>Notes</th><th aria-label="actions" />
             </tr></thead>
             <tbody>
               {data.receipts.map((r) => (
                 <tr key={r.id}>
                   <td>{r.receipt_no}</td>
                   <td>{fmtDate(r.receipt_date)}</td>
+                  <td>
+                    {r.receipt_kind === 'installment' ? `Installment ${r.installment_no}` :
+                     r.receipt_kind === 'registration' ? 'Registration' :
+                     'Misc'}
+                  </td>
                   <td>{r.mode_of_payment}{r.is_old_collection ? ' · Old' : ''}</td>
                   <td style={{ textAlign: 'right' }}>{fmtMoney(r.amount)}</td>
                   <td style={{ fontSize: 12, color: '#6b7280' }}>{r.transaction_details || '—'}</td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    {r.payment_screenshot_r2_key && (
+                      <Tooltip title="View payment screenshot">
+                        <IconButton
+                          size="small"
+                          onClick={async () => {
+                            try {
+                              const sr = await uploadsApi.signedUrl(r.payment_screenshot_r2_key);
+                              const u = sr?.data?.url;
+                              if (u) window.open(u, '_blank', 'noreferrer');
+                            } catch { /* silent — clicking again retries */ }
+                          }}
+                          sx={{ color: '#475569' }}
+                        >
+                          <AttachFileIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    <Tooltip title="Copy public share link">
+                      <span>
+                        <IconButton size="small" onClick={() => copyReceiptLink(r)} disabled={!r.share_token} sx={{ color: '#475569' }}>
+                          <ContentCopyIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                    {r.share_token && (
+                      <Tooltip title="Open receipt in new tab">
+                        <IconButton size="small" component="a" href={`/r/${r.share_token}`} target="_blank" rel="noreferrer" sx={{ color: '#475569' }}>
+                          <OpenInNewIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                     <Tooltip title="Delete">
                       <IconButton size="small" onClick={async () => {
                         if (!window.confirm('Delete this receipt?')) return;
@@ -161,11 +436,35 @@ const AdmissionDetail = () => {
       </Section>
 
       <AddReceiptDialog
-        open={receiptOpen}
-        onClose={() => setReceiptOpen(false)}
+        open={Boolean(receiptOpen)}
+        prefill={receiptOpen || undefined}
+        installments={installments}
+        offerRegistration={offerRegistration}
+        paidIndex={paidIndex}
+        onClose={() => setReceiptOpen(null)}
         admissionId={id}
-        onSaved={() => { setReceiptOpen(false); reload(); }}
+        onSaved={() => { setReceiptOpen(null); reload(); }}
       />
+
+      <VerifyAdmissionDialog
+        open={verifyOpen}
+        admissionId={id}
+        onClose={() => setVerifyOpen(false)}
+        onChanged={() => { setVerifyOpen(false); reload(); }}
+      />
+
+      <Snackbar
+        open={!!toast}
+        autoHideDuration={5000}
+        onClose={() => setToast(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        {toast && (
+          <Alert severity={toast.severity} sx={{ whiteSpace: 'pre-line', maxWidth: 520 }}>
+            {toast.text}
+          </Alert>
+        )}
+      </Snackbar>
     </div>
   );
 };
@@ -180,8 +479,8 @@ const Section = ({ title, right, children }) => (
   </div>
 );
 
-const KV = ({ label, value }) => (
-  <div>
+const KV = ({ label, value, fullSpan }) => (
+  <div style={fullSpan ? { gridColumn: '1 / -1' } : undefined}>
     <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.04 }}>{label}</div>
     <div style={{ fontSize: 13, color: '#111827', marginTop: 2 }}>{value || '—'}</div>
   </div>
@@ -189,24 +488,132 @@ const KV = ({ label, value }) => (
 
 const MODES = ['cash', 'online', 'cheque', 'upi', 'card'];
 
-const AddReceiptDialog = ({ open, onClose, admissionId, onSaved }) => {
-  const [form, setForm] = useState({
-    receipt_date: new Date().toISOString().slice(0, 10),
-    amount: '',
-    mode_of_payment: 'cash',
-    transaction_details: '',
-    is_old_collection: false,
-  });
+const AddReceiptDialog = ({ open, onClose, admissionId, onSaved, prefill, installments, offerRegistration, paidIndex }) => {
+  // Init form once per open — re-init when the prefill kind changes (e.g.
+  // user clicked "Capture" on a specific slot vs the generic "Add receipt").
+  const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  // Tracks whether a screenshot upload is in-flight so we can disable
+  // the Save button while bytes are still on the wire.
+  const [uploadingScreenshot, setUploadingScreenshot] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setForm({
+      receipt_date: new Date().toISOString().slice(0, 10),
+      amount: prefill?.suggestedAmount != null ? String(prefill.suggestedAmount) : '',
+      mode_of_payment: 'cash',
+      transaction_details: '',
+      is_old_collection: false,
+      receipt_kind: prefill?.kind || 'misc',
+      installment_no: prefill?.installment_no ?? '',
+      // Optional payment screenshot — accounts can attach a UPI / bank
+      // confirmation image so the public receipt page can show what
+      // was sent. r2_key only; the FE swaps for a signed URL on render.
+      payment_screenshot_r2_key: null,
+    });
+    setErr('');
+    setUploadingScreenshot(false);
+  }, [open, prefill?.kind, prefill?.installment_no, prefill?.suggestedAmount]);
+
+  // Which installment slots are still unpaid — drives the dropdown.
+  const unpaidSlots = useMemo(() => {
+    if (!installments) return [];
+    return installments
+      .filter((s) => !paidIndex?.installments?.[s.installment_no])
+      .map((s) => ({ no: s.installment_no, amount: s.amount, due_date: s.due_date }));
+  }, [installments, paidIndex]);
+
+  const registrationAlreadyPaid = Boolean(paidIndex?.registration);
+
+  if (!open || !form) {
+    return (
+      <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+        <DialogContent>
+          <div style={{ padding: 20, textAlign: 'center' }}><CircularProgress size={20} /></div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  const onKindChange = (kind) => {
+    // Switching kind clears the slot picker + suggested amount unless we
+    // can recompute it. Keeps the form honest.
+    setForm((f) => ({
+      ...f,
+      receipt_kind: kind,
+      installment_no: kind === 'installment' ? (unpaidSlots[0]?.no || '') : '',
+      amount: kind === 'registration' && offerRegistration != null
+        ? String(offerRegistration)
+        : kind === 'installment' && unpaidSlots[0]?.amount != null
+          ? String(unpaidSlots[0].amount)
+          : '',
+    }));
+  };
+
+  const onSlotChange = (no) => {
+    const slot = unpaidSlots.find((s) => s.no === Number(no));
+    setForm((f) => ({
+      ...f,
+      installment_no: Number(no),
+      amount: slot?.amount != null ? String(slot.amount) : f.amount,
+    }));
+  };
+
+  // Upload an optional payment screenshot. Same presign + PUT + confirm
+  // pipeline used elsewhere; we hold only the r2_key in form state.
+  const onPickScreenshot = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setErr('');
+    setUploadingScreenshot(true);
+    try {
+      const ps = await uploadsApi.presign({
+        purpose: 'receipt_screenshot',
+        content_type: file.type || 'image/jpeg',
+        size_bytes: file.size,
+        filename: file.name,
+      });
+      const presign = ps?.data;
+      if (!presign?.upload_url || !presign?.r2_key) throw new Error('Presign failed');
+      const putRes = await fetch(presign.upload_url, {
+        method: 'PUT',
+        headers: presign.headers || { 'Content-Type': file.type || 'image/jpeg' },
+        body: file,
+      });
+      if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
+      await uploadsApi.confirm({ r2_key: presign.r2_key });
+      setForm((f) => ({ ...f, payment_screenshot_r2_key: presign.r2_key }));
+    } catch (uploadErr) {
+      setErr(uploadErr?.message || 'Screenshot upload failed');
+    } finally {
+      setUploadingScreenshot(false);
+      // Reset so re-picking the same file works (browser would
+      // otherwise skip the change event).
+      if (e.target) e.target.value = '';
+    }
+  };
+  const clearScreenshot = () => setForm((f) => ({ ...f, payment_screenshot_r2_key: null }));
 
   const submit = async () => {
     setErr('');
     if (!form.amount || Number(form.amount) <= 0) { setErr('Enter a positive amount'); return; }
+    if (form.receipt_kind === 'installment' && !form.installment_no) { setErr('Pick which installment this pays for.'); return; }
+    if (form.receipt_kind === 'registration' && registrationAlreadyPaid) {
+      setErr('Registration is already captured for this admission.'); return;
+    }
     setSaving(true);
     try {
       await admissionsApi.createReceipt(admissionId, {
-        ...form, amount: Number(form.amount),
+        receipt_date: form.receipt_date,
+        amount: Number(form.amount),
+        mode_of_payment: form.mode_of_payment,
+        transaction_details: form.transaction_details || null,
+        is_old_collection: form.is_old_collection,
+        receipt_kind: form.receipt_kind,
+        installment_no: form.receipt_kind === 'installment' ? Number(form.installment_no) : null,
+        payment_screenshot_r2_key: form.payment_screenshot_r2_key || null,
       });
       onSaved?.();
     } catch (e) {
@@ -219,11 +626,58 @@ const AddReceiptDialog = ({ open, onClose, admissionId, onSaved }) => {
       <DialogTitle>Add Receipt</DialogTitle>
       <DialogContent>
         {err && <Alert severity="error" sx={{ mb: 2 }}>{err}</Alert>}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
-          <TextField label="Date" type="date" size="small" value={form.receipt_date} onChange={(e) => setForm({ ...form, receipt_date: e.target.value })} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
+          {/* What is this money for? — radio with three options. The
+              Registration radio is disabled when registration is already
+              captured for this admission (DB uniqueness backs it up). */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>
+              Pay for
+            </div>
+            <RadioGroup
+              row
+              value={form.receipt_kind}
+              onChange={(e) => onKindChange(e.target.value)}
+            >
+              <FormControlLabel
+                value="registration"
+                control={<Radio size="small" />}
+                label="Registration"
+                disabled={registrationAlreadyPaid || offerRegistration == null}
+              />
+              <FormControlLabel
+                value="installment"
+                control={<Radio size="small" />}
+                label="Installment"
+                disabled={unpaidSlots.length === 0}
+              />
+              <FormControlLabel value="misc" control={<Radio size="small" />} label="Other" />
+            </RadioGroup>
+          </div>
+
+          {form.receipt_kind === 'installment' && (
+            <FormControl size="small" fullWidth>
+              <InputLabel id="slot-label" shrink>Installment slot</InputLabel>
+              <Select
+                labelId="slot-label"
+                value={form.installment_no || ''}
+                label="Installment slot"
+                onChange={(e) => onSlotChange(e.target.value)}
+              >
+                {unpaidSlots.map((s) => (
+                  <MenuItem key={s.no} value={s.no}>
+                    Installment {s.no} · ₹ {fmtMoney(s.amount)} · due {fmtDate(s.due_date)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+
+          <TextField label="Date" type="date" size="small" value={form.receipt_date} onChange={(e) => setForm({ ...form, receipt_date: e.target.value })} InputLabelProps={{ shrink: true }} />
           <TextField label="Amount (₹)" type="number" size="small" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
           <FormControl size="small">
-            <Select value={form.mode_of_payment} onChange={(e) => setForm({ ...form, mode_of_payment: e.target.value })}>
+            <InputLabel id="mode-label" shrink>Mode of payment</InputLabel>
+            <Select labelId="mode-label" label="Mode of payment" value={form.mode_of_payment} onChange={(e) => setForm({ ...form, mode_of_payment: e.target.value })}>
               {MODES.map((m) => <MenuItem key={m} value={m}>{m.toUpperCase()}</MenuItem>)}
             </Select>
           </FormControl>
@@ -232,12 +686,42 @@ const AddReceiptDialog = ({ open, onClose, admissionId, onSaved }) => {
             <input type="checkbox" checked={form.is_old_collection} onChange={(e) => setForm({ ...form, is_old_collection: e.target.checked })} />
             Old collection (pre-system entry)
           </label>
+
+          {/* Optional payment screenshot — UPI / bank confirmation that
+              the student / parent forwarded. Surfaces on the public
+              receipt URL for parents to verify. */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>
+              Payment screenshot <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0, color: '#94a3b8' }}>(optional)</span>
+            </div>
+            {form.payment_screenshot_r2_key ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6 }}>
+                <span style={{ fontSize: 12, color: '#15803d', fontWeight: 600, flex: 1 }}>
+                  ✓ Attached
+                </span>
+                <Button size="small" onClick={clearScreenshot} sx={{ textTransform: 'none', fontSize: 11, color: '#dc2626', minWidth: 0 }}>
+                  Remove
+                </Button>
+              </div>
+            ) : (
+              <Button
+                component="label"
+                size="small"
+                variant="outlined"
+                disabled={uploadingScreenshot}
+                sx={{ textTransform: 'none', fontSize: 12, borderColor: '#cbd5e1', color: '#0f172a' }}
+              >
+                {uploadingScreenshot ? 'Uploading…' : 'Attach screenshot'}
+                <input type="file" accept="image/*" onChange={onPickScreenshot} disabled={uploadingScreenshot} style={{ display: 'none' }} />
+              </Button>
+            )}
+          </div>
         </div>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={submit} disabled={saving} sx={{ textTransform: 'none', bgcolor: 'var(--primary)' }}>
-          {saving ? 'Saving…' : 'Save'}
+        <Button onClick={onClose} sx={{ textTransform: 'none' }}>Cancel</Button>
+        <Button variant="contained" onClick={submit} disabled={saving || uploadingScreenshot} sx={{ textTransform: 'none', bgcolor: 'var(--primary)' }}>
+          {saving ? 'Saving…' : uploadingScreenshot ? 'Uploading…' : 'Save'}
         </Button>
       </DialogActions>
     </Dialog>

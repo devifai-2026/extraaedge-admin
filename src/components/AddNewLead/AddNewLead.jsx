@@ -29,7 +29,7 @@ import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import "./AddNewLead.css";
-import { leadsApi, usersApi, uploadsApi } from "../../lib/endpoints";
+import { leadsApi, usersApi, uploadsApi, admissionsApi } from "../../lib/endpoints";
 import { auth } from "../../lib/api";
 import { useDropdown } from "../../lib/useDropdowns";
 import QuickCreateDialog from "../QuickCreateDialog/QuickCreateDialog";
@@ -156,7 +156,12 @@ const hydrateFollowupsByStage = (byStage = {}) => {
     return out;
 };
 
-const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
+// `viewOnly` opens the same edit modal but locks every input and hides the
+// Update button — used by surfaces like Accounts → Pending Admissions where
+// a non-counsellor role needs to inspect the lead snapshot without editing.
+// Internally we route this through the existing `lockedConverted` plumbing
+// so we don't have to wire a second "is locked" signal through 1300 lines.
+const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = false }) => {
     const isEditMode = Boolean(leadData?.id);
     const [activeTab, setActiveTab] = useState(0);
     const [mandatoryOnly, setMandatoryOnly] = useState(false);
@@ -179,7 +184,11 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
     // only super_admin can keep editing. The backend enforces the same rule
     // on PUT /leads/:id and POST /leads/:id/stage — this flag drives the UI.
     const isConverted = isEditMode && Boolean(leadData?.converted_at || leadData?.is_converted);
-    const lockedConverted = isConverted && !isRole(ROLES.SUPER_ADMIN);
+    // The `lockedConverted` flag now also fires for the explicit `viewOnly`
+    // prop. Every read of this flag inside the JSX below already gates the
+    // right things (input disable, Update button hide, reassign panel hide)
+    // so we get a full read-only modal for free.
+    const lockedConverted = viewOnly || (isConverted && !isRole(ROLES.SUPER_ADMIN));
 
     // Inline "Add new …" mini-dialog state. `quickCreate.type` controls which
     // dropdown we're creating into (degrees / specializations / universities /
@@ -632,8 +641,15 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
             }
             if (isEditMode) {
                 await leadsApi.update(leadData.id, payload);
-                // If stage was changed via this dialog, also call /stage so the timeline gets a stage_changed entry.
-                if (payload.stage_id && payload.stage_id !== leadData.stage_id) {
+                // Fire /stage when stage OR sub-stage changed. Without the
+                // sub-stage check, moving a lead between sub-stages of the
+                // same stage updates the column silently — no timeline
+                // activity, no follow-up sweep on the outgoing stage. The
+                // repo's stage_changed insert short-circuits on no-op
+                // saves so an unchanged Save no longer drops a row.
+                const stageChanged = payload.stage_id && payload.stage_id !== leadData.stage_id;
+                const subChanged = (payload.sub_stage_id || null) !== (leadData.sub_stage_id || null);
+                if (payload.stage_id && (stageChanged || subChanged)) {
                     await leadsApi.changeStage(leadData.id, {
                         stage_id: payload.stage_id,
                         sub_stage_id: payload.sub_stage_id,
@@ -846,20 +862,9 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
         >
             <DialogTitle className="add-lead-title" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {isEditMode ? `Edit Lead ${leadData?.name || ''}` : 'Add New Lead'}
-                    {isEditMode && (
-                        <span
-                            title="Lead score (auto-recomputed from stage / sub-stage scores when you save)"
-                            style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 6,
-                                padding: '4px 12px', borderRadius: 999,
-                                background: '#fff7e6', border: '1px solid #ffd591',
-                                color: '#d46b08', fontSize: 13, fontWeight: 600,
-                            }}
-                        >
-                            ★ {leadData?.lead_score != null ? Number(leadData.lead_score).toFixed(0) : 0}
-                        </span>
-                    )}
+                    {viewOnly
+                        ? `View Lead ${leadData?.name || ''}`
+                        : isEditMode ? `Edit Lead ${leadData?.name || ''}` : 'Add New Lead'}
                 </span>
                 <IconButton onClick={handleCancel} className="add-lead-close-btn">
                     <CloseIcon />
@@ -870,6 +875,9 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                 <Tabs
                     value={activeTab}
                     onChange={(e, v) => setActiveTab(v)}
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    allowScrollButtonsMobile
                     TabIndicatorProps={{ style: { display: "none" } }}
                 >
                     <Tab label="Lead/Applicant & Stage Details" className={activeTab === 0 ? "add-lead-tab active" : "add-lead-tab"} />
@@ -885,6 +893,15 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                         <Tab
                             label="Call Recordings"
                             className={activeTab === (visibleCustomFields.length > 0 ? 4 : 3) ? "add-lead-tab active" : "add-lead-tab"}
+                        />
+                    )}
+                    {/* Admission Timeline: only for converted leads. Index
+                        is "one past Call Recordings" — base 3 + 1 (custom)
+                        + 1 (recordings) = 4..5 depending on what else is shown. */}
+                    {isEditMode && isConverted && (
+                        <Tab
+                            label="Admission Timeline"
+                            className={activeTab === (3 + (visibleCustomFields.length > 0 ? 1 : 0) + 1) ? "add-lead-tab active" : "add-lead-tab"}
                         />
                     )}
                 </Tabs>
@@ -1341,13 +1358,24 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                 {!hydrating && isEditMode && activeTab === (visibleCustomFields.length > 0 ? 4 : 3) && (
                     <CallRecordingsTab leadId={leadData.id} />
                 )}
+
+                {/* Admission Timeline tab — converted leads only. Stays
+                    one past Call Recordings regardless of custom-fields
+                    visibility. */}
+                {!hydrating && isEditMode && isConverted && activeTab === (3 + (visibleCustomFields.length > 0 ? 1 : 0) + 1) && (
+                    <AdmissionTimelineTab leadId={leadData.id} />
+                )}
             </DialogContent>
 
             <DialogActions className="add-lead-actions">
                 {submitError && (
                     <Alert severity="error" sx={{ mr: 'auto', flex: 1, fontSize: 13, py: 0 }}>{submitError}</Alert>
                 )}
-                {!submitError && lockedConverted && (
+                {/* The "only an administrator can edit" banner is meant for
+                    edit-mode-on-a-converted-lead. Suppress it in viewOnly
+                    mode — the user explicitly opened the view, so they're
+                    not trying to edit. */}
+                {!submitError && lockedConverted && !viewOnly && (
                     <Alert severity="info" sx={{ mr: 'auto', flex: 1, fontSize: 13, py: 0 }}>
                         This lead has been converted. Only an administrator can edit it.
                     </Alert>
@@ -1355,21 +1383,26 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved }) => {
                 <Button variant="outlined" onClick={handleCancel} disabled={submitting} className="add-lead-cancel-btn">
                     {lockedConverted ? 'Close' : 'Cancel'}
                 </Button>
-                <Tooltip
-                    title={lockedConverted ? 'Converted leads can only be edited by an administrator' : ''}
-                    disableHoverListener={!lockedConverted}
-                >
-                    <span>
-                        <Button
-                            variant="contained"
-                            onClick={handleSubmit}
-                            disabled={submitting || hydrating || lockedConverted}
-                            className="add-lead-add-btn"
-                        >
-                            {submitting ? (isEditMode ? 'Updating…' : 'Adding…') : (isEditMode ? 'Update' : 'Add')}
-                        </Button>
-                    </span>
-                </Tooltip>
+                {/* Hide the Update/Add button entirely in viewOnly mode —
+                    showing it greyed out is confusing because the user
+                    didn't open the modal to edit. */}
+                {!viewOnly && (
+                    <Tooltip
+                        title={lockedConverted ? 'Converted leads can only be edited by an administrator' : ''}
+                        disableHoverListener={!lockedConverted}
+                    >
+                        <span>
+                            <Button
+                                variant="contained"
+                                onClick={handleSubmit}
+                                disabled={submitting || hydrating || lockedConverted}
+                                className="add-lead-add-btn"
+                            >
+                                {submitting ? (isEditMode ? 'Updating…' : 'Adding…') : (isEditMode ? 'Update' : 'Add')}
+                            </Button>
+                        </span>
+                    </Tooltip>
+                )}
             </DialogActions>
 
             {/* Inline create-new dialog. Renders on top of this Dialog with a higher
@@ -1672,3 +1705,1165 @@ function CallRecordingsTab({ leadId }) {
         </div>
     );
 }
+
+// ---------- Admission Timeline tab ---------------------------------------
+//
+// Shown inside the lead drawer when the lead is converted. Fetches the
+// admission_events log via /admissions/by-lead/:leadId/timeline and
+// renders a vertical timeline with status badges + actor info + a
+// human-readable summary per event.
+const EVENT_META = {
+    created:         { label: 'Created',        color: '#10b981', icon: '●' },
+    status_changed:  { label: 'Status changed', color: '#3b82f6', icon: '→' },
+    receipt_added:   { label: 'Receipt added',  color: '#16a34a', icon: '₹' },
+    receipt_deleted: { label: 'Receipt removed',color: '#dc2626', icon: '−' },
+    field_edited:    { label: 'Edited',         color: '#8b5cf6', icon: '✎' },
+    photo_uploaded:  { label: 'Photo uploaded', color: '#0ea5e9', icon: '📷' },
+    note_added:      { label: 'Note added',     color: '#64748b', icon: '✎' },
+};
+
+const ACTOR_LABEL = {
+    user: 'Team',
+    student: 'Student',
+    system: 'System',
+};
+
+const fmtEventTime = (s) => {
+    if (!s) return '';
+    try {
+        return new Date(s).toLocaleString('en-IN', {
+            day: '2-digit', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit',
+        });
+    } catch { return ''; }
+};
+
+// Pretty-print a cell value. null/undefined/empty → "Not filled yet".
+const fmtCell = (v) => {
+    if (v === null || v === undefined || v === '') {
+        return <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Not filled yet</span>;
+    }
+    return String(v);
+};
+
+const fmtMoney = (v) => {
+    if (v === null || v === undefined || v === '') return '₹0';
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '₹0';
+    return `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+};
+
+const fmtDateOnly = (s) => {
+    if (!s) return '';
+    try {
+        return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch { return ''; }
+};
+
+// HTML escape for the printable view — every interpolated value runs
+// through this so a stray "<" or "&" in user data can't break the markup.
+const esc = (v) => {
+    if (v === null || v === undefined) return '<span style="color:#9ca3af;font-style:italic">Not filled yet</span>';
+    const s = String(v);
+    if (s === '') return '<span style="color:#9ca3af;font-style:italic">Not filled yet</span>';
+    return s
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+};
+const escMoney = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '&#8377;0';
+    return `&#8377;${n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+};
+const escDate = (s) => {
+    if (!s) return esc(null);
+    try {
+        return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch { return esc(null); }
+};
+
+// Darken a hex colour by `pct` percentage points. Used to derive the
+// gradient end-stop for the branded hero. Keeps the printable HTML
+// self-contained — no extra colour library at runtime. Declared before
+// buildAdmissionFormHtml so the builder's closure resolves it (const
+// declarations don't hoist).
+const darken = (hex, pct) => {
+    const h = String(hex || '').replace('#', '');
+    if (h.length !== 6) return hex;
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    const f = Math.max(0, 1 - pct / 100);
+    const to2 = (n) => Math.round(n * f).toString(16).padStart(2, '0');
+    return `#${to2(r)}${to2(g)}${to2(b)}`;
+};
+
+// Build a fully self-contained printable HTML document for the admission
+// form. Returns just the <body> content + an inline <style> block — the
+// view-in-new-tab path wraps it in a full document, the download path
+// renders it offscreen for html2canvas.
+//
+// IMPORTANT: html2canvas struggles with flex/grid when the host is mounted
+// offscreen (position:fixed left:-10000px). To keep the rendered PDF and
+// the in-tab view byte-identical, the entire layout uses HTML tables —
+// they're a 1995-era hack, but they paint correctly under html2canvas
+// every time and they're equally happy in the live tab.
+const buildAdmissionFormHtml = ({
+    admission, accountManager, resolvedManager, tenant,
+    photoUrl,
+    courseFeeSource, totalFees, paid, pending,
+    feeSchedule, receipts, education,
+}) => {
+    const a = admission || {};
+    const fullName = [a.first_name, a.middle_name, a.last_name].filter(Boolean).join(' ') || null;
+    const managerLine = a.guided_by_manager_name
+        || (resolvedManager ? `${resolvedManager.name}${resolvedManager.email ? ' · ' + resolvedManager.email : ''}` : null);
+
+    // Tenant branding — pulled from the cached session blob written at
+    // login. Falls back to the orange brand colour used elsewhere when
+    // the tenant didn't configure one.
+    const brand = tenant?.brand_primary_color || '#E87B2F';
+    const brandDark = darken(brand, 18);
+    const brandName = tenant?.brand_name || tenant?.company_name || tenant?.name || 'ExtraaEdge';
+    const logoUrl = tenant?.logo_url || null;
+
+    // Render helpers used only inside this builder
+    const row = (label, value) => `
+      <tr>
+        <td class="lbl">${esc(label)}</td>
+        <td class="val">${value}</td>
+      </tr>
+    `;
+    const sect = (title, inner) => `
+      <div class="section">
+        <div class="section-title">${esc(title)}</div>
+        <div class="section-body">${inner}</div>
+      </div>
+    `;
+
+    // Tables
+    const receiptsTable = receipts.length === 0
+        ? `<div class="empty">No payments recorded yet.</div>`
+        : `<table class="grid" cellspacing="0" cellpadding="0">
+            <thead><tr>
+              <th style="width:18%">Receipt #</th>
+              <th style="width:18%">Date</th>
+              <th style="width:20%" class="r">Amount</th>
+              <th style="width:18%">Mode</th>
+              <th>Transaction</th>
+            </tr></thead><tbody>${
+              receipts.map((r) => `<tr>
+                <td><strong>${esc(r.receipt_no || '—')}</strong></td>
+                <td>${escDate(r.receipt_date)}</td>
+                <td class="r mono"><strong>${escMoney(r.amount)}</strong></td>
+                <td>${esc(r.mode_of_payment || '—')}</td>
+                <td>${esc(r.transaction_details || '—')}</td>
+              </tr>`).join('')
+           }</tbody></table>`;
+
+    const scheduleTable = feeSchedule.length === 0
+        ? `<div class="empty">Not filled yet</div>`
+        : `<table class="grid" cellspacing="0" cellpadding="0">
+            <thead><tr>
+              <th style="width:30%">Installment</th>
+              <th style="width:40%">Due date</th>
+              <th class="r">Amount</th>
+            </tr></thead><tbody>${
+              feeSchedule.map((f) => `<tr>
+                <td><strong>#${esc(f.installment_no)}</strong></td>
+                <td>${escDate(f.due_date)}</td>
+                <td class="r mono"><strong>${escMoney(f.amount)}</strong></td>
+              </tr>`).join('')
+           }</tbody></table>`;
+
+    const eduTable = education.length === 0
+        ? `<div class="empty">Not filled yet</div>`
+        : `<table class="grid" cellspacing="0" cellpadding="0">
+            <thead><tr>
+              <th>Examination</th><th>Stream</th><th>Board / University</th><th>College</th>
+              <th class="r" style="width:10%">Year</th>
+              <th class="r" style="width:10%">%</th>
+            </tr></thead><tbody>${
+              education.map((e) => `<tr>
+                <td><strong>${esc(e.examination || '—')}</strong></td>
+                <td>${esc(e.stream || '—')}</td>
+                <td>${esc(e.board_university || '—')}</td>
+                <td>${esc(e.college_name || '—')}</td>
+                <td class="r">${esc(e.year_of_passing || '—')}</td>
+                <td class="r">${e.percentage != null ? esc(e.percentage) + '%' : '—'}</td>
+              </tr>`).join('')
+           }</tbody></table>`;
+
+    const courseFeesBlock = !courseFeeSource
+        ? `<div class="alert">Course price is missing. No custom offer exists for this lead and the programme has no catalogue price.</div>`
+        : `<table class="kv-table" cellspacing="0" cellpadding="0">
+             <tbody>
+               <tr>
+                 <td class="lbl">Pricing source</td>
+                 <td class="val">
+                   <span class="tag ${courseFeeSource.kind === 'offer' ? 'tag-offer' : 'tag-catalogue'}">
+                     ${courseFeeSource.kind === 'offer' ? 'Custom offer' : 'Catalogue price'}
+                   </span>
+                   <span class="muted">${esc(courseFeeSource.label)}</span>
+                 </td>
+               </tr>
+               ${row('Total course fees', `<strong>${escMoney(courseFeeSource.data.course_fees)}</strong>`)}
+               ${row('Registration amount', escMoney(courseFeeSource.data.registration_amount ?? 0))}
+               ${row('Payment mode', esc(courseFeeSource.data.payment_mode))}
+             </tbody>
+           </table>`;
+
+    // Payment summary as a 3-column TABLE (not flex/grid) so html2canvas
+    // lays it out reliably. Each cell is its own card-like box.
+    const pendingLabel = pending < 0 ? 'Overpaid' : 'Remaining';
+    const pendingTint = pending > 0 ? '#fef2f2' : pending < 0 ? '#fef3c7' : '#f1f5f9';
+    const pendingBorder = pending > 0 ? '#fecaca' : pending < 0 ? '#fde68a' : '#e2e8f0';
+    const paymentSummaryBlock = `
+      <table class="money-table" cellspacing="0" cellpadding="0">
+        <tr>
+          <td class="money-cell" style="background:#eef2ff;border-color:#c7d2fe">
+            <div class="money-lbl">Total fees</div>
+            <div class="money-val">${escMoney(totalFees)}</div>
+          </td>
+          <td class="money-gap"></td>
+          <td class="money-cell" style="background:#ecfdf5;border-color:#a7f3d0">
+            <div class="money-lbl">Paid till date</div>
+            <div class="money-val">${escMoney(paid)}</div>
+          </td>
+          <td class="money-gap"></td>
+          <td class="money-cell" style="background:${pendingTint};border-color:${pendingBorder}">
+            <div class="money-lbl">${esc(pendingLabel)}</div>
+            <div class="money-val">${escMoney(Math.abs(pending))}</div>
+          </td>
+        </tr>
+      </table>
+    `;
+
+    // Account manager block — table-based, with an avatar disk on the left
+    // and the role/email stack on the right. Mirrors the in-app banner.
+    const amInitials = accountManager
+        ? accountManager.name.split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase()
+        : 'AM';
+    const amBlock = `
+      <table class="am-banner" cellspacing="0" cellpadding="0">
+        <tr>
+          <td class="am-avatar"><div class="am-disc">${esc(amInitials)}</div></td>
+          <td class="am-text">
+            <div class="am-lbl">Account manager</div>
+            ${accountManager
+                ? `<div class="am-name"><strong>${esc(accountManager.name)}</strong>${
+                      accountManager.email
+                        ? ` <span class="muted">&middot; ${esc(accountManager.email)}</span>`
+                        : ''
+                   }</div>`
+                : `<div class="am-name muted" style="font-style:italic">Not yet assigned</div>`
+            }
+          </td>
+        </tr>
+      </table>
+    `;
+
+    const style = `
+      * { box-sizing: border-box; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        color: #0f172a;
+        margin: 0;
+        padding: 0;
+        background: #f1f5f9;
+        font-size: 12px;
+        line-height: 1.45;
+        -webkit-font-smoothing: antialiased;
+      }
+      .doc {
+        max-width: 794px;
+        margin: 0 auto;
+        background: #fff;
+        padding: 0 0 24px;
+        box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+      }
+
+      /* ---- Branded hero ---- */
+      .hero {
+        background: linear-gradient(135deg, ${brand} 0%, ${brandDark} 100%);
+        color: #fff;
+        padding: 22px 32px;
+      }
+      .hero-table { width: 100%; border-collapse: collapse; }
+      .hero-table td { vertical-align: top; padding: 0; }
+      .hero-logo { width: 64px; padding-right: 14px !important; }
+      .hero-logo img { width: 56px; height: 56px; object-fit: contain; background: #fff; border-radius: 8px; padding: 6px; }
+      .hero-logo .logo-fallback {
+        width: 56px; height: 56px; border-radius: 8px;
+        background: rgba(255,255,255,0.18); color: #fff;
+        font-size: 22px; font-weight: 700; text-align: center; line-height: 56px;
+      }
+      .hero-title { font-size: 13px; opacity: 0.85; margin: 0 0 4px; letter-spacing: 0.5px; text-transform: uppercase; font-weight: 600; }
+      .hero-name  { font-size: 22px; font-weight: 700; margin: 0; }
+      .hero-sub   { font-size: 12px; opacity: 0.85; margin-top: 4px; }
+      .hero-meta  { text-align: right; font-size: 11px; line-height: 1.7; }
+      .hero-meta .key { opacity: 0.78; }
+      .hero-meta .val { font-weight: 600; }
+
+      /* ---- Status pill in the hero ---- */
+      .pill {
+        display: inline-block; padding: 2px 10px; border-radius: 999px;
+        background: rgba(255,255,255,0.22); font-size: 10px; font-weight: 700;
+        letter-spacing: 0.5px; text-transform: uppercase;
+      }
+
+      /* ---- Page body ---- */
+      .doc-body { padding: 22px 32px 8px; }
+
+      /* ---- Account-manager strip ---- */
+      .am-banner { width: 100%; border-collapse: collapse; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; margin-bottom: 18px; }
+      .am-banner td { padding: 10px 14px; vertical-align: middle; }
+      .am-avatar { width: 48px; padding-right: 0 !important; }
+      .am-disc { width: 36px; height: 36px; border-radius: 50%; background: ${brand}; color: #fff; font-size: 12px; font-weight: 700; text-align: center; line-height: 36px; }
+      .am-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: #9a3412; text-transform: uppercase; margin-bottom: 2px; }
+      .am-name { font-size: 13px; color: #0f172a; }
+
+      /* ---- Sections ---- */
+      .section { margin-bottom: 16px; page-break-inside: avoid; }
+      .section-title {
+        font-size: 11px; font-weight: 700; color: ${brandDark};
+        letter-spacing: 0.6px; text-transform: uppercase;
+        border-bottom: 2px solid ${brand}; padding-bottom: 4px; margin-bottom: 10px;
+      }
+      .section-body { font-size: 12px; }
+
+      /* ---- Key-value tables ---- */
+      table.kv-table { width: 100%; border-collapse: collapse; }
+      table.kv-table .lbl {
+        width: 200px;
+        color: #64748b; font-size: 10px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.5px;
+        padding: 6px 16px 6px 0; vertical-align: top;
+      }
+      table.kv-table .val { padding: 6px 0; vertical-align: top; }
+      table.kv-table tr + tr .lbl, table.kv-table tr + tr .val { border-top: 1px solid #f1f5f9; }
+
+      /* ---- Data tables (receipts / schedule / education) ---- */
+      table.grid { width: 100%; border-collapse: collapse; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 6px; }
+      table.grid th {
+        text-align: left; background: #f8fafc; color: #475569; font-weight: 700;
+        padding: 8px 10px; border-bottom: 1px solid #e2e8f0;
+        font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px;
+      }
+      table.grid td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+      table.grid tr:last-child td { border-bottom: none; }
+      table.grid .r { text-align: right; }
+      .mono { font-family: ui-monospace, Menlo, monospace; }
+
+      /* ---- Payment-summary money cards (as a TABLE not flex) ---- */
+      table.money-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+      table.money-table .money-cell {
+        width: 32%;
+        border: 1px solid #e2e8f0; border-radius: 8px;
+        padding: 12px 14px; vertical-align: top;
+      }
+      table.money-table .money-gap { width: 2%; }
+      .money-lbl { font-size: 10px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; }
+      .money-val { font-size: 18px; font-weight: 800; color: #0f172a; margin-top: 4px; }
+
+      /* ---- Misc ---- */
+      .empty { color: #9ca3af; font-style: italic; font-size: 12px; padding: 8px 2px; }
+      .alert { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 6px; padding: 10px 14px; font-size: 12px; font-weight: 500; }
+      .tag {
+        display: inline-block;
+        font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+        text-transform: uppercase; letter-spacing: 0.5px; margin-right: 8px;
+      }
+      .tag-offer { background: #fef3c7; color: #92400e; }
+      .tag-catalogue { background: #dbeafe; color: #1e40af; }
+      .muted { color: #64748b; font-size: 11px; }
+
+      /* ---- Footer ---- */
+      .footer {
+        margin-top: 24px;
+        border-top: 1px dashed #cbd5e1;
+        padding: 14px 32px 0;
+        font-size: 10px; color: #94a3b8; text-align: center;
+      }
+      .footer strong { color: ${brand}; }
+
+      @media print {
+        body { background: #fff; }
+        .doc { box-shadow: none; }
+        .section { break-inside: avoid; }
+      }
+    `;
+
+    // Hero — logo / title block on the left, meta on the right. Pure
+    // table layout so html2canvas reproduces it byte-for-byte.
+    const logoCell = logoUrl
+        ? `<img src="${esc(logoUrl)}" alt="" />`
+        : `<div class="logo-fallback">${esc(brandName.charAt(0))}</div>`;
+    const statusPill = a.status
+        ? `<span class="pill">${esc(a.status)}</span>`
+        : '';
+
+    const body = `
+      <div class="doc">
+        <div class="hero">
+          <table class="hero-table">
+            <tr>
+              <td class="hero-logo">${logoCell}</td>
+              <td>
+                <div class="hero-title">${esc(brandName)}</div>
+                <div class="hero-name">Admission Form</div>
+                <div class="hero-sub">${esc(fullName || '—')} ${statusPill}</div>
+              </td>
+              <td class="hero-meta">
+                <div><span class="key">Admission ID</span><br/><span class="val">${esc(a.admission_code || a.id || '—')}</span></div>
+                <div style="margin-top:6px"><span class="key">Generated</span><br/><span class="val">${esc(new Date().toLocaleString('en-IN'))}</span></div>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="doc-body">
+
+          ${amBlock}
+
+          ${sect('Course fees', courseFeesBlock)}
+          ${sect('Payment summary', paymentSummaryBlock)}
+          ${sect(`Receipts (${receipts.length})`, receiptsTable)}
+          ${sect(`Fee schedule (${feeSchedule.length})`, scheduleTable)}
+
+          ${sect('Identity', `
+            <table class="kv-table" cellspacing="0" cellpadding="0"><tbody>
+              ${row('Full name', esc(fullName))}
+              ${row('Admission date', escDate(a.admission_date))}
+              ${row('Email', esc(a.email))}
+              ${row('WhatsApp', esc(a.whatsapp_number))}
+              ${row('Alternate contact', esc(a.alternate_contact))}
+              ${row('Address', esc(a.address))}
+            </tbody></table>
+          `)}
+
+          ${sect('Programme', `
+            <table class="kv-table" cellspacing="0" cellpadding="0"><tbody>
+              ${row('Programme', esc(a.program_name))}
+              ${row('Mode of training', esc(a.mode_of_training))}
+              ${row('Centre', esc(a.center_name))}
+              ${row('Mode of payment', esc(a.mode_of_payment))}
+              ${row('Source', esc(a.source))}
+              ${row('Status', esc(a.status))}
+              ${row('Counsellor', esc(a.guided_by_counsellor_name))}
+              ${row('Manager', esc(managerLine))}
+              ${row('Break reason', esc(a.break_reason))}
+            </tbody></table>
+          `)}
+
+          ${sect(`Education (${education.length})`, eduTable)}
+
+          ${sect('Student photo', photoUrl
+              ? `<img src="${esc(photoUrl)}" alt="Student photo"
+                       crossorigin="anonymous"
+                       style="max-width:180px;max-height:240px;border:1px solid #e2e8f0;border-radius:8px;display:block;" />`
+              : a.photo_r2_key
+                  ? `<div class="empty">Photo on file but preview unavailable.</div>`
+                  : `<div class="empty">No photo uploaded.</div>`)}
+
+        </div>
+
+        <div class="footer">
+          Generated from <strong>${esc(brandName)}</strong> &middot;
+          Admission ${esc(a.id || '—')}
+        </div>
+      </div>
+    `;
+
+    return { body, style };
+};
+
+// One labelled field. Empty values render "Not filled yet" so accounts
+// can see at a glance what the student / counsellor still owes.
+const Field = ({ label, value, span = 1 }) => (
+    <div style={{ gridColumn: `span ${span}`, minWidth: 0 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 2 }}>
+            {label}
+        </div>
+        <div style={{ fontSize: 13, color: '#0f172a', overflowWrap: 'anywhere' }}>
+            {fmtCell(value)}
+        </div>
+    </div>
+);
+
+function AdmissionTimelineTab({ leadId }) {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [admissionId, setAdmissionId] = useState(null);
+    const [admission, setAdmission] = useState(null);
+    const [items, setItems] = useState([]);
+    const [feeOffer, setFeeOffer] = useState(null);
+    const [programFees, setProgramFees] = useState(null);
+    const [resolvedManager, setResolvedManager] = useState(null);
+    const [accountManager, setAccountManager] = useState(null);
+    const [generatingPdf, setGeneratingPdf] = useState(false);
+    // Signed URL for the admission photo. The photo_r2_key on the row is
+    // a storage key, not a fetchable URL — uploadsApi.signedUrl exchanges
+    // it for a short-lived signed download URL we can drop straight into
+    // an <img src> on both the in-tab view and the html2canvas PDF capture.
+    const [photoUrl, setPhotoUrl] = useState(null);
+
+    // Gate for the View / Download admission form buttons. Originally
+    // locked to super_admin per spec, but the accounts team also needs
+    // the printable copy for student handoff, so account_manager is
+    // included here too. Counsellors / staff don't get it.
+    const me = auth.getUser() || {};
+    const isAdmin = me.role === 'super_admin' || me.role === 'account_manager';
+
+    useEffect(() => {
+        if (!leadId) return undefined;
+        let alive = true;
+        // No setLoading(true) here — useState initialiser already starts
+        // true; re-running on leadId change keeps the old data visible
+        // for the brief moment until the new fetch resolves.
+        admissionsApi.timelineByLead(leadId)
+            .then((r) => {
+                if (!alive) return;
+                const data = r?.data || {
+                    admission_id: null, admission: null, events: [],
+                    fee_offer: null, program_fees: null,
+                    resolved_manager: null, account_manager: null,
+                };
+                setAdmissionId(data.admission_id);
+                setAdmission(data.admission || null);
+                setItems(data.events || []);
+                setFeeOffer(data.fee_offer || null);
+                setProgramFees(data.program_fees || null);
+                setResolvedManager(data.resolved_manager || null);
+                setAccountManager(data.account_manager || null);
+            })
+            .catch((e) => { if (alive) setError(e?.message || 'Failed to load timeline'); })
+            .finally(() => { if (alive) setLoading(false); });
+        return () => { alive = false; };
+    }, [leadId]);
+
+    // Resolve photo_r2_key → signed URL. Best-effort: if the lookup
+    // fails (deleted file, ACL mismatch) we just leave photoUrl null
+    // and the printable form falls back to a "no photo" placeholder.
+    const photoKey = admission?.photo_r2_key || null;
+    useEffect(() => {
+        if (!photoKey) { setPhotoUrl(null); return undefined; }
+        let alive = true;
+        uploadsApi.signedUrl(photoKey)
+            .then((r) => { if (alive) setPhotoUrl(r?.data?.url || null); })
+            .catch(() => { if (alive) setPhotoUrl(null); });
+        return () => { alive = false; };
+    }, [photoKey]);
+
+    if (loading) {
+        return (
+            <div style={{ padding: 24, textAlign: 'center' }}>
+                <CircularProgress size={20} />
+            </div>
+        );
+    }
+
+    if (error) {
+        return <div style={{ padding: 24, color: '#dc2626' }}>{error}</div>;
+    }
+
+    if (!admissionId) {
+        return (
+            <div style={{ padding: 24, color: '#6b7280' }}>
+                This lead has converted but no admission has been created yet.
+                The accounts team will set one up from <strong>Pending Admissions</strong>.
+            </div>
+        );
+    }
+
+    const a = admission || {};
+    const fullName = [a.first_name, a.middle_name, a.last_name].filter(Boolean).join(' ') || null;
+    const receipts = Array.isArray(a.receipts) ? a.receipts : [];
+    const education = Array.isArray(a.education) ? a.education : [];
+
+    // Course-fee resolution cascade:
+    //   1. lead_fee_offers (per-lead override set by accounts)
+    //   2. programs.course_fees / registration / installments (catalog)
+    //   3. Neither → "Course price is missing"
+    const courseFeeSource = feeOffer
+        ? { kind: 'offer', label: 'Custom offer for this lead', data: feeOffer }
+        : programFees
+            ? { kind: 'program', label: 'Programme catalogue price', data: programFees }
+            : null;
+    // Authoritative "total fees" used in the payment-summary cards:
+    // course fee from the cascade if available, else the admission's own
+    // total_fees (legacy fallback). This prevents the "Remaining ₹-5,000"
+    // bug where total_fees was 0 but receipts already exist.
+    const courseTotal = courseFeeSource ? Number(courseFeeSource.data.course_fees || 0) : null;
+    const admissionTotal = Number(a.total_fees ?? 0);
+    const totalFees = courseTotal != null ? courseTotal : admissionTotal;
+    const paid = Number(a.paid_till_date ?? 0);
+    const pending = totalFees - paid;
+    // Fee schedule: prefer the per-lead offer / programme installments,
+    // else fall back to the legacy admission_fee_schedule rows.
+    const cascadeInstallments = courseFeeSource && Array.isArray(courseFeeSource.data.fee_installments)
+        ? courseFeeSource.data.fee_installments
+        : null;
+    const feeSchedule = cascadeInstallments && cascadeInstallments.length
+        ? cascadeInstallments
+        : (Array.isArray(a.fee_schedule) ? a.fee_schedule : []);
+
+    // Bundle every piece of data the printable view needs so View and
+    // Download stay in sync — no chance one drifts from the other.
+    // tenant comes from the cached login blob and carries brand_name /
+    // logo_url / brand_primary_color used in the hero.
+    const printableData = {
+        admission, accountManager, resolvedManager,
+        tenant: auth.getTenant() || null,
+        photoUrl, // signed download URL for admission.photo_r2_key, or null
+        courseFeeSource, totalFees, paid, pending,
+        feeSchedule, receipts, education,
+    };
+
+    // View — open a Blob-URL'd HTML document in a new tab. We deliberately
+    // avoid window.open('') + document.write because Chrome's popup
+    // blocker treats the empty-URL form as a pop-up and refuses it
+    // unconditionally even after a user click. Blob URLs navigate cleanly.
+    const handleViewForm = () => {
+        const { body, style } = buildAdmissionFormHtml(printableData);
+        const studentName = [a.first_name, a.last_name].filter(Boolean).join(' ') || 'admission';
+        const safeTitle = `Admission Form — ${studentName}`;
+        const html = `<!doctype html>
+<html><head><meta charset="utf-8"><title>${safeTitle.replace(/</g, '&lt;')}</title>
+<style>${style}</style></head>
+<body>${body}</body></html>`;
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        // Open with a concrete URL so it's a navigation, not a pop-up.
+        // Fall back to assigning location.href on the same window if the
+        // browser still refuses (rare — Safari with strict tracking
+        // settings). The Blob URL is revoked after a delay so the new
+        // tab has time to load.
+        const w = window.open(url, '_blank');
+        if (!w) {
+            window.location.href = url;
+        }
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    };
+
+    // Download — render the printable HTML offscreen, snap it with
+    // html2canvas, paginate into A4 with jsPDF. Dynamic-imported so
+    // these two heavyweight libs aren't in the main bundle.
+    const handleDownloadPdf = async () => {
+        if (generatingPdf) return;
+        setGeneratingPdf(true);
+        const studentName = [a.first_name, a.last_name].filter(Boolean).join(' ') || 'admission';
+        const safeName = studentName.replace(/[^a-z0-9_\- ]/gi, '').trim().replace(/\s+/g, '_') || 'admission';
+        // Offscreen mount. Width matches the rendered HTML at ~96dpi so the
+        // canvas snapshot has enough resolution for a crisp A4 page.
+        const host = document.createElement('div');
+        host.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#fff;';
+        const { body, style } = buildAdmissionFormHtml(printableData);
+        host.innerHTML = `<style>${style}</style>${body}`;
+        document.body.appendChild(host);
+        try {
+            const [{ default: html2canvas }, { default: JsPDFCtor }] = await Promise.all([
+                import('html2canvas'),
+                import('jspdf').then((m) => ({ default: m.jsPDF })),
+            ]);
+            // Wait for every <img> inside the offscreen host to finish
+            // loading before we snapshot — html2canvas captures whatever
+            // is painted at that instant, so an in-flight image would
+            // turn into a blank box on the PDF. We swallow image errors
+            // (broken link / 403) so a single bad photo doesn't kill
+            // the whole download — the rest of the form still renders.
+            await Promise.all(
+                Array.from(host.querySelectorAll('img')).map((img) => {
+                    if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+                    return new Promise((resolve) => {
+                        img.addEventListener('load', resolve, { once: true });
+                        img.addEventListener('error', resolve, { once: true });
+                    });
+                }),
+            );
+            // useCORS lets html2canvas paint same-origin-tainted images
+            // from R2/GCS signed URLs. Backed by the `crossorigin` attr
+            // we set on the rendered <img> tag.
+            const canvas = await html2canvas(host, {
+                scale: 2,
+                backgroundColor: '#ffffff',
+                useCORS: true,
+                allowTaint: false,
+                logging: false,
+            });
+            const pdf = new JsPDFCtor({ unit: 'pt', format: 'a4' });
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = pageWidth;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            // Slice the tall canvas into A4-sized pages.
+            const dataUrl = canvas.toDataURL('image/png');
+            let remaining = imgHeight;
+            let position = 0;
+            while (remaining > 0) {
+                pdf.addImage(dataUrl, 'PNG', 0, position, imgWidth, imgHeight);
+                remaining -= pageHeight;
+                if (remaining > 0) {
+                    position -= pageHeight;
+                    pdf.addPage();
+                }
+            }
+            pdf.save(`AdmissionForm_${safeName}.pdf`);
+        } catch (err) {
+            window.alert(`Failed to generate PDF: ${err.message || err}`);
+        } finally {
+            document.body.removeChild(host);
+            setGeneratingPdf(false);
+        }
+    };
+
+    return (
+        <div style={{ padding: 18 }}>
+
+            {/* ----- Admin actions: View / Download admission form ----------
+                Locked to super_admin per product spec. Buttons are hidden
+                outright for non-admins so the rest of this tab still
+                renders without a confusing disabled state. */}
+            {isAdmin && (
+                <div style={{
+                    display: 'flex', gap: 8, justifyContent: 'flex-end',
+                    marginBottom: 12,
+                }}>
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={handleViewForm}
+                        className="always-clickable"
+                        sx={{ textTransform: 'none', borderColor: '#cbd5e1', color: '#0f172a' }}
+                    >
+                        View admission form
+                    </Button>
+                    <Button
+                        variant="contained"
+                        size="small"
+                        onClick={handleDownloadPdf}
+                        disabled={generatingPdf}
+                        className="always-clickable"
+                        sx={{
+                            textTransform: 'none', background: '#E87B2F',
+                            '&:hover': { background: '#cf6c25' },
+                        }}
+                    >
+                        {generatingPdf ? 'Generating…' : 'Download PDF'}
+                    </Button>
+                </div>
+            )}
+
+            {/* ----- Top banner: account manager attribution ---------------- */}
+            <div style={{
+                background: accountManager ? '#fff7ed' : '#f8fafc',
+                border: `1px solid ${accountManager ? '#fed7aa' : '#e2e8f0'}`,
+                borderRadius: 8, padding: '10px 14px', marginBottom: 16,
+                display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+                <div style={{
+                    width: 32, height: 32, borderRadius: '50%',
+                    background: accountManager ? '#E87B2F' : '#cbd5e1',
+                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, fontWeight: 700,
+                }}>
+                    {accountManager
+                        ? accountManager.name.split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase()
+                        : 'AM'}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, color: '#9a3412', textTransform: 'uppercase' }}>
+                        Account manager
+                    </div>
+                    {accountManager ? (
+                        <div style={{ fontSize: 13, color: '#0f172a' }}>
+                            <strong>{accountManager.name}</strong>
+                            {accountManager.email && (
+                                <span style={{ color: '#6b7280' }}> · {accountManager.email}</span>
+                            )}
+                        </div>
+                    ) : (
+                        <div style={{ fontSize: 13, color: '#9ca3af', fontStyle: 'italic' }}>
+                            Not yet assigned · will populate once the admission is approved
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* ----- Course fees attached to this lead --------------------- */}
+            <SectionHeader>Course fees</SectionHeader>
+            {!courseFeeSource ? (
+                <div style={{
+                    background: '#fef2f2', border: '1px solid #fecaca',
+                    borderRadius: 8, padding: '10px 14px', marginBottom: 16,
+                    color: '#991b1b', fontSize: 13,
+                }}>
+                    <strong>Course price is missing.</strong> No custom offer exists for this lead
+                    and the programme has no catalogue price.
+                </div>
+            ) : (
+                <div style={{
+                    border: '1px solid #e2e8f0', borderRadius: 8,
+                    padding: '12px 14px', marginBottom: 16,
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                        <span style={{
+                            fontSize: 10, fontWeight: 700, letterSpacing: 0.4,
+                            background: courseFeeSource.kind === 'offer' ? '#fef3c7' : '#dbeafe',
+                            color: courseFeeSource.kind === 'offer' ? '#92400e' : '#1e40af',
+                            padding: '2px 8px', borderRadius: 999, textTransform: 'uppercase',
+                        }}>
+                            {courseFeeSource.kind === 'offer' ? 'Custom offer' : 'Catalogue price'}
+                        </span>
+                        <span style={{ fontSize: 12, color: '#64748b' }}>{courseFeeSource.label}</span>
+                    </div>
+                    <div style={{
+                        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+                        gap: 12, marginBottom: feeSchedule.length ? 12 : 0,
+                    }}>
+                        <Field label="Total course fees" value={fmtMoney(courseFeeSource.data.course_fees)} />
+                        <Field label="Registration amount" value={fmtMoney(courseFeeSource.data.registration_amount ?? 0)} />
+                        <Field label="Payment mode" value={courseFeeSource.data.payment_mode} />
+                    </div>
+                </div>
+            )}
+
+            {/* ----- Payment summary --------------------------------------- */}
+            <SectionHeader>Payment summary</SectionHeader>
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 12, marginBottom: 14,
+            }}>
+                <MoneyCard label="Total fees" value={fmtMoney(totalFees)} tint="#eef2ff" border="#c7d2fe" />
+                <MoneyCard label="Paid till date" value={fmtMoney(paid)} tint="#ecfdf5" border="#a7f3d0" />
+                <MoneyCard
+                    label={pending < 0 ? 'Overpaid' : 'Remaining'}
+                    value={fmtMoney(Math.abs(pending))}
+                    tint={pending > 0 ? '#fef2f2' : pending < 0 ? '#fef3c7' : '#f1f5f9'}
+                    border={pending > 0 ? '#fecaca' : pending < 0 ? '#fde68a' : '#e2e8f0'}
+                />
+            </div>
+            {totalFees === 0 && receipts.length > 0 && (
+                <div style={{
+                    fontSize: 12, color: '#92400e', background: '#fffbeb',
+                    border: '1px solid #fde68a', borderRadius: 6,
+                    padding: '6px 10px', marginBottom: 14,
+                }}>
+                    Heads up: receipts exist but no course fee is set, so &quot;Remaining&quot;
+                    cannot be computed. Set a custom offer or programme catalogue price.
+                </div>
+            )}
+
+            {/* ----- Receipts table ---------------------------------------- */}
+            <SectionHeader>Receipts ({receipts.length})</SectionHeader>
+            {receipts.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#9ca3af', fontStyle: 'italic', marginBottom: 16 }}>
+                    No payments recorded yet.
+                </div>
+            ) : (
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden', marginBottom: 16 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                        <thead style={{ background: '#f8fafc' }}>
+                            <tr>
+                                <Th>Receipt #</Th>
+                                <Th>Date</Th>
+                                <Th align="right">Amount</Th>
+                                <Th>Mode</Th>
+                                <Th>Transaction</Th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {receipts.map((r) => (
+                                <tr key={r.id} style={{ borderTop: '1px solid #f1f5f9' }}>
+                                    <Td><strong>{r.receipt_no || '—'}</strong></Td>
+                                    <Td>{fmtDateOnly(r.receipt_date)}</Td>
+                                    <Td align="right" mono><strong>{fmtMoney(r.amount)}</strong></Td>
+                                    <Td>{r.mode_of_payment || '—'}</Td>
+                                    <Td>{r.transaction_details || '—'}</Td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* ----- Fee schedule ------------------------------------------ */}
+            <SectionHeader>Fee schedule ({feeSchedule.length})</SectionHeader>
+            {feeSchedule.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#9ca3af', fontStyle: 'italic', marginBottom: 16 }}>
+                    Not filled yet
+                </div>
+            ) : (
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden', marginBottom: 16 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                        <thead style={{ background: '#f8fafc' }}>
+                            <tr>
+                                <Th>Installment</Th>
+                                <Th>Due date</Th>
+                                <Th align="right">Amount</Th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {feeSchedule.map((f) => (
+                                <tr key={f.id || f.installment_no} style={{ borderTop: '1px solid #f1f5f9' }}>
+                                    <Td>#{f.installment_no}</Td>
+                                    <Td>{fmtDateOnly(f.due_date)}</Td>
+                                    <Td align="right" mono>{fmtMoney(f.amount)}</Td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* ----- Admission form details -------------------------------- */}
+            <SectionHeader>Admission form · Identity</SectionHeader>
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 14, marginBottom: 16,
+            }}>
+                <Field label="Full name" value={fullName} span={2} />
+                <Field label="Admission date" value={fmtDateOnly(a.admission_date)} />
+                <Field label="Email" value={a.email} />
+                <Field label="WhatsApp" value={a.whatsapp_number} />
+                <Field label="Alternate contact" value={a.alternate_contact} />
+                <Field label="Address" value={a.address} span={3} />
+            </div>
+
+            <SectionHeader>Admission form · Programme</SectionHeader>
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 14, marginBottom: 16,
+            }}>
+                <Field label="Programme" value={a.program_name} />
+                <Field label="Mode of training" value={a.mode_of_training} />
+                <Field label="Centre" value={a.center_name} />
+                <Field label="Mode of payment" value={a.mode_of_payment} />
+                <Field label="Source" value={a.source} />
+                <Field label="Status" value={a.status} />
+                <Field label="Counsellor" value={a.guided_by_counsellor_name} />
+                <Field
+                    label="Manager"
+                    value={
+                        a.guided_by_manager_name
+                        || (resolvedManager
+                            ? `${resolvedManager.name}${resolvedManager.email ? ` · ${resolvedManager.email}` : ''}`
+                            : null)
+                    }
+                />
+                <Field label="Break reason" value={a.break_reason} />
+            </div>
+
+            {/* ----- Education --------------------------------------------- */}
+            <SectionHeader>Education ({education.length})</SectionHeader>
+            {education.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#9ca3af', fontStyle: 'italic', marginBottom: 16 }}>
+                    Not filled yet
+                </div>
+            ) : (
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden', marginBottom: 16 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                        <thead style={{ background: '#f8fafc' }}>
+                            <tr>
+                                <Th>Examination</Th>
+                                <Th>Stream</Th>
+                                <Th>Board / University</Th>
+                                <Th>College</Th>
+                                <Th align="right">Year</Th>
+                                <Th align="right">%</Th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {education.map((ed) => (
+                                <tr key={ed.id} style={{ borderTop: '1px solid #f1f5f9' }}>
+                                    <Td>{ed.examination || '—'}</Td>
+                                    <Td>{ed.stream || '—'}</Td>
+                                    <Td>{ed.board_university || '—'}</Td>
+                                    <Td>{ed.college_name || '—'}</Td>
+                                    <Td align="right">{ed.year_of_passing || '—'}</Td>
+                                    <Td align="right">{ed.percentage != null ? `${ed.percentage} ${ed.grade_unit === 'cgpa' ? 'CGPA' : '%'}` : '—'}</Td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* ----- Photos -------------------------------------------------
+                The DB has two columns: photo_r2_key (used by both the public
+                admission form and the internal New Admission page) and
+                selfie_r2_key (only ever populated by the internal page's
+                separate webcam-selfie slot). For any lead that came through
+                the public form, selfie_r2_key is always null and showing
+                "Not filled yet" is misleading — so we render the Selfie row
+                only when it actually has a value. */}
+            <SectionHeader>Photos</SectionHeader>
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: a.selfie_r2_key ? 'repeat(2, 1fr)' : '1fr',
+                gap: 14, marginBottom: 16,
+            }}>
+                <Field label="Photo uploaded" value={a.photo_r2_key ? 'Yes' : null} />
+                {a.selfie_r2_key && (
+                    <Field label="Selfie uploaded" value="Yes" />
+                )}
+            </div>
+
+            {/* ----- Event log --------------------------------------------- */}
+            <SectionHeader>Event log ({items.length})</SectionHeader>
+            {items.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#9ca3af', fontStyle: 'italic' }}>
+                    No events recorded on this admission yet.
+                </div>
+            ) : (
+            <div style={{ position: 'relative' }}>
+                {/* Vertical timeline rail */}
+                <div style={{
+                    position: 'absolute', left: 11, top: 8, bottom: 8,
+                    width: 2, background: '#e2e8f0',
+                }} />
+                {items.map((ev) => {
+                    const meta = EVENT_META[ev.event_type] || { label: ev.event_type, color: '#64748b', icon: '•' };
+                    const actorBadge = ACTOR_LABEL[ev.actor_kind] || 'System';
+                    return (
+                        <div key={ev.id} style={{ position: 'relative', paddingLeft: 36, marginBottom: 16 }}>
+                            {/* Dot */}
+                            <div style={{
+                                position: 'absolute', left: 4, top: 4,
+                                width: 16, height: 16, borderRadius: '50%',
+                                background: meta.color, color: '#fff',
+                                fontSize: 10, lineHeight: '16px', textAlign: 'center',
+                                boxShadow: '0 0 0 3px #fff',
+                            }}>
+                                {meta.icon}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>
+                                    {meta.label}
+                                </span>
+                                {ev.prev_status && ev.next_status && (
+                                    <span style={{ fontSize: 11, color: '#475569' }}>
+                                        {ev.prev_status} → <strong>{ev.next_status}</strong>
+                                    </span>
+                                )}
+                                {!ev.prev_status && ev.next_status && (
+                                    <span style={{ fontSize: 11, color: '#475569' }}>
+                                        Status: <strong>{ev.next_status}</strong>
+                                    </span>
+                                )}
+                                <span style={{
+                                    fontSize: 10, fontWeight: 600,
+                                    background: '#f1f5f9', color: '#475569',
+                                    padding: '2px 8px', borderRadius: 999, letterSpacing: 0.3,
+                                }}>
+                                    {actorBadge}
+                                </span>
+                            </div>
+                            {ev.summary && (
+                                <div style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>{ev.summary}</div>
+                            )}
+                            {/* field_edited details */}
+                            {ev.event_type === 'field_edited' && ev.metadata?.changes && (
+                                <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, lineHeight: 1.5 }}>
+                                    {Object.entries(ev.metadata.changes).slice(0, 4).map(([k, v]) => (
+                                        <div key={k}>
+                                            <strong>{k}</strong>: {String(v.from ?? '—')} → {String(v.to ?? '—')}
+                                        </div>
+                                    ))}
+                                    {Object.keys(ev.metadata.changes).length > 4 && (
+                                        <div style={{ fontStyle: 'italic' }}>
+                                            +{Object.keys(ev.metadata.changes).length - 4} more
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {/* receipt_added details. When the BE captured a
+                                share_token (newer receipts), surface a clickable
+                                link so admins can jump straight to the printable
+                                public copy. */}
+                            {ev.event_type === 'receipt_added' && ev.metadata && (
+                                <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                    {ev.metadata.receipt_no && <span>Receipt #<strong>{ev.metadata.receipt_no}</strong> · </span>}
+                                    {ev.metadata.receipt_kind === 'installment' && <span>Installment {ev.metadata.installment_no} · </span>}
+                                    {ev.metadata.receipt_kind === 'registration' && <span>Registration · </span>}
+                                    <span>Amount <strong>₹{ev.metadata.amount}</strong></span>
+                                    {ev.metadata.mode_of_payment && <span> via {ev.metadata.mode_of_payment}</span>}
+                                    {ev.metadata.share_token && (
+                                        <a
+                                            href={`/r/${ev.metadata.share_token}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            style={{
+                                                marginLeft: 'auto',
+                                                fontSize: 11, color: 'var(--primary)',
+                                                textDecoration: 'none', fontWeight: 600,
+                                                padding: '2px 8px', borderRadius: 999,
+                                                background: 'rgba(79, 70, 229, 0.08)',
+                                            }}
+                                        >
+                                            View receipt ↗
+                                        </a>
+                                    )}
+                                </div>
+                            )}
+                            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                                {fmtEventTime(ev.occurred_at)}
+                                {ev.actor_name && <> · {ev.actor_name}</>}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+            )}
+        </div>
+    );
+}
+
+// ---------- Small helpers used inside AdmissionTimelineTab ---------------
+
+const SectionHeader = ({ children }) => (
+    <div style={{
+        fontSize: 11, fontWeight: 700, color: '#94a3b8',
+        letterSpacing: 0.8, textTransform: 'uppercase',
+        margin: '14px 0 8px',
+    }}>
+        {children}
+    </div>
+);
+
+const MoneyCard = ({ label, value, tint, border }) => (
+    <div style={{
+        background: tint, border: `1px solid ${border}`,
+        borderRadius: 8, padding: '10px 12px',
+    }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, color: '#475569', textTransform: 'uppercase' }}>
+            {label}
+        </div>
+        <div style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>
+            {value}
+        </div>
+    </div>
+);
+
+const Th = ({ children, align = 'left' }) => (
+    <th style={{
+        textAlign: align, padding: '8px 12px',
+        fontSize: 11, fontWeight: 700, color: '#475569',
+        textTransform: 'uppercase', letterSpacing: 0.4,
+    }}>
+        {children}
+    </th>
+);
+
+const Td = ({ children, align = 'left', mono = false }) => (
+    <td style={{
+        textAlign: align, padding: '8px 12px',
+        color: '#0f172a',
+        fontFamily: mono ? 'ui-monospace, monospace' : 'inherit',
+    }}>
+        {children}
+    </td>
+);
