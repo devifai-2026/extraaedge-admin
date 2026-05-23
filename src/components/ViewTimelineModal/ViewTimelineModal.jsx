@@ -698,7 +698,9 @@ const DayGroup = ({ day, rows, initialExpanded = true, leadId }) => {
                       </div>
                     );
                   })() : (
-                    row.body && !isAssignmentRow && row.kind !== 'admission' && (
+                    row.body && !isAssignmentRow && row.kind !== 'admission'
+                    && row.subtype !== 'fee_offer_saved'
+                    && row.subtype !== 'share_link_minted' && (
                       <div className="timeline-card-row">
                         <ChatBubbleOutlineIcon className="card-meta-icon" />
                         <span>{String(row.body)}</span>
