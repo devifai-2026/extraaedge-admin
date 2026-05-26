@@ -125,6 +125,7 @@ function UsersTab() {
   const [addOpen, setAddOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [activeUser, setActiveUser] = useState(null);
+  const [editUser, setEditUser] = useState(null);
   // Delete confirmation modal. Soft-delete via the existing DELETE
   // /users/:id endpoint — backend sets users.deleted_at; row stays in
   // DB so foreign-key history (lead_assignments etc.) survives.
@@ -277,12 +278,12 @@ function UsersTab() {
                   </Tooltip>
                 </td>
                 <td style={{ padding: '14px 16px', whiteSpace: 'nowrap' }}>
-                  <Tooltip title="Edit user">
+                  <Tooltip title="Edit user (name, email, reporting manager…)">
                     <span>
                       <IconButton
                         size="small"
                         disabled={!canManage}
-                        onClick={() => openProfile(u)}
+                        onClick={() => setEditUser(u)}
                         sx={{ color: '#1565C0' }}
                       >
                         <EditIcon fontSize="small" />
@@ -348,6 +349,15 @@ function UsersTab() {
         users={allUsers}
         onClose={() => setAddOpen(false)}
         onCreated={() => { setAddOpen(false); reload(); }}
+      />
+
+      <UserProfileDialog
+        open={Boolean(editUser)}
+        user={editUser}
+        users={allUsers}
+        onClose={() => setEditUser(null)}
+        onSaved={() => { setEditUser(null); reload(); }}
+        onResetPassword={() => { setActiveUser(editUser); setResetOpen(true); }}
       />
 
       <ResetPasswordDialog

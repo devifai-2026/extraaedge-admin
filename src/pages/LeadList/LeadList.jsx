@@ -69,12 +69,14 @@ const LeadList = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     // Unassigned count (used to badge the Auto-assign button + show context).
+    // Honors the active advanced filter so the badge reflects what the user
+    // is actually looking at.
     const [unassignedCount, setUnassignedCount] = useState(0);
     useEffect(() => {
-        leadsApi.stageCounts()
+        leadsApi.stageCounts(advancedFilter)
             .then((r) => setUnassignedCount(r?.data?.unassigned ?? 0))
             .catch(() => setUnassignedCount(0));
-    }, [reloadKey]);
+    }, [reloadKey, advancedFilter]);
 
     // Selection (for bulk reassign)
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -216,6 +218,7 @@ const LeadList = () => {
                 activeStageId={activeStageId}
                 onChange={setActiveStageId}
                 reloadKey={reloadKey}
+                advancedFilter={advancedFilter}
             />
             <FiltersOptions
                 onRefresh={() => setReloadKey((k) => k + 1)}

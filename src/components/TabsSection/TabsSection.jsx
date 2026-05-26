@@ -6,10 +6,17 @@ import "./TabsSection.css";
 // Tabs are dynamic: pulled from /dropdowns/stages, counts from /leads/stage-counts.
 // activeStageId === null  => "All"
 // activeStageId === "fresh" / "untouched" => virtual flag buckets
-const TabsSection = ({ activeStageId, onChange, reloadKey }) => {
+// advancedFilter (optional) is forwarded to /leads/stage-counts so tab labels
+// reflect the active filter — applying a filter updates every tab count.
+const TabsSection = ({ activeStageId, onChange, reloadKey, advancedFilter }) => {
   const [stages, setStages] = useState([]);
   const [counts, setCounts] = useState({ all: 0, fresh: 0, untouched: 0, stages: [] });
   const [loading, setLoading] = useState(true);
+
+  // Stringify so an object identity that's structurally equal across renders
+  // doesn't retrigger the fetch. The filter modal returns a fresh object each
+  // apply, which is what we want — different keys / values → new refetch.
+  const filterKey = JSON.stringify(advancedFilter || {});
 
   useEffect(() => {
     let alive = true;
@@ -18,7 +25,7 @@ const TabsSection = ({ activeStageId, onChange, reloadKey }) => {
       try {
         const [stagesRes, countsRes] = await Promise.all([
           dropdownsApi.list('stages'),
-          leadsApi.stageCounts(),
+          leadsApi.stageCounts(advancedFilter),
         ]);
         if (!alive) return;
         const stagesList = (stagesRes?.data || []).filter((s) => s.is_active !== false);
@@ -32,7 +39,8 @@ const TabsSection = ({ activeStageId, onChange, reloadKey }) => {
       }
     })();
     return () => { alive = false; };
-  }, [reloadKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadKey, filterKey]);
 
   const countFor = (id) => counts.stages.find((s) => s.stage_id === id)?.count ?? 0;
 

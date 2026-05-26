@@ -29,7 +29,7 @@ export const authApi = {
 
 export const leadsApi = {
   list: (params) => api.get('/leads', params),
-  stageCounts: () => api.get('/leads/stage-counts'),
+  stageCounts: (params) => api.get('/leads/stage-counts', params),
   get: (id) => api.get(`/leads/${id}`),
   timeline: (id, params) => api.get(`/leads/${id}/timeline`, params),
   create: (body) => api.post('/leads', body),
