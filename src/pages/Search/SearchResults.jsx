@@ -11,6 +11,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { leadsApi } from '../../lib/endpoints';
 import LeadCard from '../../components/LeadCard/LeadCard';
+import ReferLeadsDrawer from '../../components/ReferLeadsDrawer/ReferLeadsDrawer';
 
 export default function SearchResults() {
   const navigate = useNavigate();
@@ -22,6 +23,10 @@ export default function SearchResults() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Reassign drawer state — the LeadCard's reassign icon + dropdown
+  // delegate back to the parent via onReassign. We mount the same
+  // ReferLeadsDrawer LeadList uses so the UX matches exactly.
+  const [referLead, setReferLead] = useState(null);
 
   // Sync debounced value + URL
   useEffect(() => {
@@ -133,6 +138,7 @@ export default function SearchResults() {
               <LeadCard
                 key={r.id}
                 lead={r}
+                onReassign={() => setReferLead(r)}
                 // Reload current results when a card mutates the lead —
                 // simplest "refresh" is to re-fire the same debounced
                 // search by bumping debouncedQ via setQ (no-op text
@@ -144,6 +150,21 @@ export default function SearchResults() {
           </Box>
         </Box>
       ))}
+
+      {/* Reassign drawer — single-lead mode. Mirrors the wiring in
+          LeadList so the Reassign icon + dropdown entry on each
+          search-result card open the same drawer the rest of the app
+          uses. */}
+      <ReferLeadsDrawer
+        open={!!referLead}
+        onClose={() => setReferLead(null)}
+        mode="single"
+        lead={referLead}
+        selectedIds={[]}
+        filterParams={{}}
+        totalInFilter={0}
+        onDone={() => setReferLead(null)}
+      />
     </Box>
   );
 }
