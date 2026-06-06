@@ -135,6 +135,24 @@ const UploadLeads = ({ open, onClose, onUploaded }) => {
             if (fileInputRef.current) fileInputRef.current.value = "";
             return;
         }
+        // Reject oversized files before we ever presign + PUT them. A real lead
+        // sheet is a few KB per row, so anything past 25 MB is almost always a
+        // bloated template (embedded dropdown lists / styling) that OOMs the
+        // server-side parse worker. The presign endpoint enforces the same cap;
+        // catching it here saves a round-trip and gives instant feedback. If a
+        // file is this big with only a handful of rows, re-save it as a fresh
+        // .xlsx (Save As → Excel Workbook) to drop the embedded baggage.
+        const MAX_BYTES = 25 * 1024 * 1024;
+        if (file.size > MAX_BYTES) {
+            setError(
+                `File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB; max 25 MB). ` +
+                "If this is a small lead list, re-save it as a fresh .xlsx (Save As → Excel Workbook) — " +
+                "downloaded templates can carry hidden dropdown data that bloats the file.",
+            );
+            setUploadedFile(null);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            return;
+        }
         setUploadedFile(file);
         setError(null);
         setResult(null);
@@ -212,6 +230,22 @@ const UploadLeads = ({ open, onClose, onUploaded }) => {
             const preview = await waitForPreview(previewId, {
                 onTick: (n) => setBusyLabel(`Validating rows… (${n})`),
             });
+
+            // Whole-file parse failure: the worker couldn't read the sheet at
+            // all (e.g. oversized / corrupt) and flagged it with a row_number 0
+            // sample error and zero total rows. Surface that message instead of
+            // committing an empty import.
+            const fileError = (Number(preview?.total_rows) === 0)
+                && (preview?.sample_errors_json || []).find((e) => e?.row_number === 0);
+            if (fileError) {
+                throw new Error(fileError.message || "Could not read this spreadsheet. Re-save it as a fresh .xlsx and try again.");
+            }
+            // The poll timed out without the worker ever writing counts — the
+            // job is wedged (server restart, stuck queue). Better to say so than
+            // commit against a preview that was never validated.
+            if (!preview) {
+                throw new Error("Validation timed out. The server may be busy — please try again in a moment.");
+            }
 
             // 5. Commit. duplicate_handling = 'skip' is the default and matches
             // your "show duplicates on /failedleads" requirement. Pass the

@@ -23,6 +23,7 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import PhoneMissedIcon from "@mui/icons-material/PhoneMissed";
 import MarkChatUnreadIcon from "@mui/icons-material/MarkChatUnread";
+import EventIcon from "@mui/icons-material/Event";
 import { colors } from '../../theme/colors';
 import WhatsappModal from "../WhatsApp/WhatsApp";
 import EmailDrawer from "../EmailDrawer/EmailDrawer";
@@ -46,6 +47,25 @@ const fmt = (v) => {
         if (isNaN(d.getTime())) return String(v);
         return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
     } catch { return String(v); }
+};
+
+// Colour + label for a follow-up status, used by the "matched follow-up"
+// badge that appears when the LeadList is filtered by a follow-up date
+// window. Mirrors the palette in FollowUpManager so the two views read the
+// same.
+const FU_STATUS = {
+    planned:   { color: '#FB8C00', label: 'Planned'   },
+    done:      { color: '#43A047', label: 'Done'      },
+    missed:    { color: '#E53935', label: 'Missed'    },
+    cancelled: { color: '#9E9E9E', label: 'Cancelled' },
+};
+const fmtFuDate = (v) => {
+    if (!v) return '';
+    try {
+        const d = new Date(v);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+    } catch { return ''; }
 };
 
 // Status badge resolver lives in lib/leadFlags.js — see flagForLead().
@@ -218,6 +238,62 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                 {flag.text}
                                 <span className="untouched-dot" />
                             </span>
+                        )}
+                        {/* Matched follow-up(s) — only present when the LeadList
+                            is filtered by a follow-up date window. Surfaces WHY
+                            the lead matched (the filter now matches any status,
+                            so most hits are past missed/done attempts that
+                            wouldn't otherwise show on the collapsed card). */}
+                        {Array.isArray(lead.matched_followups) && lead.matched_followups.length > 0 && (
+                            <Tooltip
+                                arrow
+                                title={
+                                    <div style={{ maxWidth: 280 }}>
+                                        <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                                            Matched follow-up{lead.matched_followups.length === 1 ? '' : 's'}
+                                        </div>
+                                        {lead.matched_followups.slice(0, 5).map((fu) => {
+                                            const meta = FU_STATUS[fu.status] || { label: fu.status };
+                                            return (
+                                                <div key={fu.id} style={{ marginBottom: 6 }}>
+                                                    <span style={{ fontWeight: 600 }}>{meta.label}</span>
+                                                    {' · '}{fmtFuDate(fu.next_action_datetime)}
+                                                    {(fu.stage_name || fu.sub_stage_name) && (
+                                                        <div style={{ opacity: 0.9 }}>
+                                                            <span style={{ fontWeight: 600 }}>Stage:</span> {fu.stage_name || '—'}
+                                                            {' · '}
+                                                            <span style={{ fontWeight: 600 }}>Sub-stage:</span> {fu.sub_stage_name || '—'}
+                                                        </div>
+                                                    )}
+                                                    {fu.comment ? <div style={{ fontStyle: 'italic', opacity: 0.85 }}>&quot;{fu.comment}&quot;</div> : null}
+                                                </div>
+                                            );
+                                        })}
+                                        {lead.matched_followups.length > 5 && (
+                                            <div style={{ opacity: 0.75 }}>+{lead.matched_followups.length - 5} more</div>
+                                        )}
+                                    </div>
+                                }
+                            >
+                                {(() => {
+                                    const fu = lead.matched_followups[0];
+                                    const meta = FU_STATUS[fu.status] || { color: '#9E9E9E', label: fu.status };
+                                    const extra = lead.matched_followups.length - 1;
+                                    return (
+                                        <span
+                                            className="flag-pill"
+                                            style={{
+                                                display: 'inline-flex', alignItems: 'center', gap: 5,
+                                                background: `${meta.color}1A`, color: meta.color, fontWeight: 700,
+                                            }}
+                                        >
+                                            <EventIcon style={{ fontSize: 13 }} />
+                                            {meta.label} · {fmtFuDate(fu.next_action_datetime)}
+                                            {extra > 0 ? ` +${extra}` : ''}
+                                        </span>
+                                    );
+                                })()}
+                            </Tooltip>
                         )}
                     </div>
                 </div>

@@ -120,6 +120,23 @@ const toLocalDtInput = (iso) => {
     }
 };
 
+// Human-readable date for the read-only "Other follow-up attempts" list.
+const fmtAttemptDate = (iso) => {
+    if (!iso) return '—';
+    try {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return '—';
+        return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+    } catch { return '—'; }
+};
+
+const ATTEMPT_STATUS = {
+    planned:   { color: '#FB8C00', label: 'Planned'   },
+    done:      { color: '#43A047', label: 'Done'      },
+    missed:    { color: '#E53935', label: 'Missed'    },
+    cancelled: { color: '#9E9E9E', label: 'Cancelled' },
+};
+
 // Build an empty 5-slot array. Used to seed a new stage in the
 // followups_by_stage map.
 const emptySlots = () => ([
@@ -1186,17 +1203,34 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
 
                                 {/* Per-stage 5-slot follow-up history. Shown for every stage
                                     EXCEPT the success ("Converted") stage. Works in both Add
-                                    and Edit modes. Slots are scoped to the currently-selected
-                                    stage_id; switching stages reveals that stage's own 5 slots
-                                    (any rows the user typed for a previously-selected stage
-                                    stay in state until submit). */}
+                                    and Edit modes.
+
+                                    We render a section for EVERY stage that already has
+                                    follow-ups (so a lead's existing history stays visible no
+                                    matter which stage is currently selected) PLUS the
+                                    currently-selected stage (so the user can add new slots to
+                                    it). Previously the grid only showed the selected stage's
+                                    slots, so switching stages made the original stage's
+                                    follow-ups + comments vanish from view — they were still in
+                                    state, but looked deleted. */}
                                 {(() => {
-                                    const picked = (stages.data || []).find((s) => s.id === formData.stage_id);
-                                    if (!picked || picked.is_success) return null;
-                                    const stageId = formData.stage_id;
-                                    const slots = (formData.followups_by_stage || {})[stageId] || emptySlots();
-                                    return (
-                                        <>
+                                    const stageList = stages.data || [];
+                                    const byStage = formData.followups_by_stage || {};
+                                    // Stages that already carry follow-ups, plus the selected
+                                    // stage. Dedupe, drop success stages (Converted owns none).
+                                    const stageIds = Array.from(new Set([
+                                        ...Object.keys(byStage).filter((sid) => sid && (byStage[sid] || []).some((s) => s?.next_action_datetime || s?.comment)),
+                                        ...(formData.stage_id ? [formData.stage_id] : []),
+                                    ]));
+                                    const sections = stageIds
+                                        .map((sid) => stageList.find((s) => s.id === sid))
+                                        .filter((s) => s && !s.is_success);
+                                    if (!sections.length) return null;
+                                    return sections.map((picked) => {
+                                        const stageId = picked.id;
+                                        const slots = byStage[stageId] || emptySlots();
+                                        return (
+                                        <React.Fragment key={`fu-${stageId}`}>
                                             <div className="add-lead-section-title">
                                                 Follow-up Attempts for {picked.name} (5 slots, most recent first)
                                             </div>
@@ -1258,7 +1292,86 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
                                                 </div>
                                                 );
                                             })}
-
+                                        </React.Fragment>
+                                        );
+                                    });
+                                })()}
+                                {/* Other follow-up attempts — read-only.
+                                    The 5-slot grid above only renders rows that carry a
+                                    slot_index (1..5) tied to a stage. Ad-hoc follow-ups
+                                    (slot_index = null) — e.g. ones created via the
+                                    "Followup Scheduled On" field, the Follow-up Manager, or
+                                    bulk import without slot columns — have no slot to live in,
+                                    so they'd otherwise be invisible here even though the lead
+                                    clearly has follow-up history. List them read-only so the
+                                    user can see WHY a lead matched a follow-up date filter. */}
+                                {(() => {
+                                    const all = freshLead?.past_followups || [];
+                                    const adhoc = all.filter((f) => f && (f.slot_index === null || f.slot_index === undefined));
+                                    if (!adhoc.length) return null;
+                                    const stageName = (sid) => (stages.data || []).find((s) => s.id === sid)?.name;
+                                    const subStageName = (ssid) => (subStages.data || []).find((s) => s.id === ssid)?.name;
+                                    return (
+                                        <>
+                                            <div className="add-lead-section-title">
+                                                Other follow-up attempts ({adhoc.length})
+                                            </div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                                                {adhoc.map((f) => {
+                                                    const meta = ATTEMPT_STATUS[f.status] || { color: '#9E9E9E', label: f.status || '—' };
+                                                    return (
+                                                        <div
+                                                            key={f.id}
+                                                            style={{
+                                                                display: 'flex', alignItems: 'flex-start', gap: 10,
+                                                                padding: '8px 12px', borderRadius: 6,
+                                                                background: '#fafafa', border: '1px solid #eee',
+                                                            }}
+                                                        >
+                                                            <span style={{
+                                                                flexShrink: 0, marginTop: 2,
+                                                                padding: '2px 8px', borderRadius: 999,
+                                                                background: `${meta.color}1A`, color: meta.color,
+                                                                fontSize: 11, fontWeight: 700,
+                                                            }}>
+                                                                {meta.label}
+                                                            </span>
+                                                            <div style={{ minWidth: 0 }}>
+                                                                <div style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>
+                                                                    {fmtAttemptDate(f.next_action_datetime)}
+                                                                </div>
+                                                                {(stageName(f.stage_id) || subStageName(f.sub_stage_id)) && (
+                                                                    <div style={{ fontSize: 12, color: '#555', marginTop: 2 }}>
+                                                                        <span style={{ fontWeight: 600 }}>Stage:</span> {stageName(f.stage_id) || '—'}
+                                                                        <span style={{ margin: '0 8px', color: '#ccc' }}>|</span>
+                                                                        <span style={{ fontWeight: 600 }}>Sub-stage:</span> {subStageName(f.sub_stage_id) || '—'}
+                                                                    </div>
+                                                                )}
+                                                                {f.comment && (
+                                                                    <div style={{ fontSize: 12, color: '#555', fontStyle: 'italic', marginTop: 2 }}>
+                                                                        &quot;{f.comment}&quot;
+                                                                    </div>
+                                                                )}
+                                                                {f.completion_reason && (
+                                                                    <div style={{ fontSize: 12, color: '#1b5e20', marginTop: 2 }}>
+                                                                        <strong>Closure remark:</strong> {f.completion_reason}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </>
+                                    );
+                                })()}
+                                {/* Audit timestamps — rendered once, outside the per-stage
+                                    follow-up loop. Hidden on the success (Converted) stage. */}
+                                {(() => {
+                                    const picked = (stages.data || []).find((s) => s.id === formData.stage_id);
+                                    if (!picked || picked.is_success) return null;
+                                    return (
+                                        <>
                                             {/* Audit timestamps. Optional — leave blank to let the server
                                                 use now() (or, on edit, keep whatever is already in DB). */}
                                             <div className="add-lead-section-title">Audit Timestamps (optional)</div>
