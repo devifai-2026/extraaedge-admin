@@ -5,13 +5,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box, TextField, InputAdornment, IconButton, CircularProgress, Chip,
-  List, ListItem, ListItemButton, ListItemText, Typography, Divider,
+  Typography,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { leadsApi } from '../../lib/endpoints';
-import AddNewLead from '../../components/AddNewLead/AddNewLead';
-import { flagForLead, TONE_BG } from '../../lib/leadFlags';
+import LeadCard from '../../components/LeadCard/LeadCard';
 
 export default function SearchResults() {
   const navigate = useNavigate();
@@ -23,7 +22,6 @@ export default function SearchResults() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [editLead, setEditLead] = useState(null);
 
   // Sync debounced value + URL
   useEffect(() => {
@@ -117,58 +115,35 @@ export default function SearchResults() {
         </Box>
       )}
 
+      {/* Render each search hit as a full LeadCard — same component the
+          Lead Manager uses. Users get the exact same affordances they
+          already know from /leadlist: name click → edit form, "View all"
+          / stat icons → timeline, plus the call / whatsapp / email
+          action icons on the right of each card. */}
       {grouped.map(([stage, rows]) => (
-        <Box key={stage} sx={{ mb: 2, background: '#fff', border: '1px solid #eee', borderRadius: 1 }}>
-          <Box sx={{ px: 2, py: 1.5, background: '#fdf3ed', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Chip size="small" label={stage} sx={{ height: 22, background: '#fff' }} />
+        <Box key={stage} sx={{ mb: 2 }}>
+          <Box sx={{ px: 1, py: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Chip size="small" label={stage} sx={{ height: 22, background: '#fff', border: '1px solid #e5e7eb' }} />
             <Typography variant="caption" sx={{ color: '#888' }}>
               {rows.length} lead{rows.length === 1 ? '' : 's'}
             </Typography>
           </Box>
-          <List disablePadding>
-            {rows.map((r, i) => {
-              const flag = flagForLead(r);
-              return (
-                <ListItem key={r.id} disablePadding divider={i < rows.length - 1}>
-                  <ListItemButton onClick={() => setEditLead(r)}>
-                    <ListItemText
-                      primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <span style={{ fontWeight: 600 }}>{r.name || '—'}</span>
-                          <span style={{ color: '#888', fontSize: 12 }}>
-                            {[r.phone, r.email].filter(Boolean).join(' · ')}
-                          </span>
-                          {flag && (
-                            <Chip
-                              size="small"
-                              label={flag.text}
-                              sx={{ height: 18, fontSize: 10, background: TONE_BG[flag.tone] || TONE_BG.neutral, color: '#fff' }}
-                            />
-                          )}
-                        </Box>
-                      }
-                      secondary={
-                        <span style={{ fontSize: 12, color: '#888' }}>
-                          {[r.program_name, r.city, r.assigned_to_name && `Owner: ${r.assigned_to_name}`]
-                            .filter(Boolean).join(' · ')}
-                          {r.lead_score != null && ` · Score ${Number(r.lead_score).toFixed(0)}`}
-                        </span>
-                      }
-                    />
-                  </ListItemButton>
-                </ListItem>
-              );
-            })}
-          </List>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {rows.map((r) => (
+              <LeadCard
+                key={r.id}
+                lead={r}
+                // Reload current results when a card mutates the lead —
+                // simplest "refresh" is to re-fire the same debounced
+                // search by bumping debouncedQ via setQ (no-op text
+                // change). Skip it for now: keep the list as-is so
+                // pagination / ordering doesn't shift under the user.
+                onChanged={() => { /* no-op */ }}
+              />
+            ))}
+          </Box>
         </Box>
       ))}
-
-      <AddNewLead
-        open={!!editLead}
-        leadData={editLead}
-        onClose={() => setEditLead(null)}
-        onSaved={() => { setEditLead(null); /* keep search list as-is */ }}
-      />
     </Box>
   );
 }

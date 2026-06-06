@@ -284,6 +284,12 @@ function Header() {
             </div>
 
             <div className='main-container'>
+                {/* Global lead search — available on every page so a
+                    lead can be jumped to from anywhere (Accounts,
+                    Dashboard, Settings, etc.). Inside Lead Manager
+                    every stage tab uses the same `/leadlist` path with
+                    a `?stage_id=...` query — the bar stays visible
+                    across all of them by virtue of being unconditional. */}
                 <div className="header-search-wrapper" ref={searchWrapperRef} style={{ position: 'relative' }}>
                     <div className="search-input-wrapper-header" style={{ position: 'relative' }}>
                         <input
