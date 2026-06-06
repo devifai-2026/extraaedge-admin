@@ -208,8 +208,17 @@ export const whatsappApi = {
   send: (body) => api.post('/whatsapp/send', body),
   inbox: (params) => api.get('/whatsapp/inbox', params),
   numbers: () => api.get('/whatsapp/numbers'),
-  quota: () => api.get('/whatsapp/quota'),
   usage: () => api.get('/whatsapp/usage'),
+  // Per-user personal-number WhatsApp (whatsapp-web.js gateway). Each user
+  // links their own number; sends go out from it and replies route back to them.
+  connection: {
+    connect: () => api.post('/whatsapp/connection/connect'),
+    status: () => api.get('/whatsapp/connection/status'),
+    logout: () => api.post('/whatsapp/connection/logout'),
+    conversations: () => api.get('/whatsapp/connection/conversations'),
+    messages: (lead_id) => api.get('/whatsapp/connection/messages', { lead_id }),
+    send: (body) => api.post('/whatsapp/connection/send', body), // { lead_id, body }
+  },
 };
 
 export const integrationsApi = {
