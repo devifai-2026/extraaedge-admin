@@ -54,6 +54,20 @@ const LeadList = () => {
     const [page, setPage] = useState(1);
     const [sort, setSort] = useState('created_desc');
     const [advancedFilter, setAdvancedFilter] = useState({}); // from FilterLeadsModal
+    // In-table search bar, layered ON TOP of the stage tab + advanced
+    // filter so users can narrow within whatever they're currently
+    // viewing (e.g. "Qualified" tab + search "tony"). `q` is the live
+    // input value, `debouncedQ` is what actually hits the API after a
+    // short delay — keeps the request rate sane while typing.
+    const [tableSearchQ, setTableSearchQ] = useState('');
+    const [debouncedTableSearchQ, setDebouncedTableSearchQ] = useState('');
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedTableSearchQ(tableSearchQ.trim()), 300);
+        return () => clearTimeout(t);
+    }, [tableSearchQ]);
+    // Reset to page 1 whenever the search query changes so the user
+    // doesn't end up on an empty page 4 of a now-shorter result set.
+    useEffect(() => { setPage(1); }, [debouncedTableSearchQ]);
     const [viewMode, setViewMode] = useState(() => {
         try { return localStorage.getItem('ee_lead_view_mode') || 'card'; } catch { return 'card'; }
     });
@@ -102,8 +116,11 @@ const LeadList = () => {
             delete params.flag;
         }
         // else (All tab): keep params.flag from advancedFilter as-is
+        // Layer the in-table search query on top — narrows the current
+        // stage tab + advanced-filter view by name / email / phone.
+        if (debouncedTableSearchQ) params.q = debouncedTableSearchQ;
         return params;
-    }, [activeStageId, page, sort, advancedFilter]);
+    }, [activeStageId, page, sort, advancedFilter, debouncedTableSearchQ]);
 
     const reload = useCallback(async () => {
         setLoading(true);
@@ -235,6 +252,8 @@ const LeadList = () => {
                 viewMode={viewMode}
                 onViewModeChange={setViewMode}
                 unassignedCount={unassignedCount}
+                searchQuery={tableSearchQ}
+                onSearchQueryChange={setTableSearchQ}
             />
 
             {Object.keys(advancedFilter).length > 0 && (

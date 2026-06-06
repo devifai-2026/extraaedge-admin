@@ -12,7 +12,9 @@ import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 // older short name `DeleteOutline` isn't in this package's exports map,
 // so importing it explodes at Vite resolve time.
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
-import { Tooltip, CircularProgress } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
+import { Tooltip, CircularProgress, InputBase } from "@mui/material";
 import { isRole, ROLES } from "../../lib/rbac";
 import { leadsApi } from "../../lib/endpoints";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
@@ -46,7 +48,7 @@ const SORT_OPTIONS = [
     { key: 'score_desc',         label: 'Lead Score' },
 ];
 
-const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onReassignSelected, onReassignAll, onBulkDelete, sort, onSortChange, advancedFilter, onApplyFilter, onResetFilter, viewMode = 'card', onViewModeChange, unassignedCount = 0 }) => {
+const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onReassignSelected, onReassignAll, onBulkDelete, sort, onSortChange, advancedFilter, onApplyFilter, onResetFilter, viewMode = 'card', onViewModeChange, unassignedCount = 0, searchQuery = '', onSearchQueryChange }) => {
     // Auto-assign button is for super-admin and sales-manager only —
     // counsellors don't manage assignments themselves.
     const canAutoAssign = isRole(ROLES.SUPER_ADMIN, ROLES.SALES_MANAGER);
@@ -126,6 +128,47 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                     >
                         <SwapVertIcon sx={{ color: colors.primary, cursor: "pointer" }} />
                     </IconButton>
+
+                    {/* In-table search bar — narrows the current stage
+                        tab + advanced filter by name / email / phone /
+                        WhatsApp. Wires up via onSearchQueryChange so the
+                        parent owns the debouncing + API call. Only shows
+                        when the parent passes a handler so other
+                        consumers of FiltersOptions (RawData, FailedLeads)
+                        keep their current shape. */}
+                    {typeof onSearchQueryChange === 'function' && (
+                        <Box
+                            sx={{
+                                display: 'flex', alignItems: 'center', gap: 0.5,
+                                border: `1px solid ${colors.borderGrey}`,
+                                borderRadius: 1,
+                                px: 1, py: 0.25,
+                                background: '#fff',
+                                minWidth: 220,
+                                ml: 0.5,
+                                '&:focus-within': { borderColor: colors.primary },
+                            }}
+                        >
+                            <SearchIcon sx={{ fontSize: 18, color: colors.midGrey }} />
+                            <InputBase
+                                value={searchQuery}
+                                onChange={(e) => onSearchQueryChange(e.target.value)}
+                                placeholder="Search by name, email, phone…"
+                                sx={{ fontSize: 13, flex: 1, ml: 0.5 }}
+                                inputProps={{ 'aria-label': 'Search leads in current view' }}
+                            />
+                            {searchQuery && (
+                                <IconButton
+                                    size="small"
+                                    onClick={() => onSearchQueryChange('')}
+                                    aria-label="Clear search"
+                                    sx={{ p: 0.25 }}
+                                >
+                                    <CloseIcon sx={{ fontSize: 16, color: colors.midGrey }} />
+                                </IconButton>
+                            )}
+                        </Box>
+                    )}
 
                     <Box sx={{ display: "flex", gap: 1 }}>
 

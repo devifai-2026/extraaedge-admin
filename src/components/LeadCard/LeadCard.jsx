@@ -787,6 +787,10 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                 transformOrigin={{ vertical: "top", horizontal: "right" }}
             >
                 <MenuItem onClick={() => { handleMenuClose(); setOpenEditLead(true); }}>Edit Lead</MenuItem>
+                {/* View Timeline — first-class menu entry so users find
+                    it from the More menu, not just from the "View all"
+                    link buried under the comm-stats. */}
+                <MenuItem onClick={() => { handleMenuClose(); setOpenTimeline(true); }}>View Timeline</MenuItem>
                 {!isRole(ROLES.COUNSELLOR) && (
                     <MenuItem onClick={() => { handleMenuClose(); onReassign?.(); }}>Reassign</MenuItem>
                 )}
