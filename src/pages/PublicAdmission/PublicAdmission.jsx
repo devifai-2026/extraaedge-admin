@@ -16,7 +16,7 @@ import { useParams } from 'react-router-dom';
 import {
   Box, Typography, TextField, Button, Alert, CircularProgress,
   Select, MenuItem, FormControl, InputLabel, IconButton, Divider, Chip,
-  useMediaQuery,
+  Snackbar, useMediaQuery,
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
@@ -24,6 +24,9 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import UploadIcon from '@mui/icons-material/Upload';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { publicAdmissionsApi } from '../../lib/endpoints';
 
 const blankEducation = () => ({
@@ -55,6 +58,10 @@ export default function PublicAdmission() {
   const [errorMsg, setErrorMsg] = useState('');
   const [prefill, setPrefill] = useState(null);
   const [form, setForm] = useState(null);
+  // Toast for validation/upload feedback. The student gets a clear,
+  // transient nudge (e.g. "Upload your payment screenshot") on top of the
+  // inline error strip in the footer.
+  const [toast, setToast] = useState(null);
   const isNarrow = useMediaQuery('(max-width: 720px)');
 
   // Initial prefill fetch.
@@ -96,6 +103,11 @@ export default function PublicAdmission() {
           // Installments" for clarity.
           mode_of_payment: offer?.payment_mode === 'full' ? 'Full' : 'Installment',
           photo_r2_key: null,
+          // Registration-amount payment proof. The student pays into the
+          // account the accounts team bound to this link and proves it
+          // here. Both are required to submit (backend enforces too).
+          payment_proof_r2_key: null,
+          payment_utr: '',
           education: [blankEducation()],
         });
         setStage(STAGES.ready);
@@ -232,11 +244,22 @@ export default function PublicAdmission() {
     // student-editable but always seeded from the offer, so it can't be
     // missing either. No client-side validation needed for either.
     if (!form.photo_r2_key) missing.push('Photo');
+    // Registration payment proof — both the screenshot and the UTR /
+    // reference number are mandatory (backend enforces the same).
+    if (!form.payment_proof_r2_key) missing.push('Payment screenshot');
+    if (!form.payment_utr?.trim() || form.payment_utr.trim().length < 6) {
+      missing.push('UTR / payment reference (min 6 chars)');
+    }
     // At least one qualification with an examination filled is required.
     // The empty starter row counts as "not filled" — we need a real entry.
     const validEducationCount = (form.education || []).filter((e) => e.examination?.trim()).length;
     if (validEducationCount === 0) missing.push('At least one Qualification (Examination)');
-    if (missing.length) { setErrorMsg(`Required: ${missing.join(', ')}`); return; }
+    if (missing.length) {
+      const msg = `Please complete: ${missing.join(', ')}`;
+      setErrorMsg(msg);
+      setToast({ severity: 'warning', msg });
+      return;
+    }
 
     setStage(STAGES.submitting);
     try {
@@ -255,6 +278,11 @@ export default function PublicAdmission() {
         total_fees: Number(form.total_fees),
         mode_of_payment: form.mode_of_payment || null,
         photo_r2_key: form.photo_r2_key || null,
+        // Registration-amount payment proof + the account the link was
+        // bound to (chosen by the accounts team at link-generation time).
+        payment_proof_r2_key: form.payment_proof_r2_key || null,
+        payment_utr: form.payment_utr?.trim() || null,
+        payment_account_id: prefill?.payment_account?.id || undefined,
         education: (form.education || [])
           .filter((e) => e.examination?.trim())
           .map((e) => ({
@@ -617,6 +645,33 @@ export default function PublicAdmission() {
 
           <Divider />
 
+          {/* Section: Payment. Read-only display of the ONE account the
+              accounts team bound to this link, plus the student's required
+              proof (screenshot + UTR). The student cannot edit the account
+              details — only pay into them and prove it. */}
+          <SectionCard
+            title="Payment"
+            required
+            subtitle="Pay the amount shown into the account below, then upload your payment screenshot and reference number."
+          >
+            <PaymentSection
+              account={prefill?.payment_account}
+              registrationAmount={prefill?.offer?.pay_now_amount ?? prefill?.offer?.registration_amount}
+              accent={accent}
+              token={token}
+              isNarrow={isNarrow}
+              proofKey={form.payment_proof_r2_key}
+              utr={form.payment_utr}
+              onUtrChange={set('payment_utr')}
+              onPick={uploadPhoto('payment_proof_r2_key')}
+              onClear={clearPhoto('payment_proof_r2_key')}
+              upload={uploadProgress.payment_proof_r2_key}
+              onCopyToast={(msg) => setToast({ severity: 'success', msg })}
+            />
+          </SectionCard>
+
+          <Divider />
+
           {/* Section: Photo. Single slot with two ways to pick — take a
               selfie with the camera, or pick an existing file. Either
               source writes to the same photo_r2_key. */}
@@ -678,6 +733,19 @@ export default function PublicAdmission() {
           Submitted via {tenantName} · Admission Portal
         </Typography>
       </Box>
+
+      <Snackbar
+        open={!!toast}
+        autoHideDuration={4000}
+        onClose={() => setToast(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        {toast ? (
+          <Alert severity={toast.severity || 'info'} variant="filled" onClose={() => setToast(null)} sx={{ maxWidth: 460 }}>
+            {toast.msg}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
     </Shell>
   );
 }
@@ -991,6 +1059,189 @@ function FeesOfferSection({ offer, accent, isNarrow, modeOfPayment, onChangeMode
         </Box>
       )}
     </SectionCard>
+  );
+}
+
+// One labelled, copyable account detail row (account number, IFSC, UPI…).
+// Top-level (not nested in PaymentSection) so it isn't recreated on every
+// render. Renders nothing when the value is empty.
+function PayCopyRow({ label, value, accent, onCopy }) {
+  if (!value) return null;
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}>
+      <Box sx={{ width: 140, flexShrink: 0, fontSize: 12, color: '#64748b', fontWeight: 600 }}>{label}</Box>
+      <Box sx={{ flex: 1, fontSize: 14, color: '#0f172a', wordBreak: 'break-all' }}>{value}</Box>
+      <IconButton size="small" onClick={() => onCopy?.(value, label)} aria-label={`Copy ${label}`} sx={{ color: accent }}>
+        <ContentCopyIcon sx={{ fontSize: 15 }} />
+      </IconButton>
+    </Box>
+  );
+}
+
+// Payment section — read-only account the link is bound to + the
+// student's required proof (screenshot + UTR). The account details are
+// display-only; the student pays into them off-platform and proves it.
+function PaymentSection({
+  account, registrationAmount, accent, token, isNarrow,
+  proofKey, utr, onUtrChange, onPick, onClear, upload, onCopyToast,
+}) {
+  const uploading = Boolean(upload?.active);
+  const percent = upload?.percent ?? 0;
+  const fmtMoney = (n) => (n != null ? `₹${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : null);
+
+  // Signed-URL preview for the uploaded proof (token-scoped). Keyed by
+  // r2_key so clearing the proof (key → null) naturally yields no preview
+  // without a synchronous setState in the effect body.
+  const [proofUrlByKey, setProofUrlByKey] = useState({});
+  const proofUrl = proofKey ? proofUrlByKey[proofKey] : null;
+  useEffect(() => {
+    if (!proofKey || proofUrlByKey[proofKey]) return undefined;
+    let alive = true;
+    publicAdmissionsApi.signedUrl(token, proofKey)
+      .then((r) => {
+        const url = r?.data?.url;
+        if (alive && url) setProofUrlByKey((m) => ({ ...m, [proofKey]: url }));
+      })
+      .catch(() => { /* preview is best-effort */ });
+    return () => { alive = false; };
+  }, [proofKey, token, proofUrlByKey]);
+
+  const copy = (value, label) => {
+    if (!value) return;
+    try {
+      navigator.clipboard?.writeText(String(value));
+      onCopyToast?.(`${label} copied`);
+    } catch { /* clipboard may be blocked; ignore */ }
+  };
+
+  return (
+    <Box sx={{ display: 'grid', gridTemplateColumns: isNarrow ? '1fr' : '1.1fr 1fr', gap: 2.5 }}>
+      {/* LEFT: the bound account (read-only) + amount callout */}
+      <Box>
+        {registrationAmount != null && Number(registrationAmount) > 0 && (
+          <Box sx={{
+            mb: 2, p: 2, borderRadius: 1.5,
+            border: `1px solid ${withAlpha(accent, 0.35)}`, background: withAlpha(accent, 0.06),
+            display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap',
+          }}>
+            <Box sx={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>Amount to pay now (Registration)</Box>
+            <Box sx={{ fontSize: 22, fontWeight: 800, color: accent }}>{fmtMoney(registrationAmount)}</Box>
+          </Box>
+        )}
+
+        {account ? (
+          <Box sx={{ border: '1px solid #e5e7eb', borderRadius: 1.5, p: 2, background: '#fafafa' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, color: '#334155', fontWeight: 700, fontSize: 13 }}>
+              <AccountBalanceIcon sx={{ fontSize: 18, color: accent }} />
+              Pay into this account
+              {account.label && <Chip size="small" label={account.label} sx={{ height: 20, fontSize: 10, ml: 0.5 }} />}
+            </Box>
+
+            {/* Bank block */}
+            {account.account_number && (
+              <Box sx={{ mb: account.upi_id || account.qr_url ? 1.5 : 0 }}>
+                <PayCopyRow label="Account holder" value={account.account_holder_name} accent={accent} onCopy={copy} />
+                <PayCopyRow label="Account number" value={account.account_number} accent={accent} onCopy={copy} />
+                <PayCopyRow label="IFSC" value={account.ifsc} accent={accent} onCopy={copy} />
+                {account.bank_name && <PayCopyRow label="Bank" value={[account.bank_name, account.branch].filter(Boolean).join(' · ')} accent={accent} onCopy={copy} />}
+                {account.account_type && <PayCopyRow label="Type" value={account.account_type} accent={accent} onCopy={copy} />}
+              </Box>
+            )}
+
+            {/* UPI block */}
+            {account.upi_id && (
+              <Box sx={{ pt: account.account_number ? 1.5 : 0, borderTop: account.account_number ? '1px dashed #e2e8f0' : 'none' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5, color: '#334155', fontWeight: 600, fontSize: 12 }}>
+                  <QrCode2Icon sx={{ fontSize: 16, color: accent }} /> UPI
+                </Box>
+                <PayCopyRow label="UPI ID" value={account.upi_id} accent={accent} onCopy={copy} />
+              </Box>
+            )}
+
+            {/* QR image */}
+            {account.qr_url && (
+              <Box sx={{ pt: 1.5, mt: 1, borderTop: '1px dashed #e2e8f0', textAlign: 'center' }}>
+                <Box sx={{ fontSize: 12, color: '#64748b', fontWeight: 600, mb: 1 }}>Scan to pay</Box>
+                <Box
+                  component="img" src={account.qr_url} alt="Payment QR"
+                  sx={{ width: 160, height: 160, objectFit: 'contain', borderRadius: 1.5, border: '1px solid #e5e7eb', background: '#fff', p: 0.5 }}
+                />
+              </Box>
+            )}
+          </Box>
+        ) : (
+          <Alert severity="info" sx={{ fontSize: 13 }}>
+            Payment account details aren’t available on this link yet. Please contact your counsellor for where to pay.
+          </Alert>
+        )}
+      </Box>
+
+      {/* RIGHT: the student's proof — screenshot + UTR */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box>
+          <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, fontSize: 10.5 }}>
+            Payment screenshot<RequiredMark />
+          </Typography>
+          <Box sx={{
+            mt: 1, border: `1.5px dashed ${proofKey ? withAlpha(accent, 0.4) : '#cbd5e1'}`,
+            borderRadius: 2, p: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap',
+          }}>
+            <Box sx={{
+              width: 120, height: 120, flexShrink: 0, borderRadius: 1.5, background: '#f1f5f9',
+              overflow: 'hidden', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {proofUrl ? (
+                <Box component="img" src={proofUrl} alt="Payment proof" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              ) : proofKey ? (
+                <CircularProgress size={20} sx={{ color: accent }} />
+              ) : (
+                <UploadIcon sx={{ fontSize: 30, color: '#94a3b8' }} />
+              )}
+              {uploading && (
+                <Box sx={{
+                  position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: 0.5,
+                  background: 'rgba(15,23,42,0.55)', color: '#fff',
+                }}>
+                  <CircularProgress variant={percent >= 100 ? 'indeterminate' : 'determinate'} value={percent} size={36} sx={{ color: '#fff' }} />
+                  <Typography variant="caption" sx={{ fontWeight: 600 }}>{percent < 100 ? `${percent}%` : '…'}</Typography>
+                </Box>
+              )}
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 160, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Button
+                component="label" size="medium" variant="contained" disabled={uploading}
+                startIcon={uploading ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <UploadIcon />}
+                sx={{ textTransform: 'none', fontWeight: 600, background: accent, boxShadow: 'none',
+                  '&:hover': { background: shade(accent, -10), boxShadow: 'none' } }}
+              >
+                {uploading ? 'Uploading…' : proofKey ? 'Replace screenshot' : 'Upload screenshot'}
+                <input type="file" accept="image/*" onChange={onPick} disabled={uploading} style={{ display: 'none' }} />
+              </Button>
+              {proofKey && !uploading && (
+                <Button size="small" startIcon={<DeleteOutlineIcon fontSize="small" />} onClick={onClear}
+                  sx={{ alignSelf: 'flex-start', textTransform: 'none', color: '#dc2626' }}>
+                  Remove
+                </Button>
+              )}
+              <Typography variant="caption" sx={{ color: '#94a3b8' }}>JPEG, PNG or WEBP. Up to 5 MB.</Typography>
+            </Box>
+          </Box>
+        </Box>
+
+        <TextField
+          label={<>UTR / Payment Reference No.<RequiredMark /></>}
+          value={utr || ''}
+          onChange={onUtrChange}
+          size="small"
+          fullWidth
+          placeholder="e.g. 4012 3456 7890 or UPI ref"
+          InputLabelProps={{ shrink: true }}
+          helperText="The reference number from your bank / UPI app (min 6 characters)."
+          sx={fieldSx(accent)}
+        />
+      </Box>
+    </Box>
   );
 }
 

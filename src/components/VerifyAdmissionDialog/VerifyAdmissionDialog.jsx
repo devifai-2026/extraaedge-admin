@@ -30,6 +30,7 @@ const ZERO = 0;
 export default function VerifyAdmissionDialog({ open, admissionId, onClose, onChanged }) {
   const [data, setData] = useState(null);
   const [photoUrl, setPhotoUrl] = useState(null);
+  const [proofUrl, setProofUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   // Two-step reject so the accounts user can't reject by accident — the
@@ -41,7 +42,7 @@ export default function VerifyAdmissionDialog({ open, admissionId, onClose, onCh
   useEffect(() => {
     if (!open || !admissionId) return undefined;
     let alive = true;
-    setLoading(true); setError(''); setData(null); setPhotoUrl(null);
+    setLoading(true); setError(''); setData(null); setPhotoUrl(null); setProofUrl(null);
     setRejectMode(false); setRejectReason('');
     admissionsApi.get(admissionId)
       .then((r) => { if (alive) setData(r?.data || null); })
@@ -60,6 +61,16 @@ export default function VerifyAdmissionDialog({ open, admissionId, onClose, onCh
       .catch(() => { /* placeholder stays */ });
     return () => { alive = false; };
   }, [data?.photo_r2_key]);
+
+  // Resolve the student's payment-proof screenshot → signed URL.
+  useEffect(() => {
+    if (!data?.payment_proof_r2_key) return undefined;
+    let alive = true;
+    uploadsApi.signedUrl(data.payment_proof_r2_key)
+      .then((r) => { if (alive) setProofUrl(r?.data?.url || null); })
+      .catch(() => { /* placeholder stays */ });
+    return () => { alive = false; };
+  }, [data?.payment_proof_r2_key]);
 
   const installments = useMemo(() => Array.isArray(data?.fee_schedule) ? data.fee_schedule : [], [data]);
   const isInstallment = data?.mode_of_payment === 'Installment' && installments.length > 0;
@@ -210,6 +221,72 @@ export default function VerifyAdmissionDialog({ open, admissionId, onClose, onCh
                     </tbody>
                   </Box>
                 </Box>
+              )}
+            </Box>
+
+            <Divider />
+
+            {/* Payment submitted by the student — proof screenshot, UTR,
+                amount, and which account they paid into. This is what the
+                accounts user is verifying before Approve. */}
+            <Box>
+              <SectionLabel>Payment submitted</SectionLabel>
+              {data.payment_amount != null || data.payment_utr || data.payment_proof_r2_key ? (
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                  {/* Proof screenshot */}
+                  {data.payment_proof_r2_key ? (
+                    proofUrl ? (
+                      <Box
+                        component="a" href={proofUrl} target="_blank" rel="noreferrer"
+                        sx={{ display: 'block', lineHeight: 0 }}
+                        title="Open full size"
+                      >
+                        <Box
+                          component="img" src={proofUrl} alt="Payment proof"
+                          sx={{ width: 140, height: 140, borderRadius: 1.5, objectFit: 'contain', background: '#f1f5f9', border: '1px solid #e5e7eb' }}
+                        />
+                      </Box>
+                    ) : (
+                      <Box sx={{ width: 140, height: 140, borderRadius: 1.5, background: '#f1f5f9', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <CircularProgress size={18} />
+                      </Box>
+                    )
+                  ) : (
+                    <Box sx={{ width: 140, height: 140, borderRadius: 1.5, background: '#f1f5f9', border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 11, textAlign: 'center', p: 1 }}>
+                      No screenshot
+                    </Box>
+                  )}
+
+                  {/* Payment facts */}
+                  <Box sx={{ flex: 1, minWidth: 240, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 1.5 }}>
+                    <KV label="Amount Paid" value={data.payment_amount != null ? `₹ ${fmtMoney(data.payment_amount)}` : '—'} />
+                    <KV label="UTR / Reference" value={data.payment_utr} />
+                    <KV
+                      label="Paid Into"
+                      value={
+                        data.payment_account_label || data.payment_account_bank || data.payment_account_upi
+                          ? [
+                              data.payment_account_label || data.payment_account_bank,
+                              data.payment_account_number ? `••••${String(data.payment_account_number).slice(-4)}` : data.payment_account_upi,
+                            ].filter(Boolean).join(' · ')
+                          : '—'
+                      }
+                    />
+                    <KV
+                      label="Status"
+                      value={data.payment_verified_at ? 'Verified' : 'Awaiting verification'}
+                    />
+                  </Box>
+                </Box>
+              ) : (
+                <Alert severity="warning" sx={{ py: 0 }}>
+                  No payment was submitted with this admission.
+                </Alert>
+              )}
+              {!data.payment_verified_at && Number(data.payment_amount) > 0 && (
+                <Typography variant="caption" sx={{ color: '#64748b', mt: 1, display: 'block' }}>
+                  Approving will verify this payment and record it as a registration receipt in the Payments ledger.
+                </Typography>
               )}
             </Box>
 

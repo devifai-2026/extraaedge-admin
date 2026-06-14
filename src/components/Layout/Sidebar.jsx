@@ -28,51 +28,88 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
-import InsightsIcon from '@mui/icons-material/Insights';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { hasTab } from '../../lib/rbac';
 import { admissionsApi } from '../../lib/endpoints';
 import { onNotification } from '../../lib/socket';
 
-// Each menu item declares the tab key it maps to (matches DEFAULT_TAB_KEYS on backend).
-// Items are filtered against the user's allowed_tabs from /auth/login.
-const menuItems = [
+// ---------------------------------------------------------------------------
+// Sidebar navigation model
+// ---------------------------------------------------------------------------
+// The sidebar is built from three kinds of entry, all driven off this one
+// array so adding a future role (Trainer / Student / HR) is a matter of
+// dropping a new `section` block in — no render changes required:
+//
+//   • pinned item   — a flat, always-visible top-level link (no `section`,
+//                     no `children`). Used for the two most-used surfaces.
+//   • section        — a collapsible, role-named group (`section: true`) with
+//                     `children`. Behaves as an accordion (one open at a time).
+//   • child          — a link inside a section's `children`.
+//
+// Every link still declares the `tab` key it maps to (matches
+// DEFAULT_TAB_KEYS on the backend) and is filtered against the user's
+// allowed_tabs from /auth/login. A section with zero visible children is
+// hidden entirely, so role-gating happens automatically.
+// ---------------------------------------------------------------------------
+
+// Pinned, ungrouped links shown above all sections. These are the two
+// highest-traffic surfaces, kept one click away regardless of which
+// section is open.
+const pinnedItems = [
   { id: 1, label: 'Analytics Dashboard', icon: DashboardIcon, path: '/dashboard', tab: 'dashboard' },
   { id: 2, label: 'Lead Manager', icon: PeopleAltIcon, path: '/leadlist', tab: 'leads' },
-  { id: 3, label: 'Raw Data Manager', icon: FolderIcon, path: '/rawdata', tab: 'raw_data' },
-  { id: 4, label: 'WhatsApp Chat', icon: WhatsAppIcon, path: '/whatsapplist', tab: 'whatsapp' },
-  { id: 5, label: 'Follow-ups Manager', icon: CalendarTodayIcon, path: '/followupmanager', tab: 'followups' },
-  { id: 6, label: 'Upload Failed Leads', icon: UploadFileIcon, path: '/failedleads', tab: 'failed_leads' },
-  { id: 7, label: 'Bulk Action Stage', icon: SettingsIcon, path: '/bulkuploadlist', tab: 'bulk_upload' },
-  { id: 8, label: 'Bulk Marketing Campaign', icon: CampaignIcon, path: '/bulkmarketingcampaign', tab: 'bulk_marketing' },
-  { id: 9, label: 'Drip Marketing Campaign', icon: Person4Icon, path: '/dripmarketingcampaign', tab: 'drip_marketing' },
-  { id: 10, label: 'Remarketing', icon: AdjustIcon, path: '/remarketing', tab: 'remarketing' },
-  { id: 11, label: 'Workflow Automation', icon: AutoModeIcon, path: '/automations', tab: 'automation' },
-  { id: 12, label: 'Connected Accounts', icon: AccountTreeIcon, path: '/connectedaccounts', tab: 'connected_accounts' },
-  { id: 13, label: 'Basic Settings', icon: SettingsIcon, path: '/settings', tab: 'settings.email_templates' },
-  { id: 14, label: 'Advanced Settings', icon: SettingsSuggestIcon, path: '/advancedsettings', tab: 'advanced.users_roles' },
-  { id: 15, label: 'Third Party Integration', icon: IntegrationInstructionsIcon, path: '/thirdpartyintegration', tab: 'third_party_integration' },
-  // Tenant-wide post-conversion pipeline view for admins. Sits in the
-  // main sidebar (not Accounts) so super_admins see admission status
-  // alongside lead-pipeline items without context-switching.
-  { id: 18, label: 'Admission Pipeline', icon: SchoolIcon, path: '/admission-pipeline', tab: 'admissions.pipeline' },
+  // In-depth payments ledger. `tab: 'payments'` resolves true only for
+  // super_admin (allowed_tabs:['*']); all other roles never see this row.
+  { id: 19, label: 'Payments Ledger', icon: AccountBalanceWalletIcon, path: '/payments', tab: 'payments' },
+];
 
-  // ---------- Accounts module (account_manager role) ----------
-  // All Accounts items collapse under a single "Accounts Insights" parent
-  // that expands inline. Per-child RBAC still applies (each child carries
-  // its own `tab` key) and the parent is hidden entirely when the user has
-  // access to zero children. Pending Admissions keeps its live badge; when
-  // the parent is collapsed, that badge bubbles up to the parent row.
+// Collapsible, role-named sections. Order here is the display order. New
+// roles slot in as additional blocks: e.g. a `Trainer` / `Student` / `HR`
+// section with its own children + tab keys.
+const menuSections = [
   {
-    id: 99,
-    label: 'Accounts Insights',
-    icon: InsightsIcon,
-    group: 'accounts',
+    id: 'sales',
+    label: 'Sales',
+    icon: PeopleAltIcon,
+    section: true,
     children: [
-      { id: 100, label: 'Dashboard',              icon: DashboardIcon,       path: '/accounts/dashboard',                  tab: 'accounts.dashboard' },
-      // `badgeKey: 'pending_admissions'` flags this item as one whose badge
-      // we should pull live from the API + socket. See Sidebar() below.
+      { id: 3, label: 'Raw Data Manager', icon: FolderIcon, path: '/rawdata', tab: 'raw_data' },
+      { id: 4, label: 'WhatsApp Chat', icon: WhatsAppIcon, path: '/whatsapplist', tab: 'whatsapp' },
+      { id: 5, label: 'Follow-ups Manager', icon: CalendarTodayIcon, path: '/followupmanager', tab: 'followups' },
+      { id: 6, label: 'Upload Failed Leads', icon: UploadFileIcon, path: '/failedleads', tab: 'failed_leads' },
+      { id: 7, label: 'Bulk Action Stage', icon: SettingsIcon, path: '/bulkuploadlist', tab: 'bulk_upload' },
+      { id: 20, label: 'Lead Report', icon: AssessmentIcon, path: '/reports/lead-transfers', tab: 'lead_transfer_report' },
+    ],
+  },
+  {
+    id: 'marketing',
+    label: 'Marketing',
+    icon: CampaignIcon,
+    section: true,
+    children: [
+      { id: 8, label: 'Bulk Marketing Campaign', icon: CampaignIcon, path: '/bulkmarketingcampaign', tab: 'bulk_marketing' },
+      { id: 9, label: 'Drip Marketing Campaign', icon: Person4Icon, path: '/dripmarketingcampaign', tab: 'drip_marketing' },
+      { id: 10, label: 'Remarketing', icon: AdjustIcon, path: '/remarketing', tab: 'remarketing' },
+      { id: 11, label: 'Workflow Automation', icon: AutoModeIcon, path: '/automations', tab: 'automation' },
+    ],
+  },
+  {
+    // ---------- Admissions & Accounts ----------
+    // Tenant-wide post-conversion surfaces. `Admission Pipeline` is the
+    // super_admin view; the rest are the account_manager Accounts module.
+    // They share a section so post-conversion work lives in one place.
+    // `badgeKey: 'pending_admissions'` flags the item whose badge we pull
+    // live from the API + socket (see Sidebar() below); when the section
+    // is collapsed that badge bubbles up to the section header row.
+    id: 'admissions',
+    label: 'Admissions',
+    icon: SchoolIcon,
+    section: true,
+    children: [
+      { id: 18, label: 'Admission Pipeline',      icon: SchoolIcon,          path: '/admission-pipeline',                  tab: 'admissions.pipeline' },
+      { id: 100, label: 'Accounts Dashboard',     icon: DashboardIcon,       path: '/accounts/dashboard',                  tab: 'accounts.dashboard' },
       { id: 109, label: 'Pending Admissions',     icon: PendingActionsIcon,  path: '/accounts/pending-admissions',         tab: 'accounts.pending_admissions', badgeKey: 'pending_admissions' },
       { id: 101, label: 'This Month Admissions',  icon: SchoolIcon,          path: '/accounts/this-month-admissions',      tab: 'accounts.this_month_admissions' },
       { id: 102, label: 'Total Admissions',       icon: SchoolIcon,          path: '/accounts/total-admissions',           tab: 'accounts.total_admissions' },
@@ -82,8 +119,25 @@ const menuItems = [
       { id: 106, label: 'Report',                 icon: AssessmentIcon,      path: '/accounts/report',                     tab: 'accounts.report' },
       { id: 107, label: 'Pay Schedule',           icon: PaymentsIcon,        path: '/accounts/pay-schedule',               tab: 'accounts.pay_schedule' },
       { id: 108, label: 'Collection Receipt-wise',icon: ReceiptLongIcon,     path: '/accounts/collection-receipt-wise',    tab: 'accounts.collection_receipt_wise' },
+      { id: 110, label: 'Payment Details',        icon: PaymentsIcon,        path: '/accounts/payment-details',            tab: 'accounts.payment_details' },
     ],
   },
+  {
+    id: 'configuration',
+    label: 'Configuration',
+    icon: SettingsSuggestIcon,
+    section: true,
+    children: [
+      { id: 12, label: 'Connected Accounts', icon: AccountTreeIcon, path: '/connectedaccounts', tab: 'connected_accounts' },
+      { id: 13, label: 'Basic Settings', icon: SettingsIcon, path: '/settings', tab: 'settings.email_templates' },
+      { id: 14, label: 'Advanced Settings', icon: SettingsSuggestIcon, path: '/advancedsettings', tab: 'advanced.users_roles' },
+      { id: 15, label: 'Third Party Integration', icon: IntegrationInstructionsIcon, path: '/thirdpartyintegration', tab: 'third_party_integration' },
+    ],
+  },
+  // ---- Future roles slot in here as new sections, e.g.: ----
+  // { id: 'trainer', label: 'Trainer', icon: SchoolIcon, section: true, children: [ ... ] },
+  // { id: 'student', label: 'Student', icon: PeopleAltIcon, section: true, children: [ ... ] },
+  // { id: 'hr',      label: 'HR',      icon: Person4Icon,  section: true, children: [ ... ] },
 ];
 
 const bottomMenuItems = [
@@ -100,10 +154,12 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
   // a one-line change. Skipped entirely when the user can't see the
   // corresponding tab so we don't probe the API as a counsellor.
   const [badges, setBadges] = useState({});
-  // Which group accordions are currently open. Persisted across renders
-  // but not across reloads — opening behaviour is driven by current route
-  // (auto-open the group containing the active child).
-  const [openGroups, setOpenGroups] = useState({});
+  // Which section accordion is currently open. Single value (not a map)
+  // because sections behave as an accordion — opening one closes the rest.
+  // `undefined` means "no explicit choice yet", in which case the section
+  // containing the active route auto-opens. `null` means "explicitly all
+  // closed". Persisted across renders but not across reloads.
+  const [openSection, setOpenSection] = useState(undefined);
   useEffect(() => {
     if (!hasTab('accounts.pending_admissions')) return undefined;
     let alive = true;
@@ -162,7 +218,7 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
       return typeof v === 'number' ? sum + v : sum;
     }, 0) || null;
 
-  const renderItemButton = (item, { depth = 0, isGroup = false, isOpen = false } = {}) => {
+  const renderItemButton = (item, { isGroup = false, isOpen = false } = {}) => {
     const IconComponent = item.icon;
     const isActive = !item.action && !isGroup && location.pathname === item.path;
     const badgeValue = isGroup && (!isOpen || collapsed) ? groupBadge(item) : liveBadge(item);
@@ -170,26 +226,28 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
       if (isGroup) {
         // In collapsed (mini) mode the accordion can't expand inline —
         // jump to the first visible child instead so the click isn't a
-        // no-op. In expanded mode, toggle.
+        // no-op. In expanded mode, accordion-toggle: open this section
+        // (closing any other) or close it if it's already open.
         if (collapsed) {
           const first = item.children?.[0];
           if (first?.path) navigate(first.path);
           return;
         }
-        setOpenGroups((g) => ({ ...g, [item.id]: !g[item.id] }));
+        setOpenSection((cur) => (cur === item.id ? null : item.id));
         return;
       }
       handleMenuClick(item);
     };
     return (
       <button
-        className={`menu-item ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`}
+        className={`menu-item ${isActive ? 'active' : ''} ${collapsed ? 'collapsed' : ''} ${isGroup ? 'section-header' : ''}`}
         onClick={onClick}
         style={{
           backgroundColor: isActive ? colors.primary : 'transparent',
           color: isActive ? colors.white : colors.textDark,
           justifyContent: collapsed ? 'center' : 'flex-start',
-          paddingLeft: !collapsed && depth > 0 ? 20 + depth * 20 : undefined,
+          // Nesting indent for section children is handled by the
+          // `.section-children` left-rail in CSS, so no inline padding here.
         }}
         title={collapsed ? item.label : ''}
       >
@@ -229,18 +287,20 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
     <ul className="menu-list">
       {visibleItems(items).map((item) => {
         if (item.children) {
-          // Auto-expand the group when we're sitting on one of its
-          // children, even if the user hasn't toggled it open this
-          // session. Explicit close (openGroups[id] === false) wins.
+          // Accordion open state:
+          //  • If the user has made an explicit choice this session
+          //    (openSection is a string id or null), honour it.
+          //  • Otherwise (undefined) auto-open the section that contains
+          //    the active route so the current page is always visible.
           const onChildRoute = item.children.some((c) => c.path === location.pathname);
-          const isOpen = openGroups[item.id] ?? onChildRoute;
+          const isOpen = openSection === undefined ? onChildRoute : openSection === item.id;
           return (
             <li key={item.id}>
               {renderItemButton(item, { isGroup: true, isOpen })}
               {!collapsed && isOpen && (
-                <ul className="menu-list">
+                <ul className="menu-list section-children">
                   {item.children.map((child) => (
-                    <li key={child.id}>{renderItemButton(child, { depth: 1 })}</li>
+                    <li key={child.id}>{renderItemButton(child)}</li>
                   ))}
                 </ul>
               )}
@@ -258,7 +318,11 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
         className={`sidebar ${collapsed ? 'sidebar-mini' : ''}`}
         style={{ backgroundColor: colors.white, borderRight: `1px solid ${colors.borderGrey}` }}
       >
-        <div className="sidebar-top">{renderMenuItems(menuItems)}</div>
+        <div className="sidebar-top">
+          {renderMenuItems(pinnedItems)}
+          {!collapsed && <div className="sidebar-divider" />}
+          {renderMenuItems(menuSections)}
+        </div>
         <div className="sidebar-bottom">{renderMenuItems(bottomMenuItems)}</div>
       </div>
       {canToggle && (

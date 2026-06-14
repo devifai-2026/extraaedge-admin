@@ -58,10 +58,9 @@ const PendingAdmissions = () => {
   // instead of the row so multiple rapid clicks don't stack snackbars.
   const [toast, setToast] = useState(null);
 
-  // Generate a fresh 24h share-link, copy it to clipboard, and toast.
-  // Each call mints a NEW token so the FE doesn't need to read or list
-  // existing tokens — "Copy link" and "Regenerate" are the same action
-  // from the user's POV.
+  // One-click share-link: mint a fresh 24h token, copy it, toast. The
+  // payment account is taken from the lead's saved fee offer (set in the
+  // Configure / Reconfigure dialog), so there's no per-share picker here.
   const copyShareLink = useCallback(async (leadId) => {
     if (!leadId) return;
     try {
@@ -73,8 +72,6 @@ const PendingAdmissions = () => {
         await navigator.clipboard.writeText(url);
         setToast({ severity: 'success', text: `Public link copied. Valid for 24 hours.\n${url}` });
       } catch {
-        // Clipboard blocked — fall back to showing the URL so the user
-        // can copy manually (e.g. older browsers / insecure contexts).
         setToast({ severity: 'info', text: `Copy this link manually: ${url}` });
       }
     } catch (e) {
@@ -307,7 +304,7 @@ const PendingRow = ({ row, onChanged, navigate, onView, busyView, onCopyLink, on
                     </Button>
                   </span>
                 </Tooltip>
-                <Tooltip title="Generate a 24h public link to share with the student. Click again to regenerate.">
+                <Tooltip title="Generate a 24h public link to share with the student. Uses the payment account set in the offer.">
                   <span>
                     <Button
                       size="small"

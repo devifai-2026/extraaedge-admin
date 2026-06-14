@@ -51,6 +51,39 @@
   padding-left: 16px;
 }
 
+/* Collapsible section header (e.g. Sales, Marketing, Admissions). Slightly
+   muted + uppercase to read as a group label rather than a destination. */
+.menu-item.section-header {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mid-grey, #6b7280);
+}
+
+.menu-item.section-header .menu-icon {
+  opacity: 0.75;
+}
+
+/* Children of an open section: subtle left rail to visually nest them. */
+.section-children {
+  border-left: 2px solid var(--border-grey);
+  margin-left: 26px;
+}
+
+.section-children .menu-item {
+  padding-top: 11px;
+  padding-bottom: 11px;
+  font-size: 13.5px;
+}
+
+/* Divider between the pinned (standalone) items and the sections below. */
+.sidebar-divider {
+  height: 1px;
+  margin: 8px 16px;
+  background: var(--border-grey);
+}
+
 .menu-icon {
   font-size: 18px;
   min-width: 20px;

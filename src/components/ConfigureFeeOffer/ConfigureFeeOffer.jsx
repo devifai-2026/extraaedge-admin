@@ -15,11 +15,61 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, IconButton,
-  TextField, MenuItem, Button, Alert, CircularProgress, Box, Typography, Divider, Tooltip,
+  TextField, MenuItem, Button, Alert, CircularProgress, Box, Typography, Divider, Tooltip, Chip,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
-import { leadFeeOffersApi } from '../../lib/endpoints';
+import { leadFeeOffersApi, paymentAccountsApi } from '../../lib/endpoints';
+
+// Short, scannable label for a payment account in the picker dropdown.
+const acctLabel = (a) => {
+  if (!a) return 'Account';
+  const base = a.label || a.bank_name || a.upi_id || (a.account_number ? 'Bank account' : a.qr_r2_key ? 'QR account' : 'Account');
+  const detail = a.account_number ? `••••${String(a.account_number).slice(-4)}` : a.upi_id || '';
+  return [base, detail].filter(Boolean).join(' · ') + (a.is_primary ? ' · Primary' : '');
+};
+
+// Full, readable breakdown of the chosen account (bank fields / UPI / QR)
+// shown under the picker so the accounts user can confirm exactly what the
+// student will be told to pay into. Renders nothing when no account picked.
+function PaymentAccountDetails({ account: a }) {
+  if (!a) return null;
+  const rows = [
+    ['Account holder', a.account_holder_name],
+    ['Account number', a.account_number],
+    ['IFSC', a.ifsc],
+    ['Bank', [a.bank_name, a.branch].filter(Boolean).join(' · ')],
+    ['Account type', a.account_type],
+    ['UPI ID', a.upi_id],
+  ].filter(([, v]) => v);
+  return (
+    <Box sx={{ mt: 1.25, border: '1px solid #e5e7eb', borderRadius: 1, background: '#fff', p: 1.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: rows.length ? 1 : 0 }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>
+          {a.label || 'Selected account'}
+        </Typography>
+        {a.is_primary && <Chip size="small" label="Primary" sx={{ height: 18, fontSize: 10, bgcolor: '#f59e0b', color: '#fff' }} />}
+      </Box>
+      {rows.length > 0 ? (
+        <Box sx={{ display: 'grid', gridTemplateColumns: '130px 1fr', rowGap: 0.5, columnGap: 1 }}>
+          {rows.map(([k, v]) => (
+            <Box key={k} sx={{ display: 'contents' }}>
+              <Typography sx={{ fontSize: 12, color: '#94a3b8' }}>{k}</Typography>
+              <Typography sx={{ fontSize: 12.5, color: '#0f172a', wordBreak: 'break-all' }}>{v}</Typography>
+            </Box>
+          ))}
+        </Box>
+      ) : (
+        <Typography sx={{ fontSize: 12, color: '#94a3b8' }}>
+          QR-only account — the student scans the QR shown on their form.
+        </Typography>
+      )}
+      {a.qr_r2_key && (
+        <Typography sx={{ fontSize: 11, color: '#16a34a', mt: 0.75 }}>✓ A payment QR is attached and shown to the student.</Typography>
+      )}
+    </Box>
+  );
+}
 
 // HTML date inputs expect YYYY-MM-DD. Convert any incoming value (Date
 // object, ISO string, or already-YYYY-MM-DD) to that format. Returns ''
@@ -82,6 +132,10 @@ export default function ConfigureFeeOffer({ open, leadId, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [programs, setPrograms] = useState([]);
+  // Active payment accounts for the "Pay into" selector. Primaries first;
+  // the form defaults to the first primary (else first active) when the
+  // offer doesn't already carry an account.
+  const [accounts, setAccounts] = useState([]);
   const [form, setForm] = useState(null);
   // Tracks whether an offer existed when we opened — affects the title +
   // primary button label only.
@@ -91,12 +145,22 @@ export default function ConfigureFeeOffer({ open, leadId, onClose, onSaved }) {
     if (!open || !leadId) return undefined;
     let alive = true;
     setLoading(true); setError('');
-    leadFeeOffersApi.get(leadId)
-      .then((r) => {
+    // Load the offer + the tenant's active payment accounts together. The
+    // account list is best-effort — if it fails the selector just shows
+    // "None" and the share-link falls back to the tenant primaries.
+    Promise.all([
+      leadFeeOffersApi.get(leadId),
+      paymentAccountsApi.list().then((r) => r?.data || []).catch(() => []),
+    ])
+      .then(([r, accts]) => {
         if (!alive) return;
         const data = r?.data || {};
         const progs = data.programs || [];
         setPrograms(progs);
+        const activeAccts = (accts || []).filter((a) => a.is_active !== false);
+        const orderedAccts = [...activeAccts.filter((a) => a.is_primary), ...activeAccts.filter((a) => !a.is_primary)];
+        setAccounts(orderedAccts);
+        const defaultAcctId = orderedAccts[0]?.id || '';
         // Seed the form. Priority:
         //   1. Existing offer row.
         //   2. Lead's program defaults.
@@ -111,6 +175,13 @@ export default function ConfigureFeeOffer({ open, leadId, onClose, onSaved }) {
             registration_date: toYmd(data.offer.registration_date),
             mode_of_training: data.offer.mode_of_training || '',
             payment_mode: data.offer.payment_mode || 'installment',
+            // Reuse the offer's saved account; if it's empty (legacy offer)
+            // or no longer active, fall back to the default primary.
+            payment_account_id:
+              (data.offer.payment_account_id && orderedAccts.some((a) => a.id === data.offer.payment_account_id))
+                ? data.offer.payment_account_id
+                : defaultAcctId,
+            pay_now_amount: data.offer.pay_now_amount != null ? String(data.offer.pay_now_amount) : '',
             fee_installments: [1, 2, 3, 4].map((n) => {
               const r2 = installments.find((x) => Number(x.installment_no) === n);
               return {
@@ -135,6 +206,10 @@ export default function ConfigureFeeOffer({ open, leadId, onClose, onSaved }) {
             registration_date: todayYmd(),
             mode_of_training: '',
             payment_mode: fromProgram?.payment_mode || 'installment',
+            payment_account_id: defaultAcctId,
+            // Default the "pay now" amount to the registration amount; the
+            // accounts user can override it.
+            pay_now_amount: fromProgram?.registration_amount || '',
             fee_installments: fromProgram?.fee_installments || blankInstallments(),
           });
         }
@@ -257,6 +332,8 @@ export default function ConfigureFeeOffer({ open, leadId, onClose, onSaved }) {
         registration_date: form.registration_date || null,
         mode_of_training: form.mode_of_training || null,
         payment_mode: form.payment_mode,
+        payment_account_id: form.payment_account_id || null,
+        pay_now_amount: form.pay_now_amount !== '' && form.pay_now_amount != null ? Number(form.pay_now_amount) : null,
         fee_installments: isInstallment
           ? form.fee_installments
               .filter((r) => Number(r.amount || 0) > 0)
@@ -359,6 +436,51 @@ export default function ConfigureFeeOffer({ open, leadId, onClose, onSaved }) {
                 value={form.registration_date} onChange={setKey('registration_date')}
                 InputLabelProps={{ shrink: true }}
               />
+            </Box>
+
+            {/* Payment instructions — how much the student must pay now and
+                which bank/UPI to pay into. Saved with the offer and shown on
+                the student's form / recorded against their payment. */}
+            <Box sx={{
+              border: '1px solid #e5e7eb', borderRadius: 1, p: 2, background: '#fafafa',
+              display: 'grid', gridTemplateColumns: '160px 1fr', gap: 2, alignItems: 'start',
+            }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#374151', pt: 1 }}>
+                Amount to Pay Now
+              </Typography>
+              <TextField
+                size="small" type="number" fullWidth
+                value={form.pay_now_amount} onChange={setKey('pay_now_amount')}
+                inputProps={{ min: 0, step: 'any' }}
+                placeholder="e.g. 5000"
+                helperText="The amount the student must pay upfront into the account below. Leave blank to use the registration amount."
+              />
+
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#374151', pt: 1 }}>
+                Pay into Account
+              </Typography>
+              {accounts.length > 0 ? (
+                <Box>
+                  <TextField
+                    size="small" select fullWidth
+                    value={form.payment_account_id || ''}
+                    onChange={setKey('payment_account_id')}
+                    helperText="Shown on the student's form & recorded against their payment."
+                  >
+                    <MenuItem value=""><em>None — show all primary accounts</em></MenuItem>
+                    {accounts.map((a) => (
+                      <MenuItem key={a.id} value={a.id}>{acctLabel(a)}</MenuItem>
+                    ))}
+                  </TextField>
+                  {/* Full details of the selected account so it's clear
+                      exactly what the student will see / pay into. */}
+                  <PaymentAccountDetails account={accounts.find((a) => a.id === form.payment_account_id)} />
+                </Box>
+              ) : (
+                <Alert severity="warning" sx={{ py: 0 }}>
+                  No active payment accounts. Add one under Settings → Payment Accounts.
+                </Alert>
+              )}
             </Box>
 
             {/* Installments — only when payment_mode='installment' */}

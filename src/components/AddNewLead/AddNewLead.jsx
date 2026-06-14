@@ -580,6 +580,9 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
             if (!stageId) continue;
             for (let i = 0; i < slots.length; i += 1) {
                 const slot = slots[i];
+                // A comment is only applicable with a date — handleSubmit blocks
+                // comment-without-date before we get here, so a slot is sent
+                // only when it carries a date.
                 if (!slot?.next_action_datetime) continue;
                 const dt = new Date(slot.next_action_datetime);
                 followups.push({
@@ -592,9 +595,12 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
                 });
             }
         }
-        if (!isEditMode && formData.next_action_datetime && formData.stage_id) {
+        // Top-level "Followup Scheduled On" + "Follow up Comments". Sent in
+        // both create and edit mode whenever a date is present (a comment
+        // without a date is rejected upstream in handleSubmit).
+        if (formData.next_action_datetime) {
             followups.push({
-                stage_id: formData.stage_id,
+                stage_id: formData.stage_id || null,
                 sub_stage_id: formData.sub_stage_id || null,
                 next_action_datetime: new Date(formData.next_action_datetime).toISOString(),
                 comment: formData.next_action_comment || null,
@@ -620,6 +626,8 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
             if (!stage || stage.is_success) continue;
             for (let i = 0; i < slots.length; i += 1) {
                 const slot = slots[i];
+                // Only date-bearing slots are reviewable/savable. Comment-
+                // without-date is rejected earlier in handleSubmit.
                 if (!slot?.next_action_datetime) continue;
                 out.push({
                     stage_id: stageId,
@@ -712,6 +720,31 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
             new Date(formData.next_action_datetime).getTime() < Date.now()
         ) {
             setSubmitError('Follow-up date and time must be in the future');
+            return;
+        }
+        // A comment without a date is not applicable — every comment must be
+        // tied to a "Next Action Date". Flag the offending slot(s) / the top
+        // "Follow up Comments" box so the user adds a date or clears the text.
+        const commentNoDate = [];
+        const topComment = (formData.next_action_comment || '').trim();
+        if (topComment && !formData.next_action_datetime) {
+            commentNoDate.push('Follow up Comments');
+        }
+        const stagesData = stages.data || [];
+        for (const [stageId, slots] of Object.entries(formData.followups_by_stage || {})) {
+            if (!stageId) continue;
+            const stageName = stagesData.find((s) => s.id === stageId)?.name || 'stage';
+            (slots || []).forEach((slot, idx) => {
+                const hasComment = typeof slot?.comment === 'string' && slot.comment.trim();
+                if (hasComment && !slot?.next_action_datetime) {
+                    commentNoDate.push(`${stageName} — Comment ${idx + 1}`);
+                }
+            });
+        }
+        if (commentNoDate.length) {
+            setSubmitError(
+                `A comment needs a Next Action Date. Add a date (or clear the comment) for: ${commentNoDate.join(', ')}`,
+            );
             return;
         }
         // If there are filled follow-up rows, open the sub-stage review modal

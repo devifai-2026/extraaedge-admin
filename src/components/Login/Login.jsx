@@ -187,6 +187,10 @@ function Login() {
                 style={{ background: '#fff', border: '1px solid #fde68a', borderRadius: 4, padding: 6, textAlign: 'left', cursor: 'pointer', color: '#78350f' }}>
                 <b>Counsellor:</b> counsellor@demo.local
               </button>
+              <button type="button" onClick={() => { setEmail('accounts@demo.local'); setPassword('ChangeMe123!'); setTenantSlug('demo'); }}
+                style={{ background: '#fff', border: '1px solid #fde68a', borderRadius: 4, padding: 6, textAlign: 'left', cursor: 'pointer', color: '#78350f' }}>
+                <b>Accounts:</b> accounts@demo.local
+              </button>
             </div>
             <div style={{ marginTop: 6, fontSize: 11 }}>All passwords: <code>ChangeMe123!</code> · Click a role above to autofill.</div>
             <div style={{ marginTop: 4, fontSize: 11 }}>Product Owner: <a href="http://localhost:5174" style={{ color: '#2563eb' }}>localhost:5174</a></div>

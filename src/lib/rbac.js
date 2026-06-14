@@ -27,6 +27,7 @@ const ROLE_MANAGER_TABS = [
   'connected_accounts',
   'settings.email_templates', 'settings.sms_templates', 'settings.whatsapp_templates',
   'settings.assignment_rules',
+  'lead_transfer_report',
 ];
 const ROLE_COUNSELLOR_TABS = [
   'dashboard', 'leads', 'raw_data', 'failed_leads', 'followups', 'whatsapp',
@@ -45,6 +46,7 @@ const ROLE_ACCOUNT_MANAGER_TABS = [
   'accounts.report',
   'accounts.pay_schedule',
   'accounts.collection_receipt_wise',
+  'accounts.payment_details',
 ];
 
 const FALLBACK_TABS = {
@@ -94,6 +96,8 @@ export const hasTab = (tabKey) => {
 const TAB_TO_ROUTE = {
   dashboard: '/dashboard',
   leads: '/leadlist',
+  // super_admin-only standalone payments ledger.
+  payments: '/payments',
   raw_data: '/rawdata',
   failed_leads: '/failedleads',
   bulk_upload: '/bulkuploadlist',
@@ -106,6 +110,7 @@ const TAB_TO_ROUTE = {
   connected_accounts: '/connectedaccounts',
   third_party_integration: '/connectedaccounts',
   reports: '/dashboard',
+  lead_transfer_report: '/reports/lead-transfers',
   // Accounts module — account_manager only
   'accounts.dashboard':              '/accounts/dashboard',
   'accounts.pending_admissions':     '/accounts/pending-admissions',

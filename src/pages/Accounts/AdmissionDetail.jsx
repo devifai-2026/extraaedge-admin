@@ -27,7 +27,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
-import { admissionsApi, uploadsApi } from '../../lib/endpoints';
+import { admissionsApi, uploadsApi, paymentAccountsApi } from '../../lib/endpoints';
 import { fullName, fmtDate, fmtMoney } from './utils';
 import StatusPill from './StatusPill';
 import VerifyAdmissionDialog from '../../components/VerifyAdmissionDialog/VerifyAdmissionDialog';
@@ -497,6 +497,9 @@ const AddReceiptDialog = ({ open, onClose, admissionId, onSaved, prefill, instal
   // Tracks whether a screenshot upload is in-flight so we can disable
   // the Save button while bytes are still on the wire.
   const [uploadingScreenshot, setUploadingScreenshot] = useState(false);
+  // Tenant payment accounts for the "Received into" picker. Primaries
+  // first; the form defaults to the first one (required before save).
+  const [accounts, setAccounts] = useState([]);
 
   useEffect(() => {
     if (!open) return;
@@ -512,10 +515,30 @@ const AddReceiptDialog = ({ open, onClose, admissionId, onSaved, prefill, instal
       // confirmation image so the public receipt page can show what
       // was sent. r2_key only; the FE swaps for a signed URL on render.
       payment_screenshot_r2_key: null,
+      // Which account the money was received into. Defaulted below once
+      // accounts load.
+      payment_account_id: '',
     });
     setErr('');
     setUploadingScreenshot(false);
   }, [open, prefill?.kind, prefill?.installment_no, prefill?.suggestedAmount]);
+
+  // Load active payment accounts when the dialog opens; default-select
+  // the first primary (else the first active one).
+  useEffect(() => {
+    if (!open) return undefined;
+    let alive = true;
+    paymentAccountsApi.list()
+      .then((r) => {
+        if (!alive) return;
+        const active = (r?.data || []).filter((a) => a.is_active !== false);
+        const ordered = [...active.filter((a) => a.is_primary), ...active.filter((a) => !a.is_primary)];
+        setAccounts(ordered);
+        if (ordered[0]) setForm((f) => (f ? { ...f, payment_account_id: f.payment_account_id || ordered[0].id } : f));
+      })
+      .catch(() => { if (alive) setAccounts([]); });
+    return () => { alive = false; };
+  }, [open]);
 
   // Which installment slots are still unpaid — drives the dropdown.
   const unpaidSlots = useMemo(() => {
@@ -603,6 +626,11 @@ const AddReceiptDialog = ({ open, onClose, admissionId, onSaved, prefill, instal
     if (form.receipt_kind === 'registration' && registrationAlreadyPaid) {
       setErr('Registration is already captured for this admission.'); return;
     }
+    // Require an account when the tenant has any configured — we want
+    // every recorded rupee attributed to where it landed.
+    if (accounts.length > 0 && !form.payment_account_id) {
+      setErr('Pick which account this payment was received into.'); return;
+    }
     setSaving(true);
     try {
       await admissionsApi.createReceipt(admissionId, {
@@ -614,6 +642,7 @@ const AddReceiptDialog = ({ open, onClose, admissionId, onSaved, prefill, instal
         receipt_kind: form.receipt_kind,
         installment_no: form.receipt_kind === 'installment' ? Number(form.installment_no) : null,
         payment_screenshot_r2_key: form.payment_screenshot_r2_key || null,
+        payment_account_id: form.payment_account_id || null,
       });
       onSaved?.();
     } catch (e) {
@@ -681,6 +710,29 @@ const AddReceiptDialog = ({ open, onClose, admissionId, onSaved, prefill, instal
               {MODES.map((m) => <MenuItem key={m} value={m}>{m.toUpperCase()}</MenuItem>)}
             </Select>
           </FormControl>
+
+          {/* Received into — which bank/UPI account this money landed in.
+              Required when the tenant has any account configured. */}
+          {accounts.length > 0 && (
+            <FormControl size="small" error={!form.payment_account_id}>
+              <InputLabel id="acct-label" shrink>Received into</InputLabel>
+              <Select
+                labelId="acct-label"
+                label="Received into"
+                value={form.payment_account_id || ''}
+                onChange={(e) => setForm({ ...form, payment_account_id: e.target.value })}
+              >
+                {accounts.map((a) => (
+                  <MenuItem key={a.id} value={a.id}>
+                    {(a.label || a.bank_name || a.upi_id || 'Account')}
+                    {a.account_number ? ` · ••••${String(a.account_number).slice(-4)}` : a.upi_id ? ` · ${a.upi_id}` : ''}
+                    {a.is_primary ? ' · Primary' : ''}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+
           <TextField label="Transaction details" size="small" value={form.transaction_details} onChange={(e) => setForm({ ...form, transaction_details: e.target.value })} multiline minRows={2} />
           <label style={{ fontSize: 12, color: '#374151', display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={form.is_old_collection} onChange={(e) => setForm({ ...form, is_old_collection: e.target.checked })} />

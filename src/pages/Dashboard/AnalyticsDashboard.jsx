@@ -16,6 +16,7 @@ import {
   PieChart, Pie,
 } from 'recharts';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import PaymentsIcon from '@mui/icons-material/Payments';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import CloseIcon from '@mui/icons-material/Close';
 import { colors } from '../../theme/colors';
@@ -159,9 +160,7 @@ export default function AnalyticsDashboard() {
   const [programWise, setProgramWise] = useState([]);
   const [channelSource, setChannelSource] = useState([]);
   const [programStatus, setProgramStatus] = useState([]);
-  const [coldEnq, setColdEnq] = useState({ reasons: [], daily: [] });
   const [perfTeam, setPerfTeam] = useState([]);
-  const [comms, setComms] = useState([]);
   const [myFollowups, setMyFollowups] = useState([]);
   const [myLeadsToday, setMyLeadsToday] = useState(0);
   // Tenant-wide admission state + dashboard sub-cards for admin/manager.
@@ -170,10 +169,16 @@ export default function AnalyticsDashboard() {
   // donut + top courses).
   const [admStatus, setAdmStatus] = useState(null); // lead-status snapshot
   const [admCharts, setAdmCharts] = useState(null); // dashboardWithCharts
+  // Payments summary for the dashboard CTA — count + total collected. We reuse
+  // the Payment Details endpoint's aggregate meta (limit:1 keeps the row
+  // payload tiny; we only need meta.total + meta.total_amount).
+  const [paySummary, setPaySummary] = useState(null);
+  // Payment analytics — trend (30d), by mode, by kind — for the dashboard charts.
+  const [payAnalytics, setPayAnalytics] = useState(null);
 
   const [loading, setLoading] = useState({
     summary: true, funnel: true, timeline: true, programWise: true,
-    channelSource: true, programStatus: true, coldEnq: true, perfTeam: true, comms: true,
+    channelSource: true, programStatus: true, perfTeam: true,
     admissions: true,
   });
   const [openSummaryModal, setOpenSummaryModal] = useState(false);
@@ -245,8 +250,10 @@ export default function AnalyticsDashboard() {
       Promise.all([
         admissionsApi.leadStatusSnapshot().then((r) => r?.data || null).catch(() => null),
         admissionsApi.dashboard({ trend_days: 30 }).then((r) => r?.data || null).catch(() => null),
+        admissionsApi.paymentDetails({ limit: 1 }).then((r) => r?.meta || null).catch(() => null),
+        admissionsApi.paymentAnalytics({ days: 30 }).then((r) => r?.data || null).catch(() => null),
       ])
-        .then(([snap, charts]) => { setAdmStatus(snap); setAdmCharts(charts); })
+        .then(([snap, charts, pay, payAna]) => { setAdmStatus(snap); setAdmCharts(charts); setPaySummary(pay); setPayAnalytics(payAna); })
         .finally(() => flag('admissions', false));
     } else {
       flag('admissions', false);
@@ -276,24 +283,12 @@ export default function AnalyticsDashboard() {
       .catch(() => setProgramStatus([]))
       .finally(() => flag('programStatus', false));
 
-    flag('coldEnq', true);
-    analyticsApi.coldEnquiries(params)
-      .then((r) => setColdEnq(r?.data || { reasons: [], daily: [] }))
-      .catch(() => setColdEnq({ reasons: [], daily: [] }))
-      .finally(() => flag('coldEnq', false));
-
     if (!isCounsellor) {
       flag('perfTeam', true);
       analyticsApi.counselorPerformance(params)
         .then((r) => setPerfTeam(r?.data || []))
         .catch(() => setPerfTeam([]))
         .finally(() => flag('perfTeam', false));
-
-      flag('comms', true);
-      analyticsApi.communications(params)
-        .then((r) => setComms(r?.data || []))
-        .catch(() => setComms([]))
-        .finally(() => flag('comms', false));
     }
 
     if (isCounsellor) {
@@ -318,15 +313,6 @@ export default function AnalyticsDashboard() {
     }
     return { programs: Array.from(programs.values()), stages: Array.from(stageSet) };
   }, [programStatus]);
-
-  // ---- Comms breakdown table ----
-  const commsByChannel = useMemo(() => {
-    const out = { email: 0, sms: 0, whatsapp: 0 };
-    for (const r of comms) {
-      if (out[r.channel] !== undefined) out[r.channel] += r.n;
-    }
-    return out;
-  }, [comms]);
 
   return (
     <Box sx={{ pb: 4 }}>
@@ -413,6 +399,56 @@ export default function AnalyticsDashboard() {
       {/* ============ NOTIFICATIONS ============ */}
       <NotificationsPanel />
 
+      {/* ============ PAYMENTS CTA (admin only) ============
+          Prominent, top-of-dashboard so it's never missed. Shows the real
+          total collected + payment count and links into the Payment Details
+          ledger. Admin-only. */}
+      {isAdmin && (
+        <Box
+          sx={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2,
+            flexWrap: 'wrap', mb: 2, p: 2,
+            borderRadius: 2, border: '1px solid #bbf7d0',
+            background: 'linear-gradient(90deg, #ecfdf5 0%, #ffffff 65%)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+              <PaymentsIcon sx={{ color: '#15803d', fontSize: 32 }} />
+              <Box>
+                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', lineHeight: 1.2 }}>Total Collected</Typography>
+                <Typography sx={{ fontSize: 24, fontWeight: 800, color: '#15803d', lineHeight: 1.2 }}>
+                  {paySummary ? `₹${Number(paySummary.total_amount || 0).toLocaleString('en-IN')}` : '—'}
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ borderLeft: '1px solid #d1fae5', pl: 3 }}>
+              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', lineHeight: 1.2 }}>Payments Recorded</Typography>
+              <Typography sx={{ fontSize: 24, fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
+                {paySummary ? Number(paySummary.total || 0).toLocaleString('en-IN') : '—'}
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Button
+              variant="contained"
+              startIcon={<PaymentsIcon />}
+              onClick={() => navigate('/accounts/payment-details')}
+              sx={{ textTransform: 'none', bgcolor: '#15803d', '&:hover': { bgcolor: '#166534' } }}
+            >
+              View Payment Details
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => navigate('/accounts/payment-details?receipt_kind=registration')}
+              sx={{ textTransform: 'none', color: '#15803d', borderColor: '#86efac' }}
+            >
+              Registration Payments
+            </Button>
+          </Box>
+        </Box>
+      )}
+
       {/* ============ KPI ROW ============ */}
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
         <Kpi
@@ -422,26 +458,28 @@ export default function AnalyticsDashboard() {
           accent="#E53935"
         />
         <Kpi
-          label="Cold leads"
-          value={summary?.cold_leads ?? '—'}
-          hint={summary ? `${summary.programs_active} active programs` : ''}
+          label="New leads · 7d"
+          value={summary?.new_leads_7d ?? '—'}
+          hint={summary ? `${summary.new_leads_today ?? 0} today` : ''}
           accent="#FB8C00"
         />
         {!isCounsellor && (
           <>
             <Kpi
-              label="Email · 30d"
-              value={summary?.comms_30d?.email ?? '—'}
+              label="Unassigned leads"
+              value={summary?.unassigned_leads ?? '—'}
+              hint="Awaiting routing to a counsellor"
               accent="#1E88E5"
             />
             <Kpi
-              label="WhatsApp · 30d"
-              value={summary?.comms_30d?.whatsapp ?? '—'}
+              label="Follow-ups due today"
+              value={summary?.followups_due_today ?? '—'}
               accent="#43A047"
             />
             <Kpi
-              label="SMS · 30d"
-              value={summary?.comms_30d?.sms ?? '—'}
+              label="Enrolled · this month"
+              value={summary?.enrolled_this_month ?? '—'}
+              hint={summary ? `${summary.admissions_this_month ?? 0} admissions` : ''}
               accent="#5E35B1"
             />
           </>
@@ -601,33 +639,39 @@ export default function AnalyticsDashboard() {
 
           {/* Status donut + Top courses side by side */}
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
-            <ChartCard
-              title="Status Breakdown"
-              loading={loading.admissions}
-              lastSynced={lastSynced}
-              onRefresh={reloadAll}
-              csvRows={admCharts?.charts?.status_breakdown || []}
-              fullHeight={260}
-            >
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart>
-                  <Pie
-                    data={admCharts?.charts?.status_breakdown || []}
-                    dataKey="count"
-                    nameKey="status"
-                    cx="50%" cy="50%"
-                    innerRadius={50} outerRadius={90}
-                    label
-                  >
-                    {(admCharts?.charts?.status_breakdown || []).map((entry, idx) => (
-                      <Cell key={entry.status} fill={STAGE_PALETTE[idx % STAGE_PALETTE.length]} />
-                    ))}
-                  </Pie>
-                  <RTooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </ChartCard>
+            {(() => {
+              // Build the donut from admStatus.counts (the populated source the
+              // KPI row uses) rather than the empty charts.status_breakdown.
+              const statusData = Object.entries(admStatus?.counts || {})
+                .map(([status, count]) => ({ status: status.replace(/_/g, ' '), count: Number(count) || 0 }))
+                .filter((d) => d.count > 0);
+              return (
+                <ChartCard
+                  title="Admission Status Breakdown"
+                  loading={loading.admissions}
+                  lastSynced={lastSynced}
+                  onRefresh={reloadAll}
+                  csvRows={statusData}
+                  fullHeight={260}
+                >
+                  {statusData.length === 0 ? (
+                    <Box sx={{ p: 2, color: '#888', fontSize: 13 }}>No admissions yet.</Box>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={260}>
+                      <PieChart>
+                        <Pie data={statusData} dataKey="count" nameKey="status" cx="50%" cy="50%" innerRadius={50} outerRadius={90} label>
+                          {statusData.map((entry, idx) => (
+                            <Cell key={entry.status} fill={STAGE_PALETTE[idx % STAGE_PALETTE.length]} />
+                          ))}
+                        </Pie>
+                        <RTooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
+                </ChartCard>
+              );
+            })()}
 
             <ChartCard
               title="Top Programmes · 30d"
@@ -784,38 +828,63 @@ export default function AnalyticsDashboard() {
         </ChartCard>
       </Box>
 
-      {/* ============ COLD ENQUIRIES — top reasons (everyone) ============ */}
-      <Box sx={{ mt: 2 }}>
-        <ChartCard
-          title="Top Reasons for Cold Enquiries (last 90d)"
-          loading={loading.coldEnq}
-          lastSynced={lastSynced}
-          onRefresh={reloadAll}
-          csvRows={coldEnq?.reasons}
-          fullHeight={300}
-        >
-          {(!coldEnq?.reasons || coldEnq.reasons.length === 0) ? (
-            <Box sx={{ p: 2, color: '#888', fontSize: 13 }}>No cold leads in the last 90 days.</Box>
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={coldEnq.reasons}
-                  dataKey="leads"
-                  nameKey="reason"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  label={(e) => `${e.reason}: ${e.leads}`}
-                >
-                  {coldEnq.reasons.map((_, i) => <Cell key={i} fill={STAGE_PALETTE[i % STAGE_PALETTE.length]} />)}
-                </Pie>
-                <RTooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-      </Box>
+      {/* ============ PAYMENT COLLECTION TREND + BY MODE (admin + manager) ============ */}
+      {!isCounsellor && (
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' }, gap: 2, mt: 2 }}>
+          <ChartCard
+            title="Payment Collection · 30d"
+            loading={loading.admissions}
+            lastSynced={lastSynced}
+            onRefresh={reloadAll}
+            csvRows={payAnalytics?.trend || []}
+            fullHeight={300}
+          >
+            {(!payAnalytics?.trend || payAnalytics.trend.length === 0) ? (
+              <Box sx={{ p: 2, color: '#888', fontSize: 13 }}>No payments collected in the last 30 days.</Box>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={payAnalytics.trend.map((d) => ({ ...d, day: fmtDate(d.day) }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <RTooltip formatter={(v, n) => (n === 'amount' ? `₹${Number(v).toLocaleString('en-IN')}` : v)} />
+                  <Bar dataKey="amount" name="Collected ₹" fill="#15803d" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+
+          <ChartCard
+            title="Collection by Account · 30d"
+            loading={loading.admissions}
+            lastSynced={lastSynced}
+            onRefresh={reloadAll}
+            csvRows={payAnalytics?.by_account || []}
+            fullHeight={300}
+          >
+            {(!payAnalytics?.by_account || payAnalytics.by_account.length === 0) ? (
+              <Box sx={{ p: 2, color: '#888', fontSize: 13 }}>No payments yet.</Box>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={payAnalytics.by_account}
+                    dataKey="amount"
+                    nameKey="account"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={95}
+                    label={(e) => `${e.account}: ₹${Number(e.amount).toLocaleString('en-IN')}`}
+                  >
+                    {payAnalytics.by_account.map((_, i) => <Cell key={i} fill={STAGE_PALETTE[i % STAGE_PALETTE.length]} />)}
+                  </Pie>
+                  <RTooltip formatter={(v) => `₹${Number(v).toLocaleString('en-IN')}`} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+        </Box>
+      )}
 
       {/* ============ COUNSELLOR LEADERBOARD (manager + admin) ============ */}
       {!isCounsellor && (
@@ -857,73 +926,39 @@ export default function AnalyticsDashboard() {
         </Box>
       )}
 
-      {/* ============ COMMUNICATIONS BREAKDOWN (admin only) ============ */}
-      {/* Backend returns {channel, status, n}. We pivot it so each X-axis bucket
-          is a channel (email/sms/whatsapp/call) and bars are stacked by status. */}
-      {isAdmin && (() => {
-        const STATUS_COLORS = {
-          delivered: '#43A047', sent: '#66BB6A', seen: '#1E88E5', clicked: '#0288D1',
-          queued: '#FDD835', failed: '#E53935', bounced: '#D32F2F', suppressed: '#8D6E63',
-          unsubscribed: '#5E35B1',
-          // call status buckets
-          inbound_completed: '#43A047', inbound_answered: '#66BB6A',
-          outbound_completed: '#1E88E5', outbound_answered: '#1976D2',
-          inbound_missed: '#FB8C00', outbound_missed: '#FB8C00',
-          inbound_no_answer: '#FFB300', outbound_no_answer: '#FFB300',
-          inbound_failed: '#E53935', outbound_failed: '#E53935',
-        };
-        const channelOrder = ['email', 'sms', 'whatsapp', 'call'];
-        // Pivot: { channel: 'email', delivered: 12, failed: 2, ... }
-        const pivot = new Map();
-        const statusKeys = new Set();
-        for (const r of comms) {
-          if (!pivot.has(r.channel)) pivot.set(r.channel, { channel: r.channel });
-          pivot.get(r.channel)[r.status] = r.n;
-          statusKeys.add(r.status);
-        }
-        const data = channelOrder
-          .filter((c) => pivot.has(c))
-          .map((c) => pivot.get(c));
-        const statuses = Array.from(statusKeys).sort();
-
-        return (
-          <Box sx={{ mt: 2 }}>
-            <ChartCard
-              title="Communications breakdown (30d)"
-              loading={loading.comms}
-              lastSynced={lastSynced}
-              onRefresh={reloadAll}
-              csvRows={comms}
-              fullHeight={320}
-            >
-              {data.length === 0 ? (
-                <Box sx={{ p: 3, color: '#888', fontSize: 13, textAlign: 'center' }}>
-                  No communications in the last 30 days.
-                </Box>
-              ) : (
-                <ResponsiveContainer width="100%" height={320}>
-                  <BarChart data={data}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-                    <XAxis dataKey="channel" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-                    <RTooltip />
-                    <Legend />
-                    {statuses.map((status) => (
-                      <Bar
-                        key={status}
-                        dataKey={status}
-                        stackId="comms"
-                        name={status.replace(/_/g, ' ')}
-                        fill={STATUS_COLORS[status] || '#9E9E9E'}
-                      />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </ChartCard>
-          </Box>
-        );
-      })()}
+      {/* ============ COLLECTION BY RECEIPT KIND (admin only) ============ */}
+      {/* Registration vs installment vs misc — total ₹ collected per kind. */}
+      {isAdmin && (
+        <Box sx={{ mt: 2 }}>
+          <ChartCard
+            title="Collection by Type · 30d"
+            loading={loading.admissions}
+            lastSynced={lastSynced}
+            onRefresh={reloadAll}
+            csvRows={payAnalytics?.by_kind || []}
+            fullHeight={320}
+          >
+            {(!payAnalytics?.by_kind || payAnalytics.by_kind.length === 0) ? (
+              <Box sx={{ p: 3, color: '#888', fontSize: 13, textAlign: 'center' }}>
+                No payments collected in the last 30 days.
+              </Box>
+            ) : (
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={payAnalytics.by_kind} layout="vertical" margin={{ left: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="kind" tick={{ fontSize: 12 }} width={90} />
+                  <RTooltip formatter={(v) => `₹${Number(v).toLocaleString('en-IN')}`} />
+                  <Bar dataKey="amount" name="Collected ₹" radius={[0, 4, 4, 0]}>
+                    {payAnalytics.by_kind.map((_, i) => <Cell key={i} fill={STAGE_PALETTE[i % STAGE_PALETTE.length]} />)}
+                    <LabelList dataKey="count" position="right" formatter={(v) => `${v} txn`} style={{ fontSize: 11, fill: '#6b7280' }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+        </Box>
+      )}
 
       {/* ============ SUMMARY MODAL ============ */}
       <Modal open={openSummaryModal} onClose={() => setOpenSummaryModal(false)}>
@@ -958,13 +993,16 @@ export default function AnalyticsDashboard() {
                   <>
                     <Divider />
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Email · 30d</span><b>{summary.comms_30d?.email}</b>
+                      <span>New leads · 7d</span><b>{summary.new_leads_7d ?? 0}</b>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>SMS · 30d</span><b>{summary.comms_30d?.sms}</b>
+                      <span>Unassigned leads</span><b>{summary.unassigned_leads ?? 0}</b>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>WhatsApp · 30d</span><b>{summary.comms_30d?.whatsapp}</b>
+                      <span>Follow-ups due today</span><b>{summary.followups_due_today ?? 0}</b>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Enrolled · this month</span><b>{summary.enrolled_this_month ?? 0}</b>
                     </Box>
                   </>
                 )}

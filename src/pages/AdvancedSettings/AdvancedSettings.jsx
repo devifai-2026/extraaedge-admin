@@ -13,6 +13,7 @@ import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
 import RuleFolderOutlinedIcon from "@mui/icons-material/RuleFolderOutlined";
+import AccountBalanceOutlinedIcon from "@mui/icons-material/AccountBalanceOutlined";
 import "./AdvancedSettings.css";
 
 const sections = [
@@ -50,6 +51,17 @@ const sections = [
         label: "Assignment Rules",
         description: "Round-robin, load-balanced, and program-based auto-assignment.",
         path: "/advancedsettings/assignment-rules",
+      },
+    ],
+  },
+  {
+    icon: <AccountBalanceOutlinedIcon sx={{ fontSize: 20, color: "#555" }} />,
+    title: "Payments",
+    items: [
+      {
+        label: "Payment Accounts",
+        description: "Bank accounts & UPI IDs for collecting fee payments — registration, installments & other dues. One is primary.",
+        path: "/advancedsettings/payment-accounts",
       },
     ],
   },

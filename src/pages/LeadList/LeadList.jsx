@@ -68,6 +68,19 @@ const LeadList = () => {
     // Reset to page 1 whenever the search query changes so the user
     // doesn't end up on an empty page 4 of a now-shorter result set.
     useEffect(() => { setPage(1); }, [debouncedTableSearchQ]);
+    // Per-column search boxes in the table header. These hit the server (whole
+    // tenant DB), debounced so we don't fire a query on every keystroke. Keys
+    // are server param names (stage_name, program_name, owner_name, city,
+    // created_from/created_to, updated_from/updated_to, …).
+    const [columnFilters, setColumnFilters] = useState({});
+    const [debouncedColumnFilters, setDebouncedColumnFilters] = useState({});
+    const columnFiltersKey = JSON.stringify(columnFilters);
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedColumnFilters(columnFilters), 300);
+        return () => clearTimeout(t);
+    }, [columnFiltersKey, columnFilters]);
+    const debouncedColumnFiltersKey = JSON.stringify(debouncedColumnFilters);
+    useEffect(() => { setPage(1); }, [debouncedColumnFiltersKey]);
     const [viewMode, setViewMode] = useState(() => {
         try { return localStorage.getItem('ee_lead_view_mode') || 'card'; } catch { return 'card'; }
     });
@@ -119,8 +132,13 @@ const LeadList = () => {
         // Layer the in-table search query on top — narrows the current
         // stage tab + advanced-filter view by name / email / phone.
         if (debouncedTableSearchQ) params.q = debouncedTableSearchQ;
+        // Layer the per-column header searches on top (server-side, whole-DB).
+        for (const [k, v] of Object.entries(debouncedColumnFilters)) {
+            const val = typeof v === 'string' ? v.trim() : v;
+            if (val) params[k] = val;
+        }
         return params;
-    }, [activeStageId, page, sort, advancedFilter, debouncedTableSearchQ]);
+    }, [activeStageId, page, sort, advancedFilter, debouncedTableSearchQ, debouncedColumnFilters]);
 
     const reload = useCallback(async () => {
         setLoading(true);
@@ -314,6 +332,10 @@ const LeadList = () => {
                         }}
                         onReassign={(lead) => handleSingleReassign(lead)}
                         onChanged={() => setReloadKey((k) => k + 1)}
+                        sort={sort}
+                        onSortChange={(s) => { setSort(s); setPage(1); }}
+                        columnFilters={columnFilters}
+                        onColumnFilterChange={(key, val) => setColumnFilters((p) => ({ ...p, [key]: val }))}
                     />
                 )}
 

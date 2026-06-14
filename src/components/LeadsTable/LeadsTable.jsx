@@ -6,6 +6,9 @@ import {
   Checkbox, IconButton, Tooltip, Chip, Menu, MenuItem,
 } from '@mui/material';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import CallIcon from '@mui/icons-material/Call';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
@@ -23,6 +26,36 @@ const fmt = (v) => {
     const d = new Date(v);
     return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true });
   } catch { return String(v); }
+};
+
+// Column definitions drive the header sort + per-column search controls. Both
+// are SERVER-side (whole tenant DB):
+//   • sortKey  — base for the server sort enum (<sortKey>_asc / _desc). Null = not sortable.
+//   • searchType — 'text' (text box) | 'date' (date-only calendar picker, sends
+//                  a from+to pair spanning the picked day) | null (no search).
+//   • paramKey — the server query param the search box writes to. For date
+//                columns this is the prefix (`created` -> created_from/created_to).
+const COLUMNS = [
+  { key: 'name', label: 'Name', sortKey: 'name', searchType: 'text', paramKey: 'q' },
+  { key: 'phone', label: 'Phone', sortKey: 'phone', searchType: 'text', paramKey: 'phone' },
+  { key: 'stage', label: 'Stage', sortKey: 'stage', searchType: 'text', paramKey: 'stage_name' },
+  { key: 'sub_stage', label: 'Sub-Stage', sortKey: 'sub_stage', searchType: 'text', paramKey: 'sub_stage_name' },
+  { key: 'program', label: 'Program', sortKey: 'program', searchType: 'text', paramKey: 'program_name' },
+  { key: 'city', label: 'City', sortKey: 'city', searchType: 'text', paramKey: 'city' },
+  { key: 'owner', label: 'Owner / Manager', sortKey: 'owner', searchType: 'text', paramKey: 'owner_name' },
+  { key: 'added_by', label: 'Added By', sortKey: 'added_by', searchType: 'text', paramKey: 'added_by_name' },
+  { key: 'score', label: 'Score', sortKey: 'score', searchType: null, paramKey: null },
+  { key: 'created_at', label: 'Created', sortKey: 'created', searchType: 'date', paramKey: 'date' },
+  { key: 'updated_at', label: 'Last Updated', sortKey: 'updated', searchType: 'date', paramKey: 'updated' },
+  { key: 'age', label: 'Age', sortKey: 'age', searchType: null, paramKey: null },
+  { key: 'flag', label: 'Flag', sortKey: null, searchType: null, paramKey: null },
+];
+
+// A date-only picker value 'YYYY-MM-DD' becomes a [from, to] window covering
+// that whole local day, since created_at/updated_at are timestamps.
+const dayRange = (ymd) => {
+  if (!ymd) return { from: '', to: '' };
+  return { from: `${ymd}T00:00:00`, to: `${ymd}T23:59:59.999` };
 };
 
 const headerCellStyle = {
@@ -47,17 +80,36 @@ const cellStyle = {
   verticalAlign: 'middle',
 };
 
-const LeadsTable = ({ leads, selectedIds, onToggleSelect, onToggleSelectAll, onReassign, onChanged }) => {
+const LeadsTable = ({
+  leads, selectedIds, onToggleSelect, onToggleSelectAll, onReassign, onChanged,
+  // Server-driven sort + per-column search (whole tenant DB, not just the
+  // loaded page). `sort` is the server sort key string (e.g. 'name_asc').
+  // `columnFilters` is keyed by SERVER param name (see PARAM_KEY below).
+  sort: serverSort = 'created_desc',
+  onSortChange,
+  columnFilters = {},
+  onColumnFilterChange,
+}) => {
   const [editLead, setEditLead] = useState(null);
   const [timelineLead, setTimelineLead] = useState(null);
   const [menu, setMenu] = useState({ anchor: null, lead: null });
+
+  // Click a header to cycle: <col>_asc → <col>_desc → default(created_desc).
+  const toggleSort = (key) => {
+    if (!onSortChange) return;
+    const asc = `${key}_asc`;
+    const desc = `${key}_desc`;
+    if (serverSort === asc) onSortChange(desc);
+    else if (serverSort === desc) onSortChange('created_desc');
+    else onSortChange(asc);
+  };
+  // Rows come from the server already sorted + filtered; render as-is.
+  const displayLeads = leads;
   // Lead deletion is destructive (hard-delete) and super-admin only — but we
   // surface the option for everyone and let the backend return 403 if the
   // user isn't a super-admin. That avoids silently hiding the action when
   // role detection mismatches the JWT (e.g. stale cached user object).
   const canDelete = isRole(ROLES.SUPER_ADMIN);
-  // Always render the menu item; it's role-gated visually but never silently absent.
-  const showDelete = true;
 
   const handleDelete = async (lead) => {
     if (!lead?.id) return;
@@ -79,9 +131,80 @@ const LeadsTable = ({ leads, selectedIds, onToggleSelect, onToggleSelectAll, onR
   const allSelected = leads.length > 0 && leads.every((l) => selectedIds.has(l.id));
   const someSelected = leads.some((l) => selectedIds.has(l.id));
 
+  // For a date column we keep the picked day in a side key (`<paramKey>_day`)
+  // so the picker stays controlled, and also push the derived from/to window
+  // that the server actually filters on.
+  const handleDateChange = (col, ymd) => {
+    const { from, to } = dayRange(ymd);
+    onColumnFilterChange?.(`${col.paramKey}_day`, ymd);
+    onColumnFilterChange?.(`${col.paramKey}_from`, from);
+    onColumnFilterChange?.(`${col.paramKey}_to`, to);
+  };
+
+  // Header cell with a click-to-sort label + a per-column search control
+  // (text box, or a date-only calendar picker for date columns). Written as a
+  // render function (not a child component) so the per-column <input> keeps
+  // focus across re-renders instead of remounting on every keystroke.
+  const sortHead = (col, align = 'left') => {
+    const asc = col.sortKey && `${col.sortKey}_asc`;
+    const desc = col.sortKey && `${col.sortKey}_desc`;
+    const active = col.sortKey && (serverSort === asc || serverSort === desc);
+    const SortIcon = !active ? UnfoldMoreIcon : (serverSort === asc ? ArrowUpwardIcon : ArrowDownwardIcon);
+    const textVal = col.searchType === 'text' ? (columnFilters[col.paramKey] || '') : '';
+    const dateVal = col.searchType === 'date' ? (columnFilters[`${col.paramKey}_day`] || '') : '';
+    return (
+      <th key={col.key} style={{ ...headerCellStyle, textAlign: align }}>
+        {col.sortKey ? (
+          <div
+            onClick={() => toggleSort(col.sortKey)}
+            title={`Sort by ${col.label}`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 2, cursor: 'pointer',
+              justifyContent: align === 'right' ? 'flex-end' : 'flex-start', userSelect: 'none',
+            }}
+          >
+            {col.label}
+            <SortIcon sx={{ fontSize: 14, color: active ? '#d46b08' : '#c9a98f' }} />
+          </div>
+        ) : (
+          <span>{col.label}</span>
+        )}
+        {col.searchType && (
+          <div style={{ marginTop: 4 }}>
+            <input
+              type={col.searchType === 'date' ? 'date' : 'text'}
+              value={col.searchType === 'date' ? dateVal : textVal}
+              onChange={(e) => (col.searchType === 'date'
+                ? handleDateChange(col, e.target.value)
+                : onColumnFilterChange?.(col.paramKey, e.target.value))}
+              onClick={(e) => e.stopPropagation()}
+              placeholder={col.searchType === 'date' ? '' : 'Search'}
+              style={{
+                width: col.searchType === 'date' ? 130 : '100%',
+                minWidth: 70,
+                boxSizing: 'border-box',
+                font: 'inherit',
+                fontSize: 11,
+                fontWeight: 400,
+                textTransform: 'none',
+                padding: '3px 6px',
+                border: '1px solid #e6cdbb',
+                borderRadius: 4,
+                background: '#fff',
+                color: '#333',
+              }}
+            />
+          </div>
+        )}
+      </th>
+    );
+  };
+
+  const colByKey = Object.fromEntries(COLUMNS.map((c) => [c.key, c]));
+
   return (
     <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 6, overflow: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1400 }}>
         <thead>
           <tr>
             <th style={{ ...headerCellStyle, width: 36 }}>
@@ -92,29 +215,31 @@ const LeadsTable = ({ leads, selectedIds, onToggleSelect, onToggleSelectAll, onR
                 onChange={(e) => onToggleSelectAll?.(e.target.checked)}
               />
             </th>
-            <th style={headerCellStyle}>Name</th>
-            <th style={headerCellStyle}>Phone</th>
-            <th style={headerCellStyle}>Stage</th>
-            <th style={headerCellStyle}>Sub-Stage</th>
-            <th style={headerCellStyle}>Program</th>
-            <th style={headerCellStyle}>City</th>
-            <th style={headerCellStyle}>Owner / Manager</th>
-            <th style={headerCellStyle}>Added By</th>
-            <th style={headerCellStyle}>Score</th>
-            <th style={headerCellStyle}>Age</th>
-            <th style={headerCellStyle}>Flag</th>
+            {sortHead(colByKey.name)}
+            {sortHead(colByKey.phone)}
+            {sortHead(colByKey.stage)}
+            {sortHead(colByKey.sub_stage)}
+            {sortHead(colByKey.program)}
+            {sortHead(colByKey.city)}
+            {sortHead(colByKey.owner)}
+            {sortHead(colByKey.added_by)}
+            {sortHead(colByKey.score)}
+            {sortHead(colByKey.created_at)}
+            {sortHead(colByKey.updated_at)}
+            {sortHead(colByKey.age)}
+            {sortHead(colByKey.flag)}
             <th style={{ ...headerCellStyle, textAlign: 'right' }}>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {leads.length === 0 && (
+          {displayLeads.length === 0 && (
             <tr>
-              <td colSpan={13} style={{ padding: 32, textAlign: 'center', color: '#888' }}>
-                No leads in this view.
+              <td colSpan={15} style={{ padding: 32, textAlign: 'center', color: '#888' }}>
+                {leads.length === 0 ? 'No leads in this view.' : 'No leads match the column filters.'}
               </td>
             </tr>
           )}
-          {leads.map((lead) => {
+          {displayLeads.map((lead) => {
             const flag = flagForLead(lead);
             const isSelected = selectedIds.has(lead.id);
             return (
@@ -196,6 +321,16 @@ const LeadsTable = ({ leads, selectedIds, onToggleSelect, onToggleSelectAll, onR
                   }}>
                     ★ {lead.lead_score != null ? Number(lead.lead_score).toFixed(0) : 0}
                   </span>
+                </td>
+                <td style={{ ...cellStyle, whiteSpace: 'nowrap', color: '#555' }}>
+                  <Tooltip title={lead.created_at ? `Created ${formatTimestamp(lead.created_at)}` : 'Not available'}>
+                    <span>{fmt(lead.created_at)}</span>
+                  </Tooltip>
+                </td>
+                <td style={{ ...cellStyle, whiteSpace: 'nowrap', color: '#555' }}>
+                  <Tooltip title={lead.updated_at ? `Last updated ${formatTimestamp(lead.updated_at)}` : 'Not available'}>
+                    <span>{fmt(lead.updated_at)}</span>
+                  </Tooltip>
                 </td>
                 <td style={cellStyle}>
                   <Tooltip title={lead.created_at ? `Created ${formatTimestamp(lead.created_at)}` : 'Lead age'}>

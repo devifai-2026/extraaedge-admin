@@ -412,6 +412,20 @@ export const leadFeeOffersApi = {
   upsert: (leadId, body) => api.put(`/lead-fee-offers/${leadId}`, body),
 };
 
+// Admin-managed payment destinations (bank accounts + UPI IDs) used to collect
+// the registration / admission amount. super_admin only. Exactly one account
+// is primary; the backend enforces that invariant.
+export const paymentAccountsApi = {
+  list:         (params) => api.get('/payment-accounts', params),
+  get:          (id) => api.get(`/payment-accounts/${id}`),
+  create:       (body) => api.post('/payment-accounts', body),
+  update:       (id, body) => api.put(`/payment-accounts/${id}`, body),
+  // Multiple primaries allowed; bulk mark/unmark. Body: { ids: [...] }.
+  setPrimary:   (ids) => api.post('/payment-accounts/set-primary', { ids }),
+  unsetPrimary: (ids) => api.post('/payment-accounts/unset-primary', { ids }),
+  delete:       (id) => api.delete(`/payment-accounts/${id}`),
+};
+
 // Accounts / Admissions module. Only visible to account_manager + super_admin.
 // All routes live under /api/v1/admissions.
 export const admissionsApi = {
@@ -433,7 +447,9 @@ export const admissionsApi = {
   // Mint a fresh 24h public share-link for the student to fill the admission
   // form themselves. Returns { token, expires_at } — the FE turns that into
   // a full URL using window.location.origin.
-  generateShareLink: (leadId) => api.post(`/admissions/share-link/${leadId}`),
+  // Optional body { payment_account_id } binds the account the student
+  // should pay into to the minted link.
+  generateShareLink: (leadId, body) => api.post(`/admissions/share-link/${leadId}`, body || {}),
 
   // List + detail
   list: (params) => api.get('/admissions', params),
@@ -454,6 +470,12 @@ export const admissionsApi = {
   createReceipt: (admissionId, body) => api.post(`/admissions/${admissionId}/receipts`, body),
   listReceipts: (params) => api.get('/admissions/receipts', params),
   deleteReceipt: (id) => api.delete(`/admissions/receipts/${id}`),
+
+  // Admin Payment Details ledger — paginated/filterable/sortable/searchable.
+  // Returns { data: rows, meta: { total, total_amount, page, limit } }.
+  paymentDetails: (params) => api.get('/admissions/payment-details', params),
+  // Payment analytics for the admin dashboard charts (trend, by_mode, by_kind).
+  paymentAnalytics: (params) => api.get('/admissions/payment-analytics', params),
 
   // Reports
   paySchedule: (params) => api.get('/admissions/reports/pay-schedule', params),
@@ -518,6 +540,31 @@ export const reportsApi = {
   leadPdf: (id) => api.post(`/reports/leads/${id}/pdf`),
   dashboardPdf: (body) => api.post('/reports/dashboard/pdf', body),
   jobStatus: (job_id) => api.get(`/reports/${job_id}`),
+  // Lead Transfer Report (admin + sales_manager). JSON for the on-screen table.
+  leadTransfers: (params) => api.get('/reports/lead-transfers', params),
+  // Streams the same report as an Excel file and triggers a browser download.
+  downloadLeadTransfers: async (params = {}) => {
+    const { auth, API_BASE } = await import('./api');
+    const token = auth.getAccess();
+    const qs = new URLSearchParams({ ...params, format: 'xlsx' }).toString();
+    const res = await fetch(`${API_BASE}/reports/lead-transfers?${qs}`, {
+      headers: token ? { authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      let detail = '';
+      try { const j = await res.json(); detail = j?.error?.message || ''; } catch { /* ignore */ }
+      throw new Error(`Export failed (${res.status})${detail ? `: ${detail}` : ''}`);
+    }
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = `lead-transfers-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+  },
 };
 
 export const ticketsApi = {

@@ -5,6 +5,8 @@ import AnalyticsDashboard from './pages/Dashboard/AnalyticsDashboard'
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute'
 import './App.css'
 import LeadList from './pages/LeadList/LeadList'
+import PaymentsTracker from './pages/Payments/PaymentsTracker'
+import LeadTransferReport from './pages/Reports/LeadTransferReport'
 import RawDataManager from './pages/RawDataManager/RawDataManager'
 import FailedLeads from './pages/FailedLeads/FailedLeads'
 import BulkUploadList from './pages/BulkUplodList/BulkUploadList'
@@ -41,6 +43,7 @@ import {
 } from './pages/Accounts/AdmissionsList'
 import NewAdmission from './pages/Accounts/NewAdmission'
 import AdmissionDetail from './pages/Accounts/AdmissionDetail'
+import PaymentDetails from './pages/Accounts/PaymentDetails'
 import PendingAdmissions from './pages/Accounts/PendingAdmissions'
 import {
   PaySchedulePage,
@@ -48,6 +51,7 @@ import {
   AdmissionsReportPage,
 } from './pages/Accounts/Reports'
 import AdmissionCenters from './pages/AdvancedSettings/AdmissionCenters'
+import PaymentAccounts from './pages/AdvancedSettings/PaymentAccounts'
 // Public, unauthenticated student-facing admission form. NOT wrapped in
 // Layout/ProtectedRoute — the token in the URL is the credential.
 import PublicAdmission from './pages/PublicAdmission/PublicAdmission'
@@ -71,6 +75,12 @@ function App() {
 
         <Route path="/dashboard"            element={<ProtectedRoute tab="dashboard"><Layout><AnalyticsDashboard /></Layout></ProtectedRoute>} />
         <Route path="/leadlist"             element={<ProtectedRoute tab="leads"><Layout><LeadList /></Layout></ProtectedRoute>} />
+        {/* Standalone, super_admin-only in-depth payments ledger. Sits below
+            Lead Manager in the sidebar; reuses /admissions/payment-details. */}
+        <Route path="/payments"             element={<ProtectedRoute tab="payments"><Layout><PaymentsTracker /></Layout></ProtectedRoute>} />
+        {/* Lead Transfer Report — admin + sales_manager. Telecaller/Counsellor
+            performance via the immutable assignment ledger + Excel export. */}
+        <Route path="/reports/lead-transfers" element={<ProtectedRoute tab="lead_transfer_report"><Layout><LeadTransferReport /></Layout></ProtectedRoute>} />
         <Route path="/search"               element={<ProtectedRoute tab="leads"><Layout><SearchResults /></Layout></ProtectedRoute>} />
         <Route path="/users/:id"            element={<ProtectedRoute tab="advanced.users_roles"><Layout><UserProfile /></Layout></ProtectedRoute>} />
         {/* /profile is open to every authenticated tenant role — each user
@@ -101,6 +111,8 @@ function App() {
         <Route path="/advancedsettings/org-tree" element={<ProtectedRoute tab="advanced.users_roles"><Layout><OrgTree /></Layout></ProtectedRoute>} />
         {/* Admission centers (Accounts module dropdown — managed by super_admin) */}
         <Route path="/advancedsettings/admission-centers" element={<ProtectedRoute tab="advanced.dropdowns"><Layout><AdmissionCenters /></Layout></ProtectedRoute>} />
+        {/* Payment accounts (bank + UPI for collecting fee payments — super_admin) */}
+        <Route path="/advancedsettings/payment-accounts" element={<ProtectedRoute tab="advanced.payment_accounts"><Layout><PaymentAccounts /></Layout></ProtectedRoute>} />
 
         {/* ---------- Accounts module (account_manager) ---------- */}
         <Route path="/accounts/dashboard"                element={<ProtectedRoute tab="accounts.dashboard"><Layout><AccountsDashboard /></Layout></ProtectedRoute>} />
@@ -113,6 +125,7 @@ function App() {
         <Route path="/accounts/report"                   element={<ProtectedRoute tab="accounts.report"><Layout><AdmissionsReportPage /></Layout></ProtectedRoute>} />
         <Route path="/accounts/pay-schedule"             element={<ProtectedRoute tab="accounts.pay_schedule"><Layout><PaySchedulePage /></Layout></ProtectedRoute>} />
         <Route path="/accounts/collection-receipt-wise"  element={<ProtectedRoute tab="accounts.collection_receipt_wise"><Layout><CollectionReceiptWisePage /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/payment-details"          element={<ProtectedRoute tab="accounts.payment_details"><Layout><PaymentDetails /></Layout></ProtectedRoute>} />
         {/* Admission form — `:leadId?` is optional; when present we hydrate from /leads/:id */}
         <Route path="/accounts/new-admission"            element={<ProtectedRoute tab="accounts.approvals"><Layout><NewAdmission /></Layout></ProtectedRoute>} />
         <Route path="/accounts/new-admission/:leadId"    element={<ProtectedRoute tab="accounts.approvals"><Layout><NewAdmission /></Layout></ProtectedRoute>} />
