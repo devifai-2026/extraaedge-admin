@@ -1,0 +1,38 @@
+# Render Infrastructure-as-Code for the admin frontend (static site).
+#
+# Why this file exists: the service was previously publishing the repo ROOT,
+# so Render served the dev-mode index.html (which references /src/main.jsx).
+# The browser then loaded that raw .jsx as binary/octet-stream and rejected it
+# under the strict module-script MIME check — a blank page. This pins the
+# build + publish dir so Render serves the compiled dist/ instead.
+#
+# NOTE: a render.yaml only applies to services created via a Blueprint, OR
+# when you sync it in the dashboard. An EXISTING service's dashboard settings
+# (Build Command / Publish Directory) take precedence and must be set to match
+# the values below if this Blueprint isn't driving the service.
+services:
+  - type: web
+    name: extraaedge-admin
+    runtime: static
+    branch: prod
+    # Render sets PROD=true during `vite build`, so src/lib/config.js targets
+    # the deployed backend automatically. Override the backend host here if it
+    # ever moves, via an env var, instead of editing code:
+    #   envVars:
+    #     - key: VITE_API_BASE_URL
+    #       value: https://extraaedge-server.onrender.com/api/v1
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    # SPA deep-link support: any path that doesn't match a real file in dist/
+    # is rewritten to index.html so client-side routes survive a hard reload.
+    # Real assets (/assets/*.js, /favicon.svg, …) are served directly and are
+    # NOT caught by this rewrite, so module scripts keep their correct MIME.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      # Long-cache the content-hashed build assets (filenames change per build).
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
