@@ -272,6 +272,7 @@ const LeadList = () => {
                 unassignedCount={unassignedCount}
                 searchQuery={tableSearchQ}
                 onSearchQueryChange={setTableSearchQ}
+                exportFilter={filterParams}
             />
 
             {Object.keys(advancedFilter).length > 0 && (

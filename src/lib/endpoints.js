@@ -43,6 +43,45 @@ export const leadsApi = {
   // assignments, family, attribution, custom values, tags, calls, payments,
   // referral edges) so the deletion is total.
   bulkDelete: (ids) => api.post('/leads/bulk-delete', { ids }),
+  // Download the WHOLE filtered lead list as a CSV (no pagination — every
+  // matching row in the tenant). Super-admin ONLY at the API layer (403 for
+  // anyone else). Uses fetch directly (not the JSON `api` client) because the
+  // body is a CSV file, and triggers a browser download. `params` is the same
+  // filter object passed to leadsApi.list — minus page/limit, which the export
+  // ignores. Returns the number of bytes saved (best-effort) for the caller.
+  exportCsv: async (params = {}) => {
+    const { auth, API_BASE } = await import('./api');
+    const token = auth.getAccess();
+    // Drop pagination params — the export is intentionally unpaginated.
+    const filters = { ...(params || {}) };
+    delete filters.page;
+    delete filters.limit;
+    const qs = new URLSearchParams(
+      Object.entries(filters).filter(([, v]) => v !== undefined && v !== null && v !== ''),
+    ).toString();
+    const url = `${API_BASE}/leads/export.csv${qs ? `?${qs}` : ''}`;
+    const res = await fetch(url, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) {
+      let detail = '';
+      try { const j = await res.json(); detail = j?.error?.message || ''; } catch { /* not JSON */ }
+      throw new Error(`Export failed (${res.status})${detail ? `: ${detail}` : ''}`);
+    }
+    const blob = await res.blob();
+    // Prefer the server's filename from Content-Disposition; fall back to a
+    // sensible default if the header isn't exposed.
+    const cd = res.headers.get('content-disposition') || '';
+    const match = /filename="?([^"]+)"?/.exec(cd);
+    const filename = match ? match[1] : `leads-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+    return blob.size;
+  },
   reassign: (body) => api.post('/lead-assignments', body),
   // Run the active assignment rule against every unassigned lead in the tenant.
   // Returns { found, assigned, skipped }. Admin / sales-manager only at the API layer.

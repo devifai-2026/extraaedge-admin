@@ -12,6 +12,7 @@ import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 // older short name `DeleteOutline` isn't in this package's exports map,
 // so importing it explodes at Vite resolve time.
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import FileDownloadIcon from "@mui/icons-material/FileDownloadOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
 import { Tooltip, CircularProgress, InputBase } from "@mui/material";
@@ -48,7 +49,7 @@ const SORT_OPTIONS = [
     { key: 'score_desc',         label: 'Lead Score' },
 ];
 
-const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onReassignSelected, onReassignAll, onBulkDelete, sort, onSortChange, advancedFilter, onApplyFilter, onResetFilter, viewMode = 'card', onViewModeChange, unassignedCount = 0, searchQuery = '', onSearchQueryChange }) => {
+const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onReassignSelected, onReassignAll, onBulkDelete, sort, onSortChange, advancedFilter, onApplyFilter, onResetFilter, viewMode = 'card', onViewModeChange, unassignedCount = 0, searchQuery = '', onSearchQueryChange, exportFilter }) => {
     // Auto-assign button is for super-admin and sales-manager only —
     // counsellors don't manage assignments themselves.
     const canAutoAssign = isRole(ROLES.SUPER_ADMIN, ROLES.SALES_MANAGER);
@@ -56,6 +57,22 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
     // roles, and the BE refuses non-super-admin callers anyway (defence in
     // depth — the FE check is just to hide the affordance).
     const canBulkDelete = isRole(ROLES.SUPER_ADMIN);
+    // Download-all-as-CSV is super-admin ONLY (same gate as the BE route).
+    const canExport = isRole(ROLES.SUPER_ADMIN);
+    const [exporting, setExporting] = useState(false);
+    const handleExport = async () => {
+        if (exporting) return;
+        setExporting(true);
+        try {
+            // Pass the current filter view so the CSV matches what's on screen.
+            // The endpoint strips page/limit and returns every matching row.
+            await leadsApi.exportCsv(exportFilter || {});
+        } catch (e) {
+            alert(e?.message || 'CSV export failed');
+        } finally {
+            setExporting(false);
+        }
+    };
     const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const handleConfirmBulkDelete = async () => {
@@ -239,6 +256,29 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                                         }}
                                     >
                                         Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                        )}
+
+                        {canExport && (
+                            <Tooltip title="Download the entire filtered lead list as a CSV (all rows, no pagination)">
+                                <span>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        startIcon={exporting
+                                            ? <CircularProgress size={14} sx={{ color: colors.primary }} />
+                                            : <FileDownloadIcon fontSize="small" />}
+                                        onClick={handleExport}
+                                        disabled={exporting}
+                                        sx={{
+                                            textTransform: 'none', fontSize: 12, ml: 0.5,
+                                            color: colors.primary, borderColor: colors.primary,
+                                            '&:hover': { borderColor: colors.primary, background: '#fff7f7' },
+                                        }}
+                                    >
+                                        {exporting ? 'Exporting…' : 'Download CSV'}
                                     </Button>
                                 </span>
                             </Tooltip>
