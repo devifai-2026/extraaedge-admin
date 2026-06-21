@@ -12,6 +12,7 @@ import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 import CloseIcon from '@mui/icons-material/Close';
 import { quickAddApi } from '../../lib/endpoints';
+import { auth } from '../../lib/api';
 import { useDropdown } from '../../lib/useDropdowns';
 import './QuickAdd.css';
 
@@ -91,6 +92,9 @@ const QuickAdd = ({ open, onClose, onCreated }) => {
         setError('');
         try {
             await quickAddApi.create(buildPayload());
+            // Tell any mounted LeadList to refresh live (QuickAdd lives in the
+            // header, so it can't call the list's reload directly).
+            try { window.dispatchEvent(new CustomEvent('ee:lead-created')); } catch { /* no-op */ }
             return true;
         } catch (e) {
             setError(e.message || 'Failed to add lead');
@@ -100,11 +104,17 @@ const QuickAdd = ({ open, onClose, onCreated }) => {
         }
     };
 
+    // A counsellor's quick-add self-assigns to them; managers/admins leave it
+    // Unassigned for auto-assign. Word the toast accordingly.
+    const savedText = auth.getUser()?.role === 'counsellor'
+        ? 'Lead saved to your leads.'
+        : 'Lead saved to the Unassigned bucket.';
+
     const handleSaveAndClose = async () => {
         const ok = await submit();
         if (ok) {
             setFormData(initialFormData);
-            setToast({ severity: 'success', text: 'Lead saved to Unassigned bucket.' });
+            setToast({ severity: 'success', text: savedText });
             onCreated?.();
             onClose?.();
         }
@@ -114,7 +124,7 @@ const QuickAdd = ({ open, onClose, onCreated }) => {
         const ok = await submit();
         if (ok) {
             setFormData(initialFormData);
-            setToast({ severity: 'success', text: 'Lead saved. Add another.' });
+            setToast({ severity: 'success', text: `${savedText} Add another.` });
             onCreated?.();
         }
     };

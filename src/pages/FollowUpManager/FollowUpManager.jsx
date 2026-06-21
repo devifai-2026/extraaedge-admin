@@ -186,7 +186,9 @@ function KpiTile({ label, value, color }) {
 export default function FollowUpManager() {
   const navigate = useNavigate();
   const sessionUser = auth.getUser() || {};
-  const isAdmin = sessionUser.role === 'super_admin';
+  // branch_manager is admin-like (sees their whole branch, scoped server-side),
+  // so it gets the admin/all view here rather than the counsellor view.
+  const isAdmin = sessionUser.role === 'super_admin' || sessionUser.role === 'branch_manager';
   const isManager = sessionUser.role === 'sales_manager';
 
   const [activeTab, setActiveTab] = useState('all');

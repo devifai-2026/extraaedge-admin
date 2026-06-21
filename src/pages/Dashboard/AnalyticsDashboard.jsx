@@ -143,7 +143,9 @@ export default function AnalyticsDashboard() {
   const navigate = useNavigate();
   const sessionUser = auth.getUser() || {};
   const role = sessionUser.role || ROLES.COUNSELLOR;
-  const isAdmin = role === ROLES.SUPER_ADMIN;
+  // branch_manager is admin-like for the dashboard (whole-branch view, scoped
+  // server-side), so it gets the admin variant rather than the counsellor one.
+  const isAdmin = role === ROLES.SUPER_ADMIN || role === ROLES.BRANCH_MANAGER;
   const isManager = role === ROLES.SALES_MANAGER;
   const isCounsellor = role === ROLES.COUNSELLOR;
 

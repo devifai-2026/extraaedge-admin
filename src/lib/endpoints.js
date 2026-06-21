@@ -1,6 +1,16 @@
 // Domain-specific API helpers. Single source of truth for backend endpoint paths.
 import { api, auth } from './api';
 
+// Merge the super_admin's active branch (from the header branch switcher) into
+// a query-params object, unless the caller already set branch_id. The backend
+// only honors branch_id for super_admin; for other roles it's a no-op (they're
+// branch-scoped server-side). Empty active branch = "All branches".
+const withBranch = (params = {}) => {
+  const branch = auth.getActiveBranch();
+  if (!branch || params.branch_id) return params;
+  return { ...params, branch_id: branch };
+};
+
 // Unauthenticated student-facing admission flow. Reuses the regular `api`
 // helper — the bearer token, if any, is harmless on these routes (the BE
 // router doesn't run authRequired here). Used by /apply/:token.
@@ -28,8 +38,8 @@ export const authApi = {
 };
 
 export const leadsApi = {
-  list: (params) => api.get('/leads', params),
-  stageCounts: (params) => api.get('/leads/stage-counts', params),
+  list: (params) => api.get('/leads', withBranch(params)),
+  stageCounts: (params) => api.get('/leads/stage-counts', withBranch(params)),
   get: (id) => api.get(`/leads/${id}`),
   timeline: (id, params) => api.get(`/leads/${id}/timeline`, params),
   create: (body) => api.post('/leads', body),
@@ -53,7 +63,8 @@ export const leadsApi = {
     const { auth, API_BASE } = await import('./api');
     const token = auth.getAccess();
     // Drop pagination params — the export is intentionally unpaginated.
-    const filters = { ...(params || {}) };
+    // Honor the active branch (super_admin branch switcher) like the list.
+    const filters = withBranch({ ...(params || {}) });
     delete filters.page;
     delete filters.limit;
     const qs = new URLSearchParams(
@@ -115,15 +126,15 @@ export const followUpsApi = {
 };
 
 export const analyticsApi = {
-  summary: (params) => api.get('/analytics/summary', params),
-  funnel: (params) => api.get('/analytics/funnel', params),
-  leadsTimeline: (params) => api.get('/analytics/leads-timeline', params),
-  programWise: (params) => api.get('/analytics/program-wise', params),
-  channelSource: (params) => api.get('/analytics/channel-source', params),
-  programStatus: (params) => api.get('/analytics/program-status', params),
-  coldEnquiries: (params) => api.get('/analytics/cold-enquiries', params),
-  counselorPerformance: (params) => api.get('/analytics/counselor-performance', params),
-  communications: (params) => api.get('/analytics/communications', params),
+  summary: (params) => api.get('/analytics/summary', withBranch(params)),
+  funnel: (params) => api.get('/analytics/funnel', withBranch(params)),
+  leadsTimeline: (params) => api.get('/analytics/leads-timeline', withBranch(params)),
+  programWise: (params) => api.get('/analytics/program-wise', withBranch(params)),
+  channelSource: (params) => api.get('/analytics/channel-source', withBranch(params)),
+  programStatus: (params) => api.get('/analytics/program-status', withBranch(params)),
+  coldEnquiries: (params) => api.get('/analytics/cold-enquiries', withBranch(params)),
+  counselorPerformance: (params) => api.get('/analytics/counselor-performance', withBranch(params)),
+  communications: (params) => api.get('/analytics/communications', withBranch(params)),
   loginEvents: (params) => api.get('/analytics/login-events', params),
 };
 
@@ -164,6 +175,33 @@ export const teamsApi = {
   members: (id) => api.get(`/teams/${id}/members`),
   addMember: (id, body) => api.post(`/teams/${id}/members`, body),
   removeMember: (id, user_id) => api.delete(`/teams/${id}/members/${user_id}`),
+};
+
+export const leadDiscountsApi = {
+  // Current discount on a lead (or null). Readable by counsellor/managers/
+  // account_manager.
+  get: (leadId) => api.get(`/lead-discounts/${leadId}`),
+  // Apply / request a discount. <=10% self-applies for a counsellor; higher
+  // routes to manager approval. Body: { discount_percent, reason? }.
+  apply: (leadId, body) => api.post(`/lead-discounts/${leadId}`, body),
+  // Manager approve/reject. Body: { decision: 'approved'|'rejected', reject_reason? }.
+  decide: (leadId, body) => api.post(`/lead-discounts/${leadId}/decide`, body),
+  // Pending-approval queue for the acting manager (team/branch-scoped server-side).
+  pending: () => api.get('/lead-discounts/pending'),
+};
+
+export const branchesApi = {
+  list: () => api.get('/branches'),
+  get: (id) => api.get(`/branches/${id}`),
+  create: (body) => api.post('/branches', body),
+  update: (id, body) => api.put(`/branches/${id}`, body),
+  remove: (id) => api.delete(`/branches/${id}`),
+  // First-run onboarding: create the first branch AND move all existing users
+  // + leads into it in one call. Body: { name, code?, branch_manager_id? }.
+  // Returns { branch, users_adopted, leads_backfilled }.
+  adoptAll: (body) => api.post('/branches/adopt-all', body),
+  addMember: (id, user_id) => api.post(`/branches/${id}/members`, { user_id }),
+  removeMember: (id, user_id) => api.delete(`/branches/${id}/members/${user_id}`),
 };
 
 export const customRolesApi = {

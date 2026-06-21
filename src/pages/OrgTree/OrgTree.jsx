@@ -13,14 +13,16 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { useNavigate } from 'react-router-dom';
 import { usersApi } from '../../lib/endpoints';
 
-const ROLE_TIER = { super_admin: 0, sales_manager: 1, counsellor: 2 };
+const ROLE_TIER = { super_admin: 0, branch_manager: 1, sales_manager: 2, counsellor: 3 };
 const ROLE_COLOR = {
   super_admin: '#E53935',
+  branch_manager: '#8e24aa',
   sales_manager: '#1976d2',
   counsellor: '#2e7d32',
 };
 const ROLE_LABEL = {
   super_admin: 'Super Admin',
+  branch_manager: 'Branch Manager',
   sales_manager: 'Sales Manager',
   counsellor: 'Counsellor',
 };
@@ -30,9 +32,9 @@ const ROLE_LABEL = {
 // sizes; for >50 nodes per tier we'd switch to dagre, but simpler is fine
 // for the Stage 3 release.
 const layout = (rawNodes, rawEdges) => {
-  const buckets = { 0: [], 1: [], 2: [] };
+  const buckets = { 0: [], 1: [], 2: [], 3: [] };
   for (const n of rawNodes) {
-    const tier = ROLE_TIER[n.role] ?? 2;
+    const tier = ROLE_TIER[n.role] ?? 3;
     buckets[tier].push(n);
   }
   const ROW_GAP = 180;
@@ -101,8 +103,15 @@ const OrgNode = ({ data, selected }) => {
       <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
         {data.designation || data.email}
       </div>
-      <div style={{ marginTop: 6, display: 'inline-block', fontSize: 10, fontWeight: 600, color, background: `${color}15`, padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase' }}>
-        {ROLE_LABEL[data.role] || data.role}
+      <div style={{ marginTop: 6, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 10, fontWeight: 600, color, background: `${color}15`, padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase' }}>
+          {ROLE_LABEL[data.role] || data.role}
+        </span>
+        {data.branch_name && (
+          <span style={{ fontSize: 10, fontWeight: 600, color: '#475569', background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 }}>
+            {data.branch_name}
+          </span>
+        )}
       </div>
       <Handle type="source" position={Position.Bottom} style={handleStyle} isConnectable={false} />
     </div>
@@ -131,7 +140,7 @@ export default function OrgTree() {
   const { nodes, edges } = useMemo(() => layout(raw.nodes, raw.edges), [raw]);
 
   const tierCounts = useMemo(() => {
-    const c = { super_admin: 0, sales_manager: 0, counsellor: 0 };
+    const c = { super_admin: 0, branch_manager: 0, sales_manager: 0, counsellor: 0 };
     for (const n of raw.nodes) c[n.role] = (c[n.role] || 0) + 1;
     return c;
   }, [raw]);
@@ -142,11 +151,12 @@ export default function OrgTree() {
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 600 }}>Org Tree</Typography>
           <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
-            {tierCounts.super_admin} super admin · {tierCounts.sales_manager} manager{tierCounts.sales_manager === 1 ? '' : 's'} · {tierCounts.counsellor} counsellor{tierCounts.counsellor === 1 ? '' : 's'}
+            {tierCounts.super_admin} super admin · {tierCounts.branch_manager} branch manager{tierCounts.branch_manager === 1 ? '' : 's'} · {tierCounts.sales_manager} manager{tierCounts.sales_manager === 1 ? '' : 's'} · {tierCounts.counsellor} counsellor{tierCounts.counsellor === 1 ? '' : 's'}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
           <Chip label="Super admin" size="small" sx={{ background: '#fee2e2', color: '#E53935', fontWeight: 600 }} />
+          <Chip label="Branch mgr" size="small" sx={{ background: '#f3e5f5', color: '#8e24aa', fontWeight: 600 }} />
           <Chip label="Manager" size="small" sx={{ background: '#dbeafe', color: '#1976d2', fontWeight: 600 }} />
           <Chip label="Counsellor" size="small" sx={{ background: '#dcfce7', color: '#2e7d32', fontWeight: 600 }} />
           <IconButton size="small" onClick={reload} title="Refresh"><RefreshIcon /></IconButton>
@@ -197,6 +207,7 @@ export default function OrgTree() {
             <Box sx={{ mt: 3, fontSize: 14 }}>
               <Row label="Email" value={selectedNode.email} />
               {selectedNode.designation && <Row label="Designation" value={selectedNode.designation} />}
+              <Row label="Branch" value={selectedNode.branch_name || '—'} />
               <Row label="Status" value={selectedNode.is_active ? 'Active' : 'Inactive'} />
             </Box>
             <Box sx={{ mt: 3 }}>

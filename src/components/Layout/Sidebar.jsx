@@ -32,7 +32,7 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { hasTab } from '../../lib/rbac';
-import { admissionsApi } from '../../lib/endpoints';
+import { admissionsApi, leadDiscountsApi } from '../../lib/endpoints';
 import { onNotification } from '../../lib/socket';
 
 // ---------------------------------------------------------------------------
@@ -81,6 +81,7 @@ const menuSections = [
       { id: 6, label: 'Upload Failed Leads', icon: UploadFileIcon, path: '/failedleads', tab: 'failed_leads' },
       { id: 7, label: 'Bulk Action Stage', icon: SettingsIcon, path: '/bulkuploadlist', tab: 'bulk_upload' },
       { id: 20, label: 'Lead Report', icon: AssessmentIcon, path: '/reports/lead-transfers', tab: 'lead_transfer_report' },
+      { id: 21, label: 'Discount Approvals', icon: ChecklistIcon, path: '/discount-approvals', tab: 'lead_transfer_report', badgeKey: 'discount_approvals' },
     ],
   },
   {
@@ -180,6 +181,26 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
     // managers actively watch this badge — staleness is more visible
     // than the bandwidth cost of one tiny COUNT query.
     const t = setInterval(refresh, 10_000);
+    return () => { alive = false; off(); clearInterval(t); };
+  }, []);
+
+  // Pending-discount-approvals badge (BM/SM/admin). Gated on the same tab as
+  // the menu item so counsellors never probe the manager-only endpoint. Live
+  // via the 'discount.requested'/'discount.decided' socket events + a poll.
+  useEffect(() => {
+    if (!hasTab('lead_transfer_report')) return undefined;
+    let alive = true;
+    const refresh = async () => {
+      try {
+        const r = await leadDiscountsApi.pending();
+        if (alive) setBadges((b) => ({ ...b, discount_approvals: (r?.data || []).length }));
+      } catch { /* ignore */ }
+    };
+    refresh();
+    const off = onNotification((evt) => {
+      if (evt?.type === 'discount.requested' || evt?.type === 'discount.decided') refresh();
+    });
+    const t = setInterval(refresh, 15_000);
     return () => { alive = false; off(); clearInterval(t); };
   }, []);
 

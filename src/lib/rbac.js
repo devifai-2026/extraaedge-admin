@@ -11,10 +11,14 @@ import { auth } from './api';
 // (Students/Leads are external, not application users.)
 export const ROLES = {
   SUPER_ADMIN: 'super_admin',
+  // Branch head. Admin-like access, scoped to their branch (enforced
+  // server-side). Reports to the tenant super_admin; the user form disables
+  // the "Reporting To" picker for this role.
+  BRANCH_MANAGER: 'branch_manager',
   SALES_MANAGER: 'sales_manager',
   COUNSELLOR: 'counsellor',
-  // Tenant-level role for post-conversion account management. No team,
-  // no manager — reports directly to the tenant super_admin. Visibility
+  // Tenant-level role for post-conversion account management. No team —
+  // reports to their branch manager (or the tenant super_admin). Visibility
   // scope: every converted lead in the tenant (enforced server-side).
   ACCOUNT_MANAGER: 'account_manager',
 };
@@ -51,6 +55,9 @@ const ROLE_ACCOUNT_MANAGER_TABS = [
 
 const FALLBACK_TABS = {
   [ROLES.SUPER_ADMIN]: ROLE_ALL_TABS,
+  // branch_manager is admin-like for tabs (backend sends ['*']); mirror that
+  // in the fallback so the sidebar isn't starved if allowed_tabs is missing.
+  [ROLES.BRANCH_MANAGER]: ROLE_ALL_TABS,
   [ROLES.SALES_MANAGER]: ROLE_MANAGER_TABS,
   [ROLES.COUNSELLOR]: ROLE_COUNSELLOR_TABS,
   [ROLES.ACCOUNT_MANAGER]: ROLE_ACCOUNT_MANAGER_TABS,

@@ -15,7 +15,7 @@ import SwapVertIcon from '@mui/icons-material/SwapVert';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import LoginIcon from '@mui/icons-material/Login';
-import { usersApi, customRolesApi, programsApi, authApi } from '../../lib/endpoints';
+import { usersApi, customRolesApi, programsApi, authApi, branchesApi } from '../../lib/endpoints';
 import { auth } from '../../lib/api';
 import { isRole, ROLES } from '../../lib/rbac';
 import Breadcrumb from './Breadcrumb';
@@ -59,6 +59,7 @@ const isTabApplicable = (tabKey, scope) => {
 
 const ACCESS_LEVEL_OPTIONS = [
   { value: 'super_admin', label: 'Admin (Super Admin)' },
+  { value: 'branch_manager', label: 'Branch Manager' },
   { value: 'sales_manager', label: 'Sales Manager (Operations)' },
   { value: 'counsellor', label: 'Counsellor (End User)' },
   { value: 'account_manager', label: 'Account Manager (Post-Conversion)' },
@@ -257,6 +258,7 @@ function UsersTab() {
                 <td style={{ padding: '14px 16px' }}>
                   <Chip size="small" label={
                     u.role === 'super_admin' ? 'Admin'
+                      : u.role === 'branch_manager' ? 'Branch Manager'
                       : u.role === 'sales_manager' ? 'Manager'
                       : u.role === 'account_manager' ? 'Account Mgr'
                       : 'Counsellor'
@@ -411,6 +413,7 @@ function UsersTab() {
 
 function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPassword }) {
   const { data: rolesData } = useFetch(() => customRolesApi.list(), [open]);
+  const { data: branchesData } = useFetch(() => branchesApi.list(), [open]);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -431,6 +434,7 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
         manager_ids: Array.isArray(user.manager_ids) && user.manager_ids.length
           ? user.manager_ids
           : (user.manager_id ? [user.manager_id] : []),
+        branch_id: user.branch_id || '',
         is_active: !!user.is_active,
       });
       setErr('');
@@ -441,9 +445,16 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
   // All active roles in the tenant, system + custom. The server will derive
   // the user's `role` bucket from the chosen role's `scope` automatically.
   const allRoles = rolesData?.data || [];
+  const branches = branchesData?.data || [];
+  const hasBranches = branches.length > 0;
+  const isSuperAdmin = form.role === 'super_admin';
+  const isBranchManager = form.role === 'branch_manager';
+  const branchRequired = hasBranches && !isSuperAdmin && !isBranchManager;
 
   const save = async () => {
-    setErr(''); setSaving(true);
+    setErr('');
+    if (branchRequired && !form.branch_id) { setErr('Please select a branch for this user'); return; }
+    setSaving(true);
     try {
       // We send role_id only — server resolves the role bucket from
       // custom_roles.scope, so we don't have to think about it on the FE.
@@ -457,7 +468,10 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
         designation: form.designation?.trim() || null,
         ...(form.role_id ? { role_id: form.role_id } : { role: form.role }),
         // Multi-manager. First entry becomes primary manager_id server-side.
-        manager_ids: Array.isArray(form.manager_ids) ? form.manager_ids : [],
+        // branch_manager reports to admin (server forces it) — send empty.
+        manager_ids: isBranchManager ? [] : (Array.isArray(form.manager_ids) ? form.manager_ids : []),
+        // super_admin spans all branches → null; others carry their branch.
+        branch_id: isSuperAdmin ? null : (form.branch_id || null),
       };
       await usersApi.update(user.id, payload);
       onSaved?.();
@@ -528,11 +542,12 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
           </TextField>
 
           {/* Multi-select reporting managers. All active users in the
-              tenant are candidates (excluding the user being edited). */}
+              tenant are candidates (excluding the user being edited).
+              Disabled for branch_manager — they report to the admin. */}
           <Autocomplete
             multiple
             size="small"
-            disabled={!canManage}
+            disabled={!canManage || isBranchManager}
             disableCloseOnSelect
             options={(users || []).filter((u) => u.id !== user.id && u.is_active !== false)}
             value={(users || []).filter((u) => (form.manager_ids || []).includes(u.id))}
@@ -560,8 +575,36 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
                 />
               ))
             }
-            renderInput={(params) => <TextField {...params} label="Reporting To (multi-select)" placeholder="Search by name or email…" />}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Reporting To (multi-select)"
+                placeholder={isBranchManager ? 'Reports to admin' : 'Search by name or email…'}
+                helperText={isBranchManager ? 'Branch managers report directly to the admin.' : undefined}
+              />
+            )}
           />
+
+          {/* Branch assignment — required except super_admin / branch_manager. */}
+          {!isSuperAdmin && (
+            <TextField
+              size="small"
+              select
+              label={branchRequired ? 'Branch *' : 'Branch'}
+              value={form.branch_id || ''}
+              onChange={(e) => setForm({ ...form, branch_id: e.target.value })}
+              disabled={!canManage}
+              helperText={isBranchManager
+                ? 'Assigned when this user is set as a branch head.'
+                : 'Which branch this user belongs to.'}
+            >
+              {branches.length === 0 && <MenuItem disabled value="">No branches yet</MenuItem>}
+              {!branchRequired && <MenuItem value=""><em>None</em></MenuItem>}
+              {branches.map((b) => (
+                <MenuItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ''}</MenuItem>
+              ))}
+            </TextField>
+          )}
         </div>
 
         <FormControlLabel
@@ -693,6 +736,7 @@ function FilterDialog({ open, value, users, onClose, onApply, onReset }) {
 function AddUserDialog({ open, users, onClose, onCreated }) {
   const { data: programsData } = useFetch(() => programsApi.list(), [open]);
   const { data: rolesData } = useFetch(() => customRolesApi.list(), [open]);
+  const { data: branchesData } = useFetch(() => branchesApi.list(), [open]);
   const [form, setForm] = useState(() => initialAddForm());
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -703,16 +747,25 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
   // System + custom roles. Server derives the user's role bucket from the
   // selected role's scope, so the FE never has to think about buckets.
   const allRoles = rolesData?.data || [];
+  const branches = branchesData?.data || [];
   // Reporting Managers = every active user in the tenant. Per spec the
   // picker is unrestricted (used to be filtered to "users above this role
   // in the hierarchy" — that was friction without a real benefit).
   const candidateManagers = users.filter((u) => u.is_active !== false);
+
+  // The chosen role's bucket drives branch/reporting rules.
+  const isSuperAdmin = form.role === 'super_admin';
+  const isBranchManager = form.role === 'branch_manager';
+  // super_admin spans all branches (no branch). branch_manager gets their
+  // branch when made a head, so it's optional here. Everyone else needs one.
+  const branchRequired = !isSuperAdmin && !isBranchManager;
 
   const submit = async () => {
     setErr('');
     if (!form.first_name.trim()) { setErr('First name is required'); return; }
     if (!form.email.trim()) { setErr('Email is required'); return; }
     if (!form.password || form.password.length < 10) { setErr('Password must be at least 10 chars'); return; }
+    if (branchRequired && !form.branch_id) { setErr('Please select a branch for this user'); return; }
     setSaving(true);
     try {
       const fullName = [form.first_name, form.last_name].filter(Boolean).join(' ').trim();
@@ -726,7 +779,10 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
         ...(form.role_id ? { role_id: form.role_id } : {}),
         ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
         ...(form.designation.trim() ? { designation: form.designation.trim() } : {}),
-        ...(form.manager_ids.length ? { manager_ids: form.manager_ids } : {}),
+        // branch_manager reports to admin (server forces it) — don't send managers.
+        ...(!isBranchManager && form.manager_ids.length ? { manager_ids: form.manager_ids } : {}),
+        // super_admin spans all branches; others carry their branch.
+        ...(isSuperAdmin ? {} : (form.branch_id ? { branch_id: form.branch_id } : {})),
       };
       await usersApi.create(payload);
       onCreated?.();
@@ -792,10 +848,13 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
           </TextField>
 
           {/* Multi-select reporting managers. All active users in the
-              tenant are candidates. Per-spec the picker is unrestricted. */}
+              tenant are candidates. Per-spec the picker is unrestricted.
+              Disabled for branch_manager — a branch head always reports to the
+              tenant admin (server forces this). */}
           <Autocomplete
             multiple
             size="small"
+            disabled={isBranchManager}
             disableCloseOnSelect
             options={candidateManagers}
             value={candidateManagers.filter((u) => form.manager_ids.includes(u.id))}
@@ -827,11 +886,34 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
               <TextField
                 {...params}
                 label="Reporting To (multi-select)"
-                placeholder="Type a name or email to search…"
-                helperText="One or more managers. The first becomes the user’s primary manager."
+                placeholder={isBranchManager ? 'Reports to admin' : 'Type a name or email to search…'}
+                helperText={isBranchManager
+                  ? 'Branch managers report directly to the admin.'
+                  : 'One or more managers. The first becomes the user’s primary manager.'}
               />
             )}
           />
+
+          {/* Branch assignment. Required for everyone except super_admin (spans
+              all branches) and branch_manager (assigned when made a head). */}
+          {!isSuperAdmin && (
+            <TextField
+              size="small"
+              select
+              label={branchRequired ? 'Branch *' : 'Branch'}
+              value={form.branch_id || ''}
+              onChange={(e) => setForm({ ...form, branch_id: e.target.value })}
+              helperText={isBranchManager
+                ? 'Optional — a branch manager is assigned a branch when set as its head.'
+                : 'Which branch this user belongs to.'}
+            >
+              {branches.length === 0 && <MenuItem disabled value="">No branches yet</MenuItem>}
+              {!branchRequired && <MenuItem value=""><em>None</em></MenuItem>}
+              {branches.map((b) => (
+                <MenuItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ''}</MenuItem>
+              ))}
+            </TextField>
+          )}
         </div>
         <FormControlLabel
           control={<Checkbox checked={form.allow_mobile} onChange={(e) => setForm({ ...form, allow_mobile: e.target.checked })} sx={{ color: '#E53935', '&.Mui-checked': { color: '#E53935' } }} />}
@@ -863,6 +945,7 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
 const initialAddForm = () => ({
   first_name: '', last_name: '', email: '', phone: '', password: '',
   role: 'counsellor', role_id: '', designation: '', manager_ids: [],
+  branch_id: '',
   allow_mobile: true, program_id: '',
 });
 

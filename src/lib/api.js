@@ -10,6 +10,8 @@ const STORAGE = {
   USER: 'ee_user',
   TENANT: 'ee_tenant',
   ALLOWED_TABS: 'ee_allowed_tabs',
+  TENANT_SETUP: 'ee_tenant_setup',
+  ACTIVE_BRANCH: 'ee_active_branch',
 };
 
 export const auth = {
@@ -27,12 +29,31 @@ export const auth = {
     const raw = localStorage.getItem(STORAGE.ALLOWED_TABS);
     return raw ? JSON.parse(raw) : [];
   },
-  setSession: ({ access_token, refresh_token, user, tenant, allowed_tabs }) => {
+  // Branch onboarding state from /auth/me: { needs_branch_setup, branch_count }.
+  getTenantSetup: () => {
+    const raw = localStorage.getItem(STORAGE.TENANT_SETUP);
+    return raw ? JSON.parse(raw) : null;
+  },
+  setTenantSetup: (tenant_setup) => {
+    if (tenant_setup) localStorage.setItem(STORAGE.TENANT_SETUP, JSON.stringify(tenant_setup));
+    else localStorage.removeItem(STORAGE.TENANT_SETUP);
+  },
+  // Branch switcher: the branch a super_admin is currently viewing. Empty
+  // string / null = "All branches". Only meaningful for super_admin — other
+  // roles are branch-scoped server-side and ignore this. Lead/analytics API
+  // helpers merge it into their query params.
+  getActiveBranch: () => localStorage.getItem(STORAGE.ACTIVE_BRANCH) || '',
+  setActiveBranch: (branch_id) => {
+    if (branch_id) localStorage.setItem(STORAGE.ACTIVE_BRANCH, branch_id);
+    else localStorage.removeItem(STORAGE.ACTIVE_BRANCH);
+  },
+  setSession: ({ access_token, refresh_token, user, tenant, allowed_tabs, tenant_setup }) => {
     if (access_token) localStorage.setItem(STORAGE.ACCESS, access_token);
     if (refresh_token) localStorage.setItem(STORAGE.REFRESH, refresh_token);
     if (user) localStorage.setItem(STORAGE.USER, JSON.stringify(user));
     if (tenant) localStorage.setItem(STORAGE.TENANT, JSON.stringify(tenant));
     if (allowed_tabs) localStorage.setItem(STORAGE.ALLOWED_TABS, JSON.stringify(allowed_tabs));
+    if (tenant_setup) localStorage.setItem(STORAGE.TENANT_SETUP, JSON.stringify(tenant_setup));
   },
   clear: () => {
     Object.values(STORAGE).forEach((k) => localStorage.removeItem(k));

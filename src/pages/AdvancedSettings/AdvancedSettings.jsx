@@ -30,6 +30,11 @@ const sections = [
     items: [
       { label: "User Profiles", path: "/advancedsettings/users" },
       {
+        label: "Branches",
+        description: "Create and manage branches, set each branch's manager, and assign users.",
+        path: "/advancedsettings/branches",
+      },
+      {
         label: "Org Tree",
         description: "Visual hierarchy of super admins, managers, and counsellors.",
         path: "/advancedsettings/org-tree",

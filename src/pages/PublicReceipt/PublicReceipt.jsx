@@ -55,8 +55,10 @@ export default function PublicReceipt() {
     );
   }
 
-  const { receipt, admission, tenant } = data;
+  const { receipt, admission, tenant, fee_schedule } = data;
   const accent = tenant?.brand_primary_color || '#4f46e5';
+  const scheduleRows = fee_schedule?.rows || [];
+  const totals = fee_schedule?.totals || null;
 
   return (
     <div style={{ minHeight: '100vh', background: '#f1f5f9', padding: '32px 16px', fontFamily: 'system-ui, sans-serif' }}>
@@ -132,6 +134,65 @@ export default function PublicReceipt() {
               )}
             </div>
 
+            {/* Full fee plan with Paid/Due status, so the student sees their
+                whole schedule — registration + every installment — not just
+                this single payment. */}
+            {scheduleRows.length > 0 && (
+              <div style={{ marginTop: 24 }}>
+                <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, marginBottom: 8 }}>
+                  Fee Schedule
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', color: '#64748b', textAlign: 'left' }}>
+                      <th style={schTh}>Item</th>
+                      <th style={schTh}>Due date</th>
+                      <th style={{ ...schTh, textAlign: 'right' }}>Amount</th>
+                      <th style={{ ...schTh, textAlign: 'center' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scheduleRows.map((row, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={schTd}>{row.label}</td>
+                        <td style={{ ...schTd, color: '#64748b' }}>{row.due_date ? fmtDate(row.due_date) : '—'}</td>
+                        <td style={{ ...schTd, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>₹ {fmtMoney(row.amount)}</td>
+                        <td style={{ ...schTd, textAlign: 'center' }}>
+                          <span style={{
+                            display: 'inline-block', padding: '2px 10px', borderRadius: 999,
+                            fontSize: 11, fontWeight: 700,
+                            background: row.paid ? '#dcfce7' : '#fef3c7',
+                            color: row.paid ? '#15803d' : '#b45309',
+                          }}>
+                            {row.paid ? 'Paid' : 'Due'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {totals && (
+                    <tfoot>
+                      <tr style={{ fontWeight: 700, color: '#0f172a' }}>
+                        <td style={{ ...schTd, borderTop: '2px solid #e2e8f0' }} colSpan={2}>Total</td>
+                        <td style={{ ...schTd, borderTop: '2px solid #e2e8f0', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>₹ {fmtMoney(totals.total)}</td>
+                        <td style={{ ...schTd, borderTop: '2px solid #e2e8f0' }} />
+                      </tr>
+                      <tr style={{ color: '#15803d', fontSize: 12 }}>
+                        <td style={schTd} colSpan={2}>Paid</td>
+                        <td style={{ ...schTd, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>₹ {fmtMoney(totals.paid)}</td>
+                        <td style={schTd} />
+                      </tr>
+                      <tr style={{ color: '#b45309', fontSize: 12 }}>
+                        <td style={schTd} colSpan={2}>Balance Due</td>
+                        <td style={{ ...schTd, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>₹ {fmtMoney(totals.due)}</td>
+                        <td style={schTd} />
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            )}
+
             {/* Payment screenshot — surfaced when accounts attached one
                 at capture time. Lets parents/students verify what was
                 credited matches the UPI/bank confirmation they sent. */}
@@ -167,3 +228,6 @@ const KV = ({ label, value, fullSpan }) => (
     <div style={{ fontSize: 14, color: '#0f172a', marginTop: 2 }}>{value || '—'}</div>
   </div>
 );
+
+const schTh = { padding: '8px 10px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 };
+const schTd = { padding: '8px 10px' };

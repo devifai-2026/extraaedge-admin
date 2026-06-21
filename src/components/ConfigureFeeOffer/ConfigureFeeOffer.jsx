@@ -140,6 +140,9 @@ export default function ConfigureFeeOffer({ open, leadId, onClose, onSaved }) {
   // Tracks whether an offer existed when we opened — affects the title +
   // primary button label only.
   const [hadOffer, setHadOffer] = useState(false);
+  // Approved discount % for this lead (backend returns it only when approved);
+  // null → show N/A.
+  const [discount, setDiscount] = useState(null);
 
   useEffect(() => {
     if (!open || !leadId) return undefined;
@@ -157,6 +160,8 @@ export default function ConfigureFeeOffer({ open, leadId, onClose, onSaved }) {
         const data = r?.data || {};
         const progs = data.programs || [];
         setPrograms(progs);
+        // Backend only includes `discount` when it's approved.
+        setDiscount(data.discount || null);
         const activeAccts = (accts || []).filter((a) => a.is_active !== false);
         const orderedAccts = [...activeAccts.filter((a) => a.is_primary), ...activeAccts.filter((a) => !a.is_primary)];
         setAccounts(orderedAccts);
@@ -373,6 +378,29 @@ export default function ConfigureFeeOffer({ open, leadId, onClose, onSaved }) {
           <Box sx={{ p: 4, display: 'flex', justifyContent: 'center' }}><CircularProgress size={24} /></Box>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+            {/* Approved discount for this lead. The counsellor set it at
+                conversion; only an APPROVED discount reaches Accounts (backend
+                gates it). N/A when there's no approved discount. */}
+            <Box sx={{
+              display: 'flex', alignItems: 'center', gap: 1, px: 1.5, py: 1, borderRadius: 1,
+              background: discount ? '#ecfdf5' : '#f8fafc',
+              border: `1px solid ${discount ? '#a7f3d0' : '#e5e7eb'}`,
+            }}>
+              <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                Approved Discount
+              </Typography>
+              {discount ? (
+                <Chip size="small" color="success" label={`${Number(discount.discount_percent)}%`} sx={{ fontWeight: 700 }} />
+              ) : (
+                <Chip size="small" variant="outlined" label="N/A" sx={{ color: '#94a3b8', borderColor: '#cbd5e1' }} />
+              )}
+              {discount?.approved_by_name && (
+                <Typography sx={{ fontSize: 12, color: '#64748b' }}>
+                  · approved by {discount.approved_by_name}
+                </Typography>
+              )}
+            </Box>
+
             {/* Course + base figures. Four fields on one row at md+;
                 wraps to 2x2 on smaller widths automatically. */}
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>

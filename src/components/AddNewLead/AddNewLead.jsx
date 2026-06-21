@@ -72,6 +72,10 @@ const blankForm = {
     next_action_comment: "",
     remarks: "",
     closure_remarks: "",
+    // Discount captured when moving a lead to the Qualified stage. <=10%
+    // self-applies for a counsellor; higher needs branch/sales manager approval.
+    discount_percent: "",
+    discount_reason: "",
     // CSV-parity: optional audit timestamps. Blank → server uses now().
     // Format on the wire: ISO string. UI uses datetime-local inputs.
     created_at: "",
@@ -372,6 +376,16 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
         [states.data, formData.country_id],
     );
 
+    // Does the selected stage mark the lead as CONVERTED ("Marks as Converted"
+    // / is_success)? Drives the Discount % field — discounts are captured at
+    // the moment of conversion (e.g. Enrolled, or any tenant-defined converted
+    // stage), using the flag rather than a hardcoded stage code.
+    const selectedStage = (stages.data || []).find((s) => s.id === formData.stage_id) || null;
+    const isConversionStage = selectedStage?.is_success === true;
+    // A counsellor can self-apply up to 10%; higher needs manager approval.
+    const discountNum = Number(formData.discount_percent);
+    const discountNeedsApproval = Number.isFinite(discountNum) && discountNum > 10;
+
     // Hydrate form when opening in edit mode. The list endpoint returns flat
     // fields with names; we need IDs, so fetch full lead by id.
     useEffect(() => {
@@ -665,24 +679,52 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
                 });
             }
             if (isEditMode) {
-                await leadsApi.update(leadData.id, payload);
-                // Fire /stage when stage OR sub-stage changed. Without the
-                // sub-stage check, moving a lead between sub-stages of the
-                // same stage updates the column silently — no timeline
-                // activity, no follow-up sweep on the outgoing stage. The
-                // repo's stage_changed insert short-circuits on no-op
-                // saves so an unchanged Save no longer drops a row.
+                // A stage/sub-stage transition is owned ENTIRELY by POST
+                // /leads/:id/stage (it does the timeline activity, the
+                // outgoing-stage follow-up sweep, socket notify, and the
+                // Qualified discount hook). If we ALSO sent stage_id in the
+                // PUT, the PUT would move the stage + stamp converted_at first,
+                // and the subsequent /stage call would then hit the
+                // "already converted" guard (blockEditIfConverted) and 403.
+                // So: detect the transition, strip stage fields from the PUT,
+                // and let /stage handle it.
                 const stageChanged = payload.stage_id && payload.stage_id !== leadData.stage_id;
                 const subChanged = (payload.sub_stage_id || null) !== (leadData.sub_stage_id || null);
-                if (payload.stage_id && (stageChanged || subChanged)) {
-                    await leadsApi.changeStage(leadData.id, {
+                const doStageMove = payload.stage_id && (stageChanged || subChanged);
+
+                const putPayload = { ...payload };
+                if (doStageMove) {
+                    delete putPayload.stage_id;
+                    delete putPayload.sub_stage_id;
+                }
+                await leadsApi.update(leadData.id, putPayload);
+
+                let stageResp = null;
+                if (doStageMove) {
+                    stageResp = await leadsApi.changeStage(leadData.id, {
                         stage_id: payload.stage_id,
                         sub_stage_id: payload.sub_stage_id,
                         remarks: payload.closure_remarks || payload.remarks,
                         ...(formData.next_action_datetime
                             ? { next_action_datetime: new Date(formData.next_action_datetime).toISOString() }
                             : {}),
+                        // Discount is only honored by the backend when the
+                        // destination is a CONVERSION stage; harmless otherwise.
+                        ...(formData.discount_percent !== '' && formData.discount_percent != null
+                            ? {
+                                discount_percent: Number(formData.discount_percent),
+                                ...(formData.discount_reason ? { discount_reason: formData.discount_reason } : {}),
+                            }
+                            : {}),
                     });
+                }
+                // If the discount needs approval, the backend HELD the conversion:
+                // the lead did NOT move to the converted stage. Tell the user so
+                // they don't think it failed.
+                if (stageResp?.data?.discount_pending) {
+                    setSubmitError('');
+                    // eslint-disable-next-line no-alert
+                    window.alert(stageResp.data.message || 'Discount sent for manager approval — the lead will convert once approved.');
                 }
                 onSaved?.();
             } else {
@@ -981,6 +1023,14 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
                         <div className="add-lead-section-title">Lead Details</div>
                         <div className="add-lead-form-grid">
                             <TextField label="Applicant Name" required size="small" value={formData.name} onChange={setField('name')} fullWidth />
+                            {/* Read-only branch the lead belongs to (snapshotted from its
+                                owner). Shown on edit for every role; "N/A" if unbranched. */}
+                            {isEditMode && (
+                                <TextField
+                                    size="small" label="Branch" fullWidth disabled
+                                    value={freshLead?.branch_name || leadData?.branch_name || 'N/A'}
+                                />
+                            )}
                             {!mandatoryOnly && <TextField label="Email Id" size="small" value={formData.email} onChange={setField('email')} fullWidth />}
                             {!mandatoryOnly && <TextField label="Alternate Email Id" size="small" value={formData.alternate_email} onChange={setField('alternate_email')} fullWidth />}
                             <TextField label="WhatsApp Number" required size="small" value={formData.whatsapp_number} onChange={setField('whatsapp_number')} fullWidth slotProps={{ htmlInput: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 } }} />
@@ -1178,6 +1228,58 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
                                         renderInput={(params) => <TextField {...params} label="Sub-Stage" placeholder={formData.stage_id ? 'Type to search…' : 'Pick a stage first'} />}
                                     />
                                 </div>
+
+                                {/* Discount % — only when moving to a CONVERSION stage
+                                    ("Marks as Converted"), i.e. when the lead is about to be
+                                    enrolled. Counsellors can self-apply up to 10%; higher
+                                    routes to branch/sales-manager approval (server-enforced). */}
+                                {isConversionStage && (
+                                    <div style={{ marginTop: 12, padding: 12, border: '1px solid #eee', borderRadius: 8, background: '#fcfcfc' }}>
+                                        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Discount %</div>
+                                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                                            {[5, 10].map((pct) => (
+                                                <Chip
+                                                    key={pct}
+                                                    label={`${pct}%`}
+                                                    size="small"
+                                                    color={Number(formData.discount_percent) === pct ? 'primary' : 'default'}
+                                                    variant={Number(formData.discount_percent) === pct ? 'filled' : 'outlined'}
+                                                    onClick={() => setField('discount_percent')({ target: { value: pct } })}
+                                                />
+                                            ))}
+                                            <TextField
+                                                size="small"
+                                                type="number"
+                                                label="Custom %"
+                                                value={formData.discount_percent}
+                                                onChange={(e) => setField('discount_percent')({ target: { value: e.target.value } })}
+                                                inputProps={{ min: 0, max: 100, step: 1 }}
+                                                sx={{ width: 120 }}
+                                            />
+                                            {formData.discount_percent !== '' && (
+                                                <Button size="small" onClick={() => { setField('discount_percent')({ target: { value: '' } }); setField('discount_reason')({ target: { value: '' } }); }}>
+                                                    Clear
+                                                </Button>
+                                            )}
+                                        </div>
+                                        {discountNeedsApproval && (
+                                            <Alert severity="warning" sx={{ mt: 1, fontSize: 12, py: 0 }}>
+                                                Above 10% — this will be sent to a branch/sales manager for approval.
+                                            </Alert>
+                                        )}
+                                        {formData.discount_percent !== '' && (
+                                            <TextField
+                                                size="small"
+                                                fullWidth
+                                                label="Reason (optional)"
+                                                placeholder="Why this discount?"
+                                                value={formData.discount_reason}
+                                                onChange={(e) => setField('discount_reason')({ target: { value: e.target.value } })}
+                                                sx={{ mt: 1 }}
+                                            />
+                                        )}
+                                    </div>
+                                )}
 
 
                                 {/* Upcoming follow-up — shown for every stage EXCEPT the

@@ -51,11 +51,36 @@ const COLUMNS = [
   { key: 'flag', label: 'Flag', sortKey: null, searchType: null, paramKey: null },
 ];
 
-// A date-only picker value 'YYYY-MM-DD' becomes a [from, to] window covering
-// that whole local day, since created_at/updated_at are timestamps.
-const dayRange = (ymd) => {
-  if (!ymd) return { from: '', to: '' };
-  return { from: `${ymd}T00:00:00`, to: `${ymd}T23:59:59.999` };
+// Shared styling for the per-column filter inputs.
+const dateInputStyle = (width) => ({
+  width,
+  minWidth: 0,
+  boxSizing: 'border-box',
+  font: 'inherit',
+  fontSize: 11,
+  fontWeight: 400,
+  textTransform: 'none',
+  padding: '3px 6px',
+  border: '1px solid #e6cdbb',
+  borderRadius: 4,
+  background: '#fff',
+  color: '#333',
+});
+const dateLabelStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  width: '100%',
+  fontSize: 10,
+  fontWeight: 400,
+  textTransform: 'none',
+  color: '#9a7a66',
+};
+// Fixed-width "From"/"To" tag so both date inputs line up under each other.
+const dateLabelTextStyle = {
+  width: 26,
+  flexShrink: 0,
+  textAlign: 'right',
 };
 
 const headerCellStyle = {
@@ -134,11 +159,17 @@ const LeadsTable = ({
   // For a date column we keep the picked day in a side key (`<paramKey>_day`)
   // so the picker stays controlled, and also push the derived from/to window
   // that the server actually filters on.
-  const handleDateChange = (col, ymd) => {
-    const { from, to } = dayRange(ymd);
-    onColumnFilterChange?.(`${col.paramKey}_day`, ymd);
-    onColumnFilterChange?.(`${col.paramKey}_from`, from);
-    onColumnFilterChange?.(`${col.paramKey}_to`, to);
+  // Date columns now take a FROM and TO day. We keep the raw 'YYYY-MM-DD' for
+  // each input (so the picker shows it) and derive the server timestamps:
+  //   from → start of that day, to → end of that day. Either side optional
+  //   (open-ended range).
+  const handleDateRangeChange = (col, side, ymd) => {
+    onColumnFilterChange?.(`${col.paramKey}_${side}_day`, ymd);
+    if (side === 'from') {
+      onColumnFilterChange?.(`${col.paramKey}_from`, ymd ? `${ymd}T00:00:00` : '');
+    } else {
+      onColumnFilterChange?.(`${col.paramKey}_to`, ymd ? `${ymd}T23:59:59.999` : '');
+    }
   };
 
   // Header cell with a click-to-sort label + a per-column search control
@@ -151,9 +182,19 @@ const LeadsTable = ({
     const active = col.sortKey && (serverSort === asc || serverSort === desc);
     const SortIcon = !active ? UnfoldMoreIcon : (serverSort === asc ? ArrowUpwardIcon : ArrowDownwardIcon);
     const textVal = col.searchType === 'text' ? (columnFilters[col.paramKey] || '') : '';
-    const dateVal = col.searchType === 'date' ? (columnFilters[`${col.paramKey}_day`] || '') : '';
+    const dateFromVal = col.searchType === 'date' ? (columnFilters[`${col.paramKey}_from_day`] || '') : '';
+    const dateToVal = col.searchType === 'date' ? (columnFilters[`${col.paramKey}_to_day`] || '') : '';
     return (
-      <th key={col.key} style={{ ...headerCellStyle, textAlign: align }}>
+      <th
+        key={col.key}
+        style={{
+          ...headerCellStyle,
+          textAlign: align,
+          // Bound the date columns so the From/To stack doesn't balloon the
+          // header and shove Age/Flag/Actions off-screen.
+          ...(col.searchType === 'date' ? { width: 165, minWidth: 165 } : {}),
+        }}
+      >
         {col.sortKey ? (
           <div
             onClick={() => toggleSort(col.sortKey)}
@@ -169,31 +210,38 @@ const LeadsTable = ({
         ) : (
           <span>{col.label}</span>
         )}
-        {col.searchType && (
+        {col.searchType === 'text' && (
           <div style={{ marginTop: 4 }}>
             <input
-              type={col.searchType === 'date' ? 'date' : 'text'}
-              value={col.searchType === 'date' ? dateVal : textVal}
-              onChange={(e) => (col.searchType === 'date'
-                ? handleDateChange(col, e.target.value)
-                : onColumnFilterChange?.(col.paramKey, e.target.value))}
+              type="text"
+              value={textVal}
+              onChange={(e) => onColumnFilterChange?.(col.paramKey, e.target.value)}
               onClick={(e) => e.stopPropagation()}
-              placeholder={col.searchType === 'date' ? '' : 'Search'}
-              style={{
-                width: col.searchType === 'date' ? 130 : '100%',
-                minWidth: 70,
-                boxSizing: 'border-box',
-                font: 'inherit',
-                fontSize: 11,
-                fontWeight: 400,
-                textTransform: 'none',
-                padding: '3px 6px',
-                border: '1px solid #e6cdbb',
-                borderRadius: 4,
-                background: '#fff',
-                color: '#333',
-              }}
+              placeholder="Search"
+              style={dateInputStyle('100%')}
             />
+          </div>
+        )}
+        {col.searchType === 'date' && (
+          <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }} onClick={(e) => e.stopPropagation()}>
+            <label style={dateLabelStyle}>
+              <span style={dateLabelTextStyle}>From</span>
+              <input
+                type="date" value={dateFromVal}
+                max={dateToVal || undefined}
+                onChange={(e) => handleDateRangeChange(col, 'from', e.target.value)}
+                style={dateInputStyle('100%')}
+              />
+            </label>
+            <label style={dateLabelStyle}>
+              <span style={dateLabelTextStyle}>To</span>
+              <input
+                type="date" value={dateToVal}
+                min={dateFromVal || undefined}
+                onChange={(e) => handleDateRangeChange(col, 'to', e.target.value)}
+                style={dateInputStyle('100%')}
+              />
+            </label>
           </div>
         )}
       </th>

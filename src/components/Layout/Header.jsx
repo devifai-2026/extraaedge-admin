@@ -5,6 +5,7 @@ import { auth, authApi, notificationsApi, followUpsApi, leadsApi } from '../../l
 import { connectSocket, onNotification, isSocketConnected } from '../../lib/socket'
 import { hasTab, firstAllowedRoute } from '../../lib/rbac'
 import WorkTimer from './WorkTimer'
+import BranchSwitcher from './BranchSwitcher'
 import SearchIcon from '@mui/icons-material/Search';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import AddIcon from '@mui/icons-material/Add';
@@ -281,6 +282,19 @@ function Header() {
             {/* Brand & Timer Section */}
             <div className="header-brand">
                 <span className="brand-text">{sessionTenant?.brand_name || sessionTenant?.name || 'EXTRAEDGE'}</span>
+                {/* Current user's branch. "N/A" when unbranched (e.g. super_admin
+                    spans all branches, or before branch assignment). Shown for
+                    every role. */}
+                <span
+                    title="Your branch"
+                    style={{
+                        marginLeft: 10, padding: '2px 10px', borderRadius: 12,
+                        background: '#f1f5f9', color: '#475569', fontSize: 12,
+                        fontWeight: 600, whiteSpace: 'nowrap',
+                    }}
+                >
+                    🏢 {sessionUser?.branch_name || 'N/A'}
+                </span>
             </div>
 
             <div className='main-container'>
@@ -371,6 +385,7 @@ function Header() {
                 </div>
                 <div className='sub-container'>
                     <div className="header-actions">
+                        <BranchSwitcher />
                         <div className="notification-wrapper">
                             <button
                                 className="header-btn notification-btn"
@@ -440,6 +455,14 @@ function Header() {
                                     // Land on the Lead Manager with ?focus=<id>;
                                     // LeadList opens the edit dialog for that lead on mount.
                                     if (leadId) navigate(`/leadlist?focus=${leadId}`)
+                                    else navigate('/leadlist')
+                                }}
+                                onNavigateEvent={(e) => {
+                                    setAnchorNotification(null)
+                                    // Discount-approval requests go to the approvals tab;
+                                    // everything else focuses the related lead.
+                                    if (e?.type === 'discount.requested') { navigate('/discount-approvals'); return }
+                                    if (e?.lead_id) navigate(`/leadlist?focus=${e.lead_id}`)
                                     else navigate('/leadlist')
                                 }}
                             />
@@ -646,7 +669,7 @@ function Header() {
               stage_changed). Newest first; click to open the lead.
      Follow-ups → today's planned follow-ups loaded over REST.
    ============================================================== */
-function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLive, onClear, onDeleteAll, onMarkAllRead, onNavigateLead, onFollowUpsChanged }) {
+function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLive, onClear, onDeleteAll, onMarkAllRead, onNavigateLead, onNavigateEvent, onFollowUpsChanged }) {
     const [tab, setTab] = useState('live')
     // Track which followup is mid-action so we can disable buttons + show
     // a spinner without yanking the row out of the list.
@@ -715,6 +738,19 @@ function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLi
             const counts = `${p.success_rows ?? 0} added, ${p.failed_rows ?? 0} failed, ${p.duplicate_rows ?? 0} duplicates`
             return `${who}${role ? ` (${role})` : ''} finished a bulk upload — ${counts}`
         }
+        if (e.type === 'discount.requested') {
+            const p = e.payload || {}
+            const who = p.requested_by_name || 'A counsellor'
+            return `Discount approval needed · ${p.discount_percent}% on ${p.lead_name || 'a lead'} (by ${who})`
+        }
+        if (e.type === 'discount.decided') {
+            const p = e.payload || {}
+            if (p.decision === 'approved') {
+                const adjusted = p.requested_percent != null && Number(p.requested_percent) !== Number(p.discount_percent)
+                return `Discount approved at ${p.discount_percent}%${adjusted ? ` (you asked ${p.requested_percent}%)` : ''}${p.converted ? ' — lead converted' : ''}`
+            }
+            return `Discount rejected${p.reject_reason ? ` · ${p.reject_reason}` : ''}`
+        }
         return e.type || 'Event'
     }
     const iconColor = (e) => {
@@ -724,6 +760,8 @@ function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLi
         if (e.type === 'follow_up.reminder')    return '#0288D1'
         if (e.type === 'follow_up.overdue')     return '#D32F2F'
         if (e.type === 'bulk_import.completed') return '#7E57C2'
+        if (e.type === 'discount.requested')    return '#F9A825'
+        if (e.type === 'discount.decided')      return '#43A047'
         return colors.primary
     }
     const fmtRel = (iso) => {
@@ -858,7 +896,7 @@ function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLi
                                             disablePadding
                                             sx={{ borderBottom: `1px solid ${colors.borderGrey}` }}
                                         >
-                                            <ListItemButton onClick={() => onNavigateLead?.(e.lead_id)}>
+                                            <ListItemButton onClick={() => (onNavigateEvent ? onNavigateEvent(e) : onNavigateLead?.(e.lead_id))}>
                                                 <Box sx={{
                                                     width: 8, height: 8, borderRadius: '50%',
                                                     background: iconColor(e), mr: 1.5,

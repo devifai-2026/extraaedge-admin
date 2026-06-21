@@ -187,9 +187,13 @@ const LeadList = () => {
                 triggerReload();
             }
         });
+        // Quick Add (mounted in the header, on any page) dispatches this when a
+        // lead is created, so the list refreshes live instead of only on reload.
+        window.addEventListener('ee:lead-created', triggerReload);
         return () => {
             if (scheduled) clearTimeout(scheduled);
             unsub();
+            window.removeEventListener('ee:lead-created', triggerReload);
         };
     }, []);
 
