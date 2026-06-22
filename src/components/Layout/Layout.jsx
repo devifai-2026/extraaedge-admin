@@ -26,20 +26,22 @@ function Layout({ children }) {
 
   // On mount, refresh /auth/me for EVERY role. This (a) caches the full user
   // incl. branch_name so the navbar can show it (login doesn't carry it), and
-  // (b) for a super_admin whose tenant has no branches yet, surfaces the
-  // branch-setup prompt a few seconds after landing.
+  // (b) when the tenant has no branches yet, surfaces the branch-setup gate.
+  // super_admin gets the actionable "create your first branch" form; every
+  // other role gets a BLOCKING modal that just says "ask your admin to set up
+  // a branch" — they can't proceed until the admin does it.
+  const isAdmin = auth.getUser()?.role === ROLES.SUPER_ADMIN;
   const [needsBranchSetup, setNeedsBranchSetup] = useState(false);
   useEffect(() => {
     let cancelled = false;
     let timer = null;
-    const isAdmin = auth.getUser()?.role === ROLES.SUPER_ADMIN;
     const reveal = (needs) => {
-      if (cancelled || !needs || !isAdmin) return;
-      // Small delay so the dashboard renders first, then the prompt appears.
+      if (cancelled || !needs) return;
+      // Small delay so the dashboard renders first, then the gate appears.
       timer = setTimeout(() => { if (!cancelled) setNeedsBranchSetup(true); }, 2500);
     };
-    // Optimistic from cache (admin only), then confirm with the server.
-    if (isAdmin && auth.getTenantSetup()?.needs_branch_setup) reveal(true);
+    // Optimistic from cache, then confirm with the server.
+    if (auth.getTenantSetup()?.needs_branch_setup) reveal(true);
     authApi.me()
       .then((res) => {
         if (cancelled) return;
@@ -50,7 +52,8 @@ function Layout({ children }) {
         if (me?.user) auth.setSession({ user: me.user });
         if (me?.allowed_tabs) auth.setSession({ allowed_tabs: me.allowed_tabs });
         if (me?.tenant_setup) auth.setTenantSetup(me.tenant_setup);
-        if (me?.tenant_setup?.needs_branch_setup && !timer) reveal(true);
+        if (me?.tenant_setup?.needs_branch_setup) { if (!timer) reveal(true); }
+        else setNeedsBranchSetup(false);
         // Let the navbar re-read the cached user without a reload.
         try { window.dispatchEvent(new CustomEvent('ee:user-updated')); } catch { /* no-op */ }
       })
@@ -75,6 +78,7 @@ function Layout({ children }) {
       </div>
       <BranchSetupDialog
         open={needsBranchSetup}
+        isAdmin={isAdmin}
         onDone={() => setNeedsBranchSetup(false)}
         onManage={() => { setNeedsBranchSetup(false); navigate('/advancedsettings/branches'); }}
       />

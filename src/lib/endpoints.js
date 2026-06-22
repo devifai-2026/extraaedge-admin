@@ -542,6 +542,9 @@ export const admissionsApi = {
   break: (id, reason) => api.post(`/admissions/${id}/break`, reason ? { reason } : {}),
   resume: (id) => api.post(`/admissions/${id}/resume`),
   complete: (id) => api.post(`/admissions/${id}/complete`),
+  // Drop a student (withdrew/won't continue). Stops reminders + moves them to
+  // the Drop Candidates tab.
+  drop: (id, reason) => api.post(`/admissions/${id}/drop`, reason ? { reason } : {}),
 
   // Receipts (per-admission CRUD + flat list)
   createReceipt: (admissionId, body) => api.post(`/admissions/${admissionId}/receipts`, body),

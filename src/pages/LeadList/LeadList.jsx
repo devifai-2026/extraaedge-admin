@@ -140,6 +140,25 @@ const LeadList = () => {
         return params;
     }, [activeStageId, page, sort, advancedFilter, debouncedTableSearchQ, debouncedColumnFilters]);
 
+    // Filter set the STAGE TABS use for their counts. It mirrors filterParams
+    // (advanced filter + search box + per-column header filters incl. date
+    // ranges) but deliberately DROPS the tab-selection bits — flag, stage_id,
+    // page, limit, sort — because each tab counts its own bucket against the
+    // *same* applied filters, independent of which tab is currently active.
+    // Result: applying any filter (column search, date range, advanced) updates
+    // every tab count, and clicking a tab then shows exactly that filtered set.
+    const countsFilter = useMemo(() => {
+        const f = { ...advancedFilter };
+        if (debouncedTableSearchQ) f.q = debouncedTableSearchQ;
+        for (const [k, v] of Object.entries(debouncedColumnFilters)) {
+            const val = typeof v === 'string' ? v.trim() : v;
+            if (val) f[k] = val;
+        }
+        // Tab-selection params must not constrain the per-bucket counts.
+        delete f.flag; delete f.stage_id; delete f.page; delete f.limit; delete f.sort;
+        return f;
+    }, [advancedFilter, debouncedTableSearchQ, debouncedColumnFilters]);
+
     const reload = useCallback(async () => {
         setLoading(true);
         setError('');
@@ -257,7 +276,7 @@ const LeadList = () => {
                 activeStageId={activeStageId}
                 onChange={setActiveStageId}
                 reloadKey={reloadKey}
-                advancedFilter={advancedFilter}
+                advancedFilter={countsFilter}
             />
             <FiltersOptions
                 onRefresh={() => setReloadKey((k) => k + 1)}

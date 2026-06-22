@@ -12,7 +12,7 @@ import { branchesApi, usersApi, authApi } from '../../lib/endpoints';
 import { auth } from '../../lib/api';
 import { ROLES } from '../../lib/rbac';
 
-export default function BranchSetupDialog({ open, onDone, onManage }) {
+export default function BranchSetupDialog({ open, isAdmin = false, onDone, onManage }) {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [managerId, setManagerId] = useState('');
@@ -22,14 +22,14 @@ export default function BranchSetupDialog({ open, onDone, onManage }) {
   const [result, setResult] = useState(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !isAdmin) return;
     setName('Main Branch'); setCode(''); setManagerId(''); setError(''); setResult(null);
     // Candidate branch managers — only users already holding the
     // branch_manager role can head a branch (backend enforces this too).
     usersApi.list({ role: ROLES.BRANCH_MANAGER, is_active: 'true', page: 1, limit: 100 })
       .then((res) => setManagers(res?.data || []))
       .catch(() => setManagers([]));
-  }, [open]);
+  }, [open, isAdmin]);
 
   const submit = async (e) => {
     e?.preventDefault?.();
@@ -62,6 +62,30 @@ export default function BranchSetupDialog({ open, onDone, onManage }) {
   };
 
   if (!open) return null;
+
+  // Non-admin roles can't create a branch. They get a BLOCKING, action-less
+  // modal so they wait until the tenant admin sets up the first branch —
+  // nothing scopes correctly (leads/branch) until then.
+  if (!isAdmin) {
+    return (
+      <Dialog open maxWidth="sm" fullWidth sx={{ zIndex: (theme) => theme.zIndex.modal + 5 }}>
+        <DialogTitle>Setup in progress</DialogTitle>
+        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Alert severity="info">
+            Your organisation is being set up for branch-wise operations.
+          </Alert>
+          <Typography variant="body2" color="text.secondary">
+            A branch hasn’t been created yet. Your administrator needs to create
+            the first branch before you can start working. Please check back
+            shortly — you’ll have full access once setup is complete.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => window.location.reload()}>Check again</Button>
+        </DialogActions>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog

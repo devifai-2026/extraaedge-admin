@@ -40,6 +40,7 @@ import {
   ApprovalsPage,
   AttendingsPage,
   BreakPage,
+  DropCandidatesPage,
   ThisMonthAdmissionsPage,
   TotalAdmissionsPage,
 } from './pages/Accounts/AdmissionsList'
@@ -126,6 +127,7 @@ function App() {
         <Route path="/accounts/approvals"                element={<ProtectedRoute tab="accounts.approvals"><Layout><ApprovalsPage /></Layout></ProtectedRoute>} />
         <Route path="/accounts/attendings"               element={<ProtectedRoute tab="accounts.attendings"><Layout><AttendingsPage /></Layout></ProtectedRoute>} />
         <Route path="/accounts/break"                    element={<ProtectedRoute tab="accounts.break"><Layout><BreakPage /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/drop-candidates"          element={<ProtectedRoute tab="accounts.drop_candidates"><Layout><DropCandidatesPage /></Layout></ProtectedRoute>} />
         <Route path="/accounts/report"                   element={<ProtectedRoute tab="accounts.report"><Layout><AdmissionsReportPage /></Layout></ProtectedRoute>} />
         <Route path="/accounts/pay-schedule"             element={<ProtectedRoute tab="accounts.pay_schedule"><Layout><PaySchedulePage /></Layout></ProtectedRoute>} />
         <Route path="/accounts/collection-receipt-wise"  element={<ProtectedRoute tab="accounts.collection_receipt_wise"><Layout><CollectionReceiptWisePage /></Layout></ProtectedRoute>} />

@@ -24,6 +24,7 @@ import SchoolIcon from '@mui/icons-material/School';
 import ChecklistIcon from '@mui/icons-material/Checklist';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import PauseCircleIcon from '@mui/icons-material/PauseCircle';
+import PersonOffIcon from '@mui/icons-material/PersonOff';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
@@ -117,6 +118,7 @@ const menuSections = [
       { id: 103, label: 'Approvals',              icon: ChecklistIcon,       path: '/accounts/approvals',                  tab: 'accounts.approvals' },
       { id: 104, label: 'Attendings',             icon: HowToRegIcon,        path: '/accounts/attendings',                 tab: 'accounts.attendings' },
       { id: 105, label: 'Break',                  icon: PauseCircleIcon,     path: '/accounts/break',                      tab: 'accounts.break' },
+      { id: 111, label: 'Drop Candidates',        icon: PersonOffIcon,       path: '/accounts/drop-candidates',            tab: 'accounts.drop_candidates' },
       { id: 106, label: 'Report',                 icon: AssessmentIcon,      path: '/accounts/report',                     tab: 'accounts.report' },
       { id: 107, label: 'Pay Schedule',           icon: PaymentsIcon,        path: '/accounts/pay-schedule',               tab: 'accounts.pay_schedule' },
       { id: 108, label: 'Collection Receipt-wise',icon: ReceiptLongIcon,     path: '/accounts/collection-receipt-wise',    tab: 'accounts.collection_receipt_wise' },

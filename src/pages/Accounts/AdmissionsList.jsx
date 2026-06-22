@@ -9,6 +9,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import PauseCircleIcon from '@mui/icons-material/PauseCircle';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
+import PersonOffIcon from '@mui/icons-material/PersonOff';
 import { admissionsApi } from '../../lib/endpoints';
 import { fullName, fmtDate, fmtMoney } from './utils';
 import StatusPill from './StatusPill';
@@ -218,6 +219,20 @@ export const ApprovalsPage = () => (
   />
 );
 
+// Drop action — available on Attending / On-break students. Confirms, asks an
+// optional reason, then drops (stops reminders + moves them to Drop Candidates).
+const dropAction = {
+  label: 'Drop student',
+  color: '#dc2626',
+  icon: <PersonOffIcon fontSize="small" />,
+  onClick: (r) => {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm(`Drop ${fullName(r) || 'this student'}? This stops all reminders and moves them to Drop Candidates.`)) return Promise.resolve();
+    const reason = window.prompt('Reason for drop (optional):') || '';
+    return admissionsApi.drop(r.id, reason);
+  },
+};
+
 export const AttendingsPage = () => (
   <AdmissionsList
     title="Attendings"
@@ -233,6 +248,7 @@ export const AttendingsPage = () => (
           return admissionsApi.break(r.id, reason);
         },
       },
+      dropAction,
     ]}
   />
 );
@@ -250,7 +266,17 @@ export const BreakPage = () => (
         icon: <PlayCircleIcon fontSize="small" />,
         onClick: (r) => admissionsApi.resume(r.id),
       },
+      dropAction,
     ]}
+  />
+);
+
+export const DropCandidatesPage = () => (
+  <AdmissionsList
+    title="Drop Candidates"
+    subtitle="Students who were dropped. No reminders fire against them. They stay here for record/audit."
+    statusFilter="dropped"
+    showFees
   />
 );
 

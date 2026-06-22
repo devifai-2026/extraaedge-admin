@@ -20,9 +20,7 @@ import "./UploadLeads.css";
 import { colors } from "../../theme/colors";
 import { bulkApi, uploadsApi } from "../../lib/endpoints";
 import { onNotification } from "../../lib/socket";
-
-const channelOptions = ["Offline", "Online", "Direct", "Facebook", "Google Ads", "LinkedIn", "Email Campaign"];
-const sourceOptions = ["Direct Walkin", "Website", "Social Media", "Professional Network", "Newsletter", "Referral"];
+import { useDropdown } from "../../lib/useDropdowns";
 
 // Two visible steps. Step 3 (column mapping) was removed because the
 // canonical .xlsx template the user downloads already uses the exact column
@@ -61,8 +59,16 @@ const waitForPreview = async (previewId, { timeoutMs = 30000, onTick } = {}) => 
 
 const UploadLeads = ({ open, onClose, onUploaded }) => {
     const [activeStep, setActiveStep] = useState(0);
-    const [channel, setChannel] = useState("Offline");
-    const [source, setSource] = useState("Direct Walkin");
+    const [channel, setChannel] = useState("");
+    const [source, setSource] = useState("");
+
+    // Channel / Source defaults are picked from the tenant's real dropdown
+    // values (DB), not a hardcoded list. The worker matches/auto-creates by
+    // case-insensitive name, so we hand it the chosen name string.
+    const channelsDd = useDropdown('channels', { enabled: open });
+    const sourcesDd = useDropdown('sources', { enabled: open });
+    const channelOptions = (channelsDd.data || []).map((c) => c.name).filter(Boolean);
+    const sourceOptions = (sourcesDd.data || []).map((s) => s.name).filter(Boolean);
     const [sendWelcomeEmail, setSendWelcomeEmail] = useState(false);
     const [sendWelcomeSMS, setSendWelcomeSMS] = useState(false);
     const [uploadedFile, setUploadedFile] = useState(null);
@@ -440,8 +446,10 @@ const UploadLeads = ({ open, onClose, onUploaded }) => {
                             size="small"
                             fullWidth
                             options={channelOptions}
-                            value={channel}
-                            onChange={(_, val) => setChannel(val)}
+                            value={channel || null}
+                            loading={channelsDd.loading}
+                            onChange={(_, val) => setChannel(val || "")}
+                            noOptionsText={channelsDd.loading ? "Loading…" : "No channels configured"}
                             renderInput={(params) => (
                                 <TextField {...params} placeholder="Select Channel" />
                             )}
@@ -454,8 +462,10 @@ const UploadLeads = ({ open, onClose, onUploaded }) => {
                             size="small"
                             fullWidth
                             options={sourceOptions}
-                            value={source}
-                            onChange={(_, val) => setSource(val)}
+                            value={source || null}
+                            loading={sourcesDd.loading}
+                            onChange={(_, val) => setSource(val || "")}
+                            noOptionsText={sourcesDd.loading ? "Loading…" : "No sources configured"}
                             renderInput={(params) => (
                                 <TextField {...params} placeholder="Select Source" />
                             )}

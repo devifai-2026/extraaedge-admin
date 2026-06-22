@@ -213,6 +213,7 @@ export default function PublicReceipt() {
             )}
 
             <div style={{ marginTop: 28, paddingTop: 16, borderTop: '1px dashed #e2e8f0', fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>
+              <div style={{ fontWeight: 700, color: '#64748b', marginBottom: 4 }}>Fees are non-refundable.</div>
               This is a system-generated receipt. For any queries, please contact the accounts team.
             </div>
           </div>
