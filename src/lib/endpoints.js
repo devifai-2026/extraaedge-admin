@@ -107,6 +107,16 @@ export const leadsApi = {
   },
 };
 
+// Call recordings uploaded from the mobile app. Counsellors see only their own
+// (server-enforced); managers/admins see scope. Used by the Unmatched
+// Recordings review tab.
+export const deviceRecordingsApi = {
+  list: (params) => api.get('/device-recordings', withBranch(params)),
+  playUrl: (id) => api.get(`/device-recordings/${id}/url`),
+  attach: (id, lead_id) => api.post(`/device-recordings/${id}/attach`, { lead_id }),
+  delete: (id) => api.delete(`/device-recordings/${id}`),
+};
+
 export const followUpsApi = {
   list: (params) => api.get('/follow-ups', params),
   // Per-day counts for the FollowUp Manager calendar dots.

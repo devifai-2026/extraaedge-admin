@@ -182,7 +182,7 @@ const hydrateFollowupsByStage = (byStage = {}) => {
 // a non-counsellor role needs to inspect the lead snapshot without editing.
 // Internally we route this through the existing `lockedConverted` plumbing
 // so we don't have to wire a second "is locked" signal through 1300 lines.
-const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = false }) => {
+const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = false, phonePrefill = '' }) => {
     const isEditMode = Boolean(leadData?.id);
     const [activeTab, setActiveTab] = useState(0);
     const [mandatoryOnly, setMandatoryOnly] = useState(false);
@@ -391,7 +391,8 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
     useEffect(() => {
         if (!open) return;
         if (!isEditMode) {
-            setFormData(blankForm);
+            // Seed the phone when creating a lead from an unmatched recording.
+            setFormData(phonePrefill ? { ...blankForm, phone: phonePrefill } : blankForm);
             setActiveTab(0);
             setSubmitError('');
             return;
@@ -728,8 +729,10 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
                 }
                 onSaved?.();
             } else {
-                await leadsApi.create(payload);
-                onCreated?.();
+                const created = await leadsApi.create(payload);
+                // Pass the created lead back so callers (e.g. the Unmatched
+                // Recordings tab) can link it. Existing no-arg handlers ignore it.
+                onCreated?.(created?.data ?? null);
             }
             setFormData(blankForm);
             setReviewOpen(false);

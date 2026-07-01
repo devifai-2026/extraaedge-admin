@@ -32,6 +32,7 @@ import PendingActionsIcon from '@mui/icons-material/PendingActions';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import { hasTab } from '../../lib/rbac';
 import { admissionsApi, leadDiscountsApi } from '../../lib/endpoints';
 import { onNotification } from '../../lib/socket';
@@ -83,6 +84,7 @@ const menuSections = [
       { id: 7, label: 'Bulk Action Stage', icon: SettingsIcon, path: '/bulkuploadlist', tab: 'bulk_upload' },
       { id: 20, label: 'Lead Report', icon: AssessmentIcon, path: '/reports/lead-transfers', tab: 'lead_transfer_report' },
       { id: 21, label: 'Discount Approvals', icon: ChecklistIcon, path: '/discount-approvals', tab: 'lead_transfer_report', badgeKey: 'discount_approvals' },
+      { id: 22, label: 'Unmatched Recordings', icon: GraphicEqIcon, path: '/unmatched-recordings', tab: 'unmatched_recordings' },
     ],
   },
   {
