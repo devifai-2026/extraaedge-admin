@@ -174,6 +174,11 @@ export const usersApi = {
   // to clear. Returns { avatar_r2_key, avatar_url } where avatar_url is a
   // freshly-signed download URL the navbar can render immediately.
   updateMyAvatar: (body) => api.put('/users/me/avatar', body),
+  // Self-service phone update (mandatory phone-capture popup). This number is
+  // what the mobile call-recorder app must also use so uploads attribute to
+  // this user. Rejects (409) a number already registered to another user once
+  // platform-wide uniqueness is enforced.
+  updateMyPhone: (phone) => api.put('/users/me/phone', { phone }),
 };
 
 export const teamsApi = {

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import BranchSetupDialog from '../BranchSetupDialog/BranchSetupDialog';
+import PhoneCaptureDialog from '../PhoneCaptureDialog/PhoneCaptureDialog';
 import { auth } from '../../lib/api';
 import { authApi } from '../../lib/endpoints';
 import { ROLES } from '../../lib/rbac';
@@ -32,6 +33,10 @@ function Layout({ children }) {
   // a branch" — they can't proceed until the admin does it.
   const isAdmin = auth.getUser()?.role === ROLES.SUPER_ADMIN;
   const [needsBranchSetup, setNeedsBranchSetup] = useState(false);
+  // Mandatory phone capture: any tenant user without a phone must set one so
+  // their mobile-app call recordings attribute to them. Optimistic from cache,
+  // then confirmed by the /auth/me fetch below.
+  const [needsPhone, setNeedsPhone] = useState(() => !auth.getUser()?.phone);
   useEffect(() => {
     let cancelled = false;
     let timer = null;
@@ -54,6 +59,8 @@ function Layout({ children }) {
         if (me?.tenant_setup) auth.setTenantSetup(me.tenant_setup);
         if (me?.tenant_setup?.needs_branch_setup) { if (!timer) reveal(true); }
         else setNeedsBranchSetup(false);
+        // Confirm the phone gate against the freshest user record.
+        if (me?.user) setNeedsPhone(!me.user.phone);
         // Let the navbar re-read the cached user without a reload.
         try { window.dispatchEvent(new CustomEvent('ee:user-updated')); } catch { /* no-op */ }
       })
@@ -81,6 +88,11 @@ function Layout({ children }) {
         isAdmin={isAdmin}
         onDone={() => setNeedsBranchSetup(false)}
         onManage={() => { setNeedsBranchSetup(false); navigate('/advancedsettings/branches'); }}
+      />
+      {/* Phone gate only surfaces once branch setup (if any) is resolved. */}
+      <PhoneCaptureDialog
+        open={needsPhone && !needsBranchSetup}
+        onDone={() => setNeedsPhone(false)}
       />
     </div>
   );
