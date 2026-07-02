@@ -179,6 +179,10 @@ export const usersApi = {
   // this user. Rejects (409) a number already registered to another user once
   // platform-wide uniqueness is enforced.
   updateMyPhone: (phone) => api.put('/users/me/phone', { phone }),
+  // OTP-verified phone RESET (Profile page). Send a WhatsApp OTP to the new
+  // number, then confirm it with the received code to change the phone.
+  sendPhoneOtp: (phone) => api.post('/users/me/phone/send-otp', { phone }),
+  verifyPhoneOtp: (phone, code) => api.post('/users/me/phone/verify-otp', { phone, code }),
 };
 
 export const teamsApi = {

@@ -5,6 +5,7 @@ import { auth } from "../../lib/api";
 import { authApi, usersApi } from "../../lib/endpoints";
 import { applyTheme } from "../../theme/applyTheme";
 import AvatarUploader from "../../components/AvatarUploader/AvatarUploader";
+import PhoneNumberCard from "./PhoneNumberCard";
 
 // Broadcast that the cached user blob changed (avatar, name, etc.) so any
 // component watching this event can re-read auth.getUser() without a full
@@ -215,6 +216,8 @@ export default function Profile() {
           }}
         />
       </Box>
+
+      <PhoneNumberCard />
 
       <Box sx={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 2, p: 3 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 0.5, flexWrap: "wrap" }}>

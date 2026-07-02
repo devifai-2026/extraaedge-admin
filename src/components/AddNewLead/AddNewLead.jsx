@@ -241,9 +241,13 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
     // The candidate list shown to counsellors comes from /users/team —
     // returns the counsellor's own peers + managers — which matches what
     // the server will accept.
-    // Reassign UI is hidden from counsellors — they can't reassign anyone
-    // (server-side scope on POST /lead-assignments enforces the same).
-    const canReassign = isEditMode && !isRole(ROLES.COUNSELLOR);
+    // Counsellors CAN reassign, but only leads they currently own, and only to
+    // a teammate/their manager (server-side scope on POST /lead-assignments
+    // enforces the same). Managers/admins can always reassign in edit mode.
+    // After reassign, the new owner automatically sees the full lead + all its
+    // data (recordings/timeline/notes are gated by lead ownership server-side).
+    const ownsThisLead = isEditMode && leadData?.assigned_to === (auth.getUser()?.id);
+    const canReassign = isEditMode && (!isRole(ROLES.COUNSELLOR) || ownsThisLead);
     const [reassignList, setReassignList] = useState([]);     // [{id,name,email,manager_id}]
     const [reassignTo, setReassignTo] = useState('');         // chosen user id
     const [reassignReason, setReassignReason] = useState(''); // free-text
