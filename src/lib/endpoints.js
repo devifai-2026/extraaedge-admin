@@ -94,6 +94,10 @@ export const leadsApi = {
     return blob.size;
   },
   reassign: (body) => api.post('/lead-assignments', body),
+  // Valid reassign targets for the current actor — matches exactly what the
+  // reassign POST will accept (managers+peers for a counsellor, team subtree
+  // for a manager, all counsellors for admin). Use this to populate the picker.
+  reassignTargets: () => api.get('/lead-assignments/targets'),
   // Run the active assignment rule against every unassigned lead in the tenant.
   // Returns { found, assigned, skipped }. Admin / sales-manager only at the API layer.
   autoAssignUnassigned: () => api.post('/leads/auto-assign-unassigned'),

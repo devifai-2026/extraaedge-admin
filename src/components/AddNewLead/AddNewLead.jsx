@@ -264,15 +264,12 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
 
     useEffect(() => {
         if (!open || !canReassign) return;
-        // Admins see every active counsellor; managers + counsellors get
-        // their team-scoped list from the server.
-        // Backend caps `limit` at 200 (listUsersQuery zod schema). Asking for
-        // more produced a 400 that the .catch below swallowed, leaving the
-        // dropdown empty.
-        const loader = isRole(ROLES.SUPER_ADMIN)
-            ? usersApi.list({ role: 'counsellor', limit: 200 })
-            : usersApi.myTeam();
-        loader
+        // Single source of truth for all roles: the server returns exactly the
+        // targets the reassign POST will accept. This fixes the counsellor
+        // "No options" bug — /users/team walks DOWNWARD only, so for a leaf
+        // counsellor it returned just themselves (then filtered out). The
+        // /lead-assignments/targets endpoint returns managers + peers instead.
+        leadsApi.reassignTargets()
             .then((r) => {
                 const me = leadData?.assigned_to;
                 const rows = (r?.data || []).filter((u) =>
@@ -281,10 +278,7 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
                 setReassignList(rows);
             })
             .catch((err) => {
-                // Surface the failure to the dev console — previously this
-                // swallowed errors silently and left the dropdown empty
-                // (e.g. when limit > 200 hit the zod cap).
-                console.warn('Reassign list load failed:', err?.message || err);
+                console.warn('Reassign target load failed:', err?.message || err);
                 setReassignList([]);
             });
     }, [open, canReassign, leadData?.assigned_to]);
