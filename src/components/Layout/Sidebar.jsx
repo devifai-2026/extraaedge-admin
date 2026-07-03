@@ -33,6 +33,7 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
+import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import { hasTab } from '../../lib/rbac';
 import { admissionsApi, leadDiscountsApi } from '../../lib/endpoints';
 import { onNotification } from '../../lib/socket';
@@ -62,6 +63,9 @@ import { onNotification } from '../../lib/socket';
 const pinnedItems = [
   { id: 1, label: 'Analytics Dashboard', icon: DashboardIcon, path: '/dashboard', tab: 'dashboard' },
   { id: 2, label: 'Lead Manager', icon: PeopleAltIcon, path: '/leadlist', tab: 'leads' },
+  // Tenant-wide read-only lookup. `tab: 'lead_pool'` is granted to every
+  // sales-team role by default, so counsellors get it too.
+  { id: 23, label: 'Lead Pool', icon: TravelExploreIcon, path: '/lead-pool', tab: 'lead_pool' },
   // In-depth payments ledger. `tab: 'payments'` resolves true only for
   // super_admin (allowed_tabs:['*']); all other roles never see this row.
   { id: 19, label: 'Payments Ledger', icon: AccountBalanceWalletIcon, path: '/payments', tab: 'payments' },

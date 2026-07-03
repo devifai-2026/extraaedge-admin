@@ -111,6 +111,15 @@ export const leadsApi = {
   },
 };
 
+// Tenant-wide, READ-ONLY Lead Pool. Any counsellor (and up) can look up ANY
+// lead in the tenant by name or phone (with or without a 91 prefix) — bypasses
+// the owner/team/branch scope on /leads. Returns a read-only projection:
+// lead details + current owner, manager, previous owner. No mutation surface.
+export const leadPoolApi = {
+  search: (params) => api.get('/lead-pool', params), // { q, limit? }
+  get: (id) => api.get(`/lead-pool/${id}`),
+};
+
 // Call recordings uploaded from the mobile app. Counsellors see only their own
 // (server-enforced); managers/admins see scope. Used by the Unmatched
 // Recordings review tab.

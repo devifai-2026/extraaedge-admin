@@ -5,6 +5,7 @@ import AnalyticsDashboard from './pages/Dashboard/AnalyticsDashboard'
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute'
 import './App.css'
 import LeadList from './pages/LeadList/LeadList'
+import LeadPool from './pages/LeadPool/LeadPool'
 import PaymentsTracker from './pages/Payments/PaymentsTracker'
 import LeadTransferReport from './pages/Reports/LeadTransferReport'
 import RawDataManager from './pages/RawDataManager/RawDataManager'
@@ -79,6 +80,9 @@ function App() {
 
         <Route path="/dashboard"            element={<ProtectedRoute tab="dashboard"><Layout><AnalyticsDashboard /></Layout></ProtectedRoute>} />
         <Route path="/leadlist"             element={<ProtectedRoute tab="leads"><Layout><LeadList /></Layout></ProtectedRoute>} />
+        {/* Tenant-wide, read-only Lead Pool — any counsellor (and up) can look
+            up ANY lead by name/phone. Gated by the `lead_pool` tab. */}
+        <Route path="/lead-pool"            element={<ProtectedRoute tab="lead_pool"><Layout><LeadPool /></Layout></ProtectedRoute>} />
         {/* Standalone, super_admin-only in-depth payments ledger. Sits below
             Lead Manager in the sidebar; reuses /admissions/payment-details. */}
         <Route path="/payments"             element={<ProtectedRoute tab="payments"><Layout><PaymentsTracker /></Layout></ProtectedRoute>} />

@@ -26,7 +26,7 @@ export const ROLES = {
 // Role → set of tabs the bucket can access (used for safety; final source is backend's allowed_tabs).
 const ROLE_ALL_TABS = ['*'];
 const ROLE_MANAGER_TABS = [
-  'dashboard', 'leads', 'raw_data', 'failed_leads', 'bulk_upload', 'followups',
+  'dashboard', 'leads', 'lead_pool', 'raw_data', 'failed_leads', 'bulk_upload', 'followups',
   'whatsapp', 'bulk_marketing', 'drip_marketing', 'automation',
   'connected_accounts',
   'settings.email_templates', 'settings.sms_templates', 'settings.whatsapp_templates',
@@ -34,7 +34,7 @@ const ROLE_MANAGER_TABS = [
   'lead_transfer_report',
 ];
 const ROLE_COUNSELLOR_TABS = [
-  'dashboard', 'leads', 'raw_data', 'failed_leads', 'followups', 'whatsapp',
+  'dashboard', 'leads', 'lead_pool', 'raw_data', 'failed_leads', 'followups', 'whatsapp',
 ];
 // Account managers get a dedicated Accounts module — separate sidebar
 // entirely from counsellors / managers. They never see /leadlist or
@@ -103,6 +103,7 @@ export const hasTab = (tabKey) => {
 const TAB_TO_ROUTE = {
   dashboard: '/dashboard',
   leads: '/leadlist',
+  lead_pool: '/lead-pool',
   // super_admin-only standalone payments ledger.
   payments: '/payments',
   raw_data: '/rawdata',
