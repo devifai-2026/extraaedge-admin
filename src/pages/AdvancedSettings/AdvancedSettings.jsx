@@ -14,6 +14,7 @@ import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
 import RuleFolderOutlinedIcon from "@mui/icons-material/RuleFolderOutlined";
 import AccountBalanceOutlinedIcon from "@mui/icons-material/AccountBalanceOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import "./AdvancedSettings.css";
 
 const sections = [
@@ -25,6 +26,17 @@ const sections = [
         label: "Tenant Logo",
         description: "Upload your organisation's logo (PNG). Shown in the top navbar for everyone on your account.",
         path: "/advancedsettings/branding",
+      },
+    ],
+  },
+  {
+    icon: <ReceiptLongOutlinedIcon sx={{ fontSize: 20, color: "#7b6b3a" }} />,
+    title: "Receipts",
+    items: [
+      {
+        label: "Receipt Settings",
+        description: "Organisation details on the receipt header, receipt number format, and footer terms — with a live preview.",
+        path: "/advancedsettings/receipts",
       },
     ],
   },
