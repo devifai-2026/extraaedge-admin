@@ -9,6 +9,7 @@ const S = {
   TOKEN: 'ee_student_token',
   STUDENT: 'ee_student',
   TENANT_SLUG: 'ee_student_tenant',
+  TENANT: 'ee_student_tenant_branding',
 };
 
 export const studentAuth = {
@@ -17,6 +18,10 @@ export const studentAuth = {
   getStudent: () => {
     try { return JSON.parse(localStorage.getItem(S.STUDENT) || 'null'); } catch { return null; }
   },
+  getTenant: () => {
+    try { return JSON.parse(localStorage.getItem(S.TENANT) || 'null'); } catch { return null; }
+  },
+  setTenant: (t) => { if (t) localStorage.setItem(S.TENANT, JSON.stringify(t)); },
   isAuthed: () => !!localStorage.getItem(S.TOKEN),
   setSession: ({ access_token, student, tenantSlug }) => {
     if (access_token) localStorage.setItem(S.TOKEN, access_token);
@@ -69,6 +74,7 @@ export const studentApi = {
   me: () => doFetch('/student-auth/me', { method: 'GET' }),
   // LMS student self-views.
   myCourse: () => doFetch('/courses/my-course', { method: 'GET' }),
+  dashboard: () => doFetch('/courses/my-dashboard', { method: 'GET' }),
   myClasses: () => doFetch('/classes/student/my/classes', { method: 'GET' }),
   openQuestions: (classId) => doFetch(`/classes/student/${classId}/open-questions`, { method: 'GET' }),
   answer: (classId, body) => doFetch(`/classes/student/${classId}/answer`, { method: 'POST', body: JSON.stringify(body) }),
