@@ -578,6 +578,8 @@ export const admissionsApi = {
   approve: (id) => api.post(`/admissions/${id}/approve`),
   reject: (id, reason) => api.post(`/admissions/${id}/reject`, reason ? { reason } : {}),
   emiDigest: (days = 7) => api.get(`/admissions/emi-digest`, { days }),
+  // Counsellor "My Students": their converted leads + submitted admissions.
+  myStudents: () => api.get('/admissions/my-students'),
   break: (id, reason) => api.post(`/admissions/${id}/break`, reason ? { reason } : {}),
   resume: (id) => api.post(`/admissions/${id}/resume`),
   complete: (id) => api.post(`/admissions/${id}/complete`),

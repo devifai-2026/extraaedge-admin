@@ -34,7 +34,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
-import { hasTab } from '../../lib/rbac';
+import { hasTab, currentRole, ROLES } from '../../lib/rbac';
 import { admissionsApi, leadDiscountsApi } from '../../lib/endpoints';
 import { onNotification } from '../../lib/socket';
 
@@ -68,7 +68,7 @@ const pinnedItems = [
   { id: 23, label: 'Lead Pool', icon: TravelExploreIcon, path: '/lead-pool', tab: 'lead_pool' },
   // Counsellor-facing admissions: their own converted students. Gated on
   // 'admissions.my_students' (seeded to counsellor), so only they see it.
-  { id: 24, label: 'My Students', icon: SchoolIcon, path: '/my-students', tab: 'admissions.my_students' },
+  { id: 24, label: 'My Students', icon: SchoolIcon, path: '/my-students', tab: 'admissions.my_students', roles: [ROLES.COUNSELLOR] },
   // In-depth payments ledger. `tab: 'payments'` resolves true only for
   // super_admin (allowed_tabs:['*']); all other roles never see this row.
   { id: 19, label: 'Payments Ledger', icon: AccountBalanceWalletIcon, path: '/payments', tab: 'payments' },
@@ -226,15 +226,19 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
   // Hide items the user's role doesn't have access to (allowed_tabs from
   // /auth/login). For group items, also strip children the user can't see
   // and drop the group entirely if nothing's left under it.
+  // An item may also carry `roles: [...]` to restrict it to specific roles
+  // even when the tab is technically visible (e.g. super_admin's '*' wildcard).
+  const roleOk = (item) => !item.roles || item.roles.includes(currentRole());
+  const tabOk = (item) => !item.tab || hasTab(item.tab);
   const visibleItems = (items) =>
     items
       .map((item) => {
         if (!item.children) return item;
-        const kids = item.children.filter((c) => !c.tab || hasTab(c.tab));
+        const kids = item.children.filter((c) => tabOk(c) && roleOk(c));
         return kids.length ? { ...item, children: kids } : null;
       })
       .filter(Boolean)
-      .filter((item) => item.children || !item.tab || hasTab(item.tab));
+      .filter((item) => (item.children || tabOk(item)) && roleOk(item));
 
   const liveBadge = (item) => {
     const live = item.badgeKey ? badges[item.badgeKey] : null;
