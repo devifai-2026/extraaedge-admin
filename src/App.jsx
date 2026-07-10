@@ -65,6 +65,12 @@ import PaymentAccounts from './pages/AdvancedSettings/PaymentAccounts'
 import PublicAdmission from './pages/PublicAdmission/PublicAdmission'
 import PublicReceipt from './pages/PublicReceipt/PublicReceipt'
 import AdmissionPipeline from './pages/AdmissionPipeline/AdmissionPipeline'
+// LMS student panel (separate layout + auth from the staff app).
+import StudentLogin from './pages/Student/StudentLogin'
+import StudentSetPassword from './pages/Student/StudentSetPassword'
+import StudentLayout from './pages/Student/StudentLayout'
+import StudentHome from './pages/Student/StudentHome'
+import StudentPlaceholder from './pages/Student/StudentPlaceholder'
 
 // Each route declares the backend tab key it requires.
 // `<ProtectedRoute tab="...">` redirects to /dashboard if user lacks access.
@@ -80,6 +86,20 @@ function App() {
 
         {/* Public receipt view — share URL the accounts team copies. */}
         <Route path="/r/:token" element={<PublicReceipt />} />
+
+        {/* ---- LMS student panel: separate auth + layout from the staff app ---- */}
+        <Route path="/student/login" element={<StudentLogin />} />
+        <Route path="/student/set-password" element={<StudentSetPassword />} />
+        <Route path="/student" element={<StudentLayout />}>
+          <Route index element={<StudentHome />} />
+          <Route path="home" element={<StudentHome />} />
+          <Route path="classes" element={<StudentPlaceholder title="Classes" />} />
+          <Route path="forum" element={<StudentPlaceholder title="Forum" />} />
+          <Route path="tests" element={<StudentPlaceholder title="Tests" />} />
+          <Route path="projects" element={<StudentPlaceholder title="Projects" />} />
+          <Route path="leaderboard" element={<StudentPlaceholder title="Leaderboard" />} />
+          <Route path="catalog" element={<StudentPlaceholder title="Explore Courses" />} />
+        </Route>
 
         <Route path="/dashboard"            element={<ProtectedRoute tab="dashboard"><Layout><AnalyticsDashboard /></Layout></ProtectedRoute>} />
         <Route path="/leadlist"             element={<ProtectedRoute tab="leads"><Layout><LeadList /></Layout></ProtectedRoute>} />

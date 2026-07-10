@@ -146,10 +146,28 @@ const menuSections = [
       { id: 15, label: 'Third Party Integration', icon: IntegrationInstructionsIcon, path: '/thirdpartyintegration', tab: 'third_party_integration' },
     ],
   },
-  // ---- Future roles slot in here as new sections, e.g.: ----
-  // { id: 'trainer', label: 'Trainer', icon: SchoolIcon, section: true, children: [ ... ] },
-  // { id: 'student', label: 'Student', icon: PeopleAltIcon, section: true, children: [ ... ] },
-  // { id: 'hr',      label: 'HR',      icon: Person4Icon,  section: true, children: [ ... ] },
+  // ---- LMS / Trainer module. Each child is gated by its trainer.* tab, which
+  //      is granted only to the trainer + head_trainer role bundles, so this
+  //      whole section is invisible to other roles. (Students use a separate
+  //      /student/* layout, not this sidebar.) ----
+  {
+    id: 'training',
+    label: 'Training',
+    icon: SchoolIcon,
+    section: true,
+    children: [
+      { id: 200, label: 'My Courses',    icon: SchoolIcon,          path: '/trainer/courses',       tab: 'courses.manage' },
+      { id: 201, label: 'Classes',       icon: CalendarTodayIcon,   path: '/trainer/classes',       tab: 'trainer.classes' },
+      { id: 202, label: 'Attendance',    icon: HowToRegIcon,        path: '/trainer/attendance',    tab: 'trainer.attendance' },
+      { id: 203, label: 'Recordings',    icon: GraphicEqIcon,       path: '/trainer/recordings',    tab: 'trainer.recordings' },
+      { id: 204, label: 'Announcements', icon: CampaignIcon,        path: '/trainer/announcements', tab: 'trainer.announcements' },
+      { id: 205, label: 'Student Forum', icon: PeopleAltIcon,       path: '/trainer/forum',         tab: 'trainer.forum' },
+      { id: 206, label: 'Mock Tests',    icon: ChecklistIcon,       path: '/trainer/tests',         tab: 'trainer.tests' },
+      { id: 207, label: 'Projects',      icon: AssessmentIcon,      path: '/trainer/projects',      tab: 'trainer.projects' },
+      { id: 208, label: 'Mock Interviews', icon: HowToRegIcon,      path: '/trainer/interviews',    tab: 'trainer.interviews' },
+      { id: 209, label: 'Leaderboard',   icon: AssessmentIcon,      path: '/trainer/leaderboard',   tab: 'trainer.leaderboard' },
+    ],
+  },
 ];
 
 const bottomMenuItems = [

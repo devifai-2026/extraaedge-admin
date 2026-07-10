@@ -21,6 +21,15 @@ export const ROLES = {
   // reports to their branch manager (or the tenant super_admin). Visibility
   // scope: every converted lead in the tenant (enforced server-side).
   ACCOUNT_MANAGER: 'account_manager',
+  // ---- LMS / Trainer module ----
+  // Owns a course (modules, trainer roster, batches) + teaches.
+  HEAD_TRAINER: 'head_trainer',
+  // Teaches assigned module(s) of a course.
+  TRAINER: 'trainer',
+  // Authenticated learner. NOTE: students authenticate via a separate
+  // student JWT (type:'student'); this role value is what their /student-auth
+  // session reports, used to gate the /student/* layout.
+  STUDENT: 'student',
 };
 
 // Role → set of tabs the bucket can access (used for safety; final source is backend's allowed_tabs).
@@ -54,6 +63,18 @@ const ROLE_ACCOUNT_MANAGER_TABS = [
   'accounts.payment_details',
 ];
 
+// LMS trainer surfaces (head_trainer additionally gets courses.manage).
+const ROLE_TRAINER_TABS = [
+  'trainer.classes', 'trainer.attendance', 'trainer.recordings',
+  'trainer.announcements', 'trainer.forum', 'trainer.tests',
+  'trainer.projects', 'trainer.interviews', 'trainer.leaderboard',
+];
+const ROLE_HEAD_TRAINER_TABS = ['courses.manage', ...ROLE_TRAINER_TABS];
+const ROLE_STUDENT_TABS = [
+  'student.home', 'student.classes', 'student.forum', 'student.tests',
+  'student.projects', 'student.leaderboard', 'student.catalog',
+];
+
 const FALLBACK_TABS = {
   [ROLES.SUPER_ADMIN]: ROLE_ALL_TABS,
   // branch_manager is admin-like for tabs (backend sends ['*']); mirror that
@@ -62,6 +83,9 @@ const FALLBACK_TABS = {
   [ROLES.SALES_MANAGER]: ROLE_MANAGER_TABS,
   [ROLES.COUNSELLOR]: ROLE_COUNSELLOR_TABS,
   [ROLES.ACCOUNT_MANAGER]: ROLE_ACCOUNT_MANAGER_TABS,
+  [ROLES.HEAD_TRAINER]: ROLE_HEAD_TRAINER_TABS,
+  [ROLES.TRAINER]: ROLE_TRAINER_TABS,
+  [ROLES.STUDENT]: ROLE_STUDENT_TABS,
 };
 
 // ---------- Public helpers ----------
@@ -133,6 +157,26 @@ const TAB_TO_ROUTE = {
   'accounts.collection_receipt_wise':'/accounts/collection-receipt-wise',
   // Counsellor scoped admissions.
   'admissions.my_students':          '/my-students',
+  // ---- LMS trainer surfaces (admin app, role-gated) ----
+  'courses.manage':        '/trainer/courses',
+  'trainer.classes':       '/trainer/classes',
+  'trainer.attendance':    '/trainer/attendance',
+  'trainer.recordings':    '/trainer/recordings',
+  'trainer.announcements': '/trainer/announcements',
+  'trainer.forum':         '/trainer/forum',
+  'trainer.tests':         '/trainer/tests',
+  'trainer.projects':      '/trainer/projects',
+  'trainer.interviews':    '/trainer/interviews',
+  'trainer.leaderboard':   '/trainer/leaderboard',
+  'lms.analytics':         '/lms/analytics',
+  // ---- Student panel (separate /student/* layout) ----
+  'student.home':          '/student/home',
+  'student.classes':       '/student/classes',
+  'student.forum':         '/student/forum',
+  'student.tests':         '/student/tests',
+  'student.projects':      '/student/projects',
+  'student.leaderboard':   '/student/leaderboard',
+  'student.catalog':       '/student/catalog',
 };
 
 // First route the current user is allowed to land on. Used by login and
@@ -150,6 +194,10 @@ export const firstAllowedRoute = () => {
   // first because account_managers have NO overlap with sales tabs —
   // their landing page is their own dashboard, not /leadlist.
   const order = [
+    // Student + trainer homes first so LMS principals land on their own panel
+    // rather than a CRM surface they can't see.
+    'student.home',
+    'courses.manage', 'trainer.classes',
     'accounts.dashboard',
     'dashboard', 'leads', 'raw_data', 'failed_leads',
     'followups', 'whatsapp', 'bulk_upload',

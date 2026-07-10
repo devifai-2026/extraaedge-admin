@@ -579,6 +579,9 @@ export const admissionsApi = {
 
   // Status transitions
   approve: (id) => api.post(`/admissions/${id}/approve`),
+  // Provision the student LMS portal after approval; returns { student,
+  // set_password_url, emailed } so the UI can offer a copy-link fallback.
+  confirmCourse: (id) => api.post(`/admissions/${id}/confirm-course`),
   reject: (id, reason) => api.post(`/admissions/${id}/reject`, reason ? { reason } : {}),
   emiDigest: (days = 7) => api.get(`/admissions/emi-digest`, { days }),
   // Counsellor "My Students": their converted leads + submitted admissions.

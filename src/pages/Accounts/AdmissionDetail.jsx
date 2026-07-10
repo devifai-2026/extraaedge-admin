@@ -28,6 +28,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import DownloadIcon from '@mui/icons-material/Download';
+import SchoolIcon from '@mui/icons-material/School';
 import { admissionsApi, uploadsApi, paymentAccountsApi, publicReceiptsApi } from '../../lib/endpoints';
 import { buildReceiptHtml } from '../../lib/receiptTemplate';
 import { downloadHtmlAsPdf } from '../../lib/htmlToPdf';
@@ -46,6 +47,8 @@ const AdmissionDetail = () => {
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [photoUrl, setPhotoUrl] = useState(null);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmResult, setConfirmResult] = useState(null); // { student, set_password_url, emailed }
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -149,6 +152,28 @@ const AdmissionDetail = () => {
     }
   }, []);
 
+  // Confirm the student into their course (post-approval): provisions the LMS
+  // portal and returns a set-password link (emailed + copyable fallback).
+  const confirmCourse = useCallback(async () => {
+    setConfirming(true);
+    try {
+      const res = await admissionsApi.confirmCourse(id);
+      const data = res?.data ?? res;
+      setConfirmResult(data);
+      setToast({ severity: 'success', text: data.emailed ? 'Course confirmed — set-password email sent to the student.' : 'Course confirmed — copy the set-password link below and share it with the student.' });
+      reload();
+    } catch (e) {
+      setToast({ severity: 'error', text: e?.message || 'Failed to confirm the course.' });
+    } finally {
+      setConfirming(false);
+    }
+  }, [id, reload]);
+
+  const copyText = useCallback(async (text, label = 'Link') => {
+    try { await navigator.clipboard.writeText(text); setToast({ severity: 'success', text: `${label} copied.` }); }
+    catch { setToast({ severity: 'info', text: text }); }
+  }, []);
+
   // Has the lump-sum Course Fees row been captured? We treat the first
   // 'misc' receipt as the course-balance payment. (No DB enum dedicated
   // to this yet — misc covers it cleanly.) MUST live above the early
@@ -196,8 +221,38 @@ const AdmissionDetail = () => {
               Verify &amp; Approve
             </Button>
           )}
+          {/* Course-confirm: available once approved (attending/break/completed)
+              and not yet confirmed. Provisions the student's LMS portal. */}
+          {['attending', 'on_break', 'completed'].includes(data.status) && !data.course_confirmed_at && (
+            <Button
+              variant="contained"
+              startIcon={<SchoolIcon />}
+              onClick={confirmCourse}
+              disabled={confirming}
+              sx={{ textTransform: 'none', bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' } }}
+            >
+              {confirming ? 'Confirming…' : 'Confirm course'}
+            </Button>
+          )}
+          {data.course_confirmed_at && (
+            <Chip size="small" color="success" variant="outlined" label="Course confirmed" sx={{ alignSelf: 'center' }} />
+          )}
         </div>
       </div>
+
+      {/* Set-password link callout — shown right after confirming so Accounts
+          can copy + share it (works even if the email didn't send). */}
+      {confirmResult?.set_password_url && (
+        <Alert severity="info" sx={{ mt: 2 }} action={
+          <Button size="small" onClick={() => copyText(confirmResult.set_password_url, 'Set-password link')} sx={{ textTransform: 'none' }}>
+            Copy link
+          </Button>
+        }>
+          Student portal ready for <b>{confirmResult.student?.email}</b>.{' '}
+          {confirmResult.emailed ? 'An invite email was sent. ' : 'Email not sent — share this link: '}
+          <span style={{ wordBreak: 'break-all', color: '#2563eb' }}>{confirmResult.set_password_url}</span>
+        </Alert>
+      )}
 
       <div className="accounts-kpi-row">
         <div className="accounts-kpi-card" style={{ '--kpi-accent': '#4f46e5' }}>
