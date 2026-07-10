@@ -193,17 +193,34 @@ export const firstAllowedRoute = () => {
   // dashboard-y thing they can access. Accounts-module keys are listed
   // first because account_managers have NO overlap with sales tabs —
   // their landing page is their own dashboard, not /leadlist.
+  //
+  // NOTE: students never use THIS (staff) login/route flow — they have their
+  // own /student/login + studentApi session — so no student.* route ever
+  // belongs here. And a wildcard ('*') admin must land on the CRM dashboard,
+  // NOT a trainer surface: trainer homes are matched ONLY by an explicit tab
+  // grant (a dedicated trainer/head_trainer user), never via '*'.
+  const has = (key) => candidates.includes(key);              // explicit grant only
+  const hasOrWild = (key) => candidates.includes('*') || has(key);
+
+  // 1. A dedicated trainer/head_trainer (explicit trainer tab, no wildcard)
+  //    lands on their own home.
+  if (!candidates.includes('*')) {
+    for (const key of ['courses.manage', 'trainer.classes', 'trainer.attendance']) {
+      if (has(key)) return TAB_TO_ROUTE[key];
+    }
+  }
+
+  // 2. Everyone else (incl. wildcard admins) → the most dashboard-y CRM/accounts
+  //    surface they can access.
   const order = [
-    // Student + trainer homes first so LMS principals land on their own panel
-    // rather than a CRM surface they can't see.
-    'student.home',
-    'courses.manage', 'trainer.classes',
     'accounts.dashboard',
     'dashboard', 'leads', 'raw_data', 'failed_leads',
     'followups', 'whatsapp', 'bulk_upload',
+    // trainer fallback for a wildcard admin who somehow has nothing above
+    'lms.analytics',
   ];
   for (const key of order) {
-    if (candidates.includes('*') || candidates.includes(key)) {
+    if (hasOrWild(key)) {
       const route = TAB_TO_ROUTE[key];
       if (route) return route;
     }
