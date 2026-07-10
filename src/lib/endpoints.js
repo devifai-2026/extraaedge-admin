@@ -788,4 +788,11 @@ export const interviewsApi = {
   grade: (slotId, body) => api.post(`/interviews/slots/${slotId}/grade`, body),
 };
 
+// ---- LMS: admin analytics + student sudo-login (super_admin/branch_mgr) ----
+export const lmsAnalyticsApi = {
+  dashboard: () => api.get('/lms-analytics/dashboard'),
+  students: () => api.get('/lms-analytics/students'),
+  sudoStudent: (id) => api.post(`/lms-analytics/students/${id}/sudo-login`),
+};
+
 export { auth };

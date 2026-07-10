@@ -166,6 +166,8 @@ const menuSections = [
       { id: 207, label: 'Projects',      icon: AssessmentIcon,      path: '/trainer/projects',      tab: 'trainer.projects' },
       { id: 208, label: 'Mock Interviews', icon: HowToRegIcon,      path: '/trainer/interviews',    tab: 'trainer.interviews' },
       { id: 209, label: 'Leaderboard',   icon: AssessmentIcon,      path: '/trainer/leaderboard',   tab: 'trainer.leaderboard' },
+      // Admin/branch-manager only (gated by the lms.analytics tab).
+      { id: 210, label: 'LMS Analytics', icon: AssessmentIcon,      path: '/lms/analytics',         tab: 'lms.analytics' },
     ],
   },
 ];

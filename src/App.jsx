@@ -71,6 +71,7 @@ import StudentSetPassword from './pages/Student/StudentSetPassword'
 import StudentLayout from './pages/Student/StudentLayout'
 import StudentHome from './pages/Student/StudentHome'
 import StudentCatalog from './pages/Student/StudentCatalog'
+import LmsAnalytics from './pages/LMS/LmsAnalytics'
 // LMS trainer pages (staff app, role-gated).
 import TrainerCourses from './pages/Trainer/TrainerCourses'
 import TrainerCourseDetail from './pages/Trainer/TrainerCourseDetail'
@@ -181,6 +182,8 @@ function App() {
         <Route path="/trainer/projects" element={<ProtectedRoute tab="trainer.projects"><Layout><TrainerProjects /></Layout></ProtectedRoute>} />
         <Route path="/trainer/interviews" element={<ProtectedRoute tab="trainer.interviews"><Layout><TrainerInterviews /></Layout></ProtectedRoute>} />
         <Route path="/trainer/leaderboard" element={<ProtectedRoute tab="trainer.leaderboard"><Layout><TrainerLeaderboard /></Layout></ProtectedRoute>} />
+        {/* Admin + branch-manager LMS analytics + student sudo-login. */}
+        <Route path="/lms/analytics" element={<ProtectedRoute tab="lms.analytics"><Layout><LmsAnalytics /></Layout></ProtectedRoute>} />
         <Route path="/tickets" element={<ProtectedRoute><Layout><Tickets /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/org-tree" element={<ProtectedRoute tab="advanced.users_roles"><Layout><OrgTree /></Layout></ProtectedRoute>} />
         {/* Admission centers (Accounts module dropdown — managed by super_admin) */}
