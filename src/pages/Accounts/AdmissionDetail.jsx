@@ -37,6 +37,17 @@ import StatusPill from './StatusPill';
 import VerifyAdmissionDialog from '../../components/VerifyAdmissionDialog/VerifyAdmissionDialog';
 import './Accounts.css';
 
+// Assemble a copy-paste-friendly login message from the credentials the
+// confirm-course response returns (for Accounts to WhatsApp/share).
+const credentialMessage = (c) => [
+  'Your student portal login:',
+  `Portal: ${window.location.origin}/student/login`,
+  `Institute code: ${c.tenant_slug}`,
+  `Email: ${c.email}`,
+  `Temporary password: ${c.temp_password}`,
+  'Please change your password after logging in.',
+].join('\n');
+
 const AdmissionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -48,7 +59,7 @@ const AdmissionDetail = () => {
   const [toast, setToast] = useState(null);
   const [photoUrl, setPhotoUrl] = useState(null);
   const [confirming, setConfirming] = useState(false);
-  const [confirmResult, setConfirmResult] = useState(null); // { student, set_password_url, emailed }
+  const [confirmResult, setConfirmResult] = useState(null); // { student, credentials }
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -153,14 +164,15 @@ const AdmissionDetail = () => {
   }, []);
 
   // Confirm the student into their course (post-approval): provisions the LMS
-  // portal and returns a set-password link (emailed + copyable fallback).
+  // portal and returns the student's login credentials (email + temp password)
+  // for Accounts to share manually. Shown once (temp password isn't stored).
   const confirmCourse = useCallback(async () => {
     setConfirming(true);
     try {
       const res = await admissionsApi.confirmCourse(id);
       const data = res?.data ?? res;
       setConfirmResult(data);
-      setToast({ severity: 'success', text: data.emailed ? 'Course confirmed — set-password email sent to the student.' : 'Course confirmed — copy the set-password link below and share it with the student.' });
+      setToast({ severity: 'success', text: 'Course confirmed — copy the login details below and share them with the student.' });
       reload();
     } catch (e) {
       setToast({ severity: 'error', text: e?.message || 'Failed to confirm the course.' });
@@ -240,17 +252,26 @@ const AdmissionDetail = () => {
         </div>
       </div>
 
-      {/* Set-password link callout — shown right after confirming so Accounts
-          can copy + share it (works even if the email didn't send). */}
-      {confirmResult?.set_password_url && (
-        <Alert severity="info" sx={{ mt: 2 }} action={
-          <Button size="small" onClick={() => copyText(confirmResult.set_password_url, 'Set-password link')} sx={{ textTransform: 'none' }}>
-            Copy link
+      {/* Credentials callout — shown ONCE right after confirming so Accounts
+          can copy + share the student's login details manually (WhatsApp/call).
+          The temp password isn't stored in plaintext, so it can't be shown
+          again — re-confirm to reissue a fresh one. */}
+      {confirmResult?.credentials && (
+        <Alert severity="success" sx={{ mt: 2 }} action={
+          <Button size="small" onClick={() => copyText(credentialMessage(confirmResult.credentials), 'Login details')} sx={{ textTransform: 'none' }}>
+            Copy details
           </Button>
         }>
-          Student portal ready for <b>{confirmResult.student?.email}</b>.{' '}
-          {confirmResult.emailed ? 'An invite email was sent. ' : 'Email not sent — share this link: '}
-          <span style={{ wordBreak: 'break-all', color: '#2563eb' }}>{confirmResult.set_password_url}</span>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Student portal ready — share these login details:</div>
+          <div style={{ fontFamily: 'monospace', fontSize: 13, lineHeight: 1.7 }}>
+            Portal: {window.location.origin}/student/login<br />
+            Institute code: <b>{confirmResult.credentials.tenant_slug}</b><br />
+            Email: <b>{confirmResult.credentials.email}</b><br />
+            Temp password: <b>{confirmResult.credentials.temp_password}</b>
+          </div>
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
+            Won’t be shown again — copy it now. The student can change their password after logging in.
+          </div>
         </Alert>
       )}
 
