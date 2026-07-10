@@ -181,6 +181,17 @@ const AdmissionDetail = () => {
     }
   }, [id, reload]);
 
+  // Open the student's submitted payment screenshot via a signed URL.
+  const viewPaymentProof = useCallback(async () => {
+    const key = data?.payment_proof_r2_key;
+    if (!key) return;
+    try {
+      const sr = await uploadsApi.signedUrl(key);
+      const u = sr?.data?.url;
+      if (u) window.open(u, '_blank', 'noreferrer');
+    } catch (e) { setToast({ severity: 'error', text: e?.message || 'Could not open the screenshot.' }); }
+  }, [data]);
+
   const copyText = useCallback(async (text, label = 'Link') => {
     try { await navigator.clipboard.writeText(text); setToast({ severity: 'success', text: `${label} copied.` }); }
     catch { setToast({ severity: 'info', text: text }); }
@@ -322,6 +333,28 @@ const AdmissionDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* Payment the student submitted with the form (registration/pay-now).
+          Recorded UNVERIFIED — accounts confirm it at approval. */}
+      {(data.payment_amount != null || data.payment_utr || data.payment_proof_r2_key) && (
+        <Section title="Payment submitted by student">
+          <div className="accounts-table-card" style={{ padding: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, alignItems: 'start' }}>
+              <KV label="Amount paid" value={data.payment_amount != null ? `₹ ${fmtMoney(data.payment_amount)}` : '—'} />
+              <KV label="UTR / Reference" value={data.payment_utr || '—'} />
+              <KV label="Status" value={data.payment_verified_at ? 'Verified' : 'Awaiting verification'} />
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.04 }}>Payment proof</div>
+                {data.payment_proof_r2_key ? (
+                  <Button size="small" startIcon={<AttachFileIcon />} onClick={viewPaymentProof} sx={{ textTransform: 'none', mt: 0.25, ml: -0.5 }}>
+                    View screenshot
+                  </Button>
+                ) : <div style={{ fontSize: 13, color: '#111827', marginTop: 2 }}>—</div>}
+              </div>
+            </div>
+          </div>
+        </Section>
+      )}
 
       {data.education?.length > 0 && (
         <Section title="Education">
