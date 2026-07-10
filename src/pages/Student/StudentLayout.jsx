@@ -7,6 +7,7 @@ import { resolveAssetUrl } from '../../lib/config';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined';
 import VideoLibraryOutlinedIcon from '@mui/icons-material/VideoLibraryOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
@@ -22,6 +23,7 @@ const NAV = [
   { to: '/student/home', label: 'Dashboard', icon: DashboardOutlinedIcon },
   { to: '/student/course', label: 'My Course', icon: SchoolOutlinedIcon },
   { to: '/student/classes', label: 'Classes', icon: CalendarMonthOutlinedIcon },
+  { to: '/student/attendance', label: 'Attendance', icon: EventAvailableOutlinedIcon },
   { to: '/student/recordings', label: 'Recordings', icon: VideoLibraryOutlinedIcon },
   { to: '/student/announcements', label: 'Announcements', icon: CampaignOutlinedIcon },
   { to: '/student/forum', label: 'Forum', icon: ForumOutlinedIcon },

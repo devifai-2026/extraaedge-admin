@@ -704,6 +704,11 @@ export const ticketsApi = {
   comment: (id, body) => api.post(`/tickets/${id}/comments`, body),
 };
 
+// Trainer/admin view of a student's profile + CV (read-only).
+export const studentProfileApi = {
+  view: (studentId) => api.get(`/student-auth/students/${studentId}/profile`),
+};
+
 // ---- LMS: courses / modules / trainers / batches (trainer + head + admin) ----
 export const coursesApi = {
   list: () => api.get('/courses'),

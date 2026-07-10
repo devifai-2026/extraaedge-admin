@@ -71,6 +71,7 @@ import StudentSetPassword from './pages/Student/StudentSetPassword'
 import StudentLayout from './pages/Student/StudentLayout'
 import StudentDashboard from './pages/Student/StudentDashboard'
 import StudentProfile from './pages/Student/StudentProfile'
+import StudentAttendance from './pages/Student/StudentAttendance'
 import StudentHome from './pages/Student/StudentHome'
 import StudentCatalog from './pages/Student/StudentCatalog'
 import LmsAnalytics from './pages/LMS/LmsAnalytics'
@@ -118,6 +119,7 @@ function App() {
           <Route path="home" element={<StudentDashboard />} />
           <Route path="course" element={<StudentHome />} />
           <Route path="classes" element={<StudentClasses />} />
+          <Route path="attendance" element={<StudentAttendance />} />
           <Route path="recordings" element={<StudentRecordings />} />
           <Route path="announcements" element={<StudentAnnouncements />} />
           <Route path="forum" element={<StudentForum />} />
