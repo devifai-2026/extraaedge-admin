@@ -18,3 +18,13 @@ export const isProd = env.PROD === true;
 
 export const SERVER_HOST = env.VITE_SERVER_HOST || (isProd ? PROD_HOST : LOCAL_HOST);
 export const API_URL = `${SERVER_HOST}/api/v1`;
+
+// The tenant logo is served by the backend's branding proxy and stored as a
+// ROOT-RELATIVE path (e.g. "/api/v1/public/branding/demo/logo?v=..") so it's
+// environment-independent. Resolve it against the backend host this build talks
+// to; absolute URLs (legacy rows) and data: URIs pass through untouched.
+export const resolveAssetUrl = (url) => {
+  if (!url) return url;
+  if (/^(https?:)?\/\//i.test(url) || url.startsWith('data:')) return url;
+  return `${SERVER_HOST}${url.startsWith('/') ? '' : '/'}${url}`;
+};

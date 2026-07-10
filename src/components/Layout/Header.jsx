@@ -4,7 +4,7 @@ import { colors } from '../../theme/colors'
 import { auth, authApi, notificationsApi, followUpsApi, leadsApi } from '../../lib/endpoints'
 import { connectSocket, onNotification, isSocketConnected } from '../../lib/socket'
 import { hasTab, firstAllowedRoute } from '../../lib/rbac'
-import { SERVER_HOST } from '../../lib/config'
+import { resolveAssetUrl } from '../../lib/config'
 import WorkTimer from './WorkTimer'
 import BranchSwitcher from './BranchSwitcher'
 import SearchIcon from '@mui/icons-material/Search';
@@ -30,17 +30,6 @@ import {
     Button,
     Badge,
 } from "@mui/material";
-
-// The tenant logo is served by the backend's branding proxy and stored as a
-// ROOT-RELATIVE path (e.g. "/api/v1/public/branding/demo/logo?v=..") so it's
-// environment-independent. Prefix it with the backend host this build talks to
-// (localhost in dev, the Render host in prod). Absolute URLs (legacy rows) and
-// data: URIs pass through untouched.
-const resolveLogoUrl = (url) => {
-    if (!url) return url;
-    if (/^(https?:)?\/\//i.test(url) || url.startsWith('data:')) return url;
-    return `${SERVER_HOST}${url.startsWith('/') ? '' : '/'}${url}`;
-};
 
 // Mirrors the tab gates declared in App.jsx for each route, so the live
 // tab-refresh handler below can ask "is this user still allowed on the
@@ -296,9 +285,13 @@ function Header() {
             <div className="header-brand">
                 {sessionTenant?.logo_url ? (
                     <img
-                        src={resolveLogoUrl(sessionTenant.logo_url)}
+                        src={resolveAssetUrl(sessionTenant.logo_url)}
                         alt={sessionTenant?.brand_name || sessionTenant?.name || 'Logo'}
-                        style={{ height: 34, maxWidth: 180, objectFit: 'contain', display: 'block' }}
+                        /* Render at natural size — no forced scaling. Only cap by
+                           the navbar height so an unusually tall image still fits;
+                           a small logo stays its true pixel size. maxWidth guards
+                           an ultra-wide banner from pushing the nav. */
+                        style={{ height: 'auto', width: 'auto', maxHeight: 50, maxWidth: 320, objectFit: 'contain', display: 'block' }}
                     />
                 ) : (
                     <span className="brand-text">{sessionTenant?.brand_name || sessionTenant?.name || 'EXTRAEDGE'}</span>

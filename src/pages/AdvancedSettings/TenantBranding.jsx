@@ -12,6 +12,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import { uploadsApi, brandingApi } from '../../lib/endpoints';
 import { auth } from '../../lib/api';
 import { isRole, ROLES } from '../../lib/rbac';
+import { resolveAssetUrl } from '../../lib/config';
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB (matches backend tenant_logo limit)
 
@@ -102,7 +103,7 @@ export default function TenantBranding() {
           background: '#0f172a', overflow: 'hidden',
         }}>
           {tenant?.logo_url
-            ? <img src={tenant.logo_url} alt="Current logo" style={{ maxHeight: 64, maxWidth: 200, objectFit: 'contain' }} />
+            ? <img src={resolveAssetUrl(tenant.logo_url)} alt="Current logo" style={{ maxHeight: 64, maxWidth: 200, objectFit: 'contain' }} />
             : <Typography sx={{ color: '#94a3b8', fontSize: 13 }}>No logo — brand name shown</Typography>}
         </Box>
 
