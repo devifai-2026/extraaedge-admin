@@ -19,6 +19,17 @@ import "./AdvancedSettings.css";
 const sections = [
   {
     icon: <PublicIcon sx={{ fontSize: 20, color: "#7b6b3a" }} />,
+    title: "Branding",
+    items: [
+      {
+        label: "Tenant Logo",
+        description: "Upload your organisation's logo (PNG). Shown in the top navbar for everyone on your account.",
+        path: "/advancedsettings/branding",
+      },
+    ],
+  },
+  {
+    icon: <PublicIcon sx={{ fontSize: 20, color: "#7b6b3a" }} />,
     title: "Dropdown Values",
     items: [
       { label: "Setup Dropdown Values", path: "/advancedsettings/dropdowns" },

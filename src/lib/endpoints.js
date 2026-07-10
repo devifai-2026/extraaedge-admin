@@ -341,6 +341,13 @@ export const integrationsApi = {
   getWebhookUrl: (id) => api.post(`/integrations/${id}/webhook-url`),
 };
 
+// Tenant self-branding (super_admin). updateLogo saves the uploaded logo's
+// GCS key (or null to clear) onto the tenant; returns { logo_url, brand_name, ... }.
+export const brandingApi = {
+  update: (body) => api.put('/tenant-branding', body),
+  updateLogo: (logo_r2_key) => api.put('/tenant-branding', { logo_r2_key }),
+};
+
 export const uploadsApi = {
   presign: (body) => api.post('/uploads/presign', body),
   confirm: (body) => api.post('/uploads/confirm', body),

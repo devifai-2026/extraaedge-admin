@@ -247,9 +247,9 @@ function Header() {
     // dispatches 'ee:user-updated'. Without this, changing the avatar on
     // the Profile page wouldn't repaint the navbar until a full reload.
     const [sessionUser, setSessionUser] = useState(() => auth.getUser())
-    const sessionTenant = auth.getTenant()
+    const [sessionTenant, setSessionTenant] = useState(() => auth.getTenant())
     useEffect(() => {
-        const refresh = () => setSessionUser(auth.getUser())
+        const refresh = () => { setSessionUser(auth.getUser()); setSessionTenant(auth.getTenant()); }
         window.addEventListener('ee:user-updated', refresh)
         return () => window.removeEventListener('ee:user-updated', refresh)
     }, [])
@@ -279,9 +279,18 @@ function Header() {
                 borderBottom: `1px solid ${colors.borderGrey}`,
             }}
         >
-            {/* Brand & Timer Section */}
+            {/* Brand & Timer Section. When the tenant has uploaded a logo it
+                REPLACES the brand-name text; otherwise we fall back to the text. */}
             <div className="header-brand">
-                <span className="brand-text">{sessionTenant?.brand_name || sessionTenant?.name || 'EXTRAEDGE'}</span>
+                {sessionTenant?.logo_url ? (
+                    <img
+                        src={sessionTenant.logo_url}
+                        alt={sessionTenant?.brand_name || sessionTenant?.name || 'Logo'}
+                        style={{ height: 34, maxWidth: 180, objectFit: 'contain', display: 'block' }}
+                    />
+                ) : (
+                    <span className="brand-text">{sessionTenant?.brand_name || sessionTenant?.name || 'EXTRAEDGE'}</span>
+                )}
                 {/* Current user's branch. "N/A" when unbranched (e.g. super_admin
                     spans all branches, or before branch assignment). Shown for
                     every role. */}

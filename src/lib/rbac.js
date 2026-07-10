@@ -35,6 +35,7 @@ const ROLE_MANAGER_TABS = [
 ];
 const ROLE_COUNSELLOR_TABS = [
   'dashboard', 'leads', 'lead_pool', 'raw_data', 'failed_leads', 'followups', 'whatsapp',
+  'admissions.my_students',
 ];
 // Account managers get a dedicated Accounts module — separate sidebar
 // entirely from counsellors / managers. They never see /leadlist or
@@ -130,6 +131,8 @@ const TAB_TO_ROUTE = {
   'accounts.report':                 '/accounts/report',
   'accounts.pay_schedule':           '/accounts/pay-schedule',
   'accounts.collection_receipt_wise':'/accounts/collection-receipt-wise',
+  // Counsellor scoped admissions.
+  'admissions.my_students':          '/my-students',
 };
 
 // First route the current user is allowed to land on. Used by login and

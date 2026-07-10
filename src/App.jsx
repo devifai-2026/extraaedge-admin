@@ -26,6 +26,7 @@ import DropdownsHub from './pages/AdvancedSettings/DropdownsHub'
 import DropdownDetail from './pages/AdvancedSettings/DropdownDetail'
 import UsersAndRoles from './pages/AdvancedSettings/UsersAndRoles'
 import Branches from './pages/AdvancedSettings/Branches'
+import TenantBranding from './pages/AdvancedSettings/TenantBranding'
 import DiscountApprovals from './pages/DiscountApprovals/DiscountApprovals'
 import TemplatesHub from './pages/AdvancedSettings/TemplatesHub'
 import SubscriptionPage from './pages/AdvancedSettings/SubscriptionPage'
@@ -46,6 +47,7 @@ import {
   ThisMonthAdmissionsPage,
   TotalAdmissionsPage,
 } from './pages/Accounts/AdmissionsList'
+import MyStudents from './pages/Accounts/MyStudents'
 import NewAdmission from './pages/Accounts/NewAdmission'
 import AdmissionDetail from './pages/Accounts/AdmissionDetail'
 import PaymentDetails from './pages/Accounts/PaymentDetails'
@@ -107,6 +109,7 @@ function App() {
         <Route path="/connectedaccounts"    element={<ProtectedRoute tab="connected_accounts"><Layout><ConnectedAccounts /></Layout></ProtectedRoute>} />
         <Route path="/settings"             element={<ProtectedRoute tab="settings.email_templates"><Layout><Settings /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings"     element={<ProtectedRoute><Layout><AdvancedSettings /></Layout></ProtectedRoute>} />
+        <Route path="/advancedsettings/branding" element={<ProtectedRoute><Layout><TenantBranding /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/dropdowns" element={<ProtectedRoute tab="advanced.dropdowns"><Layout><DropdownsHub /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/dropdowns/:type" element={<ProtectedRoute tab="advanced.dropdowns"><Layout><DropdownDetail /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/users" element={<ProtectedRoute tab="advanced.users_roles"><Layout><UsersAndRoles /></Layout></ProtectedRoute>} />
@@ -118,6 +121,8 @@ function App() {
         <Route path="/thirdpartyintegration" element={<ProtectedRoute tab="third_party_integration"><Layout><ThirdPartyIntegration /></Layout></ProtectedRoute>} />
         {/* Admin: post-conversion admission pipeline overview. */}
         <Route path="/admission-pipeline" element={<ProtectedRoute tab="admissions.pipeline"><Layout><AdmissionPipeline /></Layout></ProtectedRoute>} />
+        {/* Counsellor: their own converted students (configure offer + send link). */}
+        <Route path="/my-students" element={<ProtectedRoute tab="admissions.my_students"><Layout><MyStudents /></Layout></ProtectedRoute>} />
         <Route path="/tickets" element={<ProtectedRoute><Layout><Tickets /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/org-tree" element={<ProtectedRoute tab="advanced.users_roles"><Layout><OrgTree /></Layout></ProtectedRoute>} />
         {/* Admission centers (Accounts module dropdown — managed by super_admin) */}

@@ -66,6 +66,9 @@ const pinnedItems = [
   // Tenant-wide read-only lookup. `tab: 'lead_pool'` is granted to every
   // sales-team role by default, so counsellors get it too.
   { id: 23, label: 'Lead Pool', icon: TravelExploreIcon, path: '/lead-pool', tab: 'lead_pool' },
+  // Counsellor-facing admissions: their own converted students. Gated on
+  // 'admissions.my_students' (seeded to counsellor), so only they see it.
+  { id: 24, label: 'My Students', icon: SchoolIcon, path: '/my-students', tab: 'admissions.my_students' },
   // In-depth payments ledger. `tab: 'payments'` resolves true only for
   // super_admin (allowed_tabs:['*']); all other roles never see this row.
   { id: 19, label: 'Payments Ledger', icon: AccountBalanceWalletIcon, path: '/payments', tab: 'payments' },
