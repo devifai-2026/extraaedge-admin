@@ -87,3 +87,19 @@ export const onNotification = (fn) => {
 };
 
 export const isSocketConnected = () => !!(socket && socket.connected);
+
+// ---- LMS helpers ----
+// The raw socket (connecting if needed) so components can join batch rooms and
+// listen for LMS events (attendance questions/updates, class-state).
+export const getSocket = () => socket || connectSocket();
+
+export const joinBatch = (batchId) => { const s = getSocket(); if (s && batchId) s.emit('lms:join-batch', batchId); };
+export const leaveBatch = (batchId) => { const s = getSocket(); if (s && batchId) s.emit('lms:leave-batch', batchId); };
+
+// Subscribe to a named socket event; returns an unsubscribe fn.
+export const onSocketEvent = (event, fn) => {
+  const s = getSocket();
+  if (!s) return () => {};
+  s.on(event, fn);
+  return () => s.off(event, fn);
+};

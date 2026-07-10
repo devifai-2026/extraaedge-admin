@@ -74,7 +74,9 @@ import StudentPlaceholder from './pages/Student/StudentPlaceholder'
 // LMS trainer pages (staff app, role-gated).
 import TrainerCourses from './pages/Trainer/TrainerCourses'
 import TrainerCourseDetail from './pages/Trainer/TrainerCourseDetail'
+import TrainerClasses from './pages/Trainer/TrainerClasses'
 import TrainerPlaceholder from './pages/Trainer/TrainerPlaceholder'
+import StudentClasses from './pages/Student/StudentClasses'
 
 // Each route declares the backend tab key it requires.
 // `<ProtectedRoute tab="...">` redirects to /dashboard if user lacks access.
@@ -97,7 +99,7 @@ function App() {
         <Route path="/student" element={<StudentLayout />}>
           <Route index element={<StudentHome />} />
           <Route path="home" element={<StudentHome />} />
-          <Route path="classes" element={<StudentPlaceholder title="Classes" />} />
+          <Route path="classes" element={<StudentClasses />} />
           <Route path="forum" element={<StudentPlaceholder title="Forum" />} />
           <Route path="tests" element={<StudentPlaceholder title="Tests" />} />
           <Route path="projects" element={<StudentPlaceholder title="Projects" />} />
@@ -153,8 +155,8 @@ function App() {
         {/* ---- LMS trainer surfaces (staff app, role-gated by trainer.* tabs) ---- */}
         <Route path="/trainer/courses" element={<ProtectedRoute tab="courses.manage"><Layout><TrainerCourses /></Layout></ProtectedRoute>} />
         <Route path="/trainer/courses/:programId" element={<ProtectedRoute tab="courses.manage"><Layout><TrainerCourseDetail /></Layout></ProtectedRoute>} />
-        <Route path="/trainer/classes" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerPlaceholder title="Classes" /></Layout></ProtectedRoute>} />
-        <Route path="/trainer/attendance" element={<ProtectedRoute tab="trainer.attendance"><Layout><TrainerPlaceholder title="Attendance" /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/classes" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/attendance" element={<ProtectedRoute tab="trainer.attendance"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />
         <Route path="/trainer/recordings" element={<ProtectedRoute tab="trainer.recordings"><Layout><TrainerPlaceholder title="Recordings" /></Layout></ProtectedRoute>} />
         <Route path="/trainer/announcements" element={<ProtectedRoute tab="trainer.announcements"><Layout><TrainerPlaceholder title="Announcements" /></Layout></ProtectedRoute>} />
         <Route path="/trainer/forum" element={<ProtectedRoute tab="trainer.forum"><Layout><TrainerPlaceholder title="Student Forum" /></Layout></ProtectedRoute>} />

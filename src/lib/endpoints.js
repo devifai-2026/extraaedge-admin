@@ -726,4 +726,22 @@ export const coursesApi = {
   mergeBatches: (programId, body) => api.post(`/courses/${programId}/batches/merge`, body),
 };
 
+// ---- LMS: classes + live attendance (trainer) ----
+export const classesApi = {
+  list: (params) => api.get('/classes', params),
+  create: (body) => api.post('/classes', body),
+  update: (id, body) => api.put(`/classes/${id}`, body),
+  remove: (id) => api.delete(`/classes/${id}`),
+  lifecycle: (id, action) => api.post(`/classes/${id}/lifecycle`, { action }),
+  // question bank (per module; programId as query for scope)
+  listBank: (moduleId, programId) => api.get(`/classes/bank/${moduleId}`, { programId }),
+  addBankQuestion: (moduleId, programId, body) => api.post(`/classes/bank/${moduleId}?programId=${programId}`, body),
+  deleteBankQuestion: (id, programId) => api.delete(`/classes/bank-question/${id}?programId=${programId}`),
+  // fire + attendance
+  fireQuestion: (id, body) => api.post(`/classes/${id}/fire-question`, body),
+  listQuestions: (id) => api.get(`/classes/${id}/questions`),
+  attendance: (id) => api.get(`/classes/${id}/attendance`),
+  editAttendance: (id, body) => api.post(`/classes/${id}/attendance/edit`, body),
+};
+
 export { auth };

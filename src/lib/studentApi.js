@@ -69,6 +69,11 @@ export const studentApi = {
   me: () => doFetch('/student-auth/me', { method: 'GET' }),
   // LMS student self-views.
   myCourse: () => doFetch('/courses/my-course', { method: 'GET' }),
+  myClasses: () => doFetch('/classes/student/my/classes', { method: 'GET' }),
+  openQuestions: (classId) => doFetch(`/classes/student/${classId}/open-questions`, { method: 'GET' }),
+  answer: (classId, body) => doFetch(`/classes/student/${classId}/answer`, { method: 'POST', body: JSON.stringify(body) }),
+  preNotifyAbsence: (classId) => doFetch(`/classes/student/${classId}/pre-notify-absence`, { method: 'POST', body: '{}' }),
+  setJoinMode: (classId, join_mode) => doFetch(`/classes/student/${classId}/join-mode`, { method: 'POST', body: JSON.stringify({ join_mode }) }),
 };
 
 export { StudentApiError };
