@@ -253,21 +253,34 @@ const AdmissionDetail = () => {
               Verify &amp; Approve
             </Button>
           )}
-          {/* Course-confirm: available once approved (attending/break/completed)
-              and not yet confirmed. Provisions the student's LMS portal. */}
-          {['attending', 'on_break', 'completed'].includes(data.status) && !data.course_confirmed_at && (
-            <Button
-              variant="contained"
-              startIcon={<SchoolIcon />}
-              onClick={confirmCourse}
-              disabled={confirming}
-              sx={{ textTransform: 'none', bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' } }}
-            >
-              {confirming ? 'Confirming…' : 'Confirm course'}
-            </Button>
-          )}
-          {data.course_confirmed_at && (
-            <Chip size="small" color="success" variant="outlined" label="Course confirmed" sx={{ alignSelf: 'center' }} />
+          {/* Course-confirm: available once approved (attending/break/completed).
+              Before confirmation → primary "Confirm course". After → a
+              "Course confirmed" chip + a subtle "Reissue credentials" action
+              (re-confirm is idempotent and mints a fresh temp password so
+              Accounts can re-share it if the student lost it). */}
+          {['attending', 'on_break', 'completed'].includes(data.status) && (
+            data.course_confirmed_at ? (
+              <>
+                <Chip size="small" color="success" variant="outlined" label="Course confirmed" sx={{ alignSelf: 'center' }} />
+                <Button
+                  variant="text" size="small" startIcon={<SchoolIcon />}
+                  onClick={confirmCourse} disabled={confirming}
+                  sx={{ textTransform: 'none', color: '#64748b' }}
+                >
+                  {confirming ? 'Reissuing…' : 'Reissue credentials'}
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="contained"
+                startIcon={<SchoolIcon />}
+                onClick={confirmCourse}
+                disabled={confirming}
+                sx={{ textTransform: 'none', bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' } }}
+              >
+                {confirming ? 'Confirming…' : 'Confirm course'}
+              </Button>
+            )
           )}
         </div>
       </div>
