@@ -94,6 +94,8 @@ export const studentApi = {
   projects: () => doFetch('/assessments/student/projects', { method: 'GET' }),
   submitProject: (id, body) => doFetch(`/assessments/student/projects/${id}/submit`, { method: 'POST', body: JSON.stringify(body) }),
   leaderboard: () => doFetch('/assessments/student/leaderboard', { method: 'GET' }),
+  // Mock interviews.
+  interviewSlots: () => doFetch('/interviews/student/slots', { method: 'GET' }),
 };
 
 export { StudentApiError };

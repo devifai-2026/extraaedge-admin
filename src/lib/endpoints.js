@@ -778,4 +778,14 @@ export const assessmentsApi = {
   leaderboard: (programId) => api.get('/assessments/leaderboard', { programId }),
 };
 
+// ---- LMS: mock interviews (trainer) ----
+export const interviewsApi = {
+  list: (programId) => api.get('/interviews', { programId }),
+  students: (programId) => api.get('/interviews/students', { programId }),
+  create: (body) => api.post('/interviews', body),
+  listSlots: (id) => api.get(`/interviews/${id}/slots`),
+  assign: (id, body) => api.post(`/interviews/${id}/slots`, body),
+  grade: (slotId, body) => api.post(`/interviews/slots/${slotId}/grade`, body),
+};
+
 export { auth };

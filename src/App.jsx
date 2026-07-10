@@ -81,6 +81,7 @@ import TrainerForum from './pages/Trainer/TrainerForum'
 import TrainerTests from './pages/Trainer/TrainerTests'
 import TrainerProjects from './pages/Trainer/TrainerProjects'
 import TrainerLeaderboard from './pages/Trainer/TrainerLeaderboard'
+import TrainerInterviews from './pages/Trainer/TrainerInterviews'
 import TrainerPlaceholder from './pages/Trainer/TrainerPlaceholder'
 import StudentClasses from './pages/Student/StudentClasses'
 import StudentRecordings from './pages/Student/StudentRecordings'
@@ -89,6 +90,7 @@ import StudentForum from './pages/Student/StudentForum'
 import StudentTests from './pages/Student/StudentTests'
 import StudentProjects from './pages/Student/StudentProjects'
 import StudentLeaderboard from './pages/Student/StudentLeaderboard'
+import StudentInterviews from './pages/Student/StudentInterviews'
 
 // Each route declares the backend tab key it requires.
 // `<ProtectedRoute tab="...">` redirects to /dashboard if user lacks access.
@@ -118,6 +120,7 @@ function App() {
           <Route path="tests" element={<StudentTests />} />
           <Route path="projects" element={<StudentProjects />} />
           <Route path="leaderboard" element={<StudentLeaderboard />} />
+          <Route path="interviews" element={<StudentInterviews />} />
           <Route path="catalog" element={<StudentPlaceholder title="Explore Courses" />} />
         </Route>
 
@@ -176,7 +179,7 @@ function App() {
         <Route path="/trainer/forum" element={<ProtectedRoute tab="trainer.forum"><Layout><TrainerForum /></Layout></ProtectedRoute>} />
         <Route path="/trainer/tests" element={<ProtectedRoute tab="trainer.tests"><Layout><TrainerTests /></Layout></ProtectedRoute>} />
         <Route path="/trainer/projects" element={<ProtectedRoute tab="trainer.projects"><Layout><TrainerProjects /></Layout></ProtectedRoute>} />
-        <Route path="/trainer/interviews" element={<ProtectedRoute tab="trainer.interviews"><Layout><TrainerPlaceholder title="Mock Interviews" /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/interviews" element={<ProtectedRoute tab="trainer.interviews"><Layout><TrainerInterviews /></Layout></ProtectedRoute>} />
         <Route path="/trainer/leaderboard" element={<ProtectedRoute tab="trainer.leaderboard"><Layout><TrainerLeaderboard /></Layout></ProtectedRoute>} />
         <Route path="/tickets" element={<ProtectedRoute><Layout><Tickets /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/org-tree" element={<ProtectedRoute tab="advanced.users_roles"><Layout><OrgTree /></Layout></ProtectedRoute>} />

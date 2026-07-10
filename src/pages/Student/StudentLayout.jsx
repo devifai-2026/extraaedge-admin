@@ -13,6 +13,7 @@ const NAV = [
   { to: '/student/forum', label: 'Forum' },
   { to: '/student/tests', label: 'Tests' },
   { to: '/student/projects', label: 'Projects' },
+  { to: '/student/interviews', label: 'Interviews' },
   { to: '/student/leaderboard', label: 'Leaderboard' },
   { to: '/student/catalog', label: 'Explore Courses' },
 ];
