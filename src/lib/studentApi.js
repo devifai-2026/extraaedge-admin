@@ -105,6 +105,11 @@ export const studentApi = {
   // Course catalog + enquiry.
   catalog: () => doFetch('/catalog', { method: 'GET' }),
   enquire: (programId) => doFetch(`/catalog/${programId}/enquire`, { method: 'POST', body: '{}' }),
+  // Profile.
+  getProfile: () => doFetch('/student-auth/profile', { method: 'GET' }),
+  updateProfile: (body) => doFetch('/student-auth/profile', { method: 'PUT', body: JSON.stringify(body) }),
+  profilePresign: (body) => doFetch('/student-auth/profile/presign', { method: 'POST', body: JSON.stringify(body) }),
+  setCv: (body) => doFetch('/student-auth/profile/cv', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export { StudentApiError };

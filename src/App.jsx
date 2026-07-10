@@ -70,7 +70,7 @@ import StudentLogin from './pages/Student/StudentLogin'
 import StudentSetPassword from './pages/Student/StudentSetPassword'
 import StudentLayout from './pages/Student/StudentLayout'
 import StudentDashboard from './pages/Student/StudentDashboard'
-import StudentPlaceholder from './pages/Student/StudentPlaceholder'
+import StudentProfile from './pages/Student/StudentProfile'
 import StudentHome from './pages/Student/StudentHome'
 import StudentCatalog from './pages/Student/StudentCatalog'
 import LmsAnalytics from './pages/LMS/LmsAnalytics'
@@ -126,7 +126,7 @@ function App() {
           <Route path="leaderboard" element={<StudentLeaderboard />} />
           <Route path="interviews" element={<StudentInterviews />} />
           <Route path="catalog" element={<StudentCatalog />} />
-          <Route path="profile" element={<StudentPlaceholder title="My Profile" />} />
+          <Route path="profile" element={<StudentProfile />} />
         </Route>
 
         <Route path="/dashboard"            element={<ProtectedRoute tab="dashboard"><Layout><AnalyticsDashboard /></Layout></ProtectedRoute>} />
