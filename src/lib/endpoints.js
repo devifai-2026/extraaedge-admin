@@ -759,4 +759,11 @@ export const communityApi = {
   like: (id) => api.post(`/community/announcements/${id}/like`),
 };
 
+// ---- LMS: student doubt forum (trainer side) ----
+export const forumApi = {
+  listThreads: (programId) => api.get('/forum/threads', { programId }),
+  replies: (id) => api.get(`/forum/threads/${id}/replies`),
+  reply: (id, body) => api.post(`/forum/threads/${id}/replies`, body),
+};
+
 export { auth };

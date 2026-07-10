@@ -81,6 +81,12 @@ export const studentApi = {
   announcementComments: (id) => doFetch(`/community/student/announcements/${id}/comments`, { method: 'GET' }),
   announcementComment: (id, body) => doFetch(`/community/student/announcements/${id}/comments`, { method: 'POST', body: JSON.stringify(body) }),
   announcementLike: (id) => doFetch(`/community/student/announcements/${id}/like`, { method: 'POST', body: '{}' }),
+  // Forum.
+  forumTrainers: () => doFetch('/forum/student/trainers', { method: 'GET' }),
+  forumThreads: () => doFetch('/forum/student/threads', { method: 'GET' }),
+  forumCreate: (body) => doFetch('/forum/student/threads', { method: 'POST', body: JSON.stringify(body) }),
+  forumReplies: (id) => doFetch(`/forum/student/threads/${id}/replies`, { method: 'GET' }),
+  forumReply: (id, body) => doFetch(`/forum/student/threads/${id}/replies`, { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export { StudentApiError };
