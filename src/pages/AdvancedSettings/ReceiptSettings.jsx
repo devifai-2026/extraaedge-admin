@@ -4,36 +4,45 @@
 // type. Saved to the tenant via the shared /tenant-branding endpoint.
 import { useState, useMemo } from 'react';
 import {
-  Box, Typography, Button, Alert, CircularProgress, Paper, TextField, Divider,
+  Box, Typography, Button, Alert, CircularProgress, Paper, TextField, Divider, InputAdornment,
 } from '@mui/material';
 import { brandingApi } from '../../lib/endpoints';
 import { auth } from '../../lib/api';
 import { isRole, ROLES } from '../../lib/rbac';
 import { buildReceiptHtml } from '../../lib/receiptTemplate';
 
+// Phone is stored as +91XXXXXXXXXX; the field edits only the 10 local digits.
+const onlyDigits = (v, max) => String(v || '').replace(/\D/g, '').slice(0, max);
+const localPhone = (stored) => onlyDigits(String(stored || '').replace(/^\+?91/, ''), 10);
+
 export default function ReceiptSettings() {
   const canManage = isRole(ROLES.SUPER_ADMIN);
   const t0 = auth.getTenant() || {};
   const [rc, setRc] = useState({
     // Organisation contact block on the receipt header.
-    phone: t0.phone || '',
+    phone: localPhone(t0.phone),      // 10 local digits only (prefix fixed +91)
     website: t0.website || '',
     email: t0.email || '',
     address_line1: t0.address_line1 || '',
     address_line2: t0.address_line2 || '',
     city: t0.city || '',
     state: t0.state || '',
-    pincode: t0.pincode || '',
+    pincode: onlyDigits(t0.pincode, 6),
     // Numbering + footer.
     receipt_no_prefix: t0.receipt_no_prefix || '',
     receipt_no_start: t0.receipt_no_start ?? 1,
     receipt_no_pad: t0.receipt_no_pad ?? 5,
     receipt_signatory_label: t0.receipt_signatory_label || 'Authorized Signatory',
+    receipt_thankyou: t0.receipt_thankyou || '',
     receipt_terms: Array.isArray(t0.receipt_terms) ? t0.receipt_terms.join('\n') : '',
   });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const setF = (k) => (e) => setRc((s) => ({ ...s, [k]: e.target.value }));
+  // Digit-only setters for phone (10) and pincode (6).
+  const setDigits = (k, max) => (e) => setRc((s) => ({ ...s, [k]: onlyDigits(e.target.value, max) }));
+  // Full +91 phone for saving/preview (null when no digits entered yet).
+  const fullPhone = () => (rc.phone ? `+91${rc.phone}` : '');
 
   // Derive the "next receipt number" from the current form values. Pure fn of
   // its args so both the inline hint and the live preview stay in lockstep.
@@ -68,11 +77,12 @@ export default function ReceiptSettings() {
         logo_url: t0.logo_url || null,
         brand_primary_color: t0.brand_primary_color || '#E53935',
         currency: t0.currency || 'INR',
-        phone: rc.phone, website: rc.website, email: rc.email,
+        phone: fullPhone(), website: rc.website, email: rc.email,
         address_line1: rc.address_line1, address_line2: rc.address_line2,
         city: rc.city, state: rc.state, pincode: rc.pincode,
         receipt_terms: rc.receipt_terms.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 6),
         receipt_signatory_label: String(rc.receipt_signatory_label || '').trim() || 'Authorized Signatory',
+        receipt_thankyou: String(rc.receipt_thankyou || '').trim() || null,
       },
       fee_schedule: { totals: { total: 40000, paid: 5000, due: 35000 } },
       upcoming: [
@@ -88,26 +98,38 @@ export default function ReceiptSettings() {
   }, [
     rc.phone, rc.website, rc.email, rc.address_line1, rc.address_line2,
     rc.city, rc.state, rc.pincode, rc.receipt_no_prefix, rc.receipt_no_start,
-    rc.receipt_no_pad, rc.receipt_signatory_label, rc.receipt_terms,
+    rc.receipt_no_pad, rc.receipt_signatory_label, rc.receipt_thankyou, rc.receipt_terms,
     t0.brand_name, t0.name, t0.logo_url, t0.brand_primary_color, t0.currency,
   ]);
 
   const save = async () => {
-    setMsg(null); setBusy(true);
+    setMsg(null);
+    // Phone & pincode are fixed-length numeric — allow blank, else require the
+    // exact length so we never store a half-typed number on the receipt.
+    if (rc.phone && rc.phone.length !== 10) {
+      setMsg({ severity: 'error', text: 'Phone must be exactly 10 digits (the +91 prefix is added automatically).' });
+      return;
+    }
+    if (rc.pincode && rc.pincode.length !== 6) {
+      setMsg({ severity: 'error', text: 'Pincode must be exactly 6 digits.' });
+      return;
+    }
+    setBusy(true);
     try {
       const body = {
-        phone: rc.phone.trim() || null,
+        phone: fullPhone() || null,
         website: rc.website.trim() || null,
         email: rc.email.trim() || null,
         address_line1: rc.address_line1.trim() || null,
         address_line2: rc.address_line2.trim() || null,
         city: rc.city.trim() || null,
         state: rc.state.trim() || null,
-        pincode: rc.pincode.trim() || null,
+        pincode: rc.pincode || null,
         receipt_no_prefix: String(rc.receipt_no_prefix || '').trim() || null,
         receipt_no_start: Math.max(1, Number(rc.receipt_no_start) || 1),
         receipt_no_pad: Math.max(1, Number(rc.receipt_no_pad) || 5),
         receipt_signatory_label: String(rc.receipt_signatory_label || '').trim() || 'Authorized Signatory',
+        receipt_thankyou: String(rc.receipt_thankyou || '').trim() || null,
         receipt_terms: rc.receipt_terms.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 6),
       };
       const res = await brandingApi.updateReceiptSettings(body);
@@ -147,14 +169,26 @@ export default function ReceiptSettings() {
             <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
               <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1.5 }}>Organisation details (receipt header)</Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                <TextField label="Phone" size="small" value={rc.phone} onChange={setF('phone')} placeholder="+91-7219777599" />
+                <TextField
+                  label="Phone" size="small" value={rc.phone} onChange={setDigits('phone', 10)}
+                  placeholder="9876543210"
+                  InputProps={{ startAdornment: <InputAdornment position="start">+91</InputAdornment> }}
+                  inputProps={{ inputMode: 'numeric', maxLength: 10 }}
+                  helperText={rc.phone && rc.phone.length !== 10 ? '10 digits required' : ' '}
+                  error={Boolean(rc.phone) && rc.phone.length !== 10}
+                />
                 <TextField label="Website" size="small" value={rc.website} onChange={setF('website')} placeholder="www.example.com" />
                 <TextField label="Email" size="small" value={rc.email} onChange={setF('email')} sx={{ gridColumn: '1 / -1' }} />
                 <TextField label="Address line 1" size="small" value={rc.address_line1} onChange={setF('address_line1')} sx={{ gridColumn: '1 / -1' }} />
                 <TextField label="Address line 2" size="small" value={rc.address_line2} onChange={setF('address_line2')} sx={{ gridColumn: '1 / -1' }} />
                 <TextField label="City" size="small" value={rc.city} onChange={setF('city')} />
                 <TextField label="State" size="small" value={rc.state} onChange={setF('state')} />
-                <TextField label="Pincode" size="small" value={rc.pincode} onChange={setF('pincode')} />
+                <TextField
+                  label="Pincode" size="small" value={rc.pincode} onChange={setDigits('pincode', 6)}
+                  placeholder="411004" inputProps={{ inputMode: 'numeric', maxLength: 6 }}
+                  helperText={rc.pincode && rc.pincode.length !== 6 ? '6 digits required' : ' '}
+                  error={Boolean(rc.pincode) && rc.pincode.length !== 6}
+                />
               </Box>
 
               <Divider sx={{ my: 3 }} />
@@ -179,6 +213,12 @@ export default function ReceiptSettings() {
                 label="Terms (one line per rule, max 6)" fullWidth multiline minRows={2} maxRows={6} size="small"
                 value={rc.receipt_terms} onChange={setF('receipt_terms')}
                 placeholder={'Training fees are strictly non-refundable under any circumstances.\nA late fee of ₹50 per day applies to any installment paid after its due date.'}
+              />
+              <TextField
+                label="Thank-you line" fullWidth size="small" sx={{ mt: 2 }}
+                value={rc.receipt_thankyou} onChange={setF('receipt_thankyou')}
+                placeholder={`Thank you for choosing ${t0.brand_name || t0.name || 'your institute'}.`}
+                helperText="Blank = auto-generated from your brand name"
               />
               <TextField label="Signatory label" size="small" sx={{ mt: 2, width: 260 }} value={rc.receipt_signatory_label} onChange={setF('receipt_signatory_label')} />
 

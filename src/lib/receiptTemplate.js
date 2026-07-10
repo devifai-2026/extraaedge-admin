@@ -62,15 +62,15 @@ export function buildReceiptHtml(data, opts = {}) {
     : `<div style="font-size:22px;font-weight:800;color:#0f172a">${esc(brandName)}</div>`;
 
   const header = `
-    <table style="width:100%;border-collapse:collapse">
+    <table style="width:100%;border-collapse:collapse;table-layout:fixed">
       <tr>
-        <td style="vertical-align:top;padding:0">
+        <td style="width:58%;vertical-align:top;padding:0 12px 0 0;word-break:break-word;overflow-wrap:anywhere">
           ${logoCell}
-          ${addr ? `<div style="margin-top:10px;font-size:11px;color:#334155;font-weight:600">${esc(addr)}</div>` : ''}
-          ${contact ? `<div style="margin-top:3px;font-size:11px;color:#64748b">${contact}</div>` : ''}
+          ${addr ? `<div style="margin-top:10px;font-size:11px;color:#334155;font-weight:600;word-break:break-word;overflow-wrap:anywhere">${esc(addr)}</div>` : ''}
+          ${contact ? `<div style="margin-top:3px;font-size:11px;color:#64748b;word-break:break-word;overflow-wrap:anywhere">${contact}</div>` : ''}
         </td>
-        <td style="vertical-align:top;text-align:right;padding:0;white-space:nowrap">
-          <span style="display:inline-block;background:#0f172a;color:#fff;font-size:12px;font-weight:700;letter-spacing:1px;padding:7px 14px;border-radius:4px">FEE RECEIPT</span>
+        <td style="width:42%;vertical-align:top;text-align:right;padding:0;word-break:break-word;overflow-wrap:anywhere">
+          <span style="display:inline-block;background:#0f172a;color:#fff;font-size:12px;font-weight:700;letter-spacing:1px;padding:7px 14px;border-radius:4px;white-space:nowrap">FEE RECEIPT</span>
           <div style="margin-top:10px;font-size:12px;color:#334155;line-height:1.8">
             <div><b>Receipt No. :</b> ${esc(receipt.receipt_no || '—')}</div>
             <div><b>Date :</b> ${fmtDate(receipt.receipt_date)}</div>
@@ -90,13 +90,13 @@ export function buildReceiptHtml(data, opts = {}) {
 
   // --- Student details (2-col grid) ---
   const kv = (label, value) => `
-    <td style="width:50%;vertical-align:top;padding:0 0 14px">
+    <td style="width:50%;vertical-align:top;padding:0 12px 14px 0;word-break:break-word;overflow-wrap:anywhere">
       <div style="font-size:10px;font-weight:700;letter-spacing:0.5px;color:#94a3b8;text-transform:uppercase">${label}</div>
       <div style="font-size:14px;font-weight:700;color:#0f172a;margin-top:2px">${esc(value || '—')}</div>
     </td>`;
   const studentDetails = `
     ${heading('Student Details')}
-    <table style="width:100%;border-collapse:collapse">
+    <table style="width:100%;border-collapse:collapse;table-layout:fixed">
       <tr>${kv('Name', admission.student_name)}${kv('Contact', admission.contact)}</tr>
       <tr>${kv('Course', admission.program_name)}${kv('Date of Admission', fmtDate(admission.admission_date))}</tr>
       <tr>${kv('Mode of Training', admission.mode_of_training)}<td style="width:50%"></td></tr>
@@ -154,11 +154,14 @@ export function buildReceiptHtml(data, opts = {}) {
 
   // --- Footer: configurable terms + thank-you + system-generated / signatory ---
   const terms = (Array.isArray(tenant.receipt_terms) ? tenant.receipt_terms : [])
-    .map((t) => `<div style="font-size:11px;color:#475569;line-height:1.7">${esc(t)}</div>`).join('');
+    .map((t) => `<div style="font-size:11px;color:#475569;line-height:1.7;word-break:break-word;overflow-wrap:anywhere">${esc(t)}</div>`).join('');
   const signatory = tenant.receipt_signatory_label || 'Authorized Signatory';
+  // Thank-you line — admin-configurable; defaults to naming the brand.
+  const thankYou = (tenant.receipt_thankyou && String(tenant.receipt_thankyou).trim())
+    || `Thank you for choosing ${brandName}.`;
   const footer = `
     ${terms ? `<div style="margin-top:18px;padding:12px 16px;background:#f1f5f9;border-left:4px solid ${accent};border-radius:4px">${terms}</div>` : ''}
-    <div style="margin-top:16px;font-size:13px;font-weight:700;color:#0f172a">Thank you for choosing ${esc(brandName)}.</div>
+    <div style="margin-top:16px;font-size:13px;font-weight:700;color:#0f172a;word-break:break-word;overflow-wrap:anywhere">${esc(thankYou)}</div>
     <table style="width:100%;border-collapse:collapse;margin-top:22px;border-top:1px solid #e2e8f0">
       <tr>
         <td style="padding-top:10px;font-size:11px;color:#94a3b8;vertical-align:bottom">This is a system-generated receipt.</td>
