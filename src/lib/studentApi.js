@@ -87,6 +87,13 @@ export const studentApi = {
   forumCreate: (body) => doFetch('/forum/student/threads', { method: 'POST', body: JSON.stringify(body) }),
   forumReplies: (id) => doFetch(`/forum/student/threads/${id}/replies`, { method: 'GET' }),
   forumReply: (id, body) => doFetch(`/forum/student/threads/${id}/replies`, { method: 'POST', body: JSON.stringify(body) }),
+  // Assessments.
+  tests: () => doFetch('/assessments/student/tests', { method: 'GET' }),
+  takeTest: (id) => doFetch(`/assessments/student/tests/${id}`, { method: 'GET' }),
+  submitTest: (id, answers) => doFetch(`/assessments/student/tests/${id}/submit`, { method: 'POST', body: JSON.stringify({ answers }) }),
+  projects: () => doFetch('/assessments/student/projects', { method: 'GET' }),
+  submitProject: (id, body) => doFetch(`/assessments/student/projects/${id}/submit`, { method: 'POST', body: JSON.stringify(body) }),
+  leaderboard: () => doFetch('/assessments/student/leaderboard', { method: 'GET' }),
 };
 
 export { StudentApiError };

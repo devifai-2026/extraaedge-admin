@@ -766,4 +766,16 @@ export const forumApi = {
   reply: (id, body) => api.post(`/forum/threads/${id}/replies`, body),
 };
 
+// ---- LMS: assessments (trainer) ----
+export const assessmentsApi = {
+  listTests: (programId) => api.get('/assessments/tests', { programId }),
+  createTest: (body) => api.post('/assessments/tests', body),
+  testResults: (id) => api.get(`/assessments/tests/${id}/results`),
+  listProjects: (programId) => api.get('/assessments/projects', { programId }),
+  createProject: (body) => api.post('/assessments/projects', body),
+  listSubmissions: (id) => api.get(`/assessments/projects/${id}/submissions`),
+  grade: (id, body) => api.post(`/assessments/projects/${id}/grade`, body),
+  leaderboard: (programId) => api.get('/assessments/leaderboard', { programId }),
+};
+
 export { auth };
