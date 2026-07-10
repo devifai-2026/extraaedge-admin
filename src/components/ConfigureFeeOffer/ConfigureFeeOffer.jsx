@@ -136,6 +136,7 @@ export default function ConfigureFeeOffer({ open, leadId, onClose, onSaved }) {
   // the form defaults to the first primary (else first active) when the
   // offer doesn't already carry an account.
   const [accounts, setAccounts] = useState([]);
+  const [acctsError, setAcctsError] = useState('');
   const [form, setForm] = useState(null);
   // Tracks whether an offer existed when we opened — affects the title +
   // primary button label only.
@@ -153,7 +154,9 @@ export default function ConfigureFeeOffer({ open, leadId, onClose, onSaved }) {
     // "None" and the share-link falls back to the tenant primaries.
     Promise.all([
       leadFeeOffersApi.get(leadId),
-      paymentAccountsApi.list().then((r) => r?.data || []).catch(() => []),
+      // Distinguish "no accounts configured" from "couldn't load them" so the
+      // warning isn't misleading. A load failure returns a sentinel we surface.
+      paymentAccountsApi.list().then((r) => r?.data || []).catch((e) => ({ __error: e?.message || 'load failed' })),
     ])
       .then(([r, accts]) => {
         if (!alive) return;
@@ -162,7 +165,11 @@ export default function ConfigureFeeOffer({ open, leadId, onClose, onSaved }) {
         setPrograms(progs);
         // Backend only includes `discount` when it's approved.
         setDiscount(data.discount || null);
-        const activeAccts = (accts || []).filter((a) => a.is_active !== false);
+        // accts is either an array, or { __error } when the fetch failed.
+        const acctsFailed = accts && !Array.isArray(accts) && accts.__error;
+        setAcctsError(acctsFailed ? accts.__error : '');
+        const acctList = Array.isArray(accts) ? accts : [];
+        const activeAccts = acctList.filter((a) => a.is_active !== false);
         const orderedAccts = [...activeAccts.filter((a) => a.is_primary), ...activeAccts.filter((a) => !a.is_primary)];
         setAccounts(orderedAccts);
         const defaultAcctId = orderedAccts[0]?.id || '';
@@ -504,6 +511,10 @@ export default function ConfigureFeeOffer({ open, leadId, onClose, onSaved }) {
                       exactly what the student will see / pay into. */}
                   <PaymentAccountDetails account={accounts.find((a) => a.id === form.payment_account_id)} />
                 </Box>
+              ) : acctsError ? (
+                <Alert severity="error" sx={{ py: 0 }}>
+                  Couldn’t load payment accounts ({acctsError}). Try reopening; if it persists, contact an admin.
+                </Alert>
               ) : (
                 <Alert severity="warning" sx={{ py: 0 }}>
                   No active payment accounts. Add one under Settings → Payment Accounts.
