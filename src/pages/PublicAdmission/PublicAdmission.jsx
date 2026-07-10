@@ -28,6 +28,7 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import QrCode2Icon from '@mui/icons-material/QrCode2';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { publicAdmissionsApi } from '../../lib/endpoints';
+import { resolveAssetUrl } from '../../lib/config';
 
 const blankEducation = () => ({
   examination: '', stream: '', college_name: '',
@@ -370,7 +371,9 @@ export default function PublicAdmission() {
   }
 
   const tenantName = prefill?.tenant?.name || 'Admission Form';
-  const logoUrl = prefill?.tenant?.logo_url || null;
+  // Tenant logo is a root-relative branding-proxy path — resolve it against the
+  // backend host (same as the navbar/receipt) so it loads on this public page.
+  const logoUrl = resolveAssetUrl(prefill?.tenant?.logo_url || null);
   const programs = prefill?.programs || [];
   const centers = prefill?.centers || [];
 
@@ -728,10 +731,6 @@ export default function PublicAdmission() {
             </Button>
           </Box>
         </Box>
-
-        <Typography variant="caption" sx={{ display: 'block', mt: 3, textAlign: 'center', color: '#94a3b8' }}>
-          Submitted via {tenantName} · Admission Portal
-        </Typography>
       </Box>
 
       <Snackbar
