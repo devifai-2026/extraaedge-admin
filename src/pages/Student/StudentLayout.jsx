@@ -8,6 +8,8 @@ import { studentAuth } from '../../lib/studentApi';
 const NAV = [
   { to: '/student/home', label: 'My Course' },
   { to: '/student/classes', label: 'Classes' },
+  { to: '/student/recordings', label: 'Recordings' },
+  { to: '/student/announcements', label: 'Announcements' },
   { to: '/student/forum', label: 'Forum' },
   { to: '/student/tests', label: 'Tests' },
   { to: '/student/projects', label: 'Projects' },

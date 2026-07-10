@@ -74,6 +74,13 @@ export const studentApi = {
   answer: (classId, body) => doFetch(`/classes/student/${classId}/answer`, { method: 'POST', body: JSON.stringify(body) }),
   preNotifyAbsence: (classId) => doFetch(`/classes/student/${classId}/pre-notify-absence`, { method: 'POST', body: '{}' }),
   setJoinMode: (classId, join_mode) => doFetch(`/classes/student/${classId}/join-mode`, { method: 'POST', body: JSON.stringify({ join_mode }) }),
+  // Recordings + announcements.
+  recordings: () => doFetch('/community/student/recordings', { method: 'GET' }),
+  recordingUrl: (id) => doFetch(`/community/student/recordings/${id}/url`, { method: 'GET' }),
+  announcements: () => doFetch('/community/student/announcements', { method: 'GET' }),
+  announcementComments: (id) => doFetch(`/community/student/announcements/${id}/comments`, { method: 'GET' }),
+  announcementComment: (id, body) => doFetch(`/community/student/announcements/${id}/comments`, { method: 'POST', body: JSON.stringify(body) }),
+  announcementLike: (id) => doFetch(`/community/student/announcements/${id}/like`, { method: 'POST', body: '{}' }),
 };
 
 export { StudentApiError };

@@ -75,8 +75,12 @@ import StudentPlaceholder from './pages/Student/StudentPlaceholder'
 import TrainerCourses from './pages/Trainer/TrainerCourses'
 import TrainerCourseDetail from './pages/Trainer/TrainerCourseDetail'
 import TrainerClasses from './pages/Trainer/TrainerClasses'
+import TrainerRecordings from './pages/Trainer/TrainerRecordings'
+import TrainerAnnouncements from './pages/Trainer/TrainerAnnouncements'
 import TrainerPlaceholder from './pages/Trainer/TrainerPlaceholder'
 import StudentClasses from './pages/Student/StudentClasses'
+import StudentRecordings from './pages/Student/StudentRecordings'
+import StudentAnnouncements from './pages/Student/StudentAnnouncements'
 
 // Each route declares the backend tab key it requires.
 // `<ProtectedRoute tab="...">` redirects to /dashboard if user lacks access.
@@ -100,6 +104,8 @@ function App() {
           <Route index element={<StudentHome />} />
           <Route path="home" element={<StudentHome />} />
           <Route path="classes" element={<StudentClasses />} />
+          <Route path="recordings" element={<StudentRecordings />} />
+          <Route path="announcements" element={<StudentAnnouncements />} />
           <Route path="forum" element={<StudentPlaceholder title="Forum" />} />
           <Route path="tests" element={<StudentPlaceholder title="Tests" />} />
           <Route path="projects" element={<StudentPlaceholder title="Projects" />} />
@@ -157,8 +163,8 @@ function App() {
         <Route path="/trainer/courses/:programId" element={<ProtectedRoute tab="courses.manage"><Layout><TrainerCourseDetail /></Layout></ProtectedRoute>} />
         <Route path="/trainer/classes" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />
         <Route path="/trainer/attendance" element={<ProtectedRoute tab="trainer.attendance"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />
-        <Route path="/trainer/recordings" element={<ProtectedRoute tab="trainer.recordings"><Layout><TrainerPlaceholder title="Recordings" /></Layout></ProtectedRoute>} />
-        <Route path="/trainer/announcements" element={<ProtectedRoute tab="trainer.announcements"><Layout><TrainerPlaceholder title="Announcements" /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/recordings" element={<ProtectedRoute tab="trainer.recordings"><Layout><TrainerRecordings /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/announcements" element={<ProtectedRoute tab="trainer.announcements"><Layout><TrainerAnnouncements /></Layout></ProtectedRoute>} />
         <Route path="/trainer/forum" element={<ProtectedRoute tab="trainer.forum"><Layout><TrainerPlaceholder title="Student Forum" /></Layout></ProtectedRoute>} />
         <Route path="/trainer/tests" element={<ProtectedRoute tab="trainer.tests"><Layout><TrainerPlaceholder title="Mock Tests" /></Layout></ProtectedRoute>} />
         <Route path="/trainer/projects" element={<ProtectedRoute tab="trainer.projects"><Layout><TrainerPlaceholder title="Projects" /></Layout></ProtectedRoute>} />

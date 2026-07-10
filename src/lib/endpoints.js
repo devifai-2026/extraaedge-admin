@@ -744,4 +744,19 @@ export const classesApi = {
   editAttendance: (id, body) => api.post(`/classes/${id}/attendance/edit`, body),
 };
 
+// ---- LMS: recordings + announcements (trainer) ----
+export const communityApi = {
+  // recordings
+  missedRecordings: () => api.get('/community/recordings/missed'),
+  listRecordings: (classId) => api.get(`/community/classes/${classId}/recordings`),
+  addRecording: (classId, body) => api.post(`/community/classes/${classId}/recordings`, body),
+  recordingUrl: (id) => api.get(`/community/recordings/${id}/url`),
+  // announcements
+  listAnnouncements: (programId) => api.get('/community/announcements', { programId }),
+  postAnnouncement: (body) => api.post('/community/announcements', body),
+  listComments: (id) => api.get(`/community/announcements/${id}/comments`),
+  comment: (id, body) => api.post(`/community/announcements/${id}/comments`, body),
+  like: (id) => api.post(`/community/announcements/${id}/like`),
+};
+
 export { auth };
