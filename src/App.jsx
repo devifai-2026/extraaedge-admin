@@ -71,6 +71,10 @@ import StudentSetPassword from './pages/Student/StudentSetPassword'
 import StudentLayout from './pages/Student/StudentLayout'
 import StudentHome from './pages/Student/StudentHome'
 import StudentPlaceholder from './pages/Student/StudentPlaceholder'
+// LMS trainer pages (staff app, role-gated).
+import TrainerCourses from './pages/Trainer/TrainerCourses'
+import TrainerCourseDetail from './pages/Trainer/TrainerCourseDetail'
+import TrainerPlaceholder from './pages/Trainer/TrainerPlaceholder'
 
 // Each route declares the backend tab key it requires.
 // `<ProtectedRoute tab="...">` redirects to /dashboard if user lacks access.
@@ -145,6 +149,19 @@ function App() {
         <Route path="/admission-pipeline" element={<ProtectedRoute tab="admissions.pipeline"><Layout><AdmissionPipeline /></Layout></ProtectedRoute>} />
         {/* Counsellor: their own converted students (configure offer + send link). */}
         <Route path="/my-students" element={<ProtectedRoute tab="admissions.my_students"><Layout><MyStudents /></Layout></ProtectedRoute>} />
+
+        {/* ---- LMS trainer surfaces (staff app, role-gated by trainer.* tabs) ---- */}
+        <Route path="/trainer/courses" element={<ProtectedRoute tab="courses.manage"><Layout><TrainerCourses /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/courses/:programId" element={<ProtectedRoute tab="courses.manage"><Layout><TrainerCourseDetail /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/classes" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerPlaceholder title="Classes" /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/attendance" element={<ProtectedRoute tab="trainer.attendance"><Layout><TrainerPlaceholder title="Attendance" /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/recordings" element={<ProtectedRoute tab="trainer.recordings"><Layout><TrainerPlaceholder title="Recordings" /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/announcements" element={<ProtectedRoute tab="trainer.announcements"><Layout><TrainerPlaceholder title="Announcements" /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/forum" element={<ProtectedRoute tab="trainer.forum"><Layout><TrainerPlaceholder title="Student Forum" /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/tests" element={<ProtectedRoute tab="trainer.tests"><Layout><TrainerPlaceholder title="Mock Tests" /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/projects" element={<ProtectedRoute tab="trainer.projects"><Layout><TrainerPlaceholder title="Projects" /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/interviews" element={<ProtectedRoute tab="trainer.interviews"><Layout><TrainerPlaceholder title="Mock Interviews" /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/leaderboard" element={<ProtectedRoute tab="trainer.leaderboard"><Layout><TrainerPlaceholder title="Leaderboard" /></Layout></ProtectedRoute>} />
         <Route path="/tickets" element={<ProtectedRoute><Layout><Tickets /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/org-tree" element={<ProtectedRoute tab="advanced.users_roles"><Layout><OrgTree /></Layout></ProtectedRoute>} />
         {/* Admission centers (Accounts module dropdown — managed by super_admin) */}

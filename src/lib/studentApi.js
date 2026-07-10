@@ -67,6 +67,8 @@ export const studentApi = {
   setPassword: (slug, body) => doFetch('/student-auth/set-password', { method: 'POST', body: JSON.stringify(body), headers: withSlug(slug) }),
   requestReset: (slug, body) => doFetch('/student-auth/request-reset', { method: 'POST', body: JSON.stringify(body), headers: withSlug(slug) }),
   me: () => doFetch('/student-auth/me', { method: 'GET' }),
+  // LMS student self-views.
+  myCourse: () => doFetch('/courses/my-course', { method: 'GET' }),
 };
 
 export { StudentApiError };

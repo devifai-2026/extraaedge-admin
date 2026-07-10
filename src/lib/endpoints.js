@@ -704,4 +704,26 @@ export const ticketsApi = {
   comment: (id, body) => api.post(`/tickets/${id}/comments`, body),
 };
 
+// ---- LMS: courses / modules / trainers / batches (trainer + head + admin) ----
+export const coursesApi = {
+  list: () => api.get('/courses'),
+  get: (programId) => api.get(`/courses/${programId}`),
+  // Modules
+  listModules: (programId) => api.get(`/courses/${programId}/modules`),
+  createModule: (programId, body) => api.post(`/courses/${programId}/modules`, body),
+  updateModule: (programId, moduleId, body) => api.put(`/courses/${programId}/modules/${moduleId}`, body),
+  deleteModule: (programId, moduleId) => api.delete(`/courses/${programId}/modules/${moduleId}`),
+  // Trainers
+  listTrainers: (programId) => api.get(`/courses/${programId}/trainers`),
+  addTrainer: (programId, body) => api.post(`/courses/${programId}/trainers`, body),
+  removeTrainer: (programId, id) => api.delete(`/courses/${programId}/trainers/${id}`),
+  // Batches
+  listBatches: (programId) => api.get(`/courses/${programId}/batches`),
+  createBatch: (programId, body) => api.post(`/courses/${programId}/batches`, body),
+  listBatchStudents: (programId, batchId) => api.get(`/courses/${programId}/batches/${batchId}/students`),
+  listUnassignedStudents: (programId) => api.get(`/courses/${programId}/unassigned-students`),
+  placeStudent: (programId, body) => api.post(`/courses/${programId}/batches/place`, body),
+  mergeBatches: (programId, body) => api.post(`/courses/${programId}/batches/merge`, body),
+};
+
 export { auth };
