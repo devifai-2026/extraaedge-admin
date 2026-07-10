@@ -96,6 +96,9 @@ export const studentApi = {
   leaderboard: () => doFetch('/assessments/student/leaderboard', { method: 'GET' }),
   // Mock interviews.
   interviewSlots: () => doFetch('/interviews/student/slots', { method: 'GET' }),
+  // Course catalog + enquiry.
+  catalog: () => doFetch('/catalog', { method: 'GET' }),
+  enquire: (programId) => doFetch(`/catalog/${programId}/enquire`, { method: 'POST', body: '{}' }),
 };
 
 export { StudentApiError };

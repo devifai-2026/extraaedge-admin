@@ -70,7 +70,7 @@ import StudentLogin from './pages/Student/StudentLogin'
 import StudentSetPassword from './pages/Student/StudentSetPassword'
 import StudentLayout from './pages/Student/StudentLayout'
 import StudentHome from './pages/Student/StudentHome'
-import StudentPlaceholder from './pages/Student/StudentPlaceholder'
+import StudentCatalog from './pages/Student/StudentCatalog'
 // LMS trainer pages (staff app, role-gated).
 import TrainerCourses from './pages/Trainer/TrainerCourses'
 import TrainerCourseDetail from './pages/Trainer/TrainerCourseDetail'
@@ -121,7 +121,7 @@ function App() {
           <Route path="projects" element={<StudentProjects />} />
           <Route path="leaderboard" element={<StudentLeaderboard />} />
           <Route path="interviews" element={<StudentInterviews />} />
-          <Route path="catalog" element={<StudentPlaceholder title="Explore Courses" />} />
+          <Route path="catalog" element={<StudentCatalog />} />
         </Route>
 
         <Route path="/dashboard"            element={<ProtectedRoute tab="dashboard"><Layout><AnalyticsDashboard /></Layout></ProtectedRoute>} />
