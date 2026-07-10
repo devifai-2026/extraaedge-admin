@@ -15,7 +15,7 @@ import SwapVertIcon from '@mui/icons-material/SwapVert';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import LoginIcon from '@mui/icons-material/Login';
-import { usersApi, customRolesApi, programsApi, authApi, branchesApi } from '../../lib/endpoints';
+import { usersApi, customRolesApi, programsApi, authApi, branchesApi, coursesApi } from '../../lib/endpoints';
 import { auth } from '../../lib/api';
 import { isRole, ROLES } from '../../lib/rbac';
 import Breadcrumb from './Breadcrumb';
@@ -740,8 +740,12 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
   const [form, setForm] = useState(() => initialAddForm());
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  // LMS trainer bindings: rows of { program_id, module_id }. A head_trainer
+  // binds course(s) only (module_id stays null); a trainer binds course+module.
+  // Multiple rows = multiple courses/modules per trainer.
+  const [bindings, setBindings] = useState([]);
 
-  useEffect(() => { if (open) { setForm(initialAddForm()); setErr(''); } }, [open]);
+  useEffect(() => { if (open) { setForm(initialAddForm()); setErr(''); setBindings([]); } }, [open]);
 
   const programs = programsData?.data || [];
   // System + custom roles. Server derives the user's role bucket from the
@@ -756,6 +760,16 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
   // The chosen role's bucket drives branch/reporting rules.
   const isSuperAdmin = form.role === 'super_admin';
   const isBranchManager = form.role === 'branch_manager';
+  // LMS teaching roles → show the course-binding section.
+  const isHeadTrainer = form.role === 'head_trainer';
+  const isTrainer = form.role === 'trainer';
+  const isTeachingRole = isHeadTrainer || isTrainer;
+
+  // Course bindings (course-only; head assigns a trainer's modules later).
+  const addBinding = () => setBindings((b) => [...b, { program_id: '' }]);
+  const setBinding = (i, patch) => setBindings((b) => b.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const removeBinding = (i) => setBindings((b) => b.filter((_, j) => j !== i));
+
   // super_admin spans all branches (no branch). branch_manager gets their
   // branch when made a head, so it's optional here. Everyone else needs one.
   const branchRequired = !isSuperAdmin && !isBranchManager;
@@ -766,6 +780,10 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
     if (!form.email.trim()) { setErr('Email is required'); return; }
     if (!form.password || form.password.length < 10) { setErr('Password must be at least 10 chars'); return; }
     if (branchRequired && !form.branch_id) { setErr('Please select a branch for this user'); return; }
+    // Teaching roles must be bound to at least one course at creation. Trainers
+    // are course-only here; the head trainer assigns their modules later.
+    const cleanBindings = bindings.filter((b) => b.program_id);
+    if (isTeachingRole && cleanBindings.length === 0) { setErr(`Assign at least one course for this ${isHeadTrainer ? 'head trainer' : 'trainer'}.`); return; }
     setSaving(true);
     try {
       const fullName = [form.first_name, form.last_name].filter(Boolean).join(' ').trim();
@@ -784,7 +802,21 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
         // super_admin spans all branches; others carry their branch.
         ...(isSuperAdmin ? {} : (form.branch_id ? { branch_id: form.branch_id } : {})),
       };
-      await usersApi.create(payload);
+      const res = await usersApi.create(payload);
+      const newUser = res?.data ?? res;
+      // Bind teaching roles to their course(s). head → role 'head', trainer →
+      // role 'trainer'. Module assignment for trainers happens later (head does
+      // it from the Course → Trainers tab). Best-effort per binding; a failure
+      // surfaces but doesn't undo the created user.
+      if (isTeachingRole && newUser?.id && cleanBindings.length) {
+        const role = isHeadTrainer ? 'head' : 'trainer';
+        const failures = [];
+        for (const b of cleanBindings) {
+          try { await coursesApi.addTrainer(b.program_id, { user_id: newUser.id, role }); }
+          catch (e) { failures.push(e.message || 'binding failed'); }
+        }
+        if (failures.length) { setErr(`User created, but course assignment had issues: ${failures[0]}`); }
+      }
       onCreated?.();
     } catch (e) {
       setErr(e.message || 'Failed to create user');
@@ -920,6 +952,34 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
           label="Allow this user to Log In ExtraaEdge Mobile App *"
           sx={{ mt: 1 }}
         />
+
+        {/* LMS: bind a head_trainer / trainer to course(s). A course can have
+            multiple head trainers. For a trainer, the head assigns modules
+            later (Course → Trainers), so only the course is chosen here. */}
+        {isTeachingRole && (
+          <div style={{ marginTop: 20, padding: 14, border: '1px solid #fde0d5', borderRadius: 10, background: '#fff8f5' }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
+              Assign course{isHeadTrainer ? 's (as Head Trainer)' : 's (as Trainer)'} *
+            </div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>
+              {isHeadTrainer
+                ? 'The head trainer owns these courses. A course can have more than one head.'
+                : 'The trainer joins these courses. Their head trainer assigns specific modules afterwards.'}
+            </div>
+            {bindings.map((b, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                <TextField
+                  size="small" select label="Course" value={b.program_id} sx={{ flex: 1 }}
+                  onChange={(e) => setBinding(i, { program_id: e.target.value })}
+                >
+                  {programs.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+                </TextField>
+                <Button size="small" color="inherit" onClick={() => removeBinding(i)} sx={{ minWidth: 0, color: '#dc2626' }}>Remove</Button>
+              </div>
+            ))}
+            <Button size="small" onClick={addBinding} sx={{ textTransform: 'none' }}>+ Add course</Button>
+          </div>
+        )}
 
         <h4 style={{ marginTop: 24, marginBottom: 12 }}>Section 3: Default values to be set</h4>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
