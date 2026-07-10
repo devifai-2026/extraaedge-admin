@@ -346,6 +346,9 @@ export const integrationsApi = {
 export const brandingApi = {
   update: (body) => api.put('/tenant-branding', body),
   updateLogo: (logo_r2_key) => api.put('/tenant-branding', { logo_r2_key }),
+  // Fee-receipt config: { receipt_terms[], receipt_signatory_label,
+  // receipt_no_prefix, receipt_no_start, receipt_no_pad } — same endpoint.
+  updateReceiptSettings: (body) => api.put('/tenant-branding', body),
 };
 
 export const uploadsApi = {

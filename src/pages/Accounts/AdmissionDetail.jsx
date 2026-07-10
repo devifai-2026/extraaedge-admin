@@ -27,7 +27,10 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
-import { admissionsApi, uploadsApi, paymentAccountsApi } from '../../lib/endpoints';
+import DownloadIcon from '@mui/icons-material/Download';
+import { admissionsApi, uploadsApi, paymentAccountsApi, publicReceiptsApi } from '../../lib/endpoints';
+import { buildReceiptHtml } from '../../lib/receiptTemplate';
+import { downloadHtmlAsPdf } from '../../lib/htmlToPdf';
 import { fullName, fmtDate, fmtMoney } from './utils';
 import StatusPill from './StatusPill';
 import VerifyAdmissionDialog from '../../components/VerifyAdmissionDialog/VerifyAdmissionDialog';
@@ -119,6 +122,30 @@ const AdmissionDetail = () => {
       setToast({ severity: 'success', text: `Receipt link copied:\n${url}` });
     } catch {
       setToast({ severity: 'info', text: `Copy this link manually:\n${url}` });
+    }
+  }, []);
+
+  // Download the receipt as a PDF that matches the public /r/:token page
+  // exactly — we fetch the SAME public payload and feed the SAME shared
+  // template, so print and download can't drift.
+  const [downloadingId, setDownloadingId] = useState(null);
+  const downloadReceiptPdf = useCallback(async (r) => {
+    if (!r?.share_token) {
+      setToast({ severity: 'error', text: 'Old receipt — re-create it to mint a downloadable receipt.' });
+      return;
+    }
+    setDownloadingId(r.id);
+    try {
+      const res = await publicReceiptsApi.lookup(r.share_token);
+      const payload = res?.data;
+      if (!payload) throw new Error('Receipt not found');
+      const html = buildReceiptHtml(payload);
+      const safeNo = String(r.receipt_no || 'receipt').replace(/[^a-z0-9_\-]/gi, '_');
+      await downloadHtmlAsPdf(html, `Receipt_${safeNo}.pdf`);
+    } catch (e) {
+      setToast({ severity: 'error', text: e?.message || 'Failed to generate the PDF.' });
+    } finally {
+      setDownloadingId(null);
     }
   }, []);
 
@@ -416,6 +443,15 @@ const AdmissionDetail = () => {
                         <IconButton size="small" component="a" href={`/r/${r.share_token}`} target="_blank" rel="noreferrer" sx={{ color: '#475569' }}>
                           <OpenInNewIcon fontSize="small" />
                         </IconButton>
+                      </Tooltip>
+                    )}
+                    {r.share_token && (
+                      <Tooltip title="Download receipt PDF">
+                        <span>
+                          <IconButton size="small" onClick={() => downloadReceiptPdf(r)} disabled={downloadingId === r.id} sx={{ color: '#475569' }}>
+                            {downloadingId === r.id ? <CircularProgress size={16} /> : <DownloadIcon fontSize="small" />}
+                          </IconButton>
+                        </span>
                       </Tooltip>
                     )}
                     <Tooltip title="Delete">

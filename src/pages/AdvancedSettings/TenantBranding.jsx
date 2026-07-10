@@ -5,7 +5,7 @@
 // the navbar repaints immediately.
 import { useRef, useState } from 'react';
 import {
-  Box, Typography, Button, Alert, CircularProgress, Paper,
+  Box, Typography, Button, Alert, CircularProgress, Paper, TextField, Divider,
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
@@ -85,6 +85,55 @@ export default function TenantBranding() {
     }
   };
 
+  // ---- Receipt settings (number format + footer terms + signatory) ----
+  const t0 = auth.getTenant() || {};
+  const [rc, setRc] = useState({
+    receipt_no_prefix: t0.receipt_no_prefix || '',
+    receipt_no_start: t0.receipt_no_start ?? 1,
+    receipt_no_pad: t0.receipt_no_pad ?? 5,
+    receipt_signatory_label: t0.receipt_signatory_label || 'Authorized Signatory',
+    receipt_terms: Array.isArray(t0.receipt_terms) ? t0.receipt_terms.join('\n') : '',
+  });
+  const [rcBusy, setRcBusy] = useState(false);
+  const [rcMsg, setRcMsg] = useState(null);
+
+  const previewNo = () => {
+    const prefix = String(rc.receipt_no_prefix || '').trim();
+    const start = Math.max(1, Number(rc.receipt_no_start) || 1);
+    const pad = Math.max(1, Number(rc.receipt_no_pad) || 5);
+    return prefix ? `${prefix}-${String(start).padStart(pad, '0')}` : `RC-YYYYMMDD-0001 (default)`;
+  };
+
+  const saveReceiptSettings = async () => {
+    setRcMsg(null); setRcBusy(true);
+    try {
+      const body = {
+        receipt_no_prefix: String(rc.receipt_no_prefix || '').trim() || null,
+        receipt_no_start: Math.max(1, Number(rc.receipt_no_start) || 1),
+        receipt_no_pad: Math.max(1, Number(rc.receipt_no_pad) || 5),
+        receipt_signatory_label: String(rc.receipt_signatory_label || '').trim() || 'Authorized Signatory',
+        receipt_terms: rc.receipt_terms.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 6),
+      };
+      const res = await brandingApi.updateReceiptSettings(body);
+      // Reflect the saved config on the cached tenant so a re-open prefills it.
+      const saved = res?.data ?? res ?? {};
+      const nextTenant = {
+        ...(auth.getTenant() || {}),
+        receipt_no_prefix: saved.receipt_no_prefix ?? body.receipt_no_prefix,
+        receipt_no_start: saved.receipt_no_start ?? body.receipt_no_start,
+        receipt_no_pad: saved.receipt_no_pad ?? body.receipt_no_pad,
+        receipt_signatory_label: saved.receipt_signatory_label ?? body.receipt_signatory_label,
+        receipt_terms: Array.isArray(saved.receipt_terms) ? saved.receipt_terms : body.receipt_terms,
+      };
+      auth.setSession({ tenant: nextTenant });
+      setRcMsg({ severity: 'success', text: 'Receipt settings saved. New receipts use this format; existing ones are unchanged.' });
+    } catch (err) {
+      setRcMsg({ severity: 'error', text: err.message || 'Failed to save receipt settings' });
+    } finally {
+      setRcBusy(false);
+    }
+  };
+
   return (
     <Box sx={{ p: 3, maxWidth: 640, mx: 'auto' }}>
       <Typography variant="h6" sx={{ mb: 0.5 }}>Tenant Logo</Typography>
@@ -128,6 +177,68 @@ export default function TenantBranding() {
 
       {!canManage && (
         <Alert severity="info" sx={{ mt: 2 }}>Only a super admin can change the tenant logo.</Alert>
+      )}
+
+      {canManage && (
+        <>
+          <Typography variant="h6" sx={{ mt: 4, mb: 0.5 }}>Receipt Settings</Typography>
+          <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
+            Controls the fee-receipt number format and the footer text shown to students.
+            Number changes apply to new receipts only — receipts already issued keep their number.
+          </Typography>
+
+          {rcMsg && <Alert severity={rcMsg.severity} sx={{ mb: 2 }} onClose={() => setRcMsg(null)}>{rcMsg.text}</Alert>}
+
+          <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1.5 }}>Receipt number</Typography>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <TextField
+                label="Prefix" size="small" value={rc.receipt_no_prefix}
+                onChange={(e) => setRc((s) => ({ ...s, receipt_no_prefix: e.target.value }))}
+                placeholder="2026" sx={{ width: 160 }}
+                helperText="Blank = keep default RC- numbering"
+              />
+              <TextField
+                label="Starting number" size="small" type="number" value={rc.receipt_no_start}
+                onChange={(e) => setRc((s) => ({ ...s, receipt_no_start: e.target.value }))}
+                sx={{ width: 160 }} inputProps={{ min: 1 }}
+              />
+              <TextField
+                label="Digits (zero-pad)" size="small" type="number" value={rc.receipt_no_pad}
+                onChange={(e) => setRc((s) => ({ ...s, receipt_no_pad: e.target.value }))}
+                sx={{ width: 150 }} inputProps={{ min: 1, max: 12 }}
+              />
+            </Box>
+            <Typography sx={{ mt: 1, fontSize: 13, color: '#475569' }}>
+              Next receipt will look like: <b style={{ color: '#0f172a' }}>{previewNo()}</b>
+            </Typography>
+
+            <Divider sx={{ my: 3 }} />
+
+            <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1.5 }}>Footer terms &amp; signatory</Typography>
+            <TextField
+              label="Terms (one line per rule, max 6)" fullWidth multiline minRows={2} maxRows={6} size="small"
+              value={rc.receipt_terms}
+              onChange={(e) => setRc((s) => ({ ...s, receipt_terms: e.target.value }))}
+              placeholder={'Training fees are strictly non-refundable under any circumstances.\nA late fee of ₹50 per day applies to any installment paid after its due date.'}
+            />
+            <TextField
+              label="Signatory label" size="small" sx={{ mt: 2, width: 260 }}
+              value={rc.receipt_signatory_label}
+              onChange={(e) => setRc((s) => ({ ...s, receipt_signatory_label: e.target.value }))}
+            />
+
+            <Box sx={{ mt: 3 }}>
+              <Button
+                variant="contained" disableElevation disabled={rcBusy} onClick={saveReceiptSettings}
+                startIcon={rcBusy ? <CircularProgress size={16} color="inherit" /> : null}
+                sx={{ bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' }, textTransform: 'none' }}
+              >
+                {rcBusy ? 'Saving…' : 'Save receipt settings'}
+              </Button>
+            </Box>
+          </Paper>
+        </>
       )}
     </Box>
   );
