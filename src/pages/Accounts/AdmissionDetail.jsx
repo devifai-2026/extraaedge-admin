@@ -228,6 +228,15 @@ const AdmissionDetail = () => {
             <StatusPill status={data.status} />
             {' '}· {data.program_name || '—'}{' '}· Admitted {fmtDate(data.admission_date)}
           </div>
+          {/* Uncollected registration balance flag — reminds Accounts to
+              collect the remaining registration amount. */}
+          {Number(data.registration_due || 0) > 0.01 && (
+            <Chip
+              size="small"
+              label={`Registration balance ₹ ${fmtMoney(data.registration_due)} to collect`}
+              sx={{ mt: 1, bgcolor: '#fef9c3', color: '#854d0e', fontWeight: 600, height: 22, fontSize: 11 }}
+            />
+          )}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Button variant="outlined" startIcon={<EditIcon />} onClick={() => navigate(`/accounts/admission/${id}/edit`)} sx={{ textTransform: 'none' }}>
@@ -407,32 +416,51 @@ const AdmissionDetail = () => {
               <th style={{ textAlign: 'right' }}>Action</th>
             </tr></thead>
             <tbody>
-              {/* Registration row — from the offer's registration_amount */}
-              {offerRegistration != null && (
-                <tr>
-                  <td><strong>Registration</strong></td>
-                  <td>—</td>
-                  <td style={{ textAlign: 'right' }}>₹ {fmtMoney(offerRegistration)}</td>
-                  <td>
-                    {paidIndex.registration ? (
-                      <Chip size="small" label="Paid" sx={{ bgcolor: '#dcfce7', color: '#166534', fontWeight: 600, height: 22, fontSize: 11 }} />
-                    ) : (
-                      <Chip size="small" label="Pending" sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600, height: 22, fontSize: 11 }} />
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    {!paidIndex.registration && (
-                      <Button
-                        size="small"
-                        onClick={() => setReceiptOpen({ kind: 'registration', suggestedAmount: offerRegistration })}
-                        sx={{ textTransform: 'none' }}
-                      >
-                        Capture
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              )}
+              {/* Registration row — with a PAID/DUE split so a partial reg
+                  payment (e.g. reg 5000, paid 2500 now) shows 2500 still to
+                  collect. Uses the backend's registration_paid / _due /
+                  _declared_unverified breakdown. */}
+              {offerRegistration != null && (() => {
+                const regPaid = Number(data.registration_paid || 0);
+                const regUnverified = Number(data.registration_declared_unverified || 0);
+                const regDue = data.registration_due != null ? Number(data.registration_due) : Math.max(0, offerRegistration - regPaid - regUnverified);
+                const settled = regPaid + regUnverified;
+                const fullyPaid = regDue <= 0.01;
+                return (
+                  <tr>
+                    <td>
+                      <strong>Registration</strong>
+                      {(regPaid > 0 || regUnverified > 0) && !fullyPaid && (
+                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+                          ₹ {fmtMoney(settled)} {regUnverified > 0 && regPaid === 0 ? 'declared' : 'paid'} · ₹ {fmtMoney(regDue)} due
+                        </div>
+                      )}
+                    </td>
+                    <td>—</td>
+                    <td style={{ textAlign: 'right' }}>₹ {fmtMoney(offerRegistration)}</td>
+                    <td>
+                      {fullyPaid ? (
+                        <Chip size="small" label="Paid" sx={{ bgcolor: '#dcfce7', color: '#166534', fontWeight: 600, height: 22, fontSize: 11 }} />
+                      ) : settled > 0 ? (
+                        <Chip size="small" label={regUnverified > 0 && regPaid === 0 ? 'Partial · unverified' : 'Partial'} sx={{ bgcolor: '#fef9c3', color: '#854d0e', fontWeight: 600, height: 22, fontSize: 11 }} />
+                      ) : (
+                        <Chip size="small" label="Pending" sx={{ bgcolor: '#fef3c7', color: '#92400e', fontWeight: 600, height: 22, fontSize: 11 }} />
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {!fullyPaid && (
+                        <Button
+                          size="small"
+                          onClick={() => setReceiptOpen({ kind: 'registration', suggestedAmount: regDue > 0 ? regDue : offerRegistration })}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          {settled > 0 ? 'Collect balance' : 'Capture'}
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })()}
               {/* Full-mode lump sum row — only when there's no installment
                   schedule. Tagged as misc on receipt creation. */}
               {fullModeCourseBalance != null && !isInstallmentMode && (
