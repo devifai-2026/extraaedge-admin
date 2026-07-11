@@ -19,6 +19,7 @@ import { usersApi, customRolesApi, programsApi, authApi, branchesApi, coursesApi
 import { auth } from '../../lib/api';
 import { isRole, ROLES } from '../../lib/rbac';
 import Breadcrumb from './Breadcrumb';
+import TrainerStudents from '../Trainer/TrainerStudents';
 
 // Mirrors backend DEFAULT_TAB_KEYS in src/config/constants.js
 const TAB_KEYS = [
@@ -84,12 +85,14 @@ export default function UsersAndRoles() {
       <div style={{ padding: '0 24px' }}>
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: '1px solid #eee' }}>
           <Tab label="Users" />
+          <Tab label="Students" />
           <Tab label="Roles & Tabs" />
         </Tabs>
 
         <div style={{ paddingTop: 16 }}>
           {tab === 0 && <UsersTab />}
-          {tab === 1 && <RolesTab />}
+          {tab === 1 && <TrainerStudents />}
+          {tab === 2 && <RolesTab />}
         </div>
       </div>
     </div>
