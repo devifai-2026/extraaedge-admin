@@ -722,6 +722,11 @@ export const coursesApi = {
   attendanceHistory: (programId) => api.get(`/courses/${programId}/attendance-history`, withBranch()),
   insights: () => api.get('/courses/insights', withBranch()),
   myBranches: () => api.get('/courses/my-branches'),
+  // Trainer leave (G9c)
+  myLeaves: () => api.get('/courses/leaves/mine'),
+  markLeave: (body) => api.post('/courses/leaves', body),
+  cancelLeave: (id) => api.delete(`/courses/leaves/${id}`),
+  programLeaves: (programId) => api.get('/courses/leaves', { programId }),
   createTrainer: (programId, body) => api.post(`/courses/${programId}/create-trainer`, body),
   completeBatch: (programId, batchId) => api.post(`/courses/${programId}/batches/${batchId}/complete`),
   students: () => api.get('/courses/students', withBranch()),

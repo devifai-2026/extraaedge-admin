@@ -27,6 +27,7 @@ import PauseCircleIcon from '@mui/icons-material/PauseCircle';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import HistoryEduIcon from '@mui/icons-material/HistoryEduOutlined';
+import EventBusyIcon from '@mui/icons-material/EventBusyOutlined';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
@@ -168,6 +169,7 @@ const menuSections = [
       { id: 206, label: 'Mock Tests',    icon: ChecklistIcon,       path: '/trainer/tests',         tab: 'trainer.tests' },
       { id: 207, label: 'Projects',      icon: AssessmentIcon,      path: '/trainer/projects',      tab: 'trainer.projects' },
       { id: 213, label: 'Homework',      icon: HistoryEduIcon,      path: '/trainer/homework',      tab: 'trainer.projects' },
+      { id: 214, label: 'My Leave',      icon: EventBusyIcon,       path: '/trainer/leave',         tab: 'trainer.classes' },
       { id: 208, label: 'Mock Interviews', icon: HowToRegIcon,      path: '/trainer/interviews',    tab: 'trainer.interviews' },
       { id: 209, label: 'Leaderboard',   icon: AssessmentIcon,      path: '/trainer/leaderboard',   tab: 'trainer.leaderboard' },
       { id: 211, label: 'Materials',     icon: FolderIcon,          path: '/trainer/materials',     tab: 'trainer.materials' },
