@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { studentApi } from '../../lib/studentApi';
 import { PageHeader, Card, Skeleton } from '../../lib/lmsUi';
+import { sanitizeDigits } from '../../lib/validators';
 import AccountCircleIcon from '@mui/icons-material/AccountCircleOutlined';
 
 // XHR upload with progress (fetch has no upload progress).
@@ -102,7 +103,7 @@ export default function StudentProfile() {
       {/* Editable details */}
       <Card title="Details" style={{ marginBottom: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Phone" value={form.phone} onChange={set('phone')} />
+          <Field label="Phone" value={form.phone} onChange={(e) => setForm((s) => ({ ...s, phone: sanitizeDigits(e.target.value) }))} />
           <Field label="Date of birth" type="date" value={form.dob} onChange={set('dob')} />
           <Field label="Address" value={form.address} onChange={set('address')} full />
           <Field label="GitHub" value={form.github_url} onChange={set('github_url')} placeholder="https://github.com/…" />

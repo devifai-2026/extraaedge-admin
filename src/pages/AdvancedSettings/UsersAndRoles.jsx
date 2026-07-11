@@ -18,6 +18,7 @@ import LoginIcon from '@mui/icons-material/Login';
 import { usersApi, customRolesApi, programsApi, authApi, branchesApi, coursesApi } from '../../lib/endpoints';
 import { auth } from '../../lib/api';
 import { isRole, ROLES } from '../../lib/rbac';
+import { isEmail, sanitizeDigits, emailError } from '../../lib/validators';
 import Breadcrumb from './Breadcrumb';
 import TrainerStudents from '../Trainer/TrainerStudents';
 
@@ -523,8 +524,10 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <TextField size="small" label="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={!canManage} />
-          <TextField size="small" type="email" label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled={!canManage} />
-          <TextField size="small" label="WhatsApp Number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} disabled={!canManage} />
+          <TextField size="small" type="email" label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled={!canManage}
+            error={!!form.email && !isEmail(form.email)} helperText={form.email && !isEmail(form.email) ? 'Enter a valid email' : ''} />
+          <TextField size="small" label="WhatsApp Number" value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizeDigits(e.target.value) })} disabled={!canManage}
+            error={!!form.phone && form.phone.length < 7} helperText={form.phone && form.phone.length < 7 ? 'At least 7 digits' : ''} inputProps={{ inputMode: 'numeric' }} />
           <TextField
             size="small"
             label="Official Designation"
@@ -818,6 +821,8 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
     setErr('');
     if (!form.first_name.trim()) { setErr('First name is required'); return; }
     if (!form.email.trim()) { setErr('Email is required'); return; }
+    if (!isEmail(form.email)) { setErr('Enter a valid email address'); return; }
+    if (form.phone && !/^\d{7,15}$/.test(form.phone)) { setErr('Phone must be 7–15 digits'); return; }
     if (!form.password || form.password.length < 10) { setErr('Password must be at least 10 chars'); return; }
     if (branchRequired && !form.branch_id) { setErr('Please select a branch for this user'); return; }
     // Teaching roles must be bound to at least one course at creation. Trainers
@@ -875,8 +880,10 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <TextField size="small" label="First Name *" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
           <TextField size="small" label="Last Name" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
-          <TextField size="small" type="email" label="Email Id *" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          <TextField size="small" label="WhatsApp Number *" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <TextField size="small" type="email" label="Email Id *" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
+            error={!!form.email && !isEmail(form.email)} helperText={form.email && !isEmail(form.email) ? 'Enter a valid email' : ''} />
+          <TextField size="small" label="WhatsApp Number *" value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizeDigits(e.target.value) })}
+            error={!!form.phone && form.phone.length < 7} helperText={form.phone && form.phone.length < 7 ? 'At least 7 digits' : ''} inputProps={{ inputMode: 'numeric' }} />
           <TextField size="small" label="Initial password (10+ chars) *" type="password"
             value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
           <TextField

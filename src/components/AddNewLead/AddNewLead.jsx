@@ -35,6 +35,7 @@ import { useDropdown } from "../../lib/useDropdowns";
 import QuickCreateDialog from "../QuickCreateDialog/QuickCreateDialog";
 import SubStageReviewModal from "./SubStageReviewModal";
 import { isRole, ROLES } from "../../lib/rbac";
+import { isEmail } from "../../lib/validators";
 
 
 // Build initial form. All ID fields default to '' (empty string) so the Select
@@ -1032,8 +1033,10 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
                                     value={freshLead?.branch_name || leadData?.branch_name || 'N/A'}
                                 />
                             )}
-                            {!mandatoryOnly && <TextField label="Email Id" size="small" value={formData.email} onChange={setField('email')} fullWidth />}
-                            {!mandatoryOnly && <TextField label="Alternate Email Id" size="small" value={formData.alternate_email} onChange={setField('alternate_email')} fullWidth />}
+                            {!mandatoryOnly && <TextField label="Email Id" size="small" value={formData.email} onChange={setField('email')} fullWidth
+                                error={!!formData.email && !isEmail(formData.email)} helperText={formData.email && !isEmail(formData.email) ? 'Enter a valid email' : ''} />}
+                            {!mandatoryOnly && <TextField label="Alternate Email Id" size="small" value={formData.alternate_email} onChange={setField('alternate_email')} fullWidth
+                                error={!!formData.alternate_email && !isEmail(formData.alternate_email)} helperText={formData.alternate_email && !isEmail(formData.alternate_email) ? 'Enter a valid email' : ''} />}
                             <TextField label="WhatsApp Number" required size="small" value={formData.whatsapp_number} onChange={setField('whatsapp_number')} fullWidth slotProps={{ htmlInput: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 } }} />
                             {!mandatoryOnly && <TextField label="Phone" size="small" value={formData.phone} onChange={setField('phone')} fullWidth slotProps={{ htmlInput: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 } }} />}
                             {!mandatoryOnly && <TextField label="Alternate Contact Number" size="small" value={formData.alternate_contact} onChange={setField('alternate_contact')} fullWidth slotProps={{ htmlInput: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 15 } }} />}
