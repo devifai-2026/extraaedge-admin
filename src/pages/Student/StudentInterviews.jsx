@@ -24,7 +24,17 @@ export default function StudentInterviews() {
               <div>
                 <div style={{ fontWeight: 700, color: '#0f172a' }}>{s.title}</div>
                 <div style={{ fontSize: 13, color: '#64748b' }}>{s.slot_at ? fmt(s.slot_at) : 'Time to be confirmed'}</div>
-                {s.marks != null && <div style={{ fontSize: 13, color: '#15803d', marginTop: 4 }}>Scored {s.marks}/{s.max_marks}{s.feedback ? ` — ${s.feedback}` : ''}</div>}
+                {s.marks != null && <div style={{ fontSize: 13, color: '#15803d', marginTop: 4, fontWeight: 700 }}>Scored {s.marks}/{s.max_marks}</div>}
+                {Array.isArray(s.scores) && s.scores.length > 0 && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                    {s.scores.map((sc) => (
+                      <span key={sc.category_id} style={{ fontSize: 11.5, background: '#f1f5f9', color: '#334155', borderRadius: 999, padding: '3px 9px', fontWeight: 600 }}>
+                        {sc.name}: {sc.marks}/{sc.max_marks}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {s.feedback && <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4, fontStyle: 'italic' }}>“{s.feedback}”</div>}
               </div>
               {s.meeting_url && s.marks == null && <a href={s.meeting_url} target="_blank" rel="noreferrer" style={{ background: '#E53935', color: '#fff', textDecoration: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600, alignSelf: 'center' }}>Join</a>}
             </div>

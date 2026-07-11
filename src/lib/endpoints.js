@@ -796,10 +796,14 @@ export const assessmentsApi = {
 export const interviewsApi = {
   list: (programId) => api.get('/interviews', { programId }),
   students: (programId) => api.get('/interviews/students', { programId }),
+  assignableHr: () => api.get('/interviews/assignable-hr'),
   create: (body) => api.post('/interviews', body),
   listSlots: (id) => api.get(`/interviews/${id}/slots`),
   assign: (id, body) => api.post(`/interviews/${id}/slots`, body),
+  assignHr: (id, body) => api.post(`/interviews/${id}/assign-hr`, body),
   grade: (slotId, body) => api.post(`/interviews/slots/${slotId}/grade`, body),
+  score: (slotId, body) => api.post(`/interviews/slots/${slotId}/score`, body),
+  hrQueue: () => api.get('/interviews/hr/queue'),
 };
 
 // ---- LMS: admin analytics + student sudo-login (super_admin/branch_mgr) ----

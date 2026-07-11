@@ -102,6 +102,7 @@ import TrainerMaterials from './pages/Trainer/TrainerMaterials'
 import TrainerDashboard from './pages/Trainer/TrainerDashboard'
 import TrainerStudents from './pages/Trainer/TrainerStudents'
 import HrDashboard from './pages/Hr/HrDashboard'
+import HrInterviews from './pages/Hr/HrInterviews'
 import PlacementDashboard from './pages/Placement/PlacementDashboard'
 
 // Each route declares the backend tab key it requires.
@@ -191,6 +192,7 @@ function App() {
         <Route path="/trainer/dashboard" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerDashboard /></Layout></ProtectedRoute>} />
         <Route path="/trainer/students" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerStudents /></Layout></ProtectedRoute>} />
         <Route path="/hr/dashboard" element={<ProtectedRoute tab="hr.dashboard"><Layout><HrDashboard /></Layout></ProtectedRoute>} />
+        <Route path="/hr/interviews" element={<ProtectedRoute tab="hr.interviews"><Layout><HrInterviews /></Layout></ProtectedRoute>} />
         <Route path="/placement/dashboard" element={<ProtectedRoute tab="placement.dashboard"><Layout><PlacementDashboard /></Layout></ProtectedRoute>} />
         <Route path="/trainer/courses" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerCourses /></Layout></ProtectedRoute>} />
         <Route path="/trainer/courses/:programId" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerCourseDetail /></Layout></ProtectedRoute>} />
