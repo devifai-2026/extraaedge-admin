@@ -126,6 +126,9 @@ export const studentApi = {
   // Capstone.
   capstones: () => doFetch('/capstone/student', { method: 'GET' }),
   submitCapstone: (id, body) => doFetch(`/capstone/student/${id}/submit`, { method: 'POST', body: JSON.stringify(body) }),
+  // Homework (lightweight assignments with a file upload).
+  homework: () => doFetch('/homework/student', { method: 'GET' }),
+  submitHomework: (id, body) => doFetch(`/homework/student/${id}/submit`, { method: 'POST', body: JSON.stringify(body) }),
   // Billing (fees / EMI / receipts) — read-only self-service.
   payments: () => doFetch('/student-billing/payments', { method: 'GET' }),
   receiptToken: (id) => doFetch(`/student-billing/receipts/${id}/token`, { method: 'GET' }),

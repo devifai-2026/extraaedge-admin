@@ -826,6 +826,15 @@ export const capstoneApi = {
   grade: (id, body) => api.post(`/capstone/${id}/grade`, body),
 };
 
+// ---- LMS: homework (lightweight assignments w/ file upload) ----
+export const homeworkApi = {
+  list: (programId) => api.get('/homework', { programId }),
+  create: (body) => api.post('/homework', body),
+  remove: (id) => api.delete(`/homework/${id}`),
+  submissions: (id) => api.get(`/homework/${id}/submissions`),
+  grade: (id, body) => api.post(`/homework/${id}/grade`, body),
+};
+
 // ---- Placement: companies, job openings, applications ----
 export const placementApi = {
   counts: () => api.get('/placement/counts', withBranch()),

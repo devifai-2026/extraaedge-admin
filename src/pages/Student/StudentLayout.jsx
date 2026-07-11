@@ -18,6 +18,7 @@ import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
 import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
 import RocketLaunchOutlinedIcon from '@mui/icons-material/RocketLaunchOutlined';
+import HistoryEduOutlinedIcon from '@mui/icons-material/HistoryEduOutlined';
 import RecordVoiceOverOutlinedIcon from '@mui/icons-material/RecordVoiceOverOutlined';
 import LeaderboardOutlinedIcon from '@mui/icons-material/LeaderboardOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
@@ -51,6 +52,7 @@ const GROUPS = [
   { heading: 'Assess', items: [
     { to: '/student/tests', label: 'Tests', icon: QuizOutlinedIcon },
     { to: '/student/projects', label: 'Projects', icon: AssignmentOutlinedIcon },
+    { to: '/student/homework', label: 'Homework', icon: HistoryEduOutlinedIcon },
     { to: '/student/capstone', label: 'Capstone', icon: RocketLaunchOutlinedIcon },
     { to: '/student/interviews', label: 'Interviews', icon: RecordVoiceOverOutlinedIcon },
     { to: '/student/leaderboard', label: 'Leaderboard', icon: LeaderboardOutlinedIcon },
