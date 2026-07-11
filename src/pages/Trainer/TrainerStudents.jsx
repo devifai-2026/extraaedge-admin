@@ -17,6 +17,7 @@ export default function TrainerStudents() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
   const [program, setProgram] = useState('');
+  const [branch, setBranch] = useState('');
   const [toast, setToast] = useState(null);
   const [pw, setPw] = useState(null); // { name, password }
   const [busy, setBusy] = useState('');
@@ -26,8 +27,10 @@ export default function TrainerStudents() {
   useEffect(() => { load(); }, []);
 
   const programs = useMemo(() => [...new Set(rows.map((r) => r.program_name).filter(Boolean))], [rows]);
+  const branches = useMemo(() => [...new Set(rows.map((r) => r.branch_name).filter(Boolean))], [rows]);
   const filtered = rows.filter((r) => {
     if (program && r.program_name !== program) return false;
+    if (branch && r.branch_name !== branch) return false;
     if (!q.trim()) return true;
     const s = `${r.name} ${r.email} ${r.phone || ''}`.toLowerCase();
     return s.includes(q.trim().toLowerCase());
@@ -59,9 +62,15 @@ export default function TrainerStudents() {
           <>
             <TextField size="small" placeholder="Search name / email / phone" value={q} onChange={(e) => setQ(e.target.value)} sx={{ minWidth: 240, background: '#fff' }} />
             {programs.length > 1 && (
-              <TextField select size="small" label="Course" value={program} onChange={(e) => setProgram(e.target.value)} sx={{ minWidth: 200, background: '#fff' }}>
+              <TextField select size="small" label="Course" value={program} onChange={(e) => setProgram(e.target.value)} sx={{ minWidth: 180, background: '#fff' }}>
                 <MenuItem value="">All courses</MenuItem>
                 {programs.map((p) => <MenuItem key={p} value={p}>{p}</MenuItem>)}
+              </TextField>
+            )}
+            {branches.length > 1 && (
+              <TextField select size="small" label="Branch" value={branch} onChange={(e) => setBranch(e.target.value)} sx={{ minWidth: 160, background: '#fff' }}>
+                <MenuItem value="">All branches</MenuItem>
+                {branches.map((b) => <MenuItem key={b} value={b}>{b}</MenuItem>)}
               </TextField>
             )}
           </>
@@ -73,13 +82,14 @@ export default function TrainerStudents() {
           <Card pad={0} style={{ overflow: 'hidden' }}>
             <Table size="small">
               <TableHead><TableRow sx={{ background: '#fafbfc', '& th': { color: '#64748b', fontWeight: 700, fontSize: 12 } }}>
-                <TableCell>Student</TableCell><TableCell>Course</TableCell><TableCell>Batch</TableCell><TableCell align="center">Status</TableCell><TableCell align="right" />
+                <TableCell>Student</TableCell><TableCell>Course</TableCell><TableCell>Branch</TableCell><TableCell>Batch</TableCell><TableCell align="center">Status</TableCell><TableCell align="right" />
               </TableRow></TableHead>
               <TableBody>
                 {filtered.map((s) => (
                   <TableRow key={s.id} hover>
                     <TableCell>{s.name}<div style={{ fontSize: 11.5, color: '#94a3b8' }}>{s.email}{s.phone ? ` · ${s.phone}` : ''}</div></TableCell>
                     <TableCell sx={{ color: '#64748b' }}>{s.program_name || '—'}</TableCell>
+                    <TableCell sx={{ color: '#64748b' }}>{s.branch_name || '—'}</TableCell>
                     <TableCell sx={{ color: '#64748b' }}>{s.batch_name || <Badge tone="warning">No batch</Badge>}</TableCell>
                     <TableCell align="center"><Badge tone={statusTone(s.status)}>{s.status}</Badge></TableCell>
                     <TableCell align="right">
