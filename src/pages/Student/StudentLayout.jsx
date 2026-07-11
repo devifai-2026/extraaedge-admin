@@ -24,6 +24,7 @@ import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import PersonOutlineIcon from '@mui/icons-material/AccountCircleOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined';
+import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
 import WorkOutlineIcon from '@mui/icons-material/WorkOutlineOutlined';
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -55,6 +56,7 @@ const GROUPS = [
     { to: '/student/jobs', label: 'Job Openings', icon: WorkOutlineIcon },
   ] },
   { heading: 'You', items: [
+    { to: '/student/payments', label: 'Fees & Payments', icon: PaymentsOutlinedIcon },
     { to: '/student/certificate', label: 'Certificate', icon: WorkspacePremiumOutlinedIcon },
     { to: '/student/catalog', label: 'Explore Courses', icon: StorefrontOutlinedIcon },
     { to: '/student/profile', label: 'My Profile', icon: PersonOutlineIcon },

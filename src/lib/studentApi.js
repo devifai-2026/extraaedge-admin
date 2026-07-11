@@ -125,6 +125,9 @@ export const studentApi = {
   // Capstone.
   capstones: () => doFetch('/capstone/student', { method: 'GET' }),
   submitCapstone: (id, body) => doFetch(`/capstone/student/${id}/submit`, { method: 'POST', body: JSON.stringify(body) }),
+  // Billing (fees / EMI / receipts) — read-only self-service.
+  payments: () => doFetch('/student-billing/payments', { method: 'GET' }),
+  receiptToken: (id) => doFetch(`/student-billing/receipts/${id}/token`, { method: 'GET' }),
   // Job openings (placement).
   jobsFeed: () => doFetch('/placement/student/feed', { method: 'GET' }),
   applyToJob: (id) => doFetch(`/placement/student/openings/${id}/apply`, { method: 'POST', body: '{}' }),
