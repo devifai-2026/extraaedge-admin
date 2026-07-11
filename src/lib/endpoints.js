@@ -718,6 +718,9 @@ export const coursesApi = {
   insights: () => api.get('/courses/insights'),
   createTrainer: (programId, body) => api.post(`/courses/${programId}/create-trainer`, body),
   completeBatch: (programId, batchId) => api.post(`/courses/${programId}/batches/${batchId}/complete`),
+  students: () => api.get('/courses/students'),
+  resetStudentPassword: (studentId) => api.post(`/courses/students/${studentId}/reset-password`),
+  sudoStudent: (studentId) => api.post(`/courses/students/${studentId}/sudo-login`),
   // Modules
   listModules: (programId) => api.get(`/courses/${programId}/modules`),
   createModule: (programId, body) => api.post(`/courses/${programId}/modules`, body),

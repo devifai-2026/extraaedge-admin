@@ -156,8 +156,9 @@ const menuSections = [
     icon: SchoolIcon,
     section: true,
     children: [
-      { id: 199, label: 'Dashboard',     icon: SchoolIcon,          path: '/trainer/dashboard',     tab: 'trainer.classes' },
+      { id: 199, label: 'Dashboard',     icon: AssessmentIcon,      path: '/trainer/dashboard',     tab: 'trainer.classes' },
       { id: 200, label: 'My Courses',    icon: SchoolIcon,          path: '/trainer/courses',       tab: 'trainer.classes' },
+      { id: 212, label: 'Students',      icon: PeopleAltIcon,       path: '/trainer/students',      tab: 'trainer.classes' },
       { id: 201, label: 'Classes',       icon: CalendarTodayIcon,   path: '/trainer/classes',       tab: 'trainer.classes' },
       { id: 202, label: 'Attendance',    icon: HowToRegIcon,        path: '/trainer/attendance',    tab: 'trainer.attendance' },
       { id: 203, label: 'Recordings',    icon: GraphicEqIcon,       path: '/trainer/recordings',    tab: 'trainer.recordings' },
