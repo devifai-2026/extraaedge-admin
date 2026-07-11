@@ -394,6 +394,30 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
     </ul>
   );
 
+  // Render the role-named sections. When a user belongs to exactly ONE section
+  // (trainer / head_trainer / hr / placement typically see only their own
+  // department), a collapsible accordion is awkward — it hides their entire nav
+  // behind a dropdown. In that case render the section's children as FLAT,
+  // always-visible items under a static label instead. Multi-section users
+  // (super_admin / branch_manager) keep the accordion.
+  const renderSections = () => {
+    const secs = visibleItems(menuSections);
+    if (secs.length === 1 && secs[0].children) {
+      const only = secs[0];
+      return (
+        <div className="single-section">
+          {!collapsed && <div className="single-section-label">{only.label}</div>}
+          <ul className="menu-list">
+            {only.children.map((child) => (
+              <li key={child.id}>{renderItemButton(child)}</li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+    return renderMenuItems(menuSections);
+  };
+
   return (
     <>
       <div
@@ -403,7 +427,7 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
         <div className="sidebar-top">
           {renderMenuItems(pinnedItems)}
           {!collapsed && <div className="sidebar-divider" />}
-          {renderMenuItems(menuSections)}
+          {renderSections()}
         </div>
         <div className="sidebar-bottom">{renderMenuItems(bottomMenuItems)}</div>
       </div>

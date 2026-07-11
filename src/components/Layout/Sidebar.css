@@ -65,6 +65,17 @@
   opacity: 0.75;
 }
 
+/* Single-department users (trainer / HR / placement) get their nav shown flat
+   under a static label instead of a collapsible accordion. */
+.single-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mid-grey, #94a3b8);
+  padding: 4px 18px 8px;
+}
+
 /* Children of an open section: subtle left rail to visually nest them. */
 .section-children {
   border-left: 2px solid var(--border-grey);
