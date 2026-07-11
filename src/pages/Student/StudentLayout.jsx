@@ -7,6 +7,7 @@ import { NavLink, Outlet, useNavigate, Navigate } from 'react-router-dom';
 import { studentApi, studentAuth } from '../../lib/studentApi';
 import { resolveAssetUrl } from '../../lib/config';
 import { LmsStyles } from '../../lib/lmsUi';
+import StudentTour from './StudentTour';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
@@ -22,11 +23,13 @@ import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import PersonOutlineIcon from '@mui/icons-material/AccountCircleOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined';
+import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
 
 const GROUPS = [
   { heading: null, items: [
     { to: '/student/home', label: 'Dashboard', icon: DashboardOutlinedIcon, end: true },
+    { to: '/student/how-it-works', label: 'How it works', icon: HelpOutlineOutlinedIcon },
   ] },
   { heading: 'Learn', items: [
     { to: '/student/course', label: 'My Course', icon: SchoolOutlinedIcon },
@@ -52,9 +55,31 @@ const GROUPS = [
   ] },
 ];
 
+// First-login guided tour — one friendly step per sidebar tab. Targets are the
+// nav links (always visible), matched by their data-tour = route path.
+const TOUR_STEPS = [
+  { selector: '[data-tour="/student/home"]', icon: '📊', title: 'Your dashboard', body: 'Home base — next class, course progress, your streak, badges and alerts, all in one view.' },
+  { selector: '[data-tour="/student/course"]', icon: '🎓', title: 'My Course', body: 'Your modules and syllabus. Tick off each module as you complete it — it drives your progress and certificate.' },
+  { selector: '[data-tour="/student/classes"]', icon: '📅', title: 'Classes', body: 'Join your live/online classes and answer attendance questions in real time to be marked present.' },
+  { selector: '[data-tour="/student/attendance"]', icon: '🟢', title: 'Attendance', body: 'Track your attendance class-by-class on a calendar — present, absent and upcoming.' },
+  { selector: '[data-tour="/student/recordings"]', icon: '🎬', title: 'Recordings', body: 'Catch up any time — watch recordings of past classes your trainers share.' },
+  { selector: '[data-tour="/student/materials"]', icon: '📚', title: 'Materials', body: 'Slides, notes and resources for your course, neatly grouped by module.' },
+  { selector: '[data-tour="/student/announcements"]', icon: '📣', title: 'Announcements', body: 'Updates from your trainers. You can like and comment right here.' },
+  { selector: '[data-tour="/student/forum"]', icon: '💬', title: 'Forum', body: 'Stuck on something? Post a doubt and your trainers will answer.' },
+  { selector: '[data-tour="/student/tests"]', icon: '📝', title: 'Tests', body: 'Attempt mock tests and instantly see your score.' },
+  { selector: '[data-tour="/student/projects"]', icon: '🗂️', title: 'Projects', body: 'Submit your projects (live + GitHub links) and get graded with feedback.' },
+  { selector: '[data-tour="/student/interviews"]', icon: '🎤', title: 'Mock Interviews', body: 'See your interview slots, join links and the feedback you receive.' },
+  { selector: '[data-tour="/student/leaderboard"]', icon: '🏆', title: 'Leaderboard', body: 'See where you rank — combining tests, projects, attendance and interviews.' },
+  { selector: '[data-tour="/student/certificate"]', icon: '📜', title: 'Certificate', body: 'Track your completion requirements and claim your certificate when you qualify.' },
+  { selector: '[data-tour="/student/catalog"]', icon: '🛍️', title: 'Explore Courses', body: 'Interested in more? Browse other courses and send an enquiry.' },
+  { selector: '[data-tour="/student/profile"]', icon: '🪪', title: 'My Profile', body: 'Add your photo, CV, links and skills — a complete profile earns you a badge!' },
+];
+const tourKey = (id) => `ee_student_tour_v1_${id || 'anon'}`;
+
 export default function StudentLayout() {
   const navigate = useNavigate();
   const [tenant, setTenant] = useState(() => studentAuth.getTenant());
+  const [tourOpen, setTourOpen] = useState(false);
 
   // Load branding once (so the logo is present regardless of which page opens
   // first). Cheap; cached in the session for subsequent paints.
@@ -64,6 +89,27 @@ export default function StudentLayout() {
       if (t) { studentAuth.setTenant(t); setTenant(t); }
     }).catch(() => {});
   }, []);
+
+  // Auto-launch the tour on first login, and let any page replay it by
+  // dispatching `ee:start-student-tour` (the How it works page does this).
+  useEffect(() => {
+    const s = studentAuth.getStudent();
+    if (s && !localStorage.getItem(tourKey(s.id))) {
+      const timer = setTimeout(() => setTourOpen(true), 700); // let the shell paint first
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, []);
+  useEffect(() => {
+    const start = () => setTourOpen(true);
+    window.addEventListener('ee:start-student-tour', start);
+    return () => window.removeEventListener('ee:start-student-tour', start);
+  }, []);
+  const closeTour = () => {
+    setTourOpen(false);
+    const s = studentAuth.getStudent();
+    if (s) localStorage.setItem(tourKey(s.id), '1');
+  };
 
   if (!studentAuth.isAuthed()) return <Navigate to="/student/login" replace />;
   const student = studentAuth.getStudent();
@@ -89,7 +135,7 @@ export default function StudentLayout() {
                 {g.items.map((n) => {
                   const Icon = n.icon;
                   return (
-                    <NavLink key={n.to} to={n.to} end={n.end}
+                    <NavLink key={n.to} to={n.to} end={n.end} data-tour={n.to}
                       style={({ isActive }) => ({
                         display: 'flex', alignItems: 'center', gap: 11, textDecoration: 'none',
                         fontSize: 13.5, fontWeight: 600, padding: '9px 11px', borderRadius: 10,
@@ -127,6 +173,8 @@ export default function StudentLayout() {
           <Outlet />
         </div>
       </main>
+
+      <StudentTour steps={TOUR_STEPS} open={tourOpen} onClose={closeTour} />
     </div>
   );
 }

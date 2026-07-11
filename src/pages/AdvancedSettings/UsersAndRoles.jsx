@@ -261,7 +261,10 @@ function UsersTab() {
                       : u.role === 'branch_manager' ? 'Branch Manager'
                       : u.role === 'sales_manager' ? 'Manager'
                       : u.role === 'account_manager' ? 'Account Mgr'
-                      : 'Counsellor'
+                      : u.role === 'head_trainer' ? 'Head Trainer'
+                      : u.role === 'trainer' ? 'Trainer'
+                      : u.role === 'counsellor' ? 'Counsellor'
+                      : (u.role_name || u.role || 'User')
                   } />
                 </td>
                 <td style={{ padding: '14px 16px', color: '#555' }}>{u.role_name || '—'}</td>
