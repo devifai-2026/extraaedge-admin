@@ -66,7 +66,12 @@ function HrScoreRow({ sl, hrCats, trainerCats, onSave }) {
     <>
       <TableRow>
         <TableCell>{sl.name}</TableCell>
-        <TableCell sx={{ color: '#64748b' }}>{sl.slot_at ? fmtDate(sl.slot_at) : '—'}</TableCell>
+        <TableCell sx={{ color: '#64748b', fontSize: 12.5 }}>{(() => {
+          const start = sl.starts_at || sl.slot_at;
+          if (!start) return '—';
+          if (sl.ends_at) { try { return `${fmtDate(start)} – ${new Date(sl.ends_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`; } catch { return fmtDate(start); } }
+          return fmtDate(start);
+        })()}</TableCell>
         {hrCats.map((c) => (
           <TableCell key={c.id} align="center">
             <TextField size="small" type="number" value={vals[c.id]} onChange={(e) => setVals((v) => ({ ...v, [c.id]: e.target.value }))} sx={{ width: 64 }} inputProps={{ min: 0, max: c.max_marks }} />

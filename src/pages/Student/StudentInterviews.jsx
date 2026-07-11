@@ -23,7 +23,14 @@ export default function StudentInterviews() {
             <div key={s.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontWeight: 700, color: '#0f172a' }}>{s.title}</div>
-                <div style={{ fontSize: 13, color: '#64748b' }}>{s.slot_at ? fmt(s.slot_at) : 'Time to be confirmed'}</div>
+                <div style={{ fontSize: 13, color: '#64748b' }}>
+                  {(() => {
+                    const start = s.starts_at || s.slot_at;
+                    if (!start) return 'Time to be confirmed';
+                    if (s.ends_at) { try { return `${fmt(start)} – ${new Date(s.ends_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`; } catch { return fmt(start); } }
+                    return fmt(start);
+                  })()}
+                </div>
                 {s.complete
                   ? <div style={{ fontSize: 13, color: '#15803d', marginTop: 4, fontWeight: 700 }}>Scored {s.marks}/{s.max_marks}</div>
                   : (Array.isArray(s.scores) && s.scores.length > 0

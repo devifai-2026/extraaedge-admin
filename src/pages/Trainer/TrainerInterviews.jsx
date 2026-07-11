@@ -3,7 +3,7 @@
 // score the trainer categories. HR scores its own categories from the HR portal.
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Box, Typography, MenuItem, TextField, Button, Alert, Snackbar, IconButton, Chip,
+  Box, Typography, MenuItem, TextField, Button, Alert, Snackbar, IconButton, Chip, Autocomplete,
   Table, TableHead, TableRow, TableCell, TableBody, Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
@@ -123,53 +123,86 @@ function SlotsDialog({ programId, interview, onClose, onChange, onError }) {
   const [view, setView] = useState({ categories: [], slots: [], interview: {} });
   const [students, setStudents] = useState([]);
   const [hrList, setHrList] = useState([]);
-  const [assign, setAssign] = useState({ student_id: '', slot_at: '' });
+  // Multi-assign: pick many students (search), one shared date, and a start/end
+  // time window applied to all — they share the same interview + meeting URL.
+  const [picked, setPicked] = useState([]);
+  const [day, setDay] = useState('');
+  const [start, setStart] = useState('');
+  const [end, setEnd] = useState('');
+  const [assigning, setAssigning] = useState(false);
   const load = useCallback(() => {
-    Promise.all([interviewsApi.listSlots(interview.id), interviewsApi.students(programId), interviewsApi.assignableHr()])
+    Promise.all([interviewsApi.listSlots(interview.id), interviewsApi.students(programId), interviewsApi.assignableHr(interview.id)])
       .then(([v, st, hr]) => { setView(v?.data || { categories: [], slots: [] }); setStudents(st?.data || []); setHrList(hr?.data || []); }).catch(() => {});
   }, [interview.id, programId]);
   useEffect(() => { load(); }, [load]);
 
   const trainerCats = (view.categories || []).filter((c) => c.scored_by === 'trainer');
   const hrCats = (view.categories || []).filter((c) => c.scored_by === 'hr');
+  // Students not already assigned a slot (so the picker only offers new ones).
+  const assignedIds = new Set((view.slots || []).map((s) => String(s.student_id)));
+  const options = students.filter((s) => !assignedIds.has(String(s.id)));
 
+  const isoAt = (d, t) => (d && t ? new Date(`${d}T${t}`).toISOString() : null);
   const doAssign = async () => {
-    if (!assign.student_id) return;
-    try { await interviewsApi.assign(interview.id, { student_id: assign.student_id, slot_at: assign.slot_at ? new Date(assign.slot_at).toISOString() : null }); setAssign({ student_id: '', slot_at: '' }); load(); onChange(); }
-    catch (e) { onError(e.message); }
+    if (!picked.length) { onError('Pick at least one student'); return; }
+    setAssigning(true);
+    try {
+      const startsAt = isoAt(day, start);
+      const endsAt = isoAt(day, end);
+      await interviewsApi.assignBulk(interview.id, picked.map((p) => ({ student_id: p.id, starts_at: startsAt, ends_at: endsAt })));
+      setPicked([]); setDay(''); setStart(''); setEnd(''); load(); onChange();
+    } catch (e) { onError(e.message); } finally { setAssigning(false); }
   };
   const setHr = async (hrId) => { try { await interviewsApi.assignHr(interview.id, { hr_user_id: hrId || null }); load(); } catch (e) { onError(e.message); } };
   const saveScores = async (slotId, scores) => {
     try { await interviewsApi.score(slotId, { scores }); load(); onChange(); } catch (e) { onError(e.message); }
   };
 
+  const hrName = hrList.find((h) => h.id === (view.interview?.hr_user_id))?.name;
+
   return (
     <Dialog open onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>{interview.title} — rubric & scoring</DialogTitle>
+      <DialogTitle>{interview.title} — assign &amp; score</DialogTitle>
       <DialogContent>
-        <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-          <TextField select size="small" label="Assign student" value={assign.student_id} onChange={(e) => setAssign((s) => ({ ...s, student_id: e.target.value }))} sx={{ minWidth: 200 }}>
-            {students.map((st) => <MenuItem key={st.id} value={st.id}>{st.name}</MenuItem>)}
+        {/* Who scores what — makes the trainer/HR split explicit */}
+        <Box sx={{ mb: 2, p: 1.5, borderRadius: 2, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+          <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.4, mb: 1 }}>Who scores what</Typography>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+            {(view.categories || []).map((c) => <Chip key={c.id} size="small" label={`${c.name} /${c.max_marks} · ${c.scored_by === 'hr' ? 'HR' : 'Trainer'}`} color={c.scored_by === 'hr' ? 'primary' : 'default'} variant="outlined" />)}
+          </div>
+          <TextField select size="small" label="HR evaluator (scores the HR categories)" value={view.interview?.hr_user_id || ''} onChange={(e) => setHr(e.target.value)} sx={{ minWidth: 280 }}
+            helperText={hrList.length === 0 ? 'No HR users in this branch yet' : (hrName ? `${hrName} will score the HR categories` : 'Pick who scores the soft-skill categories')}>
+            <MenuItem value="">— none —</MenuItem>
+            {hrList.map((h) => <MenuItem key={h.id} value={h.id}>{h.name}</MenuItem>)}
           </TextField>
-          <TextField size="small" type="datetime-local" label="Slot time" InputLabelProps={{ shrink: true }} value={assign.slot_at} onChange={(e) => setAssign((s) => ({ ...s, slot_at: e.target.value }))} />
-          <Button variant="contained" onClick={doAssign} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>Assign</Button>
-          <Box sx={{ ml: 'auto' }}>
-            <TextField select size="small" label="HR evaluator" value={view.interview?.hr_user_id || ''} onChange={(e) => setHr(e.target.value)} sx={{ minWidth: 200 }}
-              helperText={hrList.length === 0 ? 'No HR users yet' : 'Scores the HR categories'}>
-              <MenuItem value="">— none</MenuItem>
-              {hrList.map((h) => <MenuItem key={h.id} value={h.id}>{h.name}</MenuItem>)}
-            </TextField>
-          </Box>
         </Box>
 
-        <div style={{ marginBottom: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {(view.categories || []).map((c) => <Chip key={c.id} size="small" label={`${c.name} /${c.max_marks} · ${c.scored_by}`} color={c.scored_by === 'hr' ? 'primary' : 'default'} variant="outlined" />)}
-        </div>
+        {/* Bulk assign: many students, one shared date + time window, one URL */}
+        <Box sx={{ mb: 2, p: 1.5, borderRadius: 2, border: '1px dashed #cbd5e1' }}>
+          <Typography sx={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.4, mb: 1 }}>Assign students</Typography>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <Autocomplete
+              multiple size="small" options={options} value={picked}
+              onChange={(_e, v) => setPicked(v)}
+              getOptionLabel={(o) => o.name || o.email || ''}
+              isOptionEqualToValue={(a, b) => a.id === b.id}
+              sx={{ minWidth: 300, flex: 1 }}
+              renderInput={(params) => <TextField {...params} label="Search & select students" placeholder="Type a name…" />}
+            />
+            <TextField size="small" type="date" label="Date" InputLabelProps={{ shrink: true }} value={day} onChange={(e) => setDay(e.target.value)} />
+            <TextField size="small" type="time" label="Start" InputLabelProps={{ shrink: true }} value={start} onChange={(e) => setStart(e.target.value)} />
+            <TextField size="small" type="time" label="End" InputLabelProps={{ shrink: true }} value={end} onChange={(e) => setEnd(e.target.value)} />
+            <Button variant="contained" onClick={doAssign} disabled={assigning || !picked.length} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>
+              {assigning ? 'Assigning…' : `Assign ${picked.length || ''}`.trim()}
+            </Button>
+          </Box>
+          <Typography sx={{ fontSize: 11.5, color: '#94a3b8', mt: 0.5 }}>All selected students get the same meeting link and time window.</Typography>
+        </Box>
 
         {(view.slots || []).length === 0 ? <Typography sx={{ color: '#94a3b8', fontSize: 13 }}>No students assigned yet.</Typography> : (
           <Table size="small">
             <TableHead><TableRow sx={{ background: '#fafbfc' }}>
-              <TableCell>Student</TableCell><TableCell>Slot</TableCell>
+              <TableCell>Student</TableCell><TableCell>Slot window</TableCell>
               {trainerCats.map((c) => <TableCell key={c.id} align="center">{c.name}</TableCell>)}
               {hrCats.map((c) => <TableCell key={c.id} align="center" sx={{ color: '#2563eb' }}>{c.name} (HR)</TableCell>)}
               <TableCell align="right">Total</TableCell><TableCell align="right" />
@@ -183,6 +216,15 @@ function SlotsDialog({ programId, interview, onClose, onChange, onError }) {
   );
 }
 
+// Render a slot's start/end window (falls back to the legacy single slot time).
+const slotWindow = (sl) => {
+  const s = sl.starts_at || sl.slot_at;
+  if (!s) return '—';
+  const start = fmtDate(s);
+  if (sl.ends_at) { try { return `${start} – ${new Date(sl.ends_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`; } catch { return start; } }
+  return start;
+};
+
 function ScoreRow({ sl, trainerCats, hrCats, onSave }) {
   const scoreFor = (catId) => (sl.scores || []).find((x) => x.category_id === catId)?.marks;
   const [vals, setVals] = useState(() => Object.fromEntries(trainerCats.map((c) => [c.id, scoreFor(c.id) ?? ''])));
@@ -193,7 +235,7 @@ function ScoreRow({ sl, trainerCats, hrCats, onSave }) {
   return (
     <TableRow>
       <TableCell>{sl.name}</TableCell>
-      <TableCell sx={{ color: '#64748b' }}>{sl.slot_at ? fmtDate(sl.slot_at) : '—'}</TableCell>
+      <TableCell sx={{ color: '#64748b', fontSize: 12.5 }}>{slotWindow(sl)}</TableCell>
       {trainerCats.map((c) => (
         <TableCell key={c.id} align="center">
           <TextField size="small" type="number" value={vals[c.id]} onChange={(e) => setVals((v) => ({ ...v, [c.id]: e.target.value }))} sx={{ width: 64 }} inputProps={{ min: 0, max: c.max_marks }} />

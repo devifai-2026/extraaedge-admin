@@ -804,10 +804,13 @@ export const assessmentsApi = {
 export const interviewsApi = {
   list: (programId) => api.get('/interviews', { programId }),
   students: (programId) => api.get('/interviews/students', { programId }),
-  assignableHr: () => api.get('/interviews/assignable-hr'),
+  // Optionally scope the HR list to the interview's branch (F3).
+  assignableHr: (interviewId) => api.get('/interviews/assignable-hr', interviewId ? { interview_id: interviewId } : undefined),
   create: (body) => api.post('/interviews', body),
   listSlots: (id) => api.get(`/interviews/${id}/slots`),
   assign: (id, body) => api.post(`/interviews/${id}/slots`, body),
+  // Bulk-assign the same interview to many students, each a start/end window.
+  assignBulk: (id, assignments) => api.post(`/interviews/${id}/slots/bulk`, { assignments }),
   assignHr: (id, body) => api.post(`/interviews/${id}/assign-hr`, body),
   grade: (slotId, body) => api.post(`/interviews/slots/${slotId}/grade`, body),
   score: (slotId, body) => api.post(`/interviews/slots/${slotId}/score`, body),
