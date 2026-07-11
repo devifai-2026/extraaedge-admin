@@ -14,18 +14,11 @@ const fmtDate = (v) => { try { return new Date(v).toLocaleDateString('en-IN', { 
 export default function StudentCertificate() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [claiming, setClaiming] = useState(false);
   const [toast, setToast] = useState('');
   const tenant = studentAuth.getTenant();
 
   const load = () => studentApi.certificate().then((r) => setData(r?.data ?? r)).catch((e) => setToast(e.message)).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
-
-  const claim = async () => {
-    setClaiming(true);
-    try { await studentApi.claimCertificate(); setToast('Certificate issued 🎓'); setLoading(true); load(); }
-    catch (e) { setToast(e.message); } finally { setClaiming(false); }
-  };
 
   const orgName = tenant?.name || 'Institute';
   const issued = data?.issued;
@@ -62,11 +55,11 @@ export default function StudentCertificate() {
             <div style={{ fontSize: 46 }}>🎓</div>
             <div style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', marginTop: 6 }}>{data?.eligible ? 'You are ready to graduate!' : 'Almost there'}</div>
             <div style={{ fontSize: 13.5, color: '#64748b', marginTop: 4, maxWidth: 460, margin: '4px auto 0' }}>
-              {data?.eligible ? 'You have met all the requirements. Claim your certificate below.' : 'Complete the requirements below to unlock your course-completion certificate.'}
+              Your certificate is issued automatically by {orgName} once you complete the course — no action needed. Here&apos;s your progress:
             </div>
           </div>
 
-          <div style={{ display: 'grid', gap: 10, maxWidth: 460, margin: '0 auto 18px' }}>
+          <div style={{ display: 'grid', gap: 10, maxWidth: 460, margin: '0 auto 8px' }}>
             {(data?.requirements || []).map((req) => (
               <div key={req.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, border: `1px solid ${req.met ? '#bbf7d0' : '#e2e8f0'}`, background: req.met ? '#f0fdf4' : '#fff' }}>
                 {req.met ? <CheckCircleIcon sx={{ color: '#16a34a' }} /> : <RadioButtonUncheckedIcon sx={{ color: '#cbd5e1' }} />}
@@ -76,10 +69,6 @@ export default function StudentCertificate() {
                 </div>
               </div>
             ))}
-          </div>
-
-          <div style={{ textAlign: 'center' }}>
-            <Btn onClick={claim} disabled={!data?.eligible || claiming}>{claiming ? 'Issuing…' : 'Claim certificate'}</Btn>
           </div>
         </Card>
       )}

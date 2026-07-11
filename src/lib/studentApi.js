@@ -119,7 +119,6 @@ export const studentApi = {
   materialUrl: (id) => doFetch(`/learning/student/materials/${id}/download`, { method: 'GET' }),
   progress: () => doFetch('/learning/student/progress', { method: 'GET' }), // read-only; trainers certify completion
   certificate: () => doFetch('/learning/student/certificate', { method: 'GET' }),
-  claimCertificate: () => doFetch('/learning/student/certificate/claim', { method: 'POST', body: '{}' }),
   homeExtras: () => doFetch('/learning/student/home-extras', { method: 'POST', body: '{}' }),
   // Capstone.
   capstones: () => doFetch('/capstone/student', { method: 'GET' }),
