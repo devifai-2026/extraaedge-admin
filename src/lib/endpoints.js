@@ -11,6 +11,10 @@ const withBranch = (params = {}) => {
   return { ...params, branch_id: branch };
 };
 
+// The active branch id from the switcher, or null for "All branches". Used to
+// stamp a new placement company/opening with the branch currently being viewed.
+const activeBranchId = () => auth.getActiveBranch() || null;
+
 // Unauthenticated student-facing admission flow. Reuses the regular `api`
 // helper — the bearer token, if any, is harmless on these routes (the BE
 // router doesn't run authRequired here). Used by /apply/:token.
@@ -819,15 +823,17 @@ export const capstoneApi = {
 export const placementApi = {
   counts: () => api.get('/placement/counts', withBranch()),
   programModules: (programId) => api.get(`/placement/programs/${programId}/modules`),
-  // Companies
-  listCompanies: () => api.get('/placement/companies'),
-  createCompany: (body) => api.post('/placement/companies', body),
-  bulkCompanies: (rows) => api.post('/placement/companies/bulk', { rows }),
+  // Companies (list/counts honor the active-branch switcher via withBranch).
+  // Creates inherit the active branch so a company/opening made while viewing a
+  // branch is stamped to it (backend still validates the actor may use it).
+  listCompanies: () => api.get('/placement/companies', withBranch()),
+  createCompany: (body) => api.post('/placement/companies', { branch_id: activeBranchId(), ...body }),
+  bulkCompanies: (rows, branch_id) => api.post('/placement/companies/bulk', { rows, branch_id: branch_id || activeBranchId() || undefined }),
   updateCompany: (id, body) => api.put(`/placement/companies/${id}`, body),
   deleteCompany: (id) => api.delete(`/placement/companies/${id}`),
   // Openings
-  listOpenings: (status) => api.get('/placement/openings', status ? { status } : undefined),
-  createOpening: (body) => api.post('/placement/openings', body),
+  listOpenings: (status) => api.get('/placement/openings', withBranch(status ? { status } : {})),
+  createOpening: (body) => api.post('/placement/openings', { branch_id: activeBranchId(), ...body }),
   previewAudience: (id) => api.get(`/placement/openings/${id}/preview-audience`, withBranch()),
   fire: (id) => api.post(`/placement/openings/${id}/fire`, withBranch()),
   setOpeningStatus: (id, status) => api.post(`/placement/openings/${id}/status`, { status }),
