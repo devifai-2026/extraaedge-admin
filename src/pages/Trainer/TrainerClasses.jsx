@@ -24,6 +24,7 @@ export default function TrainerClasses() {
   const [toast, setToast] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [consoleClass, setConsoleClass] = useState(null);
+  const [view, setView] = useState('list'); // 'list' | 'calendar'
 
   useEffect(() => { coursesApi.list().then((r) => setCourses(r?.data || [])).catch(() => {}); }, []);
 
@@ -50,6 +51,13 @@ export default function TrainerClasses() {
           <Button variant="contained" startIcon={<AddIcon />} disabled={batches.length === 0} onClick={() => setCreateOpen(true)}
                   sx={{ textTransform: 'none', bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' } }}>Schedule class</Button>
         )}
+        {programId && (
+          <Box sx={{ ml: 'auto', display: 'flex', border: '1px solid #e2e8f0', borderRadius: 2, overflow: 'hidden' }}>
+            {['list', 'calendar'].map((v) => (
+              <button key={v} onClick={() => setView(v)} style={{ border: 'none', background: view === v ? '#0f172a' : '#fff', color: view === v ? '#fff' : '#475569', padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>{v}</button>
+            ))}
+          </Box>
+        )}
       </Box>
 
       {programId && !loading && batches.length === 0 && (
@@ -60,7 +68,11 @@ export default function TrainerClasses() {
         </Card>
       )}
 
-      {loading ? <CircularProgress /> : programId && batches.length > 0 && (
+      {!loading && programId && batches.length > 0 && view === 'calendar' && (
+        <ClassCalendar classes={classes} onOpen={setConsoleClass} />
+      )}
+
+      {loading ? <CircularProgress /> : programId && batches.length > 0 && view === 'list' && (
         classes.length === 0 ? (
           <Card><EmptyState icon="📅" title="No classes yet" text="Schedule your first class for this course — students see it instantly with join links." /></Card>
         ) : (
@@ -153,3 +165,53 @@ function CreateClassDialog({ programId, batches, modules, onClose, onDone, onErr
     </Dialog>
   );
 }
+
+// Month calendar of classes. Days with classes show colored pills (accent =
+// scheduled, red = live, grey = ended); clicking a class opens its console.
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+function ClassCalendar({ classes, onOpen }) {
+  const [cursor, setCursor] = useState(() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d; });
+  const byDay = {};
+  for (const c of classes) { const d = new Date(c.starts_at); const k = ymd(new Date(d.getFullYear(), d.getMonth(), d.getDate())); (byDay[k] ||= []).push(c); }
+  const year = cursor.getFullYear(); const month = cursor.getMonth();
+  const lead = new Date(year, month, 1).getDay();
+  const days = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < lead; i += 1) cells.push(null);
+  for (let d = 1; d <= days; d += 1) cells.push(new Date(year, month, d));
+  const todayKey = ymd(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()));
+  const shift = (n) => setCursor((c) => new Date(c.getFullYear(), c.getMonth() + n, 1));
+  const pill = (c) => (c.started_at && !c.ended_at ? '#dc2626' : c.ended_at ? '#94a3b8' : 'var(--lms-accent, #E53935)');
+  return (
+    <Card pad={16}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+        <button onClick={() => shift(-1)} style={navBtn}>‹</button>
+        <div style={{ fontWeight: 700, color: '#0f172a' }}>{cursor.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</div>
+        <button onClick={() => shift(1)} style={navBtn}>›</button>
+      </Box>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 4 }}>
+        {DOW.map((d) => <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>{d}</div>)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} />;
+          const k = ymd(d); const list = byDay[k] || []; const isToday = k === todayKey;
+          return (
+            <div key={k} style={{ minHeight: 78, border: isToday ? '2px solid #0f172a' : '1px solid #eef0f4', borderRadius: 8, padding: 4, background: '#fff', display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textAlign: 'right' }}>{d.getDate()}</div>
+              {list.slice(0, 3).map((c) => (
+                <button key={c.id} title={`${c.title} · ${c.batch_name}`} onClick={() => onOpen(c)}
+                  style={{ border: 'none', textAlign: 'left', background: `color-mix(in srgb, ${pill(c)} 14%, transparent)`, color: pill(c), borderLeft: `3px solid ${pill(c)}`, borderRadius: 4, padding: '2px 5px', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {c.title}
+                </button>
+              ))}
+              {list.length > 3 && <div style={{ fontSize: 10, color: '#94a3b8' }}>+{list.length - 3} more</div>}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+const navBtn = { border: '1px solid #e2e8f0', background: '#fff', borderRadius: 8, width: 30, height: 30, fontSize: 16, cursor: 'pointer', color: '#475569' };
