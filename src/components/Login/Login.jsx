@@ -193,6 +193,7 @@ function Login() {
               </button>
             </div>
             <div style={{ marginTop: 6, fontSize: 11 }}>All passwords: <code>ChangeMe123!</code> · Click a role above to autofill.</div>
+            <div style={{ marginTop: 4, fontSize: 11 }}>Student portal: <a href="/student/login" style={{ color: '#2563eb', wordBreak: 'break-all' }}>{`${window.location.origin}/student/login`}</a></div>
             <div style={{ marginTop: 4, fontSize: 11 }}>Product Owner: <a href="http://localhost:5174" style={{ color: '#2563eb' }}>localhost:5174</a></div>
           </div>
         </div>
