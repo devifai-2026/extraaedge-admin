@@ -28,6 +28,8 @@ import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
 import WorkOutlineIcon from '@mui/icons-material/WorkOutlineOutlined';
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
+import AttendanceQuestionHost from './AttendanceQuestionHost';
+import { disconnectStudentSocket } from '../../lib/studentSocket';
 
 const GROUPS = [
   { heading: null, items: [
@@ -125,7 +127,7 @@ export default function StudentLayout() {
   const student = studentAuth.getStudent();
   const accent = tenant?.brand_primary_color || '#E53935';
   const logo = tenant?.logo_url ? resolveAssetUrl(tenant.logo_url) : null;
-  const logout = () => { studentAuth.clear(); navigate('/student/login', { replace: true }); };
+  const logout = () => { disconnectStudentSocket(); studentAuth.clear(); navigate('/student/login', { replace: true }); };
 
   return (
     <div style={{ '--lms-accent': accent, display: 'flex', height: '100vh', overflow: 'hidden', background: '#f5f6fa', fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}>
@@ -183,6 +185,10 @@ export default function StudentLayout() {
           <Outlet />
         </div>
       </main>
+
+      {/* Global live-attendance popup — connects the student socket + joins
+          batch rooms, pops a timed modal when a trainer fires a question. */}
+      <AttendanceQuestionHost />
 
       <StudentTour steps={TOUR_STEPS} open={tourOpen} onClose={closeTour} />
     </div>
