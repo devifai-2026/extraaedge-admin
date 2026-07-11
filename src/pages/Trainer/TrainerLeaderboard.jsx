@@ -1,8 +1,10 @@
 // Trainer Leaderboard — ranked students for a course (tests + projects +
 // attendance% + interview marks).
 import { useEffect, useState, useCallback } from 'react';
-import { Box, Typography, Paper, MenuItem, TextField } from '@mui/material';
+import { Box, MenuItem, TextField } from '@mui/material';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEventsOutlined';
 import { coursesApi, assessmentsApi } from '../../lib/endpoints';
+import { PageHeader, Card, EmptyState } from '../../lib/lmsUi';
 import LeaderboardTable from './LeaderboardTable';
 
 export default function TrainerLeaderboard() {
@@ -16,12 +18,19 @@ export default function TrainerLeaderboard() {
 
   return (
     <Box sx={{ p: 3, maxWidth: 900, mx: 'auto' }}>
-      <Typography variant="h6" sx={{ mb: 0.5 }}>Leaderboard</Typography>
-      <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>Ranked by tests + projects + attendance + interviews.</Typography>
-      <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, mb: 2 }}>
-        {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-      </TextField>
-      {programId && <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}><LeaderboardTable rows={rows} /></Paper>}
+      <PageHeader
+        title="Leaderboard"
+        subtitle="Ranked by tests + projects + attendance + interviews."
+        icon={EmojiEventsIcon}
+        right={(
+          <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, background: '#fff' }}>
+            {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+          </TextField>
+        )}
+      />
+      {!programId
+        ? <Card><EmptyState icon="🏆" title="Pick a course" text="Choose a course to see its ranked leaderboard." /></Card>
+        : <Card pad={0} style={{ overflow: 'hidden' }}><LeaderboardTable rows={rows} /></Card>}
     </Box>
   );
 }

@@ -2,6 +2,8 @@
 // creates a lead for the sales team (no payment here).
 import { useEffect, useState } from 'react';
 import { studentApi } from '../../lib/studentApi';
+import { PageHeader, Card, EmptyState, Skeleton } from '../../lib/lmsUi';
+import StorefrontIcon from '@mui/icons-material/StorefrontOutlined';
 
 const money = (n, cur) => (n == null ? null : `${cur === 'USD' ? '$' : '₹'}${Number(n).toLocaleString('en-IN')}`);
 
@@ -20,15 +22,19 @@ export default function StudentCatalog() {
     catch (e) { setToast(e.message); } finally { setEnquiring(null); }
   };
 
-  if (loading) return <p style={{ color: '#94a3b8' }}>Loading courses…</p>;
+  if (loading) return (
+    <div>
+      <PageHeader title="Explore Courses" subtitle="Interested in another course? Send an enquiry and our team will get in touch." icon={StorefrontIcon} />
+      <Card><Skeleton h={16} w="50%" /><div style={{ height: 8 }} /><Skeleton h={12} w="70%" /></Card>
+    </div>
+  );
   return (
     <div>
-      <h2 style={{ fontSize: 20, color: '#0f172a', margin: '0 0 4px' }}>Explore more courses</h2>
-      <p style={{ color: '#64748b', fontSize: 14, marginTop: 0 }}>Interested in another course? Send an enquiry and our team will get in touch.</p>
-      {rows.length === 0 ? <div style={{ color: '#94a3b8' }}>No other courses available right now.</div> : (
+      <PageHeader title="Explore Courses" subtitle="Interested in another course? Send an enquiry and our team will get in touch." icon={StorefrontIcon} />
+      {rows.length === 0 ? <Card><EmptyState icon="🎓" title="No other courses right now" text="New courses will show up here as soon as they're added to the catalog." /></Card> : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
           {rows.map((p) => (
-            <div key={p.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div key={p.id} style={{ background: '#fff', border: '1px solid #eef0f5', borderRadius: 16, boxShadow: '0 2px 12px -8px rgba(15,23,42,0.18)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               {p.image_url && <img src={p.image_url} alt={p.name} style={{ width: '100%', height: 120, objectFit: 'cover' }} />}
               <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
                 <div style={{ fontWeight: 700, color: '#0f172a' }}>{p.name}</div>

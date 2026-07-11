@@ -2,6 +2,8 @@
 // upload (PDF/DOC → GCS). Read-back uses short-lived signed URLs for photo/CV.
 import { useEffect, useRef, useState } from 'react';
 import { studentApi } from '../../lib/studentApi';
+import { PageHeader, Card, Skeleton } from '../../lib/lmsUi';
+import AccountCircleIcon from '@mui/icons-material/AccountCircleOutlined';
 
 // XHR upload with progress (fetch has no upload progress).
 function putWithProgress(url, method, headers, file, onPct) {
@@ -56,14 +58,19 @@ export default function StudentProfile() {
     } catch (e) { setToast(e.message); } finally { setUploading(''); }
   };
 
-  if (!p) return <p style={{ color: '#94a3b8' }}>Loading profile…</p>;
+  if (!p) return (
+    <div style={{ maxWidth: 720 }}>
+      <PageHeader title="My Profile" subtitle="Your details, links, skills and CV — keep them up to date." icon={AccountCircleIcon} />
+      <Card><Skeleton h={16} w="40%" /><div style={{ height: 8 }} /><Skeleton h={12} w="70%" /></Card>
+    </div>
+  );
 
   return (
     <div style={{ maxWidth: 720 }}>
-      <h2 style={{ fontSize: 22, color: '#0f172a', margin: '0 0 16px' }}>My Profile</h2>
+      <PageHeader title="My Profile" subtitle="Your details, links, skills and CV — keep them up to date." icon={AccountCircleIcon} />
 
       {/* Photo + identity */}
-      <div style={card}>
+      <Card style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ width: 96, height: 96, borderRadius: '50%', overflow: 'hidden', background: '#f1f5f9', border: '1px solid #e2e8f0', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {p.photo_url ? <img src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 28, fontWeight: 800, color: '#cbd5e1' }}>{(p.name || '?').slice(0, 1)}</span>}
@@ -77,11 +84,10 @@ export default function StudentProfile() {
             </button>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* CV */}
-      <div style={card}>
-        <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>CV / Resume</div>
+      <Card title="CV / Resume" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           {p.cv_url
             ? <a href={p.cv_url} target="_blank" rel="noreferrer" style={btnGhost}>📄 View current CV{p.cv_filename ? ` (${p.cv_filename})` : ''}</a>
@@ -91,11 +97,10 @@ export default function StudentProfile() {
             {uploading === 'cv' ? 'Uploading…' : (p.cv_url ? 'Replace CV' : 'Upload CV')}
           </button>
         </div>
-      </div>
+      </Card>
 
       {/* Editable details */}
-      <div style={card}>
-        <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 12 }}>Details</div>
+      <Card title="Details" style={{ marginBottom: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="Phone" value={form.phone} onChange={set('phone')} />
           <Field label="Date of birth" type="date" value={form.dob} onChange={set('dob')} />
@@ -109,7 +114,7 @@ export default function StudentProfile() {
         <div style={{ marginTop: 14, textAlign: 'right' }}>
           <button onClick={save} disabled={saving} style={btnPrimary}>{saving ? 'Saving…' : 'Save profile'}</button>
         </div>
-      </div>
+      </Card>
 
       {toast && <div style={toastBox} onClick={() => setToast('')}>{toast}</div>}
     </div>
@@ -125,8 +130,7 @@ const Field = ({ label, value, onChange, type = 'text', placeholder, full, texta
   </div>
 );
 
-const card = { background: '#fff', border: '1px solid #eef0f4', borderRadius: 14, padding: 18, marginBottom: 16, boxShadow: '0 1px 2px rgba(15,23,42,0.04)' };
-const inp = { width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14, fontFamily: 'inherit' };
+const inp ={ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14, fontFamily: 'inherit' };
 const btnPrimary = { background: '#E53935', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' };
 const btnGhost = { border: '1px solid #cbd5e1', background: '#fff', color: '#475569', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', display: 'inline-block' };
 const toastBox = { position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: '#0f172a', color: '#fff', padding: '10px 18px', borderRadius: 8, fontSize: 13, cursor: 'pointer', zIndex: 50 };

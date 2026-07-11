@@ -1,10 +1,10 @@
 // Trainer Forum — student doubts on the trainer's course(s). Open a thread to
 // read and reply; a reply marks it answered and notifies the student.
 import { useEffect, useState, useCallback } from 'react';
-import {
-  Box, Typography, Paper, MenuItem, TextField, Button, Chip, Collapse, Divider,
-} from '@mui/material';
+import { Box, MenuItem, TextField, Collapse } from '@mui/material';
+import ForumIcon from '@mui/icons-material/ForumOutlined';
 import { coursesApi, forumApi } from '../../lib/endpoints';
+import { PageHeader, Card, Badge, Btn, EmptyState } from '../../lib/lmsUi';
 
 const fmt = (v) => { try { return new Date(v).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };
 
@@ -17,18 +17,32 @@ export default function TrainerForum() {
   const load = useCallback(() => { if (programId) forumApi.listThreads(programId).then((r) => setThreads(r?.data || [])).catch(() => {}); }, [programId]);
   useEffect(() => { load(); }, [load]);
 
+  const open = threads.filter((t) => t.status !== 'answered').length;
+
   return (
     <Box sx={{ p: 3, maxWidth: 820, mx: 'auto' }}>
-      <Typography variant="h6" sx={{ mb: 0.5 }}>Student Forum</Typography>
-      <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>Answer student doubts. Replying marks the thread answered and notifies the student.</Typography>
-      <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, mb: 2 }}>
-        {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-      </TextField>
+      <PageHeader
+        title="Student Forum"
+        subtitle="Answer student doubts. Replying marks the thread answered and notifies the student."
+        icon={ForumIcon}
+        right={(
+          <>
+            {programId && open > 0 && <Badge tone="warning">{open} awaiting reply</Badge>}
+            <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, background: '#fff' }}>
+              {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            </TextField>
+          </>
+        )}
+      />
 
-      <Box sx={{ display: 'grid', gap: 12 }}>
-        {programId && threads.length === 0 && <Typography sx={{ color: '#94a3b8', fontSize: 14 }}>No questions yet.</Typography>}
-        {threads.map((t) => <ThreadCard key={t.id} t={t} api={forumApi} canReply onChange={load} />)}
-      </Box>
+      {!programId && <Card><EmptyState icon="💬" title="Pick a course" text="Choose a course above to see the questions your students have raised." /></Card>}
+      {programId && (threads.length === 0
+        ? <Card><EmptyState icon="💬" title="No questions yet" text="When students post a doubt on this course, it will show up here for you to answer." /></Card>
+        : (
+          <Box sx={{ display: 'grid', gap: 12 }}>
+            {threads.map((t) => <ThreadCard key={t.id} t={t} api={forumApi} canReply onChange={load} />)}
+          </Box>
+        ))}
     </Box>
   );
 }
@@ -56,29 +70,33 @@ export function ThreadCard({ t, api, canReply, onChange }) {
     } catch { /* ignore */ }
   };
 
+  const answered = t.status === 'answered';
   return (
-    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'flex-start' }}>
-        <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>{t.title}</Typography>
-        <Chip size="small" label={t.status} color={t.status === 'answered' ? 'success' : 'default'} variant={t.status === 'answered' ? 'filled' : 'outlined'} />
-      </Box>
-      <Typography sx={{ fontSize: 14, color: '#334155', whiteSpace: 'pre-wrap', mt: 0.5 }}>{t.body}</Typography>
-      <Typography sx={{ fontSize: 11, color: '#94a3b8', mt: 0.5 }}>{t.student_name} · {fmt(t.created_at)}</Typography>
-      <Button size="small" onClick={toggle} sx={{ textTransform: 'none', mt: 0.5 }}>{open ? 'Hide' : `${t.reply_count} replies`}</Button>
+    <Card style={answered ? undefined : { borderLeft: '3px solid #d97706' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+        <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 15 }}>{t.title}</div>
+        <Badge tone={answered ? 'success' : 'warning'}>{answered ? 'Answered' : 'Open'}</Badge>
+      </div>
+      <div style={{ fontSize: 14, color: '#334155', whiteSpace: 'pre-wrap', marginTop: 4 }}>{t.body}</div>
+      <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 6 }}>{t.student_name} · {fmt(t.created_at)}</div>
+      <button onClick={toggle} style={{ marginTop: 8, border: 'none', background: 'none', color: '#E53935', fontWeight: 600, fontSize: 13, cursor: 'pointer', padding: 0 }}>
+        {open ? 'Hide replies' : `${t.reply_count} ${t.reply_count === 1 ? 'reply' : 'replies'}`}
+      </button>
       <Collapse in={open}>
-        <Divider sx={{ my: 1 }} />
+        <div style={{ borderTop: '1px solid #eef0f5', margin: '10px 0' }} />
         {(replies || []).map((r) => (
-          <Box key={r.id} sx={{ mb: 1 }}>
-            <Typography sx={{ fontSize: 13 }}><b style={{ color: r.author_kind === 'user' ? '#E53935' : '#0f172a' }}>{r.author_name}{r.author_kind === 'user' ? ' (trainer)' : ''}:</b> {r.body}</Typography>
-          </Box>
+          <div key={r.id} style={{ marginBottom: 8, fontSize: 13.5, color: '#334155' }}>
+            <b style={{ color: r.author_kind === 'user' ? '#E53935' : '#0f172a' }}>{r.author_name}{r.author_kind === 'user' ? ' (trainer)' : ''}:</b> {r.body}
+          </div>
         ))}
+        {(replies && replies.length === 0) && <div style={{ fontSize: 12.5, color: '#94a3b8', marginBottom: 8 }}>No replies yet — be the first to answer.</div>}
         {canReply && (
-          <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
             <TextField size="small" fullWidth placeholder="Write a reply…" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(); }} />
-            <Button size="small" onClick={send} sx={{ textTransform: 'none' }}>Reply</Button>
-          </Box>
+            <Btn variant="primary" size="sm" onClick={send} disabled={!text.trim()}>Reply</Btn>
+          </div>
         )}
       </Collapse>
-    </Paper>
+    </Card>
   );
 }

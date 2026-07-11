@@ -2,11 +2,13 @@
 // Recording uploads auto-post here too (auto_source='recording').
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Box, Typography, Paper, MenuItem, TextField, Button, Alert, Snackbar, IconButton, Collapse, Divider,
+  Box, Typography, MenuItem, TextField, Button, Alert, Snackbar, Collapse, Divider,
 } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbUpOffAltIcon from '@mui/icons-material/ThumbUpOffAlt';
 import ChatBubbleOutlineIcon from '@mui/icons-material/CommentOutlined';
+import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
+import { PageHeader, Card, EmptyState, Badge } from '../../lib/lmsUi';
 import { coursesApi, communityApi } from '../../lib/endpoints';
 
 const fmt = (v) => { try { return new Date(v).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };
@@ -31,22 +33,27 @@ export default function TrainerAnnouncements() {
 
   return (
     <Box sx={{ p: 3, maxWidth: 800, mx: 'auto' }}>
-      <Typography variant="h6" sx={{ mb: 0.5 }}>Announcements</Typography>
-      <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>Post updates to your course. Students can comment and like.</Typography>
+      <PageHeader
+        title="Announcements"
+        subtitle="Post updates to your course. Students can comment and like."
+        icon={CampaignOutlinedIcon}
+        right={(
+          <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, background: '#fff' }}>
+            {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+          </TextField>
+        )}
+      />
 
-      <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, mb: 2 }}>
-        {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-      </TextField>
-
+      {!programId && <Card><EmptyState icon="📣" title="Pick a course" text="Choose a course above to post an announcement and read the thread." /></Card>}
       {programId && (
         <>
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2 }}>
+          <Card style={{ marginBottom: 16 }}>
             <TextField size="small" fullWidth label="Title (optional)" value={title} onChange={(e) => setTitle(e.target.value)} sx={{ mb: 1 }} />
             <TextField size="small" fullWidth multiline minRows={2} label="Write an announcement…" value={body} onChange={(e) => setBody(e.target.value)} />
-            <Box sx={{ mt: 1, textAlign: 'right' }}>
+            <Box sx={{ mt: 1.5, textAlign: 'right' }}>
               <Button variant="contained" onClick={post} disabled={!body.trim()} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>Post</Button>
             </Box>
-          </Paper>
+          </Card>
 
           <AnnouncementFeed feed={feed} api={communityApi} onChange={load} isTrainer />
         </>
@@ -63,9 +70,11 @@ export default function TrainerAnnouncements() {
 // listComments(id) — the trainer (communityApi) and student (studentApi) both
 // provide these with matching shapes.
 export function AnnouncementFeed({ feed, api, onChange }) {
+  if (!feed || feed.length === 0) {
+    return <Card><EmptyState icon="📣" title="No announcements yet" text="Post an update above — students see it instantly and can comment or like." /></Card>;
+  }
   return (
     <Box sx={{ display: 'grid', gap: 12 }}>
-      {feed.length === 0 && <Typography sx={{ color: '#94a3b8', fontSize: 14 }}>No announcements yet.</Typography>}
       {feed.map((a) => <AnnouncementCard key={a.id} a={a} api={api} onChange={onChange} />)}
     </Box>
   );
@@ -101,11 +110,11 @@ function AnnouncementCard({ a, api, onChange }) {
   };
 
   return (
-    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-      {a.auto_source === 'recording' && <Typography sx={{ fontSize: 11, color: '#2563eb', fontWeight: 700, mb: 0.5 }}>📹 RECORDING</Typography>}
-      {a.title && <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>{a.title}</Typography>}
+    <Card>
+      {a.auto_source === 'recording' && <div style={{ marginBottom: 6 }}><Badge tone="info">📹 Recording</Badge></div>}
+      {a.title && <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: 15 }}>{a.title}</Typography>}
       <Typography sx={{ fontSize: 14, color: '#334155', whiteSpace: 'pre-wrap' }}>{a.body}</Typography>
-      <Typography sx={{ fontSize: 11, color: '#94a3b8', mt: 0.5 }}>{a.author_name || 'System'} · {fmt(a.created_at)}</Typography>
+      <Typography sx={{ fontSize: 11.5, color: '#94a3b8', mt: 0.5 }}>{a.author_name || 'System'} · {fmt(a.created_at)}</Typography>
       <Box sx={{ display: 'flex', gap: 2, mt: 1, alignItems: 'center' }}>
         <Button size="small" startIcon={likeState.liked ? <ThumbUpIcon fontSize="small" /> : <ThumbUpOffAltIcon fontSize="small" />} onClick={like} sx={{ textTransform: 'none', color: likeState.liked ? '#E53935' : '#64748b' }}>{likeState.count}</Button>
         <Button size="small" startIcon={<ChatBubbleOutlineIcon fontSize="small" />} onClick={toggleComments} sx={{ textTransform: 'none', color: '#64748b' }}>{a.comment_count} comments</Button>
@@ -122,6 +131,6 @@ function AnnouncementCard({ a, api, onChange }) {
           <Button size="small" onClick={addComment} sx={{ textTransform: 'none' }}>Send</Button>
         </Box>
       </Collapse>
-    </Paper>
+    </Card>
   );
 }

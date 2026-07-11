@@ -4,15 +4,18 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Paper, Tabs, Tab, Button, TextField, Alert, Snackbar,
-  CircularProgress, Chip, IconButton, Tooltip, Dialog, DialogTitle, DialogContent,
+  Box, Tabs, Tab, Button, TextField, Alert, Snackbar,
+  CircularProgress, IconButton, Dialog, DialogTitle, DialogContent,
   DialogActions, MenuItem, FormControlLabel, Checkbox, Table, TableHead, TableRow, TableCell, TableBody,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import MergeIcon from '@mui/icons-material/CallMerge';
+import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
+import { PageHeader, Card, EmptyState, Badge, Btn } from '../../lib/lmsUi';
 import { coursesApi, usersApi } from '../../lib/endpoints';
+import StudentProfileDialog from '../../components/StudentProfileDialog/StudentProfileDialog';
 
 export default function TrainerCourseDetail() {
   const { programId } = useParams();
@@ -32,10 +35,12 @@ export default function TrainerCourseDetail() {
 
   return (
     <Box sx={{ p: 3, maxWidth: 1000, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-        <IconButton size="small" onClick={() => navigate('/trainer/courses')}><ArrowBackIcon /></IconButton>
-        <Typography variant="h6">{course?.name || 'Course'}</Typography>
-      </Box>
+      <PageHeader
+        title={course?.name || 'Course'}
+        subtitle="Manage this course's modules, trainer roster and batches."
+        icon={SchoolOutlinedIcon}
+        right={<Btn variant="ghost" size="sm" onClick={() => navigate('/trainer/courses')}><ArrowBackIcon sx={{ fontSize: 16 }} /> All courses</Btn>}
+      />
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
@@ -171,6 +176,7 @@ function BatchesTab({ programId, notify }) {
   const [newBatch, setNewBatch] = useState('');
   const [placeDlg, setPlaceDlg] = useState(null); // { student }
   const [mergeDlg, setMergeDlg] = useState(false);
+  const [profileId, setProfileId] = useState(null); // student id to view
 
   const load = useCallback(() => {
     Promise.all([coursesApi.listBatches(programId), coursesApi.listUnassignedStudents(programId)])
@@ -221,6 +227,7 @@ function BatchesTab({ programId, notify }) {
                 <TableCell>{s.name}</TableCell>
                 <TableCell sx={{ color: '#64748b' }}>{s.email}</TableCell>
                 <TableCell align="right">
+                  <Button size="small" onClick={() => setProfileId(s.student_id)} sx={{ textTransform: 'none' }}>Profile</Button>
                   <Button size="small" disabled={activeBatches.length === 0} onClick={() => setPlaceDlg({ student: s })} sx={{ textTransform: 'none' }}>Place in batch</Button>
                 </TableCell>
               </TableRow>
@@ -231,6 +238,7 @@ function BatchesTab({ programId, notify }) {
 
       {placeDlg && <PlaceDialog programId={programId} student={placeDlg.student} batches={activeBatches} onClose={() => setPlaceDlg(null)} onDone={() => { setPlaceDlg(null); load(); notify('success', 'Student placed'); }} onError={(m) => notify('error', m)} />}
       {mergeDlg && <MergeDialog programId={programId} batches={activeBatches} onClose={() => setMergeDlg(false)} onDone={(r) => { setMergeDlg(false); load(); notify('success', `Merged — ${r.moved} student(s) moved`); }} onError={(m) => notify('error', m)} />}
+      {profileId && <StudentProfileDialog studentId={profileId} onClose={() => setProfileId(null)} />}
     </Box>
   );
 }

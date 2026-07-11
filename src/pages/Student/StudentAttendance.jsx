@@ -4,6 +4,8 @@
 // own class list (studentApi.myClasses).
 import { useEffect, useMemo, useState } from 'react';
 import { studentApi } from '../../lib/studentApi';
+import { PageHeader, Card, Skeleton } from '../../lib/lmsUi';
+import EventAvailableIcon from '@mui/icons-material/EventAvailableOutlined';
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -69,18 +71,25 @@ export default function StudentAttendance() {
   const shift = (n) => setCursor((c) => new Date(c.getFullYear(), c.getMonth() + n, 1));
   const todayKey = ymd(startOfDay(new Date()));
 
-  if (loading) return <p style={{ color: '#94a3b8' }}>Loading attendance…</p>;
+  if (loading) return (
+    <div style={{ maxWidth: 760 }}>
+      <PageHeader title="Attendance" subtitle="Your class-by-class attendance at a glance." icon={EventAvailableIcon} />
+      <Card><Skeleton h={16} w="50%" /><div style={{ height: 8 }} /><Skeleton h={12} w="70%" /></Card>
+    </div>
+  );
 
   return (
     <div style={{ maxWidth: 760 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-        <h2 style={{ fontSize: 22, color: '#0f172a', margin: 0 }}>Attendance</h2>
-        {stats.pct != null && (
+      <PageHeader
+        title="Attendance"
+        subtitle="Your class-by-class attendance at a glance."
+        icon={EventAvailableIcon}
+        right={stats.pct != null && (
           <div style={{ background: '#0f172a', color: '#fff', borderRadius: 10, padding: '6px 14px', fontSize: 13, fontWeight: 700 }}>
             {stats.pct}% · {stats.present}/{stats.total} classes
           </div>
         )}
-      </div>
+      />
 
       {/* Legend */}
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -91,7 +100,7 @@ export default function StudentAttendance() {
         ))}
       </div>
 
-      <div style={{ background: '#fff', border: '1px solid #eef0f4', borderRadius: 14, padding: 16, boxShadow: '0 1px 2px rgba(15,23,42,0.04)' }}>
+      <Card pad={16}>
         {/* Month nav */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <button onClick={() => shift(-1)} style={navBtn}>‹</button>
@@ -124,11 +133,11 @@ export default function StudentAttendance() {
             );
           })}
         </div>
-      </div>
+      </Card>
 
       {/* Selected-day detail */}
       {selected && (
-        <div style={{ background: '#fff', border: '1px solid #eef0f4', borderRadius: 14, padding: 16, marginTop: 12 }}>
+        <Card pad={16} style={{ marginTop: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <div style={{ fontWeight: 700 }}>{new Date(selected.key).toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'long' })}</div>
             <button onClick={() => setSelected(null)} style={{ border: 'none', background: 'none', color: '#94a3b8', cursor: 'pointer' }}>✕</button>
@@ -145,7 +154,7 @@ export default function StudentAttendance() {
               </div>
             );
           })}
-        </div>
+        </Card>
       )}
     </div>
   );

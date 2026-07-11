@@ -3,9 +3,11 @@
 // lists ended classes still MISSING a recording (the "don't forget" prompt).
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  Box, Typography, Paper, Alert, Snackbar, CircularProgress, Button, MenuItem, TextField, LinearProgress, Chip,
+  Box, Alert, Snackbar, CircularProgress, Button, MenuItem, TextField, LinearProgress, Chip,
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import VideoLibraryOutlinedIcon from '@mui/icons-material/VideoLibraryOutlined';
+import { PageHeader, Card, EmptyState } from '../../lib/lmsUi';
 import { coursesApi, classesApi, communityApi, uploadsApi } from '../../lib/endpoints';
 
 export default function TrainerRecordings() {
@@ -43,17 +45,21 @@ export default function TrainerRecordings() {
 
   return (
     <Box sx={{ p: 3, maxWidth: 900, mx: 'auto' }}>
-      <Typography variant="h6" sx={{ mb: 0.5 }}>Recordings</Typography>
-      <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>Upload a class recording. Students get access based on their batch join settings.</Typography>
+      <PageHeader title="Recordings" subtitle="Upload class recordings — students get access based on their batch join settings." icon={VideoLibraryOutlinedIcon} />
 
       {missed.length > 0 && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          <b>{missed.length} ended class{missed.length > 1 ? 'es' : ''} still need a recording:</b>{' '}
-          {missed.slice(0, 5).map((m) => `${m.title} (${m.batch_name})`).join(', ')}{missed.length > 5 ? '…' : ''}
-        </Alert>
+        <Card pad={16} style={{ background: '#fffbeb', border: '1px solid #fde68a', marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <span style={{ fontSize: 26, lineHeight: 1.2 }}>🎬</span>
+            <div>
+              <div style={{ fontWeight: 700, color: '#854d0e', fontSize: 13.5 }}>{missed.length} ended class{missed.length > 1 ? 'es' : ''} still need{missed.length > 1 ? '' : 's'} a recording</div>
+              <div style={{ fontSize: 12.5, color: '#a16207', marginTop: 2 }}>{missed.slice(0, 5).map((m) => `${m.title} (${m.batch_name})`).join(', ')}{missed.length > 5 ? '…' : ''}</div>
+            </div>
+          </div>
+        </Card>
       )}
 
-      <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+      <Card title="Upload a recording">
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
           <TextField select size="small" label="Course" value={programId} onChange={(e) => { setProgramId(e.target.value); setClassId(''); }} sx={{ minWidth: 220 }}>
             {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
@@ -69,7 +75,7 @@ export default function TrainerRecordings() {
         </Box>
         {busy && <LinearProgress variant="determinate" value={pct} sx={{ mt: 2, borderRadius: 1 }} />}
         {classId && <RecordingList classId={classId} key={classId} />}
-      </Paper>
+      </Card>
 
       <Snackbar open={!!toast} autoHideDuration={5000} onClose={() => setToast(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         {toast ? <Alert severity={toast.severity} onClose={() => setToast(null)}>{toast.text}</Alert> : undefined}
@@ -82,7 +88,7 @@ function RecordingList({ classId }) {
   const [rows, setRows] = useState([]);
   useEffect(() => { communityApi.listRecordings(classId).then((r) => setRows(r?.data || [])).catch(() => {}); }, [classId]);
   const open = async (id) => { try { const r = await communityApi.recordingUrl(id); const u = (r?.data ?? r)?.url; if (u) window.open(u, '_blank', 'noreferrer'); } catch { /* ignore */ } };
-  if (rows.length === 0) return <Typography sx={{ mt: 2, fontSize: 13, color: '#94a3b8' }}>No recordings for this class yet.</Typography>;
+  if (rows.length === 0) return <div style={{ marginTop: 6 }}><EmptyState icon="🎬" title="No recordings for this class yet" text="Upload a video above — it will appear here and students get notified automatically." /></div>;
   return (
     <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
       {rows.map((r) => <Chip key={r.id} label={r.label || 'Recording'} onClick={() => open(r.id)} variant="outlined" clickable />)}

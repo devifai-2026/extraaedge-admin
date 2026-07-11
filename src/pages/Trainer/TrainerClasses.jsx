@@ -2,10 +2,12 @@
 // console (start/end, fire attendance MCQs, watch present/absent update live).
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Box, Typography, Paper, Button, TextField, MenuItem, Alert, Snackbar, CircularProgress,
-  Table, TableHead, TableRow, TableCell, TableBody, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
+  Box, Button, TextField, MenuItem, Alert, Snackbar, CircularProgress,
+  Table, TableHead, TableRow, TableCell, TableBody, Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import { PageHeader, Card, EmptyState, Badge } from '../../lib/lmsUi';
 import { coursesApi, classesApi } from '../../lib/endpoints';
 import { fmtDate } from '../Accounts/utils';
 import TrainerClassConsole from './TrainerClassConsole';
@@ -36,8 +38,7 @@ export default function TrainerClasses() {
 
   return (
     <Box sx={{ p: 3, maxWidth: 1000, mx: 'auto' }}>
-      <Typography variant="h6" sx={{ mb: 0.5 }}>Classes</Typography>
-      <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>Schedule classes and run live attendance.</Typography>
+      <PageHeader title="Classes" subtitle="Schedule classes for your batches and run live attendance." icon={CalendarMonthOutlinedIcon} />
 
       <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'center', flexWrap: 'wrap' }}>
         <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240 }}>
@@ -50,10 +51,12 @@ export default function TrainerClasses() {
       </Box>
 
       {loading ? <CircularProgress /> : programId && (
-        classes.length === 0 ? <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', color: '#94a3b8', borderRadius: 2 }}>No classes yet.</Paper> : (
-          <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+        classes.length === 0 ? (
+          <Card><EmptyState icon="📅" title="No classes yet" text="Schedule your first class for this course — students see it instantly with join links." /></Card>
+        ) : (
+          <Card pad={0} style={{ overflow: 'hidden' }}>
             <Table size="small">
-              <TableHead><TableRow sx={{ background: '#fafafa' }}>
+              <TableHead><TableRow sx={{ background: '#fafbfc', '& th': { color: '#64748b', fontWeight: 700, fontSize: 12 } }}>
                 <TableCell>Title</TableCell><TableCell>Batch</TableCell><TableCell>When</TableCell>
                 <TableCell align="center">Mode</TableCell><TableCell align="center">State</TableCell><TableCell align="right" />
               </TableRow></TableHead>
@@ -63,9 +66,9 @@ export default function TrainerClasses() {
                     <TableCell>{c.title}{c.kind === 'mock_test' ? ' · Mock' : ''}</TableCell>
                     <TableCell sx={{ color: '#64748b' }}>{c.batch_name}</TableCell>
                     <TableCell sx={{ color: '#64748b' }}>{fmtDate(c.starts_at)}</TableCell>
-                    <TableCell align="center"><Chip size="small" variant="outlined" label={c.mode} /></TableCell>
+                    <TableCell align="center"><Badge tone="neutral">{c.mode}</Badge></TableCell>
                     <TableCell align="center">
-                      {c.ended_at ? <Chip size="small" label="Ended" /> : c.started_at ? <Chip size="small" color="success" label="Live" /> : <Chip size="small" variant="outlined" label="Scheduled" />}
+                      {c.ended_at ? <Badge tone="neutral">Ended</Badge> : c.started_at ? <Badge tone="danger">● LIVE</Badge> : <Badge tone="warning">Scheduled</Badge>}
                     </TableCell>
                     <TableCell align="right">
                       <Button size="small" onClick={() => setConsoleClass(c)} sx={{ textTransform: 'none' }}>Open console</Button>
@@ -74,7 +77,7 @@ export default function TrainerClasses() {
                 ))}
               </TableBody>
             </Table>
-          </Paper>
+          </Card>
         )
       )}
 

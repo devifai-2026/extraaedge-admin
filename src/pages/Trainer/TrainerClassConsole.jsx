@@ -3,12 +3,13 @@
 // table update live over the socket. Manual edits are flagged server-side.
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography,
-  TextField, IconButton, Chip, Table, TableHead, TableRow, TableCell, TableBody,
-  Alert, Divider,
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, Box,
+  TextField, IconButton, Table, TableHead, TableRow, TableCell, TableBody,
+  Alert,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
+import { Section, Badge } from '../../lib/lmsUi';
 import { classesApi } from '../../lib/endpoints';
 import { joinBatch, leaveBatch, onSocketEvent } from '../../lib/socket';
 
@@ -60,10 +61,10 @@ export default function TrainerClassConsole({ cls, onClose }) {
 
   return (
     <Dialog open onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
         {cls.title}
-        <Chip size="small" label={cls.batch_name} variant="outlined" />
-        {ended ? <Chip size="small" label="Ended" /> : started ? <Chip size="small" color="success" label="Live" /> : <Chip size="small" variant="outlined" label="Scheduled" />}
+        <Badge tone="neutral">{cls.batch_name}</Badge>
+        {ended ? <Badge tone="neutral">Ended</Badge> : started ? <Badge tone="danger">● LIVE</Badge> : <Badge tone="warning">Scheduled</Badge>}
       </DialogTitle>
       <DialogContent>
         {msg && <Alert severity="info" sx={{ mb: 2 }} onClose={() => setMsg('')}>{msg}</Alert>}
@@ -75,29 +76,28 @@ export default function TrainerClassConsole({ cls, onClose }) {
         </Box>
 
         {/* Fire an attendance question */}
-        <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1 }}>Fire attendance question</Typography>
-        <Box sx={{ display: 'grid', gap: 1, mb: 1 }}>
-          <TextField size="small" label="Question" value={q.question} onChange={(e) => setQ((s) => ({ ...s, question: e.target.value }))} />
-          {q.options.map((o, i) => (
-            <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              <TextField size="small" fullWidth label={`Option ${i + 1}`} value={o} onChange={(e) => setOpt(i, e.target.value)} />
-              {q.options.length > 2 && <IconButton size="small" onClick={() => setQ((s) => ({ ...s, options: s.options.filter((_, j) => j !== i) }))}><DeleteOutlineIcon fontSize="small" /></IconButton>}
+        <Section title="Fire attendance question">
+          <Box sx={{ display: 'grid', gap: 1 }}>
+            <TextField size="small" label="Question" value={q.question} onChange={(e) => setQ((s) => ({ ...s, question: e.target.value }))} />
+            {q.options.map((o, i) => (
+              <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <TextField size="small" fullWidth label={`Option ${i + 1}`} value={o} onChange={(e) => setOpt(i, e.target.value)} />
+                {q.options.length > 2 && <IconButton size="small" onClick={() => setQ((s) => ({ ...s, options: s.options.filter((_, j) => j !== i) }))}><DeleteOutlineIcon fontSize="small" /></IconButton>}
+              </Box>
+            ))}
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <Button size="small" startIcon={<AddIcon />} onClick={() => setQ((s) => ({ ...s, options: [...s.options, ''] }))} sx={{ textTransform: 'none' }}>Add option</Button>
+              <TextField size="small" type="number" label="Visible (min)" value={q.visible_minutes} onChange={(e) => setQ((s) => ({ ...s, visible_minutes: e.target.value }))} sx={{ width: 130 }} inputProps={{ min: 1, max: 120 }} />
+              <Button size="small" variant="contained" onClick={fire} sx={{ textTransform: 'none', bgcolor: '#E53935', ml: 'auto' }}>Fire question</Button>
             </Box>
-          ))}
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <Button size="small" startIcon={<AddIcon />} onClick={() => setQ((s) => ({ ...s, options: [...s.options, ''] }))} sx={{ textTransform: 'none' }}>Add option</Button>
-            <TextField size="small" type="number" label="Visible (min)" value={q.visible_minutes} onChange={(e) => setQ((s) => ({ ...s, visible_minutes: e.target.value }))} sx={{ width: 130 }} inputProps={{ min: 1, max: 120 }} />
-            <Button size="small" variant="contained" onClick={fire} sx={{ textTransform: 'none', bgcolor: '#E53935', ml: 'auto' }}>Fire question</Button>
           </Box>
-        </Box>
+        </Section>
 
-        <Divider sx={{ my: 2 }} />
+        <div style={{ borderTop: '1px solid #eef0f5', margin: '4px 0 18px' }} />
 
-        <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1 }}>
-          Attendance · {present}/{table.length} present
-        </Typography>
+        <Section title="Attendance" right={<Badge tone={table.length > 0 && present === table.length ? 'success' : 'neutral'}>{present}/{table.length} present</Badge>}>
         <Table size="small">
-          <TableHead><TableRow>
+          <TableHead><TableRow sx={{ background: '#fafbfc', '& th': { color: '#64748b', fontWeight: 700, fontSize: 12 } }}>
             <TableCell>Student</TableCell><TableCell align="center">Answered</TableCell>
             <TableCell align="center">Join</TableCell><TableCell align="center">Status</TableCell><TableCell align="right" />
           </TableRow></TableHead>
@@ -108,8 +108,8 @@ export default function TrainerClassConsole({ cls, onClose }) {
                 <TableCell align="center">{r.answered}</TableCell>
                 <TableCell align="center" sx={{ color: '#64748b' }}>{r.join_mode || '—'}</TableCell>
                 <TableCell align="center">
-                  <Chip size="small" label={r.status} color={r.status === 'present' ? 'success' : 'default'} variant={r.status === 'present' ? 'filled' : 'outlined'} />
-                  {r.edited_at && <div style={{ fontSize: 10, color: '#94a3b8' }}>edited{r.edited_by_name ? ` by ${r.edited_by_name}` : ''}</div>}
+                  <Badge tone={r.status === 'present' ? 'success' : r.status === 'absent' ? 'danger' : 'neutral'}>{r.status}</Badge>
+                  {r.edited_at && <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>edited{r.edited_by_name ? ` by ${r.edited_by_name}` : ''}</div>}
                 </TableCell>
                 <TableCell align="right">
                   {r.status === 'present'
@@ -120,6 +120,7 @@ export default function TrainerClassConsole({ cls, onClose }) {
             ))}
           </TableBody>
         </Table>
+        </Section>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} sx={{ textTransform: 'none' }}>Close</Button>

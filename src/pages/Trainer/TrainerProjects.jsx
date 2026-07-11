@@ -2,11 +2,13 @@
 // marks) and grade student submissions (live URL + GitHub URL).
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Box, Typography, Paper, MenuItem, TextField, Button, Alert, Snackbar,
+  Box, Typography, MenuItem, TextField, Button, Alert, Snackbar,
   Table, TableHead, TableRow, TableCell, TableBody, Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import AssignmentIcon from '@mui/icons-material/AssignmentOutlined';
 import { coursesApi, assessmentsApi } from '../../lib/endpoints';
+import { PageHeader, Card, EmptyState } from '../../lib/lmsUi';
 import { fmtDate } from '../Accounts/utils';
 
 export default function TrainerProjects() {
@@ -23,19 +25,25 @@ export default function TrainerProjects() {
 
   return (
     <Box sx={{ p: 3, maxWidth: 900, mx: 'auto' }}>
-      <Typography variant="h6" sx={{ mb: 0.5 }}>Projects</Typography>
-      <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>Assign projects; students submit a live link + GitHub URL. Grade against your scheme.</Typography>
-      <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'center' }}>
-        <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240 }}>
-          {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-        </TextField>
-        {programId && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>New project</Button>}
-      </Box>
+      <PageHeader
+        title="Projects"
+        subtitle="Assign projects; students submit a live link + GitHub URL. Grade against your scheme."
+        icon={AssignmentIcon}
+        right={(
+          <>
+            <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, background: '#fff' }}>
+              {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            </TextField>
+            {programId && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>New project</Button>}
+          </>
+        )}
+      />
 
-      {programId && (projects.length === 0 ? <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', color: '#94a3b8', borderRadius: 2 }}>No projects yet.</Paper> : (
-        <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+      {!programId && <Card><EmptyState icon="🗂️" title="Pick a course" text="Choose a course above to see and assign its projects." /></Card>}
+      {programId && (projects.length === 0 ? <Card><EmptyState icon="🗂️" title="No projects yet" text="Create a project brief — students submit a live link and GitHub URL for you to grade." /></Card> : (
+        <Card pad={0} style={{ overflow: 'hidden' }}>
           <Table size="small">
-            <TableHead><TableRow sx={{ background: '#fafafa' }}><TableCell>Project</TableCell><TableCell>Deadline</TableCell><TableCell align="center">Submitted</TableCell><TableCell align="center">Graded</TableCell><TableCell align="right" /></TableRow></TableHead>
+            <TableHead><TableRow sx={{ background: '#fafbfc' }}><TableCell>Project</TableCell><TableCell>Deadline</TableCell><TableCell align="center">Submitted</TableCell><TableCell align="center">Graded</TableCell><TableCell align="right" /></TableRow></TableHead>
             <TableBody>{projects.map((p) => (
               <TableRow key={p.id} hover>
                 <TableCell>{p.title}</TableCell><TableCell sx={{ color: '#64748b' }}>{p.deadline ? fmtDate(p.deadline) : '—'}</TableCell>
@@ -44,7 +52,7 @@ export default function TrainerProjects() {
               </TableRow>
             ))}</TableBody>
           </Table>
-        </Paper>
+        </Card>
       ))}
 
       {createOpen && <CreateProjectDialog programId={programId} onClose={() => setCreateOpen(false)} onDone={() => { setCreateOpen(false); load(); setToast({ severity: 'success', text: 'Project created' }); }} onError={(m) => setToast({ severity: 'error', text: m })} />}

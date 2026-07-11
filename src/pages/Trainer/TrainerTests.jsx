@@ -7,7 +7,9 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
+import QuizIcon from '@mui/icons-material/QuizOutlined';
 import { coursesApi, assessmentsApi } from '../../lib/endpoints';
+import { PageHeader, Card, EmptyState } from '../../lib/lmsUi';
 
 export default function TrainerTests() {
   const [courses, setCourses] = useState([]);
@@ -23,19 +25,25 @@ export default function TrainerTests() {
 
   return (
     <Box sx={{ p: 3, maxWidth: 900, mx: 'auto' }}>
-      <Typography variant="h6" sx={{ mb: 0.5 }}>Mock Tests</Typography>
-      <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>Create MCQ tests; students’ attempts are auto-scored.</Typography>
-      <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'center' }}>
-        <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240 }}>
-          {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-        </TextField>
-        {programId && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>New test</Button>}
-      </Box>
+      <PageHeader
+        title="Mock Tests"
+        subtitle="Create MCQ tests; students’ attempts are auto-scored."
+        icon={QuizIcon}
+        right={(
+          <>
+            <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, background: '#fff' }}>
+              {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            </TextField>
+            {programId && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>New test</Button>}
+          </>
+        )}
+      />
 
-      {programId && (tests.length === 0 ? <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', color: '#94a3b8', borderRadius: 2 }}>No tests yet.</Paper> : (
-        <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+      {!programId && <Card><EmptyState icon="📝" title="Pick a course" text="Choose a course above to see and create its mock tests." /></Card>}
+      {programId && (tests.length === 0 ? <Card><EmptyState icon="📝" title="No tests yet" text="Create your first MCQ test — student attempts are auto-scored the moment they submit." /></Card> : (
+        <Card pad={0} style={{ overflow: 'hidden' }}>
           <Table size="small">
-            <TableHead><TableRow sx={{ background: '#fafafa' }}><TableCell>Test</TableCell><TableCell align="center">Marks</TableCell><TableCell align="center">Attempts</TableCell><TableCell align="right" /></TableRow></TableHead>
+            <TableHead><TableRow sx={{ background: '#fafbfc' }}><TableCell>Test</TableCell><TableCell align="center">Marks</TableCell><TableCell align="center">Attempts</TableCell><TableCell align="right" /></TableRow></TableHead>
             <TableBody>{tests.map((t) => (
               <TableRow key={t.id} hover>
                 <TableCell>{t.title}</TableCell><TableCell align="center">{t.total_marks}</TableCell><TableCell align="center">{t.attempt_count}</TableCell>
@@ -43,7 +51,7 @@ export default function TrainerTests() {
               </TableRow>
             ))}</TableBody>
           </Table>
-        </Paper>
+        </Card>
       ))}
 
       {createOpen && <CreateTestDialog programId={programId} onClose={() => setCreateOpen(false)} onDone={() => { setCreateOpen(false); load(); setToast({ severity: 'success', text: 'Test created' }); }} onError={(m) => setToast({ severity: 'error', text: m })} />}
