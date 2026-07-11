@@ -43,14 +43,23 @@ export default function TrainerProjects() {
       {programId && (projects.length === 0 ? <Card><EmptyState icon="🗂️" title="No projects yet" text="Create a project brief — students submit a live link and GitHub URL for you to grade." /></Card> : (
         <Card pad={0} style={{ overflow: 'hidden' }}>
           <Table size="small">
-            <TableHead><TableRow sx={{ background: '#fafbfc' }}><TableCell>Project</TableCell><TableCell>Deadline</TableCell><TableCell align="center">Submitted</TableCell><TableCell align="center">Graded</TableCell><TableCell align="right" /></TableRow></TableHead>
-            <TableBody>{projects.map((p) => (
+            <TableHead><TableRow sx={{ background: '#fafbfc' }}><TableCell>Project</TableCell><TableCell>Deadline</TableCell><TableCell align="center">Submitted</TableCell><TableCell align="center">Graded</TableCell><TableCell align="center">To grade</TableCell><TableCell align="right" /></TableRow></TableHead>
+            <TableBody>{projects.map((p) => {
+              const pending = Math.max(0, (p.submission_count || 0) - (p.graded_count || 0));
+              return (
               <TableRow key={p.id} hover>
                 <TableCell>{p.title}</TableCell><TableCell sx={{ color: '#64748b' }}>{p.deadline ? fmtDate(p.deadline) : '—'}</TableCell>
                 <TableCell align="center">{p.submission_count}</TableCell><TableCell align="center">{p.graded_count}</TableCell>
-                <TableCell align="right"><Button size="small" onClick={() => setSubsFor(p)} sx={{ textTransform: 'none' }}>Submissions</Button></TableCell>
+                <TableCell align="center">{pending > 0 ? <span style={{ background: '#fef3c7', color: '#b45309', fontWeight: 700, borderRadius: 999, padding: '2px 9px', fontSize: 12 }}>{pending}</span> : <span style={{ color: '#cbd5e1' }}>0</span>}</TableCell>
+                <TableCell align="right">
+                  <Button size="small" variant={pending > 0 ? 'contained' : 'outlined'} onClick={() => setSubsFor(p)}
+                    sx={{ textTransform: 'none', ...(pending > 0 ? { bgcolor: '#E53935' } : { color: '#E53935', borderColor: '#E53935' }) }}>
+                    {pending > 0 ? `Grade ${pending}` : 'Grade / view'}
+                  </Button>
+                </TableCell>
               </TableRow>
-            ))}</TableBody>
+              );
+            })}</TableBody>
           </Table>
         </Card>
       ))}
@@ -107,8 +116,13 @@ function SubmissionsDialog({ project, onClose, onGraded, onError }) {
   };
   return (
     <Dialog open onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>{project.title} — submissions (max {project.max_marks})</DialogTitle>
+      <DialogTitle>Grade submissions · {project.title} <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 14 }}>(max {project.max_marks})</span></DialogTitle>
       <DialogContent>
+        {project.marking_scheme && (
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 12.5, color: '#475569' }}>
+            <b style={{ color: '#334155' }}>Marking scheme:</b> {project.marking_scheme}
+          </div>
+        )}
         {rows.length === 0 ? <Typography sx={{ color: '#94a3b8', fontSize: 13 }}>No submissions yet.</Typography> : (
           <Table size="small">
             <TableHead><TableRow><TableCell>Student</TableCell><TableCell>Links</TableCell><TableCell align="right">Marks</TableCell><TableCell align="right" /></TableRow></TableHead>
