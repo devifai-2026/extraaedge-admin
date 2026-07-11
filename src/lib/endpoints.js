@@ -552,8 +552,9 @@ export const paymentAccountsApi = {
 // Accounts / Admissions module. Only visible to account_manager + super_admin.
 // All routes live under /api/v1/admissions.
 export const admissionsApi = {
-  // Dashboard summary cards + chart data
-  dashboard: (params) => api.get('/admissions/dashboard', params),
+  // Dashboard summary cards + chart data. withBranch lets a super_admin scope to
+  // the switcher's branch; a branch_manager is scoped to their branch server-side.
+  dashboard: (params) => api.get('/admissions/dashboard', withBranch(params || {})),
 
   // Pending admissions queue (converted leads w/o admission + pending_approval)
   pendingAdmissions: () => api.get('/admissions/pending-admissions'),
@@ -561,7 +562,7 @@ export const admissionsApi = {
   // Tenant-wide admission pipeline snapshot: status counts + list of every
   // converted lead with their current admission state. Feeds the Admission
   // Pipeline sidebar page + the dashboard cards.
-  leadStatusSnapshot: () => api.get('/admissions/lead-status-snapshot'),
+  leadStatusSnapshot: () => api.get('/admissions/lead-status-snapshot', withBranch()),
   // Append-only event log for one admission. Drives the timeline tab.
   timeline: (id) => api.get(`/admissions/${id}/timeline`),
   // Lead-drawer Admission Timeline tab uses this — resolves lead→admission
@@ -587,7 +588,7 @@ export const admissionsApi = {
   // set_password_url, emailed } so the UI can offer a copy-link fallback.
   confirmCourse: (id) => api.post(`/admissions/${id}/confirm-course`),
   reject: (id, reason) => api.post(`/admissions/${id}/reject`, reason ? { reason } : {}),
-  emiDigest: (days = 7) => api.get(`/admissions/emi-digest`, { days }),
+  emiDigest: (days = 7) => api.get(`/admissions/emi-digest`, withBranch({ days })),
   // Counsellor "My Students": their converted leads + submitted admissions.
   myStudents: () => api.get('/admissions/my-students'),
   break: (id, reason) => api.post(`/admissions/${id}/break`, reason ? { reason } : {}),
@@ -604,9 +605,9 @@ export const admissionsApi = {
 
   // Admin Payment Details ledger — paginated/filterable/sortable/searchable.
   // Returns { data: rows, meta: { total, total_amount, page, limit } }.
-  paymentDetails: (params) => api.get('/admissions/payment-details', params),
+  paymentDetails: (params) => api.get('/admissions/payment-details', withBranch(params || {})),
   // Payment analytics for the admin dashboard charts (trend, by_mode, by_kind).
-  paymentAnalytics: (params) => api.get('/admissions/payment-analytics', params),
+  paymentAnalytics: (params) => api.get('/admissions/payment-analytics', withBranch(params || {})),
 
   // Reports
   paySchedule: (params) => api.get('/admissions/reports/pay-schedule', params),
@@ -845,8 +846,8 @@ export const placementApi = {
 
 // ---- LMS: admin analytics + student sudo-login (super_admin/branch_mgr) ----
 export const lmsAnalyticsApi = {
-  dashboard: () => api.get('/lms-analytics/dashboard'),
-  students: () => api.get('/lms-analytics/students'),
+  dashboard: () => api.get('/lms-analytics/dashboard', withBranch()),
+  students: () => api.get('/lms-analytics/students', withBranch()),
   sudoStudent: (id) => api.post(`/lms-analytics/students/${id}/sudo-login`),
 };
 

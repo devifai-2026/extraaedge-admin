@@ -21,6 +21,12 @@ import { isRole, ROLES } from '../../lib/rbac';
 import Breadcrumb from './Breadcrumb';
 import TrainerStudents from '../Trainer/TrainerStudents';
 
+// Scopes a branch_manager may NOT assign to a user (mirrors backend
+// BRANCH_MANAGER_FORBIDDEN_ROLES). A BM can't create admins or other BMs.
+const BM_FORBIDDEN_SCOPES = ['super_admin', 'branch_manager'];
+const pickableRolesFor = (roles, isBM) =>
+  (isBM ? roles.filter((r) => !BM_FORBIDDEN_SCOPES.includes(r.scope)) : roles);
+
 // Mirrors backend DEFAULT_TAB_KEYS in src/config/constants.js
 const TAB_KEYS = [
   'dashboard', 'leads', 'raw_data', 'failed_leads', 'bulk_upload',
@@ -135,7 +141,11 @@ function UsersTab() {
   // DB so foreign-key history (lead_assignments etc.) survives.
   const [deleteUser, setDeleteUser] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  const canManage = isRole(ROLES.SUPER_ADMIN);
+  // Branch managers CAN manage users — the backend scopes them to their branch
+  // subtree and blocks admin/branch-manager targets (assertBranchManagerScope).
+  // Sudo-login ("Login as user") stays super_admin-only.
+  const canManage = isRole(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER);
+  const canSudo = isRole(ROLES.SUPER_ADMIN);
 
   const allUsers = data?.data || [];
   const filteredUsers = useMemo(() => {
@@ -310,13 +320,14 @@ function UsersTab() {
                       </IconButton>
                     </span>
                   </Tooltip>
-                  {/* Login as user — org-admin only. Disabled for the
-                      admin's own row (no-op) and for inactive users. */}
+                  {/* Login as user — org-admin (super_admin) only. Disabled for
+                      the admin's own row (no-op) and for inactive users. */}
+                  {canSudo && (
                   <Tooltip title="Login as this user">
                     <span>
                       <IconButton
                         size="small"
-                        disabled={!canManage || !u.is_active || u.id === auth.getUser()?.id}
+                        disabled={!u.is_active || u.id === auth.getUser()?.id}
                         onClick={() => loginAsUser(u)}
                         sx={{ color: '#0f766e' }}
                       >
@@ -324,6 +335,7 @@ function UsersTab() {
                       </IconButton>
                     </span>
                   </Tooltip>
+                  )}
                   <Tooltip title="Delete user">
                     <span>
                       <IconButton
@@ -423,7 +435,10 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
-  const canManage = isRole(ROLES.SUPER_ADMIN);
+  // Branch managers may add/edit users in their branch (backend enforces the
+  // subtree + forbids admin/branch-manager targets).
+  const canManage = isRole(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER);
+  const isBM = isRole(ROLES.BRANCH_MANAGER);
 
   useEffect(() => {
     if (open && user) {
@@ -451,7 +466,7 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
   if (!user) return null;
   // All active roles in the tenant, system + custom. The server will derive
   // the user's `role` bucket from the chosen role's `scope` automatically.
-  const allRoles = rolesData?.data || [];
+  const allRoles = pickableRolesFor(rolesData?.data || [], isBM);
   const branches = branchesData?.data || [];
   const hasBranches = branches.length > 0;
   const isSuperAdmin = form.role === 'super_admin';
@@ -772,8 +787,10 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
 
   const programs = programsData?.data || [];
   // System + custom roles. Server derives the user's role bucket from the
-  // selected role's scope, so the FE never has to think about buckets.
-  const allRoles = rolesData?.data || [];
+  // selected role's scope, so the FE never has to think about buckets. A branch
+  // manager can't create admins/other BMs, so those scopes are filtered out.
+  const isBM = isRole(ROLES.BRANCH_MANAGER);
+  const allRoles = pickableRolesFor(rolesData?.data || [], isBM);
   const branches = branchesData?.data || [];
   // Reporting Managers = every active user in the tenant. Per spec the
   // picker is unrestricted (used to be filtered to "users above this role

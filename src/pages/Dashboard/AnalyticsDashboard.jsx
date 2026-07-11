@@ -339,6 +339,20 @@ export default function AnalyticsDashboard() {
       </Box>
       <Divider />
 
+      {/* First-run guidance: a branch_manager with no branch assigned yet sees
+          empty branch-scoped data everywhere. Explain why instead of a silent
+          blank dashboard. */}
+      {role === ROLES.BRANCH_MANAGER && !sessionUser.branch_id && (
+        <Box sx={{ mt: 2, p: 2, borderRadius: 2, border: '1px solid #fde68a', background: '#fffbeb', color: '#92400e' }}>
+          <Typography sx={{ fontWeight: 700, fontSize: 14 }}>No branch assigned yet</Typography>
+          <Typography sx={{ fontSize: 13, mt: 0.5 }}>
+            Your account isn’t linked to a branch, so branch-scoped dashboards, leads and
+            reports will appear empty. Ask a super-admin to set your branch (Users &amp; Roles →
+            your profile → Branch), then reload.
+          </Typography>
+        </Box>
+      )}
+
       {/* ============ FILTER BAR (admins/managers only see counselor picker) ============ */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mt: 1.5, mb: 1.5, flexWrap: 'wrap' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
