@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { colors } from '../../theme/colors'
 import { auth, authApi, notificationsApi, followUpsApi, leadsApi } from '../../lib/endpoints'
 import { connectSocket, onNotification, isSocketConnected } from '../../lib/socket'
-import { hasTab, firstAllowedRoute } from '../../lib/rbac'
+import { hasTab, firstAllowedRoute, isRole } from '../../lib/rbac'
 import { resolveAssetUrl } from '../../lib/config'
 import WorkTimer from './WorkTimer'
 import BranchSwitcher from './BranchSwitcher'
@@ -685,6 +685,8 @@ function Header() {
    ============================================================== */
 function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLive, onClear, onDeleteAll, onMarkAllRead, onNavigateLead, onNavigateEvent, onFollowUpsChanged }) {
     const [tab, setTab] = useState('live')
+    // Trainers / head trainers see LMS notifications, not lead follow-ups.
+    const isTeachingRole = isRole('head_trainer', 'trainer')
     // Track which followup is mid-action so we can disable buttons + show
     // a spinner without yanking the row out of the list.
     const [busyFollowUpId, setBusyFollowUpId] = useState(null)
@@ -878,19 +880,22 @@ function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLi
                             borderBottom: tab === 'live' ? `2px solid ${colors.primary}` : '2px solid transparent',
                         }}
                     >
-                        Live ({liveEvents.length})
+                        {isTeachingRole ? 'Notifications' : 'Live'} ({liveEvents.length})
                     </button>
-                    <button
-                        onClick={() => setTab('followups')}
-                        style={{
-                            flex: 1, padding: '10px 0', background: 'none', border: 'none',
-                            fontWeight: 600, fontSize: 13, cursor: 'pointer',
-                            color: tab === 'followups' ? colors.primary : '#666',
-                            borderBottom: tab === 'followups' ? `2px solid ${colors.primary}` : '2px solid transparent',
-                        }}
-                    >
-                        Follow-ups ({followUps.length})
-                    </button>
+                    {/* Follow-ups are a lead-CRM concept — irrelevant to trainers/students. */}
+                    {!isTeachingRole && (
+                        <button
+                            onClick={() => setTab('followups')}
+                            style={{
+                                flex: 1, padding: '10px 0', background: 'none', border: 'none',
+                                fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                                color: tab === 'followups' ? colors.primary : '#666',
+                                borderBottom: tab === 'followups' ? `2px solid ${colors.primary}` : '2px solid transparent',
+                            }}
+                        >
+                            Follow-ups ({followUps.length})
+                        </button>
+                    )}
                 </Box>
 
                 <Box sx={{ flex: 1, overflowY: 'auto', maxHeight: 380 }}>
