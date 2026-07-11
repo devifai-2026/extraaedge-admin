@@ -715,6 +715,9 @@ export const coursesApi = {
   get: (programId) => api.get(`/courses/${programId}`),
   assignableStaff: () => api.get('/courses/assignable-staff'),
   attendanceHistory: (programId) => api.get(`/courses/${programId}/attendance-history`),
+  insights: () => api.get('/courses/insights'),
+  createTrainer: (programId, body) => api.post(`/courses/${programId}/create-trainer`, body),
+  completeBatch: (programId, batchId) => api.post(`/courses/${programId}/batches/${batchId}/complete`),
   // Modules
   listModules: (programId) => api.get(`/courses/${programId}/modules`),
   createModule: (programId, body) => api.post(`/courses/${programId}/modules`, body),
