@@ -99,6 +99,7 @@ export const studentApi = {
   tests: () => doFetch('/assessments/student/tests', { method: 'GET' }),
   takeTest: (id) => doFetch(`/assessments/student/tests/${id}`, { method: 'GET' }),
   submitTest: (id, answers) => doFetch(`/assessments/student/tests/${id}/submit`, { method: 'POST', body: JSON.stringify({ answers }) }),
+  testResult: (id) => doFetch(`/assessments/student/tests/${id}/result`, { method: 'GET' }),
   projects: () => doFetch('/assessments/student/projects', { method: 'GET' }),
   submitProject: (id, body) => doFetch(`/assessments/student/projects/${id}/submit`, { method: 'POST', body: JSON.stringify(body) }),
   leaderboard: () => doFetch('/assessments/student/leaderboard', { method: 'GET' }),

@@ -11,6 +11,7 @@ export default function StudentTests() {
   const [taking, setTaking] = useState(null); // { id, title, questions, total_marks }
   const [answers, setAnswers] = useState([]);
   const [result, setResult] = useState(null);
+  const [reviewing, setReviewing] = useState(null); // { title, score, total_marks, review }
   const [toast, setToast] = useState('');
 
   const load = useCallback(() => { studentApi.tests().then((r) => setTests(r?.data || [])).catch(() => {}).finally(() => setLoading(false)); }, []);
@@ -24,7 +25,16 @@ export default function StudentTests() {
     } catch (e) { setToast(e.message); }
   };
   const submit = async () => {
-    try { const r = await studentApi.submitTest(taking.id, answers); const res = r?.data ?? r; setResult(res); setTaking(null); load(); }
+    try {
+      const r = await studentApi.submitTest(taking.id, answers); const res = r?.data ?? r;
+      setResult(res);
+      // Jump straight into the per-question review.
+      setReviewing({ title: taking.title, score: res.score, total_marks: res.total_marks, review: res.review || [] });
+      setTaking(null); load();
+    } catch (e) { setToast(e.message); }
+  };
+  const viewResult = async (id) => {
+    try { const r = await studentApi.testResult(id); const res = r?.data ?? r; if (res.attempted) setReviewing(res); }
     catch (e) { setToast(e.message); }
   };
 
@@ -34,6 +44,43 @@ export default function StudentTests() {
       <Card><Skeleton h={16} w="50%" /><div style={{ height: 8 }} /><Skeleton h={12} w="70%" /></Card>
     </div>
   );
+
+  if (reviewing) {
+    const { title, score, total_marks: tm, review = [] } = reviewing;
+    return (
+      <div>
+        <PageHeader title={title} subtitle="Your result and answer review." icon={QuizIcon} />
+        <div style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '12px 16px', borderRadius: 12, marginBottom: 14, fontWeight: 700, fontSize: 16 }}>You scored {score} / {tm}</div>
+        {review.map((r, i) => {
+          const correctIdx = r.correct_index;
+          return (
+            <Card key={i} pad={16} style={{ marginBottom: 12, borderLeft: `4px solid ${r.correct ? '#16a34a' : '#dc2626'}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>{i + 1}. {r.q} <span style={{ color: '#94a3b8', fontSize: 12 }}>({r.marks} marks)</span></div>
+                <Badge tone={r.correct ? 'success' : 'danger'}>{r.correct ? 'Correct' : 'Wrong'}</Badge>
+              </div>
+              <div style={{ display: 'grid', gap: 6 }}>
+                {(r.options || []).map((o, oi) => {
+                  const isCorrect = oi === correctIdx;
+                  const isYours = oi === r.your_answer;
+                  const bg = isCorrect ? '#f0fdf4' : (isYours && !r.correct ? '#fef2f2' : 'transparent');
+                  const bd = isCorrect ? '#16a34a' : (isYours && !r.correct ? '#dc2626' : '#e2e8f0');
+                  return (
+                    <div key={oi} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, padding: '6px 10px', borderRadius: 8, background: bg, border: `1px solid ${bd}` }}>
+                      <span>{o}</span>
+                      {isCorrect && <span style={{ marginLeft: 'auto', color: '#16a34a', fontSize: 12, fontWeight: 700 }}>✓ Correct answer</span>}
+                      {isYours && !isCorrect && <span style={{ marginLeft: 'auto', color: '#dc2626', fontSize: 12, fontWeight: 700 }}>Your answer</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          );
+        })}
+        <Btn variant="ghost" onClick={() => setReviewing(null)}>Back to tests</Btn>
+      </div>
+    );
+  }
 
   if (taking) {
     const totalQ = (taking.questions || []).length;
@@ -79,7 +126,7 @@ export default function StudentTests() {
                 <div style={{ fontSize: 12, color: '#64748b' }}>{t.module_name ? `${t.module_name} · ` : ''}{t.total_marks} marks</div>
               </div>
               {t.my_submitted_at
-                ? <Badge tone="success">Scored {t.my_score}/{t.total_marks}</Badge>
+                ? <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Badge tone="success">Scored {t.my_score}/{t.total_marks}</Badge><Btn size="sm" variant="ghost" onClick={() => viewResult(t.id)}>Review</Btn></div>
                 : <Btn size="sm" onClick={() => start(t.id)}>Take test</Btn>}
             </Card>
           ))}
