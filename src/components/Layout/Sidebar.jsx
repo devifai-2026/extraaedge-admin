@@ -173,6 +173,29 @@ const menuSections = [
       { id: 210, label: 'LMS Analytics', icon: AssessmentIcon,      path: '/lms/analytics',         tab: 'lms.analytics' },
     ],
   },
+  {
+    id: 'hr',
+    label: 'HR',
+    icon: PeopleAltIcon,
+    section: true,
+    children: [
+      { id: 220, label: 'Dashboard',    icon: AssessmentIcon,  path: '/hr/dashboard',    tab: 'hr.dashboard' },
+      { id: 221, label: 'Interviews',   icon: ChecklistIcon,   path: '/hr/interviews',   tab: 'hr.interviews' },
+      { id: 222, label: 'Certificates', icon: SchoolIcon,      path: '/hr/certificates', tab: 'hr.certificates' },
+    ],
+  },
+  {
+    id: 'placement',
+    label: 'Placement',
+    icon: CampaignIcon,
+    section: true,
+    children: [
+      { id: 230, label: 'Dashboard',    icon: AssessmentIcon,  path: '/placement/dashboard',    tab: 'placement.dashboard' },
+      { id: 231, label: 'Companies',    icon: SchoolIcon,      path: '/placement/companies',    tab: 'placement.companies' },
+      { id: 232, label: 'Job Openings', icon: ChecklistIcon,   path: '/placement/openings',     tab: 'placement.openings' },
+      { id: 233, label: 'Applications', icon: PeopleAltIcon,   path: '/placement/applications', tab: 'placement.applications' },
+    ],
+  },
 ];
 
 const bottomMenuItems = [

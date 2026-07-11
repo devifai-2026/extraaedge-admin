@@ -30,6 +30,11 @@ export const ROLES = {
   // student JWT (type:'student'); this role value is what their /student-auth
   // session reports, used to gate the /student/* layout.
   STUDENT: 'student',
+  // ---- Operations departments ----
+  // HR: mock-interview soft-skill scoring + certificate issuance.
+  HR: 'hr',
+  // Placement: companies, job openings, applications, criteria firing.
+  PLACEMENT: 'placement',
 };
 
 // Role → set of tabs the bucket can access (used for safety; final source is backend's allowed_tabs).
@@ -74,8 +79,10 @@ const ROLE_HEAD_TRAINER_TABS = ['courses.manage', ...ROLE_TRAINER_TABS];
 const ROLE_STUDENT_TABS = [
   'student.home', 'student.classes', 'student.forum', 'student.tests',
   'student.projects', 'student.leaderboard', 'student.catalog',
-  'student.materials', 'student.certificate',
+  'student.materials', 'student.certificate', 'student.jobs',
 ];
+const ROLE_HR_TABS = ['hr.dashboard', 'hr.interviews', 'hr.certificates'];
+const ROLE_PLACEMENT_TABS = ['placement.dashboard', 'placement.companies', 'placement.openings', 'placement.applications'];
 
 const FALLBACK_TABS = {
   [ROLES.SUPER_ADMIN]: ROLE_ALL_TABS,
@@ -88,6 +95,8 @@ const FALLBACK_TABS = {
   [ROLES.HEAD_TRAINER]: ROLE_HEAD_TRAINER_TABS,
   [ROLES.TRAINER]: ROLE_TRAINER_TABS,
   [ROLES.STUDENT]: ROLE_STUDENT_TABS,
+  [ROLES.HR]: ROLE_HR_TABS,
+  [ROLES.PLACEMENT]: ROLE_PLACEMENT_TABS,
 };
 
 // ---------- Public helpers ----------
@@ -172,6 +181,15 @@ const TAB_TO_ROUTE = {
   'trainer.leaderboard':   '/trainer/leaderboard',
   'trainer.materials':     '/trainer/materials',
   'lms.analytics':         '/lms/analytics',
+  // ---- HR department ----
+  'hr.dashboard':          '/hr/dashboard',
+  'hr.interviews':         '/hr/interviews',
+  'hr.certificates':       '/hr/certificates',
+  // ---- Placement department ----
+  'placement.dashboard':   '/placement/dashboard',
+  'placement.companies':   '/placement/companies',
+  'placement.openings':    '/placement/openings',
+  'placement.applications': '/placement/applications',
   // ---- Student panel (separate /student/* layout) ----
   'student.home':          '/student/home',
   'student.classes':       '/student/classes',
@@ -182,6 +200,7 @@ const TAB_TO_ROUTE = {
   'student.catalog':       '/student/catalog',
   'student.materials':     '/student/materials',
   'student.certificate':   '/student/certificate',
+  'student.jobs':          '/student/jobs',
 };
 
 // First route the current user is allowed to land on. Used by login and
@@ -210,7 +229,7 @@ export const firstAllowedRoute = () => {
   // 1. A dedicated trainer/head_trainer (explicit trainer tab, no wildcard)
   //    lands on their own home.
   if (!candidates.includes('*')) {
-    for (const key of ['courses.manage', 'trainer.classes', 'trainer.attendance']) {
+    for (const key of ['courses.manage', 'trainer.classes', 'trainer.attendance', 'hr.dashboard', 'placement.dashboard']) {
       if (has(key)) return TAB_TO_ROUTE[key];
     }
   }

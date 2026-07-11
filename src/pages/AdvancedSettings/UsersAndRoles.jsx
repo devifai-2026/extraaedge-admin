@@ -456,7 +456,7 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
   const hasBranches = branches.length > 0;
   const isSuperAdmin = form.role === 'super_admin';
   const isBranchManager = form.role === 'branch_manager';
-  const isTeachingRole = form.role === 'head_trainer' || form.role === 'trainer';
+  const isTeachingRole = ['head_trainer', 'trainer', 'hr', 'placement'].includes(form.role);
   const branchRequired = hasBranches && !isSuperAdmin && !isBranchManager;
 
   const save = async () => {

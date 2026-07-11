@@ -12,7 +12,7 @@ import { isRole, ROLES } from '../../lib/rbac';
 
 export default function BranchSwitcher() {
   const isAdmin = isRole(ROLES.SUPER_ADMIN);
-  const isTeacher = isRole(ROLES.HEAD_TRAINER, ROLES.TRAINER);
+  const isTeacher = isRole(ROLES.HEAD_TRAINER, ROLES.TRAINER, ROLES.HR, ROLES.PLACEMENT);
   const [branches, setBranches] = useState([]);
   const [active, setActive] = useState(auth.getActiveBranch() || '');
 
