@@ -68,6 +68,8 @@ export const studentApi = {
   get: (path) => doFetch(path, { method: 'GET' }),
   post: (path, body) => doFetch(path, { method: 'POST', body: JSON.stringify(body ?? {}) }),
   // Auth calls that must set the tenant slug explicitly (no session yet).
+  // Public tenant branding (logo/name/colors) for the login screen, by slug.
+  branding: (slug) => doFetch('/student-auth/branding', { method: 'GET', headers: withSlug(slug) }),
   login: (slug, body) => doFetch('/student-auth/login', { method: 'POST', body: JSON.stringify(body), headers: withSlug(slug) }),
   setPassword: (slug, body) => doFetch('/student-auth/set-password', { method: 'POST', body: JSON.stringify(body), headers: withSlug(slug) }),
   requestReset: (slug, body) => doFetch('/student-auth/request-reset', { method: 'POST', body: JSON.stringify(body), headers: withSlug(slug) }),
