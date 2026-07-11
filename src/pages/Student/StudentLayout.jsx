@@ -72,10 +72,10 @@ export default function StudentLayout() {
   const logout = () => { studentAuth.clear(); navigate('/student/login', { replace: true }); };
 
   return (
-    <div style={{ '--lms-accent': accent, display: 'flex', minHeight: '100vh', background: '#f5f6fa', fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}>
+    <div style={{ '--lms-accent': accent, display: 'flex', height: '100vh', overflow: 'hidden', background: '#f5f6fa', fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}>
       <LmsStyles />
-      {/* Sidebar */}
-      <aside style={{ width: 256, background: 'linear-gradient(180deg,#0b1220 0%,#0e1729 100%)', color: '#e2e8f0', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh' }}>
+      {/* Sidebar — full height, non-scrolling shell; only <main> scrolls. */}
+      <aside style={{ width: 256, flexShrink: 0, background: 'linear-gradient(180deg,#0b1220 0%,#0e1729 100%)', color: '#e2e8f0', display: 'flex', flexDirection: 'column', height: '100vh' }}>
         <div style={{ padding: '22px 20px 18px', display: 'flex', alignItems: 'center', gap: 11, minHeight: 34 }}>
           {logo
             ? <img src={logo} alt={tenant?.name} style={{ height: 36, maxWidth: 170, objectFit: 'contain' }} />
@@ -122,7 +122,7 @@ export default function StudentLayout() {
         </div>
       </aside>
 
-      <main style={{ flex: 1, minWidth: 0, padding: '0 0 40px' }}>
+      <main style={{ flex: 1, minWidth: 0, height: '100vh', overflowY: 'auto', padding: '0 0 40px' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 32px', width: '100%', boxSizing: 'border-box' }}>
           <Outlet />
         </div>

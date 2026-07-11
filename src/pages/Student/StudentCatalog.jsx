@@ -47,7 +47,7 @@ export default function StudentCatalog() {
                 </div>
                 <button
                   onClick={() => enquire(p)} disabled={enquiring === p.id || enquired[p.id]}
-                  style={{ marginTop: 6, background: enquired[p.id] ? '#dcfce7' : '#E53935', color: enquired[p.id] ? '#15803d' : '#fff', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600, cursor: enquired[p.id] ? 'default' : 'pointer' }}>
+                  style={{ marginTop: 'auto', background: enquired[p.id] ? '#dcfce7' : '#E53935', color: enquired[p.id] ? '#15803d' : '#fff', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600, cursor: enquired[p.id] ? 'default' : 'pointer' }}>
                   {enquired[p.id] ? '✓ Enquiry sent' : enquiring === p.id ? 'Sending…' : 'Enrol / Enquire'}
                 </button>
               </div>
