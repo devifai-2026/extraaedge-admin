@@ -200,7 +200,11 @@ function ScoreRow({ sl, trainerCats, hrCats, onSave }) {
         </TableCell>
       ))}
       {hrCats.map((c) => <TableCell key={c.id} align="center" sx={{ color: '#94a3b8', fontSize: 12 }}>{scoreFor(c.id) ?? '—'}</TableCell>)}
-      <TableCell align="right"><b>{sl.marks ?? '—'}</b></TableCell>
+      <TableCell align="right">
+        <b>{sl.marks ?? '—'}</b>
+        {sl.complete ? <Chip size="small" label="Final" color="success" variant="outlined" sx={{ ml: 0.5, height: 18, fontSize: 10 }} />
+          : sl.pending_hr ? <Chip size="small" label="Awaiting HR" color="warning" variant="outlined" sx={{ ml: 0.5, height: 18, fontSize: 10 }} /> : null}
+      </TableCell>
       <TableCell align="right"><Button size="small" onClick={save} sx={{ textTransform: 'none' }}>Save</Button></TableCell>
     </TableRow>
   );
