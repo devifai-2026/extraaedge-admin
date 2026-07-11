@@ -106,6 +106,9 @@ import HrDashboard from './pages/Hr/HrDashboard'
 import HrInterviews from './pages/Hr/HrInterviews'
 import HrCertificates from './pages/Hr/HrCertificates'
 import PlacementDashboard from './pages/Placement/PlacementDashboard'
+import PlacementCompanies from './pages/Placement/PlacementCompanies'
+import PlacementOpenings from './pages/Placement/PlacementOpenings'
+import PlacementApplications from './pages/Placement/PlacementApplications'
 
 // Each route declares the backend tab key it requires.
 // `<ProtectedRoute tab="...">` redirects to /dashboard if user lacks access.
@@ -198,6 +201,9 @@ function App() {
         <Route path="/hr/interviews" element={<ProtectedRoute tab="hr.interviews"><Layout><HrInterviews /></Layout></ProtectedRoute>} />
         <Route path="/hr/certificates" element={<ProtectedRoute tab="hr.certificates"><Layout><HrCertificates /></Layout></ProtectedRoute>} />
         <Route path="/placement/dashboard" element={<ProtectedRoute tab="placement.dashboard"><Layout><PlacementDashboard /></Layout></ProtectedRoute>} />
+        <Route path="/placement/companies" element={<ProtectedRoute tab="placement.companies"><Layout><PlacementCompanies /></Layout></ProtectedRoute>} />
+        <Route path="/placement/openings" element={<ProtectedRoute tab="placement.openings"><Layout><PlacementOpenings /></Layout></ProtectedRoute>} />
+        <Route path="/placement/applications" element={<ProtectedRoute tab="placement.applications"><Layout><PlacementApplications /></Layout></ProtectedRoute>} />
         <Route path="/trainer/courses" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerCourses /></Layout></ProtectedRoute>} />
         <Route path="/trainer/courses/:programId" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerCourseDetail /></Layout></ProtectedRoute>} />
         <Route path="/trainer/classes" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />

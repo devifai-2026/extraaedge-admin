@@ -815,6 +815,28 @@ export const capstoneApi = {
   grade: (id, body) => api.post(`/capstone/${id}/grade`, body),
 };
 
+// ---- Placement: companies, job openings, applications ----
+export const placementApi = {
+  counts: () => api.get('/placement/counts', withBranch()),
+  programModules: (programId) => api.get(`/placement/programs/${programId}/modules`),
+  // Companies
+  listCompanies: () => api.get('/placement/companies'),
+  createCompany: (body) => api.post('/placement/companies', body),
+  bulkCompanies: (rows) => api.post('/placement/companies/bulk', { rows }),
+  updateCompany: (id, body) => api.put(`/placement/companies/${id}`, body),
+  deleteCompany: (id) => api.delete(`/placement/companies/${id}`),
+  // Openings
+  listOpenings: (status) => api.get('/placement/openings', status ? { status } : undefined),
+  createOpening: (body) => api.post('/placement/openings', body),
+  previewAudience: (id) => api.get(`/placement/openings/${id}/preview-audience`, withBranch()),
+  fire: (id) => api.post(`/placement/openings/${id}/fire`, withBranch()),
+  setOpeningStatus: (id, status) => api.post(`/placement/openings/${id}/status`, { status }),
+  deleteOpening: (id) => api.delete(`/placement/openings/${id}`),
+  // Applications
+  applications: (id) => api.get(`/placement/openings/${id}/applications`),
+  setApplicationStatus: (id, body) => api.post(`/placement/applications/${id}/status`, body),
+};
+
 // ---- LMS: admin analytics + student sudo-login (super_admin/branch_mgr) ----
 export const lmsAnalyticsApi = {
   dashboard: () => api.get('/lms-analytics/dashboard'),
