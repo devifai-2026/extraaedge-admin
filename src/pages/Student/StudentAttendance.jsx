@@ -11,16 +11,18 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const startOfDay = (v) => { const d = new Date(v); d.setHours(0, 0, 0, 0); return d; };
 
-// Status for a class from the student's POV.
+// Status for a class from the student's POV. Attendance only counts once the
+// trainer has ENDED the class (c.ended_at) — matching the backend, which never
+// auto-marks absent for a class that hasn't ended. A class whose scheduled time
+// has passed but was never ended is "pending" (trainer hasn't run/closed it),
+// NOT absent — so a forgotten class never wrongly counts against the student.
 function classState(c) {
   const now = new Date();
   const start = new Date(c.starts_at);
   if (c.my_status === 'present') return 'present';
-  if (c.ended_at || start < now) {
-    // Class is over (or its start has passed): present handled above → absent.
-    return c.my_status === 'present' ? 'present' : (new Date(c.ends_at || c.starts_at) < now ? 'absent' : 'pending');
-  }
-  return 'upcoming';
+  if (c.ended_at) return c.my_status === 'present' ? 'present' : 'absent';
+  // Not ended yet: upcoming if it hasn't started, otherwise awaiting the trainer.
+  return start > now ? 'upcoming' : 'pending';
 }
 
 const COLORS = {

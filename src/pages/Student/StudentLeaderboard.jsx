@@ -16,7 +16,7 @@ export default function StudentLeaderboard() {
 
   return (
     <div>
-      <PageHeader title="Leaderboard" subtitle="Tests + projects + attendance + interviews." icon={LeaderboardIcon} />
+      <PageHeader title="Leaderboard" subtitle="Weighted 0–100: tests, projects, capstone, interviews & attendance." icon={LeaderboardIcon} />
       {loading ? <p style={{ color: '#94a3b8' }}>Loading…</p> : (
         <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
           <LeaderboardTable rows={rows} highlightStudentId={me?.id} />
