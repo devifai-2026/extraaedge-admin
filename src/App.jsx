@@ -186,8 +186,8 @@ function App() {
 
         {/* ---- LMS trainer surfaces (staff app, role-gated by trainer.* tabs) ---- */}
         <Route path="/trainer/dashboard" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerDashboard /></Layout></ProtectedRoute>} />
-        <Route path="/trainer/courses" element={<ProtectedRoute tab="courses.manage"><Layout><TrainerCourses /></Layout></ProtectedRoute>} />
-        <Route path="/trainer/courses/:programId" element={<ProtectedRoute tab="courses.manage"><Layout><TrainerCourseDetail /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/courses" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerCourses /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/courses/:programId" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerCourseDetail /></Layout></ProtectedRoute>} />
         <Route path="/trainer/classes" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />
         <Route path="/trainer/attendance" element={<ProtectedRoute tab="trainer.attendance"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />
         <Route path="/trainer/recordings" element={<ProtectedRoute tab="trainer.recordings"><Layout><TrainerRecordings /></Layout></ProtectedRoute>} />

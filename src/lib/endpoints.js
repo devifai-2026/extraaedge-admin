@@ -713,6 +713,8 @@ export const studentProfileApi = {
 export const coursesApi = {
   list: () => api.get('/courses'),
   get: (programId) => api.get(`/courses/${programId}`),
+  assignableStaff: () => api.get('/courses/assignable-staff'),
+  attendanceHistory: (programId) => api.get(`/courses/${programId}/attendance-history`),
   // Modules
   listModules: (programId) => api.get(`/courses/${programId}/modules`),
   createModule: (programId, body) => api.post(`/courses/${programId}/modules`, body),
