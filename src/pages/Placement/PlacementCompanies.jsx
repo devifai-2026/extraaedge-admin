@@ -117,16 +117,67 @@ function AddCompanyDialog({ onClose, onDone, onError }) {
   );
 }
 
+// Header-aware, quoted-comma-safe CSV parser (handles "a, b" and "" escapes).
+const parseCsv = (text) => {
+  const rows = [];
+  let row = []; let field = ''; let inQuotes = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i += 1; } else inQuotes = false; }
+      else field += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i += 1; row.push(field); rows.push(row); row = []; field = ''; }
+    else field += ch;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c.trim() !== ''));
+};
+
+const TEMPLATE = 'name,website,industry,location\nAcme Corp,https://acme.com,SaaS,Bengaluru\nGlobex,https://globex.io,Fintech,Pune\n';
+
 function BulkDialog({ onClose, onDone, onError }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const downloadTemplate = () => {
+    const blob = new Blob([TEMPLATE], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'companies-template.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+  const onFile = (e) => {
+    const f = e.target.files?.[0]; e.target.value = '';
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => setText(String(reader.result || ''));
+    reader.readAsText(f);
+  };
+
+  // Parse to rows, tolerating an optional header row.
+  const toRows = () => {
+    const parsed = parseCsv(text);
+    if (!parsed.length) return [];
+    const first = parsed[0].map((c) => c.trim().toLowerCase());
+    const hasHeader = first.includes('name');
+    const idx = hasHeader
+      ? { name: first.indexOf('name'), website: first.indexOf('website'), industry: first.indexOf('industry'), location: first.indexOf('location') }
+      : { name: 0, website: 1, industry: 2, location: 3 };
+    return parsed.slice(hasHeader ? 1 : 0)
+      .map((r) => ({
+        name: (r[idx.name] || '').trim(),
+        website: (r[idx.website] || '').trim() || null,
+        industry: (r[idx.industry] || '').trim() || null,
+        location: (r[idx.location] || '').trim() || null,
+      }))
+      .filter((x) => x.name);
+  };
+  const preview = toRows();
+
   const submit = async () => {
-    // One company per line: Name, Website, Industry, Location
-    const rows = text.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => {
-      const [name, website, industry, location] = l.split(',').map((x) => (x || '').trim());
-      return { name, website: website || null, industry: industry || null, location: location || null };
-    }).filter((r) => r.name);
-    if (!rows.length) { onError('Add at least one company (one per line)'); return; }
+    const rows = toRows();
+    if (!rows.length) { onError('No valid companies found (need at least a name).'); return; }
     setBusy(true);
     try { const r = await placementApi.bulkCompanies(rows); const d = r?.data ?? r; onDone(d.inserted); } catch (e) { onError(e.message); } finally { setBusy(false); }
   };
@@ -134,12 +185,19 @@ function BulkDialog({ onClose, onDone, onError }) {
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Bulk import companies</DialogTitle>
       <DialogContent>
-        <div style={{ fontSize: 12.5, color: '#64748b', marginBottom: 8 }}>One company per line: <code>Name, Website, Industry, Location</code></div>
-        <TextField fullWidth multiline minRows={8} placeholder={'Acme Corp, https://acme.com, SaaS, Bengaluru\nGlobex, https://globex.io, Fintech, Pune'} value={text} onChange={(e) => setText(e.target.value)} />
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+          <Button size="small" variant="outlined" onClick={downloadTemplate} sx={{ textTransform: 'none' }}>Download CSV template</Button>
+          <Button size="small" variant="outlined" component="label" sx={{ textTransform: 'none' }}>
+            Upload CSV<input type="file" accept=".csv,text/csv" hidden onChange={onFile} />
+          </Button>
+        </div>
+        <div style={{ fontSize: 12.5, color: '#64748b', marginBottom: 8 }}>Columns: <code>name, website, industry, location</code> (a header row is optional; commas inside quotes are handled).</div>
+        <TextField fullWidth multiline minRows={8} placeholder={TEMPLATE} value={text} onChange={(e) => setText(e.target.value)} />
+        {text.trim() && <div style={{ fontSize: 12.5, color: preview.length ? '#15803d' : '#dc2626', marginTop: 6 }}>{preview.length} valid {preview.length === 1 ? 'company' : 'companies'} detected.</div>}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} sx={{ textTransform: 'none' }}>Cancel</Button>
-        <Button variant="contained" onClick={submit} disabled={busy} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>Import</Button>
+        <Button variant="contained" onClick={submit} disabled={busy || !preview.length} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>Import {preview.length || ''}</Button>
       </DialogActions>
     </Dialog>
   );

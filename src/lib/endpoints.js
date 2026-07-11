@@ -855,6 +855,7 @@ export const placementApi = {
   deleteStage: (id) => api.delete(`/placement/stages/${id}`),
   moveStage: (id, body) => api.post(`/placement/applications/${id}/move`, body),
   applicationHistory: (id) => api.get(`/placement/applications/${id}/history`),
+  studentReport: (studentId) => api.get(`/placement/students/${studentId}/report`),
 };
 
 // ---- LMS: admin analytics + student sudo-login (super_admin/branch_mgr) ----
