@@ -1,19 +1,17 @@
-// Student home / My Course — the enrolled course, its modules + syllabus, and
-// the student's batch. Real data from /courses/my-course.
+// My Course — the enrolled course, its modules + syllabus, and batch. Premium
+// treatment: course banner, module cards with syllabus, progress framing.
 import { useEffect, useState } from 'react';
 import { studentApi, studentAuth } from '../../lib/studentApi';
+import { PageHeader, Card, EmptyState, Badge, Skeleton, ACCENT } from '../../lib/lmsUi';
+import SchoolIcon from '@mui/icons-material/SchoolOutlined';
 
 export default function StudentHome() {
-  const [me] = useState(studentAuth.getStudent());
   const [view, setView] = useState(null);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    studentApi.myCourse()
-      .then((r) => setView(r?.data ?? r))
-      .catch((e) => setErr(e?.message || 'Could not load your course'))
-      .finally(() => setLoading(false));
+    studentApi.myCourse().then((r) => setView(r?.data ?? r)).catch((e) => setErr(e?.message || 'Could not load your course')).finally(() => setLoading(false));
   }, []);
 
   const course = view?.course;
@@ -22,39 +20,44 @@ export default function StudentHome() {
 
   return (
     <div>
-      <h2 style={{ fontSize: 20, margin: '0 0 6px', color: '#0f172a' }}>
-        Welcome{me?.name ? `, ${me.name}` : ''} 👋
-      </h2>
-      {loading && <p style={{ color: '#94a3b8' }}>Loading your course…</p>}
-      {err && <div style={{ background: '#fef2f2', color: '#b91c1c', padding: '8px 12px', borderRadius: 8, fontSize: 13 }}>{err}</div>}
+      <PageHeader title="My Course" subtitle={course?.program_name || undefined} icon={SchoolIcon} />
+
+      {loading && <Card><Skeleton h={20} w="40%" /><div style={{ height: 10 }} /><Skeleton h={12} /><div style={{ height: 6 }} /><Skeleton h={12} w="80%" /></Card>}
+      {err && <Card><div style={{ color: '#b91c1c', fontSize: 13 }}>{err}</div></Card>}
 
       {course && (
         <>
-          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20, marginTop: 12 }}>
-            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, color: '#94a3b8', fontWeight: 700 }}>Your course</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>{course.program_name || '—'}</div>
-            {course.program_description && <div style={{ fontSize: 14, color: '#64748b', marginTop: 6 }}>{course.program_description}</div>}
-            <div style={{ marginTop: 10, fontSize: 13, color: '#475569' }}>
-              Batch: <b>{batch?.name || 'To be assigned'}</b>
-              {course.program_type ? ` · ${course.program_type}` : ''}
+          {/* Course banner */}
+          <div style={{ background: `linear-gradient(120deg, ${ACCENT} 0%, #0e1729 130%)`, color: '#fff', borderRadius: 16, padding: '22px 24px', marginBottom: 18, boxShadow: `0 16px 36px -22px ${ACCENT}` }}>
+            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.3 }}>{course.program_name}</div>
+            {course.program_description && <div style={{ fontSize: 13.5, opacity: 0.9, marginTop: 6, maxWidth: 640 }}>{course.program_description}</div>}
+            <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+              <span style={pill}>{batch?.name ? `Batch: ${batch.name}` : 'Batch: to be assigned'}</span>
+              {course.program_type && <span style={pill}>{course.program_type}</span>}
+              <span style={pill}>{modules.length} module{modules.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
 
-          <h3 style={{ fontSize: 16, margin: '22px 0 10px', color: '#0f172a' }}>Modules & syllabus</h3>
+          {/* Modules */}
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: 0.5, margin: '4px 0 12px' }}>Modules & syllabus</div>
           {modules.length === 0 ? (
-            <div style={{ color: '#94a3b8', fontSize: 14 }}>Modules will appear here once your trainer sets them up.</div>
+            <Card><EmptyState icon="🧩" title="Syllabus coming soon" text="Your trainer will set up the modules and syllabus shortly." /></Card>
           ) : (
             <div style={{ display: 'grid', gap: 12 }}>
               {modules.map((m, i) => (
-                <div key={m.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
-                  <div style={{ fontWeight: 700, color: '#0f172a' }}>{i + 1}. {m.name}</div>
-                  {m.description && <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>{m.description}</div>}
+                <Card key={m.id} pad={16}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: m.syllabus?.length ? 8 : 0 }}>
+                    <span style={{ width: 28, height: 28, borderRadius: 8, background: `color-mix(in srgb, ${ACCENT} 12%, transparent)`, color: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>{i + 1}</span>
+                    <div style={{ fontWeight: 700, color: '#0f172a', flex: 1 }}>{m.name}</div>
+                    {m.trainer_name && <Badge tone="neutral">{m.trainer_name}</Badge>}
+                  </div>
+                  {m.description && <div style={{ fontSize: 13, color: '#64748b', margin: '0 0 8px 38px' }}>{m.description}</div>}
                   {Array.isArray(m.syllabus) && m.syllabus.length > 0 && (
-                    <ul style={{ margin: '8px 0 0', paddingLeft: 18, color: '#475569', fontSize: 13 }}>
+                    <ul style={{ margin: '0 0 0 38px', paddingLeft: 16, color: '#475569', fontSize: 13, display: 'grid', gap: 3 }}>
                       {m.syllabus.map((t, j) => <li key={j}>{typeof t === 'string' ? t : (t?.title || JSON.stringify(t))}</li>)}
                     </ul>
                   )}
-                </div>
+                </Card>
               ))}
             </div>
           )}
@@ -63,3 +66,5 @@ export default function StudentHome() {
     </div>
   );
 }
+
+const pill = { background: 'rgba(255,255,255,0.16)', borderRadius: 999, padding: '5px 12px', fontSize: 12, fontWeight: 600 };

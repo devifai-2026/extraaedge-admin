@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, Navigate } from 'react-router-dom';
 import { studentApi, studentAuth } from '../../lib/studentApi';
 import { resolveAssetUrl } from '../../lib/config';
+import { LmsStyles } from '../../lib/lmsUi';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
@@ -68,6 +69,7 @@ export default function StudentLayout() {
 
   return (
     <div style={{ '--lms-accent': accent, display: 'flex', minHeight: '100vh', background: '#f5f6fa', fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}>
+      <LmsStyles />
       {/* Sidebar */}
       <aside style={{ width: 256, background: 'linear-gradient(180deg,#0b1220 0%,#0e1729 100%)', color: '#e2e8f0', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh' }}>
         <div style={{ padding: '22px 20px 18px', display: 'flex', alignItems: 'center', gap: 11, minHeight: 34 }}>
