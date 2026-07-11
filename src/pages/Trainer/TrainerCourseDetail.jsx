@@ -78,6 +78,7 @@ function ModulesTab({ programId, notify, canManage }) {
   const [classes, setClasses] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [batches, setBatches] = useState([]);
+  const [trainers, setTrainers] = useState([]); // course roster (for per-topic trainer picker)
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [open, setOpen] = useState({}); // moduleId → expanded
@@ -91,11 +92,15 @@ function ModulesTab({ programId, notify, canManage }) {
       classesApi.list({ programId }).catch(() => ({ data: [] })),
       learningApi.listMaterials(programId).catch(() => ({ data: [] })),
       coursesApi.listBatches(programId).catch(() => ({ data: [] })),
-    ]).then(([m, c, mat, b]) => { setRows(m?.data || []); setClasses(c?.data || []); setMaterials(mat?.data || []); setBatches((b?.data || []).filter((x) => x.status !== 'merged')); })
+      coursesApi.listTrainers(programId).catch(() => ({ data: [] })),
+    ]).then(([m, c, mat, b, t]) => { setRows(m?.data || []); setClasses(c?.data || []); setMaterials(mat?.data || []); setBatches((b?.data || []).filter((x) => x.status !== 'merged')); setTrainers(t?.data || []); })
       .catch((e) => notify('error', e.message)).finally(() => setLoading(false));
   }, [programId, notify]);
   useEffect(() => { load(); }, [load]);
 
+  // Topics are stored as objects { title, trainer_user_id } so each topic can be
+  // taught by a different trainer. (Legacy string topics still render.)
+  const normalizeTopic = (t) => (typeof t === 'string' ? { title: t, trainer_user_id: null } : { title: t?.title || '', trainer_user_id: t?.trainer_user_id ?? null });
   const saveTopics = async (m, syllabus) => {
     try { await coursesApi.updateModule(programId, m.id, { syllabus }); load(); }
     catch (e) { notify('error', e.message); }
@@ -103,10 +108,17 @@ function ModulesTab({ programId, notify, canManage }) {
   const addTopic = (m) => {
     const val = (topicInput[m.id] || '').trim();
     if (!val) return;
-    const syllabus = [...(Array.isArray(m.syllabus) ? m.syllabus : []), val];
+    const syllabus = [...(Array.isArray(m.syllabus) ? m.syllabus : []).map(normalizeTopic), { title: val, trainer_user_id: null }];
     setTopicInput((s) => ({ ...s, [m.id]: '' }));
     saveTopics(m, syllabus);
   };
+  const setTopicTrainer = (m, idx, trainerUserId) => {
+    const syllabus = (Array.isArray(m.syllabus) ? m.syllabus : []).map(normalizeTopic).map((t, j) => (j === idx ? { ...t, trainer_user_id: trainerUserId || null } : t));
+    saveTopics(m, syllabus);
+  };
+  // Distinct trainer users on the roster, for the picker.
+  const trainerOptions = Array.from(new Map((trainers || []).map((t) => [t.user_id, { id: t.user_id, name: t.user_name }])).values());
+  const trainerName = (uid) => trainerOptions.find((t) => t.id === uid)?.name;
   const removeTopic = (m, idx) => {
     const syllabus = (Array.isArray(m.syllabus) ? m.syllabus : []).filter((_, j) => j !== idx);
     saveTopics(m, syllabus);
@@ -161,15 +173,21 @@ function ModulesTab({ programId, notify, canManage }) {
                 {isOpen && (
                   <div style={{ borderTop: '1px solid #eef0f5', padding: 14, background: '#fafbfc' }}>
                     <div style={{ marginBottom: 12 }}>
-                      <SubHead>Topics ({Array.isArray(m.syllabus) ? m.syllabus.length : 0})</SubHead>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                      <SubHead>Topics ({Array.isArray(m.syllabus) ? m.syllabus.length : 0}) — each can have its own trainer</SubHead>
+                      <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
                         {(Array.isArray(m.syllabus) ? m.syllabus : []).map((s, j) => {
-                          const label = typeof s === 'string' ? s : (s?.title || JSON.stringify(s));
+                          const topic = normalizeTopic(s);
                           return (
-                            <span key={j} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 999, padding: '4px 10px', fontSize: 12.5, color: '#334155' }}>
-                              {label}
+                            <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #eef0f5', borderRadius: 10, padding: '6px 10px', fontSize: 13, color: '#334155', flexWrap: 'wrap' }}>
+                              <span style={{ flex: 1, minWidth: 120 }}>{topic.title}</span>
+                              {canManage && trainerOptions.length > 0 ? (
+                                <TextField select size="small" variant="standard" value={topic.trainer_user_id || ''} onChange={(e) => setTopicTrainer(m, j, e.target.value)} sx={{ minWidth: 150 }} SelectProps={{ displayEmpty: true }}>
+                                  <MenuItem value=""><em style={{ color: '#94a3b8' }}>Unassigned</em></MenuItem>
+                                  {trainerOptions.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+                                </TextField>
+                              ) : (topic.trainer_user_id ? <Badge tone="neutral">{trainerName(topic.trainer_user_id) || 'Trainer'}</Badge> : null)}
                               {canManage && <span onClick={() => removeTopic(m, j)} style={{ cursor: 'pointer', color: '#94a3b8', fontWeight: 700 }}>×</span>}
-                            </span>
+                            </div>
                           );
                         })}
                         {(!m.syllabus || m.syllabus.length === 0) && !canManage && <Muted>No topics added yet.</Muted>}
