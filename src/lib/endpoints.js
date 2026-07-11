@@ -848,6 +848,13 @@ export const placementApi = {
   // Applications
   applications: (id) => api.get(`/placement/openings/${id}/applications`),
   setApplicationStatus: (id, body) => api.post(`/placement/applications/${id}/status`, body),
+  // Dynamic pipeline stages (tenant-defined) + candidate stage moves + history.
+  stages: (params) => api.get('/placement/stages', params),
+  createStage: (body) => api.post('/placement/stages', body),
+  updateStage: (id, body) => api.put(`/placement/stages/${id}`, body),
+  deleteStage: (id) => api.delete(`/placement/stages/${id}`),
+  moveStage: (id, body) => api.post(`/placement/applications/${id}/move`, body),
+  applicationHistory: (id) => api.get(`/placement/applications/${id}/history`),
 };
 
 // ---- LMS: admin analytics + student sudo-login (super_admin/branch_mgr) ----

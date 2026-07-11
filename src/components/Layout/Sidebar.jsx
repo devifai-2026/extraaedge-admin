@@ -194,6 +194,7 @@ const menuSections = [
       { id: 231, label: 'Companies',    icon: SchoolIcon,      path: '/placement/companies',    tab: 'placement.companies' },
       { id: 232, label: 'Job Openings', icon: ChecklistIcon,   path: '/placement/openings',     tab: 'placement.openings' },
       { id: 233, label: 'Applications', icon: PeopleAltIcon,   path: '/placement/applications', tab: 'placement.applications' },
+      { id: 234, label: 'Pipeline Stages', icon: ChecklistIcon, path: '/placement/stages',       tab: 'placement.applications' },
     ],
   },
 ];
