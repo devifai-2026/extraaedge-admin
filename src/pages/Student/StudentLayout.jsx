@@ -3,7 +3,7 @@
 // present on first paint of every page, and the tenant accent drives the whole
 // portal via a CSS variable (--lms-accent).
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate, Navigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { studentApi, studentAuth } from '../../lib/studentApi';
 import { resolveAssetUrl } from '../../lib/config';
 import { LmsStyles } from '../../lib/lmsUi';
@@ -28,6 +28,7 @@ import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
 import WorkOutlineIcon from '@mui/icons-material/WorkOutlineOutlined';
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
+import MenuIcon from '@mui/icons-material/Menu';
 import AttendanceQuestionHost from './AttendanceQuestionHost';
 import { disconnectStudentSocket } from '../../lib/studentSocket';
 
@@ -88,10 +89,28 @@ const TOUR_STEPS = [
 ];
 const tourKey = (id) => `ee_student_tour_v1_${id || 'anon'}`;
 
+// Track a CSS media query in JS (the student shell uses inline styles, not the
+// MUI theme, so useMediaQuery from MUI isn't wired here).
+function useMedia(query) {
+  const [match, setMatch] = useState(() => (typeof window !== 'undefined' ? window.matchMedia(query).matches : false));
+  useEffect(() => {
+    const m = window.matchMedia(query);
+    const on = () => setMatch(m.matches);
+    on(); m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, [query]);
+  return match;
+}
+
 export default function StudentLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [tenant, setTenant] = useState(() => studentAuth.getTenant());
   const [tourOpen, setTourOpen] = useState(false);
+  const isMobile = useMedia('(max-width: 860px)');
+  const [navOpen, setNavOpen] = useState(false);
+  // Close the drawer whenever the route changes (mobile nav tap).
+  useEffect(() => { setNavOpen(false); }, [location.pathname]);
 
   // Load branding once (so the logo is present regardless of which page opens
   // first). Cheap; cached in the session for subsequent paints.
@@ -129,11 +148,19 @@ export default function StudentLayout() {
   const logo = tenant?.logo_url ? resolveAssetUrl(tenant.logo_url) : null;
   const logout = () => { disconnectStudentSocket(); studentAuth.clear(); navigate('/student/login', { replace: true }); };
 
+  // On mobile the sidebar becomes a fixed slide-in drawer with a scrim; on
+  // desktop it's the static 256px rail. Only <main> scrolls.
+  const asideStyle = isMobile
+    ? { position: 'fixed', top: 0, left: 0, zIndex: 1300, width: 264, height: '100vh', transform: navOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform .25s ease', background: 'linear-gradient(180deg,#0b1220 0%,#0e1729 100%)', color: '#e2e8f0', display: 'flex', flexDirection: 'column', boxShadow: navOpen ? '0 0 40px rgba(0,0,0,.4)' : 'none' }
+    : { width: 256, flexShrink: 0, background: 'linear-gradient(180deg,#0b1220 0%,#0e1729 100%)', color: '#e2e8f0', display: 'flex', flexDirection: 'column', height: '100vh' };
+
   return (
     <div style={{ '--lms-accent': accent, display: 'flex', height: '100vh', overflow: 'hidden', background: '#f5f6fa', fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}>
       <LmsStyles />
-      {/* Sidebar — full height, non-scrolling shell; only <main> scrolls. */}
-      <aside style={{ width: 256, flexShrink: 0, background: 'linear-gradient(180deg,#0b1220 0%,#0e1729 100%)', color: '#e2e8f0', display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      {/* Scrim behind the mobile drawer */}
+      {isMobile && navOpen && <div onClick={() => setNavOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', zIndex: 1250 }} />}
+      {/* Sidebar — static rail on desktop, slide-in drawer on mobile. */}
+      <aside style={asideStyle}>
         <div style={{ padding: '22px 20px 18px', display: 'flex', alignItems: 'center', gap: 11, minHeight: 34 }}>
           {logo
             ? <img src={logo} alt={tenant?.name} style={{ height: 36, maxWidth: 170, objectFit: 'contain' }} />
@@ -181,7 +208,16 @@ export default function StudentLayout() {
       </aside>
 
       <main style={{ flex: 1, minWidth: 0, height: '100vh', overflowY: 'auto', padding: '0 0 40px' }}>
-        <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 32px', width: '100%', boxSizing: 'border-box' }}>
+        {/* Mobile top bar with the hamburger + institute logo. */}
+        {isMobile && (
+          <div style={{ position: 'sticky', top: 0, zIndex: 1000, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+            <button onClick={() => setNavOpen(true)} aria-label="Open menu" style={{ border: 'none', background: 'transparent', padding: 4, cursor: 'pointer', display: 'flex' }}>
+              <MenuIcon sx={{ fontSize: 26, color: '#0f172a' }} />
+            </button>
+            {logo ? <img src={logo} alt={tenant?.name} style={{ height: 26, maxWidth: 130, objectFit: 'contain' }} /> : <span style={{ fontWeight: 800, color: '#0f172a' }}>{tenant?.name || 'My Learning'}</span>}
+          </div>
+        )}
+        <div style={{ maxWidth: 1120, margin: '0 auto', padding: isMobile ? '0 16px' : '0 32px', width: '100%', boxSizing: 'border-box' }}>
           <Outlet />
         </div>
       </main>
