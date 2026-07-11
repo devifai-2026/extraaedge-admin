@@ -26,7 +26,8 @@ export default function PlacementDashboard() {
       <StatGrid>
         <StatTile icon={BusinessIcon} label="Companies" value={v('companies')} />
         <StatTile icon={WorkIcon} tint="#2563eb" label="Open positions" value={v('open_positions')} sub={c ? `${c.closed_positions} closed` : undefined} />
-        <StatTile icon={PeopleIcon} tint="#059669" label="Applications" value={v('applications')} sub={c ? `${c.selected} selected` : undefined} />
+        <StatTile icon={PeopleIcon} tint="#7c3aed" label="Applications" value={v('applications')} sub={c ? `${c.fired ?? 0} fired · ${c.applied ?? 0} in pipeline` : undefined} />
+        <StatTile icon={PeopleIcon} tint="#059669" label="Placed" value={v('selected')} sub={c ? `${c.offers ?? 0} offer${(c.offers ?? 0) === 1 ? '' : 's'} · ${c.applications ? Math.round(100 * (c.selected / c.applications)) : 0}% of applicants` : undefined} />
       </StatGrid>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
         <Card title="Companies" icon={BusinessIcon}>

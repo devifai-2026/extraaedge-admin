@@ -32,9 +32,19 @@ export default function StudentInterviews() {
                 {Array.isArray(s.scores) && s.scores.length > 0 && (
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
                     {s.scores.map((sc) => (
-                      <span key={sc.category_id} style={{ fontSize: 11.5, background: '#f1f5f9', color: '#334155', borderRadius: 999, padding: '3px 9px', fontWeight: 600 }}>
+                      <span key={sc.category_id} style={{ fontSize: 11.5, background: '#f1f5f9', color: '#334155', borderRadius: 999, padding: '3px 9px', fontWeight: 600 }} title={sc.comment || ''}>
                         {sc.name}: {sc.marks}/{sc.max_marks}
                       </span>
+                    ))}
+                  </div>
+                )}
+                {/* Per-category qualitative feedback (HR/trainer notes). */}
+                {Array.isArray(s.scores) && s.scores.some((sc) => sc.comment) && (
+                  <div style={{ marginTop: 6, display: 'grid', gap: 3 }}>
+                    {s.scores.filter((sc) => sc.comment).map((sc) => (
+                      <div key={sc.category_id} style={{ fontSize: 12, color: '#475569' }}>
+                        <b style={{ color: '#334155' }}>{sc.name}:</b> {sc.comment}
+                      </div>
                     ))}
                   </div>
                 )}

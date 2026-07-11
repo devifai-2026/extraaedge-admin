@@ -862,6 +862,7 @@ export const learningApi = {
   progress: (programId) => api.get('/learning/progress', { programId }),
   listCertificates: (programId) => api.get('/learning/certificates', { programId }),
   issueCertificate: (body) => api.post('/learning/certificates/issue', body),
+  hrCounts: () => api.get('/learning/hr/counts'),
   hrCertificates: (programId) => api.get('/learning/hr/certificates', { programId }),
   hrAutoIssue: (body) => api.post('/learning/hr/certificates/auto-issue', body),
 };

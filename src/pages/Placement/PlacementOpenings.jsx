@@ -66,7 +66,7 @@ export default function PlacementOpenings() {
 }
 
 function OpeningCard({ o, onFired, onStatus, onError, onToast, navigate }) {
-  const [preview, setPreview] = useState(null);
+  const [preview, setPreview] = useState(null); // { count, students: [{id,name,program_name}] }
   const [busy, setBusy] = useState(false);
   const crit = o.criteria || {};
   const critChips = [
@@ -76,11 +76,19 @@ function OpeningCard({ o, onFired, onStatus, onError, onToast, navigate }) {
     crit.course_completed && 'Course completed',
     crit.module_completed_id && 'Module completed',
   ].filter(Boolean);
-  const doPreview = async () => { setBusy(true); try { const r = await placementApi.previewAudience(o.id); setPreview((r?.data ?? r).count); } catch (e) { onError(e.message); } finally { setBusy(false); } };
+  const noCriteria = critChips.length === 0;
+  const doPreview = async () => { setBusy(true); try { const r = await placementApi.previewAudience(o.id); setPreview(r?.data ?? r); } catch (e) { onError(e.message); } finally { setBusy(false); } };
   const doFire = async () => {
-    if (!window.confirm('Fire this opening to all matched students?')) return;
+    // Require a preview first so the operator sees exactly who will be fired
+    // before this irreversible action (creates applications + notifications).
+    if (preview == null) { onError('Preview the matches first so you can see who will be notified.'); return; }
+    if (preview.count === 0) { onError('No students match this criteria yet — adjust the criteria.'); return; }
+    const names = (preview.students || []).slice(0, 8).map((s) => s.name).join(', ');
+    const more = preview.count > 8 ? ` and ${preview.count - 8} more` : '';
+    // eslint-disable-next-line no-alert
+    if (!window.confirm(`Fire "${o.title}" to ${preview.count} student${preview.count === 1 ? '' : 's'}?\n\n${names}${more}`)) return;
     setBusy(true);
-    try { const r = await placementApi.fire(o.id); const d = r?.data ?? r; onToast(`Fired to ${d.fired} student${d.fired === 1 ? '' : 's'} (${d.matched} matched)`); onFired(); } catch (e) { onError(e.message); } finally { setBusy(false); }
+    try { const r = await placementApi.fire(o.id); const d = r?.data ?? r; onToast(`Fired to ${d.fired} student${d.fired === 1 ? '' : 's'} (${d.matched} matched)`); setPreview(null); onFired(); } catch (e) { onError(e.message); } finally { setBusy(false); }
   };
   return (
     <Card>
@@ -88,12 +96,28 @@ function OpeningCard({ o, onFired, onStatus, onError, onToast, navigate }) {
         <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontWeight: 800, fontSize: 16, color: '#0f172a' }}>{o.title} <span style={{ color: '#64748b', fontWeight: 600, fontSize: 14 }}>· {o.company_name}</span></div>
           <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>{[o.ctc, o.location, o.job_type, o.program_name].filter(Boolean).join(' · ') || '—'}</div>
-          {critChips.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{critChips.map((c) => <Badge key={c} tone="info">{c}</Badge>)}</div>}
+          {critChips.length > 0
+            ? <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{critChips.map((c) => <Badge key={c} tone="info">{c}</Badge>)}</div>
+            : <div style={{ fontSize: 12, color: '#b45309', marginTop: 8 }}>⚠ No criteria — this matches EVERY active student in scope.</div>}
           <div style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>{o.applicant_count || 0} in pipeline</div>
+          {/* Preview reveals the actual matched students before firing. */}
+          {preview != null && (
+            <div style={{ marginTop: 10, padding: 10, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#334155', marginBottom: 6 }}>{preview.count} student{preview.count === 1 ? '' : 's'} match{preview.count === 1 ? 'es' : ''}{noCriteria ? ' (all active students)' : ''}</div>
+              {preview.count === 0
+                ? <div style={{ fontSize: 12, color: '#94a3b8' }}>No matches — adjust the criteria.</div>
+                : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {(preview.students || []).slice(0, 24).map((s) => (
+                      <span key={s.id} style={{ fontSize: 11.5, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 999, padding: '2px 8px', color: '#475569' }}>{s.name}</span>
+                    ))}
+                    {preview.count > 24 && <span style={{ fontSize: 11.5, color: '#94a3b8' }}>+{preview.count - 24} more</span>}
+                  </div>}
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          {o.status === 'open' && <Btn size="sm" variant="ghost" onClick={doPreview} disabled={busy}>{preview == null ? 'Preview matches' : `${preview} match`}</Btn>}
-          {o.status === 'open' && <Btn size="sm" onClick={doFire} disabled={busy}>Fire →</Btn>}
+          {o.status === 'open' && <Btn size="sm" variant="ghost" onClick={doPreview} disabled={busy}>{preview == null ? 'Preview matches' : `${preview.count} match${preview.count === 1 ? '' : 'es'} · refresh`}</Btn>}
+          {o.status === 'open' && <Btn size="sm" onClick={doFire} disabled={busy || preview == null || preview.count === 0}>Fire →</Btn>}
           <Btn size="sm" variant="ghost" onClick={() => navigate(`/placement/applications?opening=${o.id}`)}>Applicants</Btn>
           {o.status === 'open'
             ? <Btn size="sm" variant="ghost" onClick={() => onStatus(o, 'closed')}>Close</Btn>

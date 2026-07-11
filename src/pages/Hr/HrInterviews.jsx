@@ -53,23 +53,34 @@ export default function HrInterviews() {
 
 function HrScoreRow({ sl, hrCats, trainerCats, onSave }) {
   const scoreFor = (catId) => (sl.scores || []).find((x) => x.category_id === catId)?.marks;
+  const commentFor = (catId) => (sl.scores || []).find((x) => x.category_id === catId)?.comment;
   const [vals, setVals] = useState(() => Object.fromEntries(hrCats.map((c) => [c.id, scoreFor(c.id) ?? ''])));
+  // One qualitative note per row, seeded from any existing HR-category comment.
+  const [note, setNote] = useState(() => (hrCats.map((c) => commentFor(c.id)).find(Boolean) || ''));
   const save = () => {
-    const scores = hrCats.filter((c) => vals[c.id] !== '' && vals[c.id] != null).map((c) => ({ category_id: c.id, marks: Number(vals[c.id]) }));
+    const scores = hrCats.filter((c) => vals[c.id] !== '' && vals[c.id] != null)
+      .map((c) => ({ category_id: c.id, marks: Number(vals[c.id]), comment: note || null }));
     if (scores.length) onSave(sl.id, scores);
   };
   return (
-    <TableRow>
-      <TableCell>{sl.name}</TableCell>
-      <TableCell sx={{ color: '#64748b' }}>{sl.slot_at ? fmtDate(sl.slot_at) : '—'}</TableCell>
-      {hrCats.map((c) => (
-        <TableCell key={c.id} align="center">
-          <TextField size="small" type="number" value={vals[c.id]} onChange={(e) => setVals((v) => ({ ...v, [c.id]: e.target.value }))} sx={{ width: 64 }} inputProps={{ min: 0, max: c.max_marks }} />
+    <>
+      <TableRow>
+        <TableCell>{sl.name}</TableCell>
+        <TableCell sx={{ color: '#64748b' }}>{sl.slot_at ? fmtDate(sl.slot_at) : '—'}</TableCell>
+        {hrCats.map((c) => (
+          <TableCell key={c.id} align="center">
+            <TextField size="small" type="number" value={vals[c.id]} onChange={(e) => setVals((v) => ({ ...v, [c.id]: e.target.value }))} sx={{ width: 64 }} inputProps={{ min: 0, max: c.max_marks }} />
+          </TableCell>
+        ))}
+        {trainerCats.map((c) => <TableCell key={c.id} align="center" sx={{ color: '#94a3b8', fontSize: 12 }}>{scoreFor(c.id) ?? '—'}</TableCell>)}
+        <TableCell align="right"><b>{sl.marks ?? '—'}</b>{sl.pending_hr ? <div style={{ fontSize: 10, color: '#b45309' }}>awaiting you</div> : sl.complete ? <div style={{ fontSize: 10, color: '#15803d' }}>final</div> : null}</TableCell>
+        <TableCell align="right"><Button size="small" onClick={save} sx={{ textTransform: 'none' }}>Save</Button></TableCell>
+      </TableRow>
+      <TableRow>
+        <TableCell colSpan={2 + hrCats.length + trainerCats.length + 2} sx={{ pt: 0, pb: 1.5, border: 0 }}>
+          <TextField size="small" fullWidth placeholder="Feedback for this candidate (communication, confidence, areas to improve…)" value={note} onChange={(e) => setNote(e.target.value)} multiline maxRows={3} />
         </TableCell>
-      ))}
-      {trainerCats.map((c) => <TableCell key={c.id} align="center" sx={{ color: '#94a3b8', fontSize: 12 }}>{scoreFor(c.id) ?? '—'}</TableCell>)}
-      <TableCell align="right"><b>{sl.marks ?? '—'}</b></TableCell>
-      <TableCell align="right"><Button size="small" onClick={save} sx={{ textTransform: 'none' }}>Save</Button></TableCell>
-    </TableRow>
+      </TableRow>
+    </>
   );
 }
