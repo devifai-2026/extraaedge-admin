@@ -27,8 +27,16 @@ export default function StudentClasses() {
   }, [active, pollQuestions]);
 
   const answer = async (cid, qid, oi) => { try { await studentApi.answer(cid, { question_id: qid, option_index: oi }); toast.show('Answer submitted'); pollQuestions(cid); } catch (e) { toast.show(e.message); } };
-  const preNotify = async (cid) => { try { await studentApi.preNotifyAbsence(cid); toast.show('Marked absent for this class'); load(); } catch (e) { toast.show(e.message); } };
-  const setJoin = async (cid, mode) => { try { await studentApi.setJoinMode(cid, mode); toast.show(`Joining ${mode}`); } catch (e) { toast.show(e.message); } };
+  const preNotify = async (cid) => {
+    const reason = window.prompt('Let your trainer know why you can’t attend (optional):', '');
+    if (reason === null) return; // cancelled
+    try { await studentApi.preNotifyAbsence(cid, reason.trim()); toast.show('Marked absent — your trainer will see the reason'); load(); } catch (e) { toast.show(e.message); }
+  };
+  const setJoin = async (cid, mode) => {
+    let reason = '';
+    if (mode === 'online') { const r = window.prompt('Attending online — add a note for your trainer (optional):', ''); if (r === null) return; reason = r.trim(); }
+    try { await studentApi.setJoinMode(cid, mode, reason); toast.show(`Joining ${mode}`); } catch (e) { toast.show(e.message); }
+  };
 
   const statusTone = (s) => (s === 'present' ? 'success' : s === 'absent' ? 'danger' : s === 'pending' ? 'warning' : 'neutral');
 

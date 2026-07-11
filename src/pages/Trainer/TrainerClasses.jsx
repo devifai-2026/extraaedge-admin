@@ -19,10 +19,12 @@ export default function TrainerClasses() {
   const [programId, setProgramId] = useState('');
   const [batches, setBatches] = useState([]);
   const [modules, setModules] = useState([]);
+  const [trainers, setTrainers] = useState([]);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [rescheduleClass, setRescheduleClass] = useState(null);
   const [consoleClass, setConsoleClass] = useState(null);
   const [view, setView] = useState('list'); // 'list' | 'calendar'
 
@@ -31,8 +33,8 @@ export default function TrainerClasses() {
   const loadCourse = useCallback((pid) => {
     if (!pid) return;
     setLoading(true);
-    Promise.all([classesApi.list({ programId: pid }), coursesApi.listBatches(pid), coursesApi.listModules(pid)])
-      .then(([c, b, m]) => { setClasses(c?.data || []); setBatches((b?.data || []).filter((x) => x.status !== 'merged')); setModules(m?.data || []); })
+    Promise.all([classesApi.list({ programId: pid }), coursesApi.listBatches(pid), coursesApi.listModules(pid), coursesApi.listTrainers(pid).catch(() => ({ data: [] }))])
+      .then(([c, b, m, t]) => { setClasses(c?.data || []); setBatches((b?.data || []).filter((x) => x.status !== 'merged')); setModules(m?.data || []); setTrainers(t?.data || []); })
       .catch((e) => setToast({ severity: 'error', text: e.message }))
       .finally(() => setLoading(false));
   }, []);
@@ -85,7 +87,7 @@ export default function TrainerClasses() {
               <TableBody>
                 {classes.map((c) => (
                   <TableRow key={c.id} hover>
-                    <TableCell>{c.title}{c.kind === 'mock_test' ? ' · Mock' : ''}</TableCell>
+                    <TableCell>{c.title}{c.kind === 'mock_test' ? ' · Mock' : ''}{c.trainer_name ? <div style={{ fontSize: 11, color: '#94a3b8' }}>{c.trainer_name}</div> : null}</TableCell>
                     <TableCell sx={{ color: '#64748b' }}>{c.batch_name}</TableCell>
                     <TableCell sx={{ color: '#64748b' }}>{fmtDate(c.starts_at)}</TableCell>
                     <TableCell align="center"><Badge tone="neutral">{c.mode}</Badge></TableCell>
@@ -93,6 +95,7 @@ export default function TrainerClasses() {
                       {c.ended_at ? <Badge tone="neutral">Ended</Badge> : c.started_at ? <Badge tone="danger">● LIVE</Badge> : <Badge tone="warning">Scheduled</Badge>}
                     </TableCell>
                     <TableCell align="right">
+                      {!c.ended_at && <Button size="small" onClick={() => setRescheduleClass(c)} sx={{ textTransform: 'none' }}>Reschedule</Button>}
                       <Button size="small" onClick={() => setConsoleClass(c)} sx={{ textTransform: 'none' }}>Open console</Button>
                     </TableCell>
                   </TableRow>
@@ -104,9 +107,15 @@ export default function TrainerClasses() {
       )}
 
       {createOpen && (
-        <CreateClassDialog programId={programId} batches={batches} modules={modules}
+        <CreateClassDialog programId={programId} batches={batches} modules={modules} trainers={trainers}
           onClose={() => setCreateOpen(false)}
           onDone={() => { setCreateOpen(false); loadCourse(programId); setToast({ severity: 'success', text: 'Class scheduled' }); }}
+          onError={(m) => setToast({ severity: 'error', text: m })} />
+      )}
+      {rescheduleClass && (
+        <RescheduleDialog cls={rescheduleClass} trainers={trainers}
+          onClose={() => setRescheduleClass(null)}
+          onDone={() => { setRescheduleClass(null); loadCourse(programId); setToast({ severity: 'success', text: 'Class updated' }); }}
           onError={(m) => setToast({ severity: 'error', text: m })} />
       )}
       {consoleClass && (
@@ -120,8 +129,8 @@ export default function TrainerClasses() {
   );
 }
 
-function CreateClassDialog({ programId, batches, modules, onClose, onDone, onError }) {
-  const [f, setF] = useState({ title: '', batch_id: '', module_id: '', kind: 'lecture', mode: 'online', meeting_url: '', starts_at: '', ends_at: '' });
+function CreateClassDialog({ programId, batches, modules, trainers = [], onClose, onDone, onError }) {
+  const [f, setF] = useState({ title: '', batch_id: '', module_id: '', trainer_id: '', kind: 'lecture', mode: 'online', meeting_url: '', starts_at: '', ends_at: '' });
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
   const submit = async () => {
@@ -129,7 +138,7 @@ function CreateClassDialog({ programId, batches, modules, onClose, onDone, onErr
     setBusy(true);
     try {
       await classesApi.create({
-        program_id: programId, batch_id: f.batch_id, module_id: f.module_id || null,
+        program_id: programId, batch_id: f.batch_id, module_id: f.module_id || null, trainer_id: f.trainer_id || null,
         title: f.title, kind: f.kind, mode: f.mode, meeting_url: f.meeting_url || null,
         starts_at: new Date(f.starts_at).toISOString(), ends_at: new Date(f.ends_at).toISOString(),
       });
@@ -148,6 +157,10 @@ function CreateClassDialog({ programId, batches, modules, onClose, onDone, onErr
           <MenuItem value="">—</MenuItem>
           {modules.map((m) => <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>)}
         </TextField>
+        <TextField select size="small" label="Teacher" value={f.trainer_id} onChange={set('trainer_id')} sx={{ gridColumn: '1 / -1' }} helperText="Who teaches this class">
+          <MenuItem value="">— unassigned</MenuItem>
+          {trainers.map((t) => <MenuItem key={t.id} value={t.user_id}>{t.user_name}{t.role === 'head' ? ' (head)' : ''}{t.module_name ? ` · ${t.module_name}` : ''}</MenuItem>)}
+        </TextField>
         <TextField select size="small" label="Kind" value={f.kind} onChange={set('kind')}>
           <MenuItem value="lecture">Lecture</MenuItem><MenuItem value="mock_test">Mock test</MenuItem>
         </TextField>
@@ -161,6 +174,43 @@ function CreateClassDialog({ programId, batches, modules, onClose, onDone, onErr
       <DialogActions>
         <Button onClick={onClose} sx={{ textTransform: 'none' }}>Cancel</Button>
         <Button variant="contained" onClick={submit} disabled={busy} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>Schedule</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// Reschedule / reassign an existing class.
+function RescheduleDialog({ cls, trainers = [], onClose, onDone, onError }) {
+  const toLocal = (iso) => { try { const d = new Date(iso); const off = d.getTimezoneOffset(); return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16); } catch { return ''; } };
+  const [f, setF] = useState({ starts_at: toLocal(cls.starts_at), ends_at: toLocal(cls.ends_at), trainer_id: cls.trainer_id || '', meeting_url: cls.meeting_url || '' });
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
+  const submit = async () => {
+    if (!f.starts_at || !f.ends_at) { onError('Start and end are required'); return; }
+    setBusy(true);
+    try {
+      await classesApi.update(cls.id, {
+        starts_at: new Date(f.starts_at).toISOString(), ends_at: new Date(f.ends_at).toISOString(),
+        trainer_id: f.trainer_id || null, meeting_url: f.meeting_url || null,
+      });
+      onDone();
+    } catch (e) { onError(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Reschedule · {cls.title}</DialogTitle>
+      <DialogContent sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr 1fr', pt: 1 }}>
+        <TextField size="small" type="datetime-local" label="Starts" InputLabelProps={{ shrink: true }} value={f.starts_at} onChange={set('starts_at')} />
+        <TextField size="small" type="datetime-local" label="Ends" InputLabelProps={{ shrink: true }} value={f.ends_at} onChange={set('ends_at')} />
+        <TextField select size="small" label="Teacher" value={f.trainer_id} onChange={set('trainer_id')} sx={{ gridColumn: '1 / -1' }}>
+          <MenuItem value="">— unassigned</MenuItem>
+          {trainers.map((t) => <MenuItem key={t.id} value={t.user_id}>{t.user_name}{t.role === 'head' ? ' (head)' : ''}</MenuItem>)}
+        </TextField>
+        <TextField size="small" label="Meeting URL" value={f.meeting_url} onChange={set('meeting_url')} sx={{ gridColumn: '1 / -1' }} placeholder="https://…" />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} sx={{ textTransform: 'none' }}>Cancel</Button>
+        <Button variant="contained" onClick={submit} disabled={busy} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>Save</Button>
       </DialogActions>
     </Dialog>
   );

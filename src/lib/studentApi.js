@@ -78,8 +78,8 @@ export const studentApi = {
   myClasses: () => doFetch('/classes/student/my/classes', { method: 'GET' }),
   openQuestions: (classId) => doFetch(`/classes/student/${classId}/open-questions`, { method: 'GET' }),
   answer: (classId, body) => doFetch(`/classes/student/${classId}/answer`, { method: 'POST', body: JSON.stringify(body) }),
-  preNotifyAbsence: (classId) => doFetch(`/classes/student/${classId}/pre-notify-absence`, { method: 'POST', body: '{}' }),
-  setJoinMode: (classId, join_mode) => doFetch(`/classes/student/${classId}/join-mode`, { method: 'POST', body: JSON.stringify({ join_mode }) }),
+  preNotifyAbsence: (classId, reason) => doFetch(`/classes/student/${classId}/pre-notify-absence`, { method: 'POST', body: JSON.stringify({ reason: reason || undefined }) }),
+  setJoinMode: (classId, join_mode, reason) => doFetch(`/classes/student/${classId}/join-mode`, { method: 'POST', body: JSON.stringify({ join_mode, reason: reason || undefined }) }),
   // Recordings + announcements.
   recordings: () => doFetch('/community/student/recordings', { method: 'GET' }),
   recordingUrl: (id) => doFetch(`/community/student/recordings/${id}/url`, { method: 'GET' }),

@@ -104,7 +104,7 @@ export default function TrainerClassConsole({ cls, onClose }) {
           <TableBody>
             {table.map((r) => (
               <TableRow key={r.student_id}>
-                <TableCell>{r.name}{r.pre_notified_absent ? ' · pre-notified' : ''}</TableCell>
+                <TableCell>{r.name}{r.pre_notified_absent ? ' · pre-notified' : ''}{r.reason ? <div style={{ fontSize: 11, color: '#b45309', marginTop: 2, fontStyle: 'italic' }}>“{r.reason}”</div> : null}</TableCell>
                 <TableCell align="center">{r.answered}</TableCell>
                 <TableCell align="center" sx={{ color: '#64748b' }}>{r.join_mode || '—'}</TableCell>
                 <TableCell align="center">
