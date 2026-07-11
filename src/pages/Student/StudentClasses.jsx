@@ -30,7 +30,7 @@ export default function StudentClasses() {
   const preNotify = async (cid) => { try { await studentApi.preNotifyAbsence(cid); toast.show('Marked absent for this class'); load(); } catch (e) { toast.show(e.message); } };
   const setJoin = async (cid, mode) => { try { await studentApi.setJoinMode(cid, mode); toast.show(`Joining ${mode}`); } catch (e) { toast.show(e.message); } };
 
-  const statusTone = (s) => s === 'present' ? 'success' : s === 'absent' ? 'danger' : 'warning';
+  const statusTone = (s) => (s === 'present' ? 'success' : s === 'absent' ? 'danger' : s === 'pending' ? 'warning' : 'neutral');
 
   return (
     <div>
