@@ -95,6 +95,9 @@ import StudentTests from './pages/Student/StudentTests'
 import StudentProjects from './pages/Student/StudentProjects'
 import StudentLeaderboard from './pages/Student/StudentLeaderboard'
 import StudentInterviews from './pages/Student/StudentInterviews'
+import StudentMaterials from './pages/Student/StudentMaterials'
+import StudentCertificate from './pages/Student/StudentCertificate'
+import TrainerMaterials from './pages/Trainer/TrainerMaterials'
 
 // Each route declares the backend tab key it requires.
 // `<ProtectedRoute tab="...">` redirects to /dashboard if user lacks access.
@@ -127,6 +130,8 @@ function App() {
           <Route path="projects" element={<StudentProjects />} />
           <Route path="leaderboard" element={<StudentLeaderboard />} />
           <Route path="interviews" element={<StudentInterviews />} />
+          <Route path="materials" element={<StudentMaterials />} />
+          <Route path="certificate" element={<StudentCertificate />} />
           <Route path="catalog" element={<StudentCatalog />} />
           <Route path="profile" element={<StudentProfile />} />
         </Route>
@@ -188,6 +193,7 @@ function App() {
         <Route path="/trainer/projects" element={<ProtectedRoute tab="trainer.projects"><Layout><TrainerProjects /></Layout></ProtectedRoute>} />
         <Route path="/trainer/interviews" element={<ProtectedRoute tab="trainer.interviews"><Layout><TrainerInterviews /></Layout></ProtectedRoute>} />
         <Route path="/trainer/leaderboard" element={<ProtectedRoute tab="trainer.leaderboard"><Layout><TrainerLeaderboard /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/materials" element={<ProtectedRoute tab="trainer.materials"><Layout><TrainerMaterials /></Layout></ProtectedRoute>} />
         {/* Admin + branch-manager LMS analytics + student sudo-login. */}
         <Route path="/lms/analytics" element={<ProtectedRoute tab="lms.analytics"><Layout><LmsAnalytics /></Layout></ProtectedRoute>} />
         <Route path="/tickets" element={<ProtectedRoute><Layout><Tickets /></Layout></ProtectedRoute>} />

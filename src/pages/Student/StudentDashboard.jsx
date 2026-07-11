@@ -21,12 +21,14 @@ export default function StudentDashboard() {
   const [d, setD] = useState(null);
   const [err, setErr] = useState('');
   const [notifs, setNotifs] = useState({ items: [], unread: 0 });
+  const [extras, setExtras] = useState(null); // { streak, badges, progress, rank }
 
   const loadNotifs = () => studentApi.notifications().then((r) => setNotifs(r?.data ?? r ?? { items: [], unread: 0 })).catch(() => {});
   useEffect(() => {
     studentApi.dashboard().then((r) => { const data = r?.data ?? r; setD(data); if (data?.tenant) studentAuth.setTenant(data.tenant); })
       .catch((e) => setErr(e?.message || 'Could not load your dashboard'));
     loadNotifs();
+    studentApi.homeExtras().then((r) => setExtras(r?.data ?? r)).catch(() => {}); // pings streak + returns badges/progress
   }, []);
   const markAll = async () => { try { await studentApi.markAllNotifRead(); loadNotifs(); } catch { /* ignore */ } };
 
@@ -66,6 +68,44 @@ export default function StudentDashboard() {
         <Stat icon={QuizIcon} tint="#2563eb" label="Tests" value={`${s.tests_attempted}/${s.tests_total}`} sub="attempted" />
         <Stat icon={AssignmentIcon} tint="#7c5cfc" label="Projects" value={`${s.projects_submitted}/${s.projects_total}`} sub="submitted" />
       </div>
+
+      {/* Progress, streak & achievements */}
+      {extras && (
+        <div style={{ background: '#fff', borderRadius: 16, padding: 18, boxShadow: '0 2px 10px -6px rgba(15,23,42,0.15)', border: '1px solid #eef0f5', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 18 }}>🏅</span>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>Your progress & achievements</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 999, padding: '5px 12px' }}>
+              <span style={{ fontSize: 16 }}>🔥</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#c2410c' }}>{extras.streak?.current || 0}-day streak</span>
+              {extras.streak?.longest > (extras.streak?.current || 0) && <span style={{ fontSize: 11.5, color: '#9a3412' }}>· best {extras.streak.longest}</span>}
+            </div>
+          </div>
+
+          {/* Course progress bar */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: '#64748b', fontWeight: 600, marginBottom: 6 }}>
+              <span>Course completion</span>
+              <span>{extras.progress?.completed || 0}/{extras.progress?.total || 0} modules · {extras.progress?.pct || 0}%</span>
+            </div>
+            <div style={{ height: 8, background: '#eef2f7', borderRadius: 999, overflow: 'hidden' }}>
+              <div style={{ width: `${extras.progress?.pct || 0}%`, height: '100%', background: accent, borderRadius: 999, transition: 'width .3s' }} />
+            </div>
+          </div>
+
+          {/* Badges */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 10 }}>
+            {(extras.badges || []).map((b) => (
+              <div key={b.key} title={b.hint} style={{ textAlign: 'center', padding: '12px 6px', borderRadius: 12, border: '1px solid #eef0f5', background: b.earned ? '#fffdf5' : '#f8fafc', opacity: b.earned ? 1 : 0.55, filter: b.earned ? 'none' : 'grayscale(1)' }}>
+                <div style={{ fontSize: 26, lineHeight: 1 }}>{b.icon}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', marginTop: 6 }}>{b.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Content cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>

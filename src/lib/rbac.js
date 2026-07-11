@@ -68,11 +68,13 @@ const ROLE_TRAINER_TABS = [
   'trainer.classes', 'trainer.attendance', 'trainer.recordings',
   'trainer.announcements', 'trainer.forum', 'trainer.tests',
   'trainer.projects', 'trainer.interviews', 'trainer.leaderboard',
+  'trainer.materials',
 ];
 const ROLE_HEAD_TRAINER_TABS = ['courses.manage', ...ROLE_TRAINER_TABS];
 const ROLE_STUDENT_TABS = [
   'student.home', 'student.classes', 'student.forum', 'student.tests',
   'student.projects', 'student.leaderboard', 'student.catalog',
+  'student.materials', 'student.certificate',
 ];
 
 const FALLBACK_TABS = {
@@ -168,6 +170,7 @@ const TAB_TO_ROUTE = {
   'trainer.projects':      '/trainer/projects',
   'trainer.interviews':    '/trainer/interviews',
   'trainer.leaderboard':   '/trainer/leaderboard',
+  'trainer.materials':     '/trainer/materials',
   'lms.analytics':         '/lms/analytics',
   // ---- Student panel (separate /student/* layout) ----
   'student.home':          '/student/home',
@@ -177,6 +180,8 @@ const TAB_TO_ROUTE = {
   'student.projects':      '/student/projects',
   'student.leaderboard':   '/student/leaderboard',
   'student.catalog':       '/student/catalog',
+  'student.materials':     '/student/materials',
+  'student.certificate':   '/student/certificate',
 };
 
 // First route the current user is allowed to land on. Used by login and

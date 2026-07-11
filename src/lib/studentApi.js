@@ -114,6 +114,14 @@ export const studentApi = {
   updateProfile: (body) => doFetch('/student-auth/profile', { method: 'PUT', body: JSON.stringify(body) }),
   profilePresign: (body) => doFetch('/student-auth/profile/presign', { method: 'POST', body: JSON.stringify(body) }),
   setCv: (body) => doFetch('/student-auth/profile/cv', { method: 'POST', body: JSON.stringify(body) }),
+  // Learning layer.
+  materials: () => doFetch('/learning/student/materials', { method: 'GET' }),
+  materialUrl: (id) => doFetch(`/learning/student/materials/${id}/download`, { method: 'GET' }),
+  progress: () => doFetch('/learning/student/progress', { method: 'GET' }),
+  setProgress: (moduleId, completed) => doFetch(`/learning/student/progress/${moduleId}`, { method: 'PUT', body: JSON.stringify({ completed }) }),
+  certificate: () => doFetch('/learning/student/certificate', { method: 'GET' }),
+  claimCertificate: () => doFetch('/learning/student/certificate/claim', { method: 'POST', body: '{}' }),
+  homeExtras: () => doFetch('/learning/student/home-extras', { method: 'POST', body: '{}' }),
 };
 
 export { StudentApiError };

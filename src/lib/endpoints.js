@@ -800,4 +800,15 @@ export const lmsAnalyticsApi = {
   sudoStudent: (id) => api.post(`/lms-analytics/students/${id}/sudo-login`),
 };
 
+// ---- LMS: learning layer (materials, progress, certificates) — trainer/admin ----
+export const learningApi = {
+  listMaterials: (programId) => api.get('/learning/materials', { programId }),
+  createMaterial: (body) => api.post('/learning/materials', body),
+  deleteMaterial: (id) => api.delete(`/learning/materials/${id}`),
+  materialUrl: (id) => api.get(`/learning/materials/${id}/download`),
+  progress: (programId) => api.get('/learning/progress', { programId }),
+  listCertificates: (programId) => api.get('/learning/certificates', { programId }),
+  issueCertificate: (body) => api.post('/learning/certificates/issue', body),
+};
+
 export { auth };

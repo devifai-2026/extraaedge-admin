@@ -20,6 +20,8 @@ import RecordVoiceOverOutlinedIcon from '@mui/icons-material/RecordVoiceOverOutl
 import LeaderboardOutlinedIcon from '@mui/icons-material/LeaderboardOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import PersonOutlineIcon from '@mui/icons-material/AccountCircleOutlined';
+import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
+import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
 
 const GROUPS = [
@@ -31,6 +33,7 @@ const GROUPS = [
     { to: '/student/classes', label: 'Classes', icon: CalendarMonthOutlinedIcon },
     { to: '/student/attendance', label: 'Attendance', icon: EventAvailableOutlinedIcon },
     { to: '/student/recordings', label: 'Recordings', icon: VideoLibraryOutlinedIcon },
+    { to: '/student/materials', label: 'Materials', icon: MenuBookOutlinedIcon },
   ] },
   { heading: 'Engage', items: [
     { to: '/student/announcements', label: 'Announcements', icon: CampaignOutlinedIcon },
@@ -43,6 +46,7 @@ const GROUPS = [
     { to: '/student/leaderboard', label: 'Leaderboard', icon: LeaderboardOutlinedIcon },
   ] },
   { heading: 'You', items: [
+    { to: '/student/certificate', label: 'Certificate', icon: WorkspacePremiumOutlinedIcon },
     { to: '/student/catalog', label: 'Explore Courses', icon: StorefrontOutlinedIcon },
     { to: '/student/profile', label: 'My Profile', icon: PersonOutlineIcon },
   ] },
