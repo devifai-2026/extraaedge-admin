@@ -522,10 +522,12 @@ function CapstoneTab({ programId, notify, canManage }) {
       ) : (
         <Card pad={0} style={{ overflow: 'hidden' }}>
           <Table size="small">
-            <TableHead><TableRow sx={{ background: '#fafbfc', '& th': { color: '#64748b', fontWeight: 700, fontSize: 12 } }}><TableCell>Capstone</TableCell><TableCell align="center">Max</TableCell><TableCell align="center">Submitted</TableCell><TableCell align="center">Graded</TableCell><TableCell align="right" /></TableRow></TableHead>
+            <TableHead><TableRow sx={{ background: '#fafbfc', '& th': { color: '#64748b', fontWeight: 700, fontSize: 12 } }}><TableCell>Capstone</TableCell><TableCell>Batch</TableCell><TableCell align="center">Max</TableCell><TableCell align="center">Submitted</TableCell><TableCell align="center">Graded</TableCell><TableCell align="right" /></TableRow></TableHead>
             <TableBody>{rows.map((c) => (
               <TableRow key={c.id} hover>
-                <TableCell>{c.title}</TableCell><TableCell align="center">{c.max_marks}</TableCell><TableCell align="center">{c.submission_count}</TableCell><TableCell align="center">{c.graded_count}</TableCell>
+                <TableCell>{c.title}</TableCell>
+                <TableCell>{c.batch_name ? <Chip size="small" label={c.batch_name} /> : <span style={{ color: '#94a3b8', fontSize: 12 }}>All batches</span>}</TableCell>
+                <TableCell align="center">{c.max_marks}</TableCell><TableCell align="center">{c.submission_count}</TableCell><TableCell align="center">{c.graded_count}</TableCell>
                 <TableCell align="right"><Button size="small" onClick={() => setSubsFor(c)} sx={{ textTransform: 'none' }}>Submissions</Button></TableCell>
               </TableRow>
             ))}</TableBody>
@@ -539,13 +541,15 @@ function CapstoneTab({ programId, notify, canManage }) {
 }
 
 function CreateCapstoneDialog({ programId, onClose, onDone, onError }) {
-  const [f, setF] = useState({ title: '', brief: '', marking_scheme: '', max_marks: 100, deadline: '' });
+  const [f, setF] = useState({ title: '', brief: '', marking_scheme: '', max_marks: 100, deadline: '', batch_id: '' });
+  const [batches, setBatches] = useState([]);
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
+  useEffect(() => { coursesApi.listBatches(programId).then((r) => setBatches((r?.data || []).filter((b) => b.status !== 'merged'))).catch(() => {}); }, [programId]);
   const submit = async () => {
     if (!f.title.trim()) { onError('Title required'); return; }
     setBusy(true);
-    try { await capstoneApi.create({ program_id: programId, title: f.title.trim(), brief: f.brief || null, marking_scheme: f.marking_scheme || null, max_marks: Number(f.max_marks) || 100, deadline: f.deadline ? new Date(f.deadline).toISOString() : null }); onDone(); }
+    try { await capstoneApi.create({ program_id: programId, batch_id: f.batch_id || null, title: f.title.trim(), brief: f.brief || null, marking_scheme: f.marking_scheme || null, max_marks: Number(f.max_marks) || 100, deadline: f.deadline ? new Date(f.deadline).toISOString() : null }); onDone(); }
     catch (e) { onError(e.message); } finally { setBusy(false); }
   };
   return (
@@ -553,6 +557,11 @@ function CreateCapstoneDialog({ programId, onClose, onDone, onError }) {
       <DialogTitle>New capstone</DialogTitle>
       <DialogContent sx={{ display: 'grid', gap: 2, pt: 1 }}>
         <TextField size="small" label="Title" value={f.title} onChange={set('title')} />
+        <TextField select size="small" label="Batch" value={f.batch_id} onChange={set('batch_id')}
+          helperText="Leave as “All batches” for a course-wide capstone, or target one batch.">
+          <MenuItem value="">All batches (course-wide)</MenuItem>
+          {batches.map((b) => <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>)}
+        </TextField>
         <TextField size="small" label="Brief" multiline minRows={2} value={f.brief} onChange={set('brief')} />
         <TextField size="small" label="Marking scheme" multiline minRows={2} value={f.marking_scheme} onChange={set('marking_scheme')} />
         <Box sx={{ display: 'flex', gap: 2 }}>
