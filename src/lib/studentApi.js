@@ -123,6 +123,9 @@ export const studentApi = {
   // Capstone.
   capstones: () => doFetch('/capstone/student', { method: 'GET' }),
   submitCapstone: (id, body) => doFetch(`/capstone/student/${id}/submit`, { method: 'POST', body: JSON.stringify(body) }),
+  // Job openings (placement).
+  jobsFeed: () => doFetch('/placement/student/feed', { method: 'GET' }),
+  applyToJob: (id) => doFetch(`/placement/student/openings/${id}/apply`, { method: 'POST', body: '{}' }),
   // Profile presign is reused for capstone file uploads (kind handled server-side).
 };
 

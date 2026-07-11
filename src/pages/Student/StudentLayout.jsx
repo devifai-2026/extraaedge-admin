@@ -24,6 +24,7 @@ import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import PersonOutlineIcon from '@mui/icons-material/AccountCircleOutlined';
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined';
+import WorkOutlineIcon from '@mui/icons-material/WorkOutlineOutlined';
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
 
@@ -50,6 +51,9 @@ const GROUPS = [
     { to: '/student/interviews', label: 'Interviews', icon: RecordVoiceOverOutlinedIcon },
     { to: '/student/leaderboard', label: 'Leaderboard', icon: LeaderboardOutlinedIcon },
   ] },
+  { heading: 'Career', items: [
+    { to: '/student/jobs', label: 'Job Openings', icon: WorkOutlineIcon },
+  ] },
   { heading: 'You', items: [
     { to: '/student/certificate', label: 'Certificate', icon: WorkspacePremiumOutlinedIcon },
     { to: '/student/catalog', label: 'Explore Courses', icon: StorefrontOutlinedIcon },
@@ -73,7 +77,8 @@ const TOUR_STEPS = [
   { selector: '[data-tour="/student/capstone"]', icon: '🚀', title: 'Capstone', body: 'Your big end-of-course project — submit your deployed link + repo and get graded.' },
   { selector: '[data-tour="/student/interviews"]', icon: '🎤', title: 'Mock Interviews', body: 'See your interview slots, join links and the feedback you receive.' },
   { selector: '[data-tour="/student/leaderboard"]', icon: '🏆', title: 'Leaderboard', body: 'See where you rank — combining tests, projects, attendance and interviews.' },
-  { selector: '[data-tour="/student/certificate"]', icon: '📜', title: 'Certificate', body: 'Track your completion requirements and claim your certificate when you qualify.' },
+  { selector: '[data-tour="/student/jobs"]', icon: '💼', title: 'Job Openings', body: 'Roles the placement team shares with you — apply and track your status.' },
+  { selector: '[data-tour="/student/certificate"]', icon: '📜', title: 'Certificate', body: 'Your certificate is issued automatically once you complete the course — download it here.' },
   { selector: '[data-tour="/student/catalog"]', icon: '🛍️', title: 'Explore Courses', body: 'Interested in more? Browse other courses and send an enquiry.' },
   { selector: '[data-tour="/student/profile"]', icon: '🪪', title: 'My Profile', body: 'Add your photo, CV, links and skills — a complete profile earns you a badge!' },
 ];
