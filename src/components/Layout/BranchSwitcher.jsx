@@ -6,22 +6,26 @@
 import { useEffect, useState } from 'react';
 import { Select, MenuItem, Box } from '@mui/material';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
-import { branchesApi } from '../../lib/endpoints';
+import { branchesApi, coursesApi } from '../../lib/endpoints';
 import { auth } from '../../lib/api';
 import { isRole, ROLES } from '../../lib/rbac';
 
 export default function BranchSwitcher() {
   const isAdmin = isRole(ROLES.SUPER_ADMIN);
+  const isTeacher = isRole(ROLES.HEAD_TRAINER, ROLES.TRAINER);
   const [branches, setBranches] = useState([]);
   const [active, setActive] = useState(auth.getActiveBranch() || '');
 
   useEffect(() => {
-    if (!isAdmin) return;
-    branchesApi.list().then((res) => setBranches(res?.data || [])).catch(() => setBranches([]));
-  }, [isAdmin]);
+    if (isAdmin) branchesApi.list().then((res) => setBranches(res?.data || [])).catch(() => setBranches([]));
+    else if (isTeacher) coursesApi.myBranches().then((res) => setBranches(res?.data || [])).catch(() => setBranches([]));
+  }, [isAdmin, isTeacher]);
 
-  // Only show the switcher to admins of a multi-branch tenant.
-  if (!isAdmin || branches.length === 0) return null;
+  // Admins see it in any multi-branch tenant. Teaching staff see it only when
+  // they actually work across 2+ branches (otherwise there's nothing to switch).
+  if (isAdmin) { if (branches.length === 0) return null; }
+  else if (isTeacher) { if (branches.length < 2) return null; }
+  else return null;
 
   const onChange = (e) => {
     const val = e.target.value;

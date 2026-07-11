@@ -441,6 +441,7 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
           ? user.manager_ids
           : (user.manager_id ? [user.manager_id] : []),
         branch_id: user.branch_id || '',
+        branch_ids: Array.isArray(user.branch_ids) ? user.branch_ids : [],
         is_active: !!user.is_active,
       });
       setErr('');
@@ -455,6 +456,7 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
   const hasBranches = branches.length > 0;
   const isSuperAdmin = form.role === 'super_admin';
   const isBranchManager = form.role === 'branch_manager';
+  const isTeachingRole = form.role === 'head_trainer' || form.role === 'trainer';
   const branchRequired = hasBranches && !isSuperAdmin && !isBranchManager;
 
   const save = async () => {
@@ -478,6 +480,8 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
         manager_ids: isBranchManager ? [] : (Array.isArray(form.manager_ids) ? form.manager_ids : []),
         // super_admin spans all branches → null; others carry their branch.
         branch_id: isSuperAdmin ? null : (form.branch_id || null),
+        // Extra branches a trainer/head works across (multi-branch).
+        ...(isTeachingRole ? { branch_ids: Array.isArray(form.branch_ids) ? form.branch_ids : [] } : {}),
       };
       await usersApi.update(user.id, payload);
       onSaved?.();
@@ -607,6 +611,19 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
               {branches.length === 0 && <MenuItem disabled value="">No branches yet</MenuItem>}
               {!branchRequired && <MenuItem value=""><em>None</em></MenuItem>}
               {branches.map((b) => (
+                <MenuItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ''}</MenuItem>
+              ))}
+            </TextField>
+          )}
+          {isTeachingRole && (
+            <TextField
+              size="small" select label="Additional branches" disabled={!canManage}
+              SelectProps={{ multiple: true, renderValue: (sel) => (sel || []).map((id) => branches.find((b) => b.id === id)?.name || '').filter(Boolean).join(', ') || 'None' }}
+              value={Array.isArray(form.branch_ids) ? form.branch_ids : []}
+              onChange={(e) => setForm({ ...form, branch_ids: e.target.value })}
+              helperText="Other branches this trainer works across (they can switch between them)."
+            >
+              {branches.filter((b) => b.id !== form.branch_id).map((b) => (
                 <MenuItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ''}</MenuItem>
               ))}
             </TextField>
@@ -807,6 +824,7 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
         ...(!isBranchManager && form.manager_ids.length ? { manager_ids: form.manager_ids } : {}),
         // super_admin spans all branches; others carry their branch.
         ...(isSuperAdmin ? {} : (form.branch_id ? { branch_id: form.branch_id } : {})),
+        ...(isTeachingRole ? { branch_ids: Array.isArray(form.branch_ids) ? form.branch_ids : [] } : {}),
       };
       const res = await usersApi.create(payload);
       const newUser = res?.data ?? res;
@@ -952,6 +970,19 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
               ))}
             </TextField>
           )}
+          {isTeachingRole && (
+            <TextField
+              size="small" select label="Additional branches"
+              SelectProps={{ multiple: true, renderValue: (sel) => (sel || []).map((id) => branches.find((b) => b.id === id)?.name || '').filter(Boolean).join(', ') || 'None' }}
+              value={Array.isArray(form.branch_ids) ? form.branch_ids : []}
+              onChange={(e) => setForm({ ...form, branch_ids: e.target.value })}
+              helperText="Other branches this trainer works across (they can switch between them)."
+            >
+              {branches.filter((b) => b.id !== form.branch_id).map((b) => (
+                <MenuItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ''}</MenuItem>
+              ))}
+            </TextField>
+          )}
         </div>
         <FormControlLabel
           control={<Checkbox checked={form.allow_mobile} onChange={(e) => setForm({ ...form, allow_mobile: e.target.checked })} sx={{ color: '#E53935', '&.Mui-checked': { color: '#E53935' } }} />}
@@ -1011,7 +1042,7 @@ function AddUserDialog({ open, users, onClose, onCreated }) {
 const initialAddForm = () => ({
   first_name: '', last_name: '', email: '', phone: '', password: '',
   role: 'counsellor', role_id: '', designation: '', manager_ids: [],
-  branch_id: '',
+  branch_id: '', branch_ids: [],
   allow_mobile: true, program_id: '',
 });
 
