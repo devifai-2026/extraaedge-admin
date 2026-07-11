@@ -843,6 +843,7 @@ export const homeworkApi = {
 // ---- Placement: companies, job openings, applications ----
 export const placementApi = {
   counts: () => api.get('/placement/counts', withBranch()),
+  analytics: () => api.get('/placement/analytics', withBranch()),
   programModules: (programId) => api.get(`/placement/programs/${programId}/modules`),
   // Companies (list/counts honor the active-branch switcher via withBranch).
   // Creates inherit the active branch so a company/opening made while viewing a

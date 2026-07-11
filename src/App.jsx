@@ -116,6 +116,7 @@ import PlacementOpenings from './pages/Placement/PlacementOpenings'
 import PlacementApplications from './pages/Placement/PlacementApplications'
 import PlacementStages from './pages/Placement/PlacementStages'
 import PlacementStudentReport from './pages/Placement/PlacementStudentReport'
+import PlacementAnalytics from './pages/Placement/PlacementAnalytics'
 
 // Each route declares the backend tab key it requires.
 // `<ProtectedRoute tab="...">` redirects to /dashboard if user lacks access.
@@ -216,6 +217,7 @@ function App() {
         <Route path="/placement/applications" element={<ProtectedRoute tab="placement.applications"><Layout><PlacementApplications /></Layout></ProtectedRoute>} />
         <Route path="/placement/stages" element={<ProtectedRoute tab="placement.applications"><Layout><PlacementStages /></Layout></ProtectedRoute>} />
         <Route path="/placement/students/:id" element={<ProtectedRoute tab="placement.applications"><Layout><PlacementStudentReport /></Layout></ProtectedRoute>} />
+        <Route path="/placement/analytics" element={<ProtectedRoute tab="placement.dashboard"><Layout><PlacementAnalytics /></Layout></ProtectedRoute>} />
         <Route path="/trainer/courses" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerCourses /></Layout></ProtectedRoute>} />
         <Route path="/trainer/courses/:programId" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerCourseDetail /></Layout></ProtectedRoute>} />
         <Route path="/trainer/classes" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />
