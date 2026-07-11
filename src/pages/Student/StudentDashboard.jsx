@@ -12,6 +12,9 @@ export default function StudentDashboard() {
   const navigate = useNavigate();
   const [d, setD] = useState(null);
   const [err, setErr] = useState('');
+  const [notifs, setNotifs] = useState({ items: [], unread: 0 });
+
+  const loadNotifs = () => studentApi.notifications().then((r) => setNotifs(r?.data ?? r ?? { items: [], unread: 0 })).catch(() => {});
 
   useEffect(() => {
     studentApi.dashboard()
@@ -21,7 +24,10 @@ export default function StudentDashboard() {
         if (data?.tenant) studentAuth.setTenant(data.tenant); // feed the sidebar logo
       })
       .catch((e) => setErr(e?.message || 'Could not load your dashboard'));
+    loadNotifs();
   }, []);
+
+  const markAll = async () => { try { await studentApi.markAllNotifRead(); loadNotifs(); } catch { /* ignore */ } };
 
   if (err) return <div style={alertErr}>{err}</div>;
   if (!d) return <p style={{ color: '#94a3b8' }}>Loading your dashboard…</p>;
@@ -85,6 +91,21 @@ export default function StudentDashboard() {
           ) : <Empty text="No announcements yet." />}
         </Card>
 
+        {/* Notifications */}
+        <Card title={`Notifications${notifs.unread ? ` (${notifs.unread})` : ''}`} onMore={notifs.unread ? markAll : undefined} moreLabel="Mark all read">
+          {notifs.items?.length ? (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {notifs.items.slice(0, 5).map((n) => (
+                <div key={n.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', opacity: n.is_read ? 0.6 : 1, cursor: n.link ? 'pointer' : 'default' }}
+                  onClick={() => { if (n.link) { studentApi.markNotifRead(n.id).catch(() => {}); navigate(n.link); } }}>
+                  {!n.is_read && <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#E53935', marginTop: 6, flexShrink: 0 }} />}
+                  <span style={{ fontSize: 13, color: '#334155' }}>{n.message}</span>
+                </div>
+              ))}
+            </div>
+          ) : <Empty text="No notifications yet." />}
+        </Card>
+
         {/* Explore other courses */}
         <Card title="Explore more" onMore={() => navigate('/student/catalog')}>
           <div style={{ fontSize: 13, color: '#64748b', marginBottom: 10 }}>Discover other courses you can enrol in.</div>
@@ -103,11 +124,11 @@ const Stat = ({ label, value, sub, accent }) => (
   </div>
 );
 
-const Card = ({ title, children, onMore }) => (
+const Card = ({ title, children, onMore, moreLabel = 'View all' }) => (
   <div style={{ background: '#fff', border: '1px solid #eef0f4', borderRadius: 14, padding: 18, boxShadow: '0 1px 2px rgba(15,23,42,0.04)' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{title}</div>
-      {onMore && <button onClick={onMore} style={{ border: 'none', background: 'none', color: '#2563eb', fontSize: 12, cursor: 'pointer' }}>View all</button>}
+      {onMore && <button onClick={onMore} style={{ border: 'none', background: 'none', color: '#2563eb', fontSize: 12, cursor: 'pointer' }}>{moreLabel}</button>}
     </div>
     {children}
   </div>

@@ -105,6 +105,10 @@ export const studentApi = {
   // Course catalog + enquiry.
   catalog: () => doFetch('/catalog', { method: 'GET' }),
   enquire: (programId) => doFetch(`/catalog/${programId}/enquire`, { method: 'POST', body: '{}' }),
+  // Notifications.
+  notifications: (unread) => doFetch(`/student-notifications${unread ? '?unread=true' : ''}`, { method: 'GET' }),
+  markNotifRead: (id) => doFetch(`/student-notifications/${id}/read`, { method: 'POST', body: '{}' }),
+  markAllNotifRead: () => doFetch('/student-notifications/read-all', { method: 'POST', body: '{}' }),
   // Profile.
   getProfile: () => doFetch('/student-auth/profile', { method: 'GET' }),
   updateProfile: (body) => doFetch('/student-auth/profile', { method: 'PUT', body: JSON.stringify(body) }),
