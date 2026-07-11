@@ -2,6 +2,8 @@
 // submit a live URL + GitHub URL, and view marks + feedback once graded.
 import { useEffect, useState, useCallback } from 'react';
 import { studentApi } from '../../lib/studentApi';
+import { PageHeader } from '../../lib/lmsUi';
+import AssignmentIcon from '@mui/icons-material/AssignmentOutlined';
 
 const fmt = (v) => { try { return new Date(v).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };
 
@@ -16,7 +18,7 @@ export default function StudentProjects() {
   if (loading) return <p style={{ color: '#94a3b8' }}>Loading projects…</p>;
   return (
     <div>
-      <h2 style={{ fontSize: 20, color: '#0f172a', margin: '0 0 12px' }}>Projects</h2>
+      <PageHeader title="Projects" subtitle="Submit your work and track grades." icon={AssignmentIcon} />
       {rows.length === 0 ? <div style={{ color: '#94a3b8' }}>No projects yet.</div> : (
         <div style={{ display: 'grid', gap: 12 }}>
           {rows.map((p) => <ProjectCard key={p.id} p={p} onSubmitted={() => { setToast('Submitted'); load(); }} onError={setToast} />)}

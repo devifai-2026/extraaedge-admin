@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { studentApi } from '../../lib/studentApi';
 import { ThreadCard } from '../Trainer/TrainerForum';
+import { PageHeader } from '../../lib/lmsUi';
+import ForumIcon from '@mui/icons-material/ForumOutlined';
 
 export default function StudentForum() {
   const [threads, setThreads] = useState([]);
@@ -36,9 +38,9 @@ export default function StudentForum() {
 
   return (
     <div>
-      <h2 style={{ fontSize: 20, margin: '0 0 12px', color: '#0f172a' }}>Ask your trainers</h2>
+      <PageHeader title="Forum" subtitle="Ask your trainers a doubt — mention them to notify directly." icon={ForumIcon} />
 
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+      <div style={{ background: '#fff', border: '1px solid #eef0f5', borderRadius: 16, padding: 18, marginBottom: 16, boxShadow: '0 2px 12px -8px rgba(15,23,42,0.18)' }}>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Question title" style={inp} />
         <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Describe your doubt…" rows={3} style={{ ...inp, resize: 'vertical' }} />
         {trainers.length > 0 && (

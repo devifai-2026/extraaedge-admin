@@ -2,6 +2,8 @@
 // time) and marks/feedback once graded.
 import { useEffect, useState } from 'react';
 import { studentApi } from '../../lib/studentApi';
+import { PageHeader } from '../../lib/lmsUi';
+import InterviewIcon from '@mui/icons-material/RecordVoiceOverOutlined';
 
 const fmt = (v) => { try { return new Date(v).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };
 
@@ -14,7 +16,7 @@ export default function StudentInterviews() {
   if (loading) return <p style={{ color: '#94a3b8' }}>Loading…</p>;
   return (
     <div>
-      <h2 style={{ fontSize: 20, color: '#0f172a', margin: '0 0 12px' }}>Mock Interviews</h2>
+      <PageHeader title="Mock Interviews" subtitle="Your assigned slots, join links and scores." icon={InterviewIcon} />
       {rows.length === 0 ? <div style={{ color: '#94a3b8' }}>No interviews assigned yet.</div> : (
         <div style={{ display: 'grid', gap: 12 }}>
           {rows.map((s) => (
