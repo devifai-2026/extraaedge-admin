@@ -99,6 +99,7 @@ import StudentMaterials from './pages/Student/StudentMaterials'
 import StudentCertificate from './pages/Student/StudentCertificate'
 import StudentHowItWorks from './pages/Student/StudentHowItWorks'
 import TrainerMaterials from './pages/Trainer/TrainerMaterials'
+import TrainerDashboard from './pages/Trainer/TrainerDashboard'
 
 // Each route declares the backend tab key it requires.
 // `<ProtectedRoute tab="...">` redirects to /dashboard if user lacks access.
@@ -184,6 +185,7 @@ function App() {
         <Route path="/my-students" element={<ProtectedRoute tab="admissions.my_students"><Layout><MyStudents /></Layout></ProtectedRoute>} />
 
         {/* ---- LMS trainer surfaces (staff app, role-gated by trainer.* tabs) ---- */}
+        <Route path="/trainer/dashboard" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerDashboard /></Layout></ProtectedRoute>} />
         <Route path="/trainer/courses" element={<ProtectedRoute tab="courses.manage"><Layout><TrainerCourses /></Layout></ProtectedRoute>} />
         <Route path="/trainer/courses/:programId" element={<ProtectedRoute tab="courses.manage"><Layout><TrainerCourseDetail /></Layout></ProtectedRoute>} />
         <Route path="/trainer/classes" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />

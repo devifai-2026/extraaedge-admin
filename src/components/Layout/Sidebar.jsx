@@ -156,6 +156,7 @@ const menuSections = [
     icon: SchoolIcon,
     section: true,
     children: [
+      { id: 199, label: 'Dashboard',     icon: SchoolIcon,          path: '/trainer/dashboard',     tab: 'trainer.classes' },
       { id: 200, label: 'My Courses',    icon: SchoolIcon,          path: '/trainer/courses',       tab: 'courses.manage' },
       { id: 201, label: 'Classes',       icon: CalendarTodayIcon,   path: '/trainer/classes',       tab: 'trainer.classes' },
       { id: 202, label: 'Attendance',    icon: HowToRegIcon,        path: '/trainer/attendance',    tab: 'trainer.attendance' },

@@ -2,9 +2,9 @@
 // Batch ops (create / place student / merge, with the recordings-share toggle)
 // are head-trainer/admin only; the backend enforces it, and errors surface here.
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Box, Tabs, Tab, Button, TextField, Alert, Snackbar,
+  Box, Tabs, Tab, Button, TextField, Alert, Snackbar, Paper, Typography, Chip,
   CircularProgress, IconButton, Dialog, DialogTitle, DialogContent,
   DialogActions, MenuItem, FormControlLabel, Checkbox, Table, TableHead, TableRow, TableCell, TableBody,
 } from '@mui/material';
@@ -20,7 +20,9 @@ import StudentProfileDialog from '../../components/StudentProfileDialog/StudentP
 export default function TrainerCourseDetail() {
   const { programId } = useParams();
   const navigate = useNavigate();
-  const [tab, setTab] = useState(0);
+  const [searchParams] = useSearchParams();
+  const TAB_INDEX = { modules: 0, trainers: 1, batches: 2 };
+  const [tab, setTab] = useState(TAB_INDEX[searchParams.get('tab')] ?? 0);
   const [course, setCourse] = useState(null);
   const [error, setError] = useState('');
   const [toast, setToast] = useState(null);

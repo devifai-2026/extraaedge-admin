@@ -1,18 +1,20 @@
 // Trainer Classes — schedule classes for a course's batch, and open the live
 // console (start/end, fire attendance MCQs, watch present/absent update live).
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box, Button, TextField, MenuItem, Alert, Snackbar, CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, Dialog, DialogTitle, DialogContent, DialogActions,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import { PageHeader, Card, EmptyState, Badge } from '../../lib/lmsUi';
+import { PageHeader, Card, EmptyState, Badge, Btn } from '../../lib/lmsUi';
 import { coursesApi, classesApi } from '../../lib/endpoints';
 import { fmtDate } from '../Accounts/utils';
 import TrainerClassConsole from './TrainerClassConsole';
 
 export default function TrainerClasses() {
+  const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
   const [programId, setProgramId] = useState('');
   const [batches, setBatches] = useState([]);
@@ -50,7 +52,15 @@ export default function TrainerClasses() {
         )}
       </Box>
 
-      {loading ? <CircularProgress /> : programId && (
+      {programId && !loading && batches.length === 0 && (
+        <Card style={{ marginBottom: 16, borderLeft: '3px solid #d97706' }}>
+          <EmptyState icon="👥" title="Create a batch first"
+            text="Classes are scheduled into a batch (a cohort of students). Add a batch to this course, then come back to schedule classes."
+            action={<Btn onClick={() => navigate(`/trainer/courses/${programId}?tab=batches`)}>Go to Batches →</Btn>} />
+        </Card>
+      )}
+
+      {loading ? <CircularProgress /> : programId && batches.length > 0 && (
         classes.length === 0 ? (
           <Card><EmptyState icon="📅" title="No classes yet" text="Schedule your first class for this course — students see it instantly with join links." /></Card>
         ) : (
