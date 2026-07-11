@@ -17,6 +17,7 @@ import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
 import QuizOutlinedIcon from '@mui/icons-material/QuizOutlined';
 import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined';
+import RocketLaunchOutlinedIcon from '@mui/icons-material/RocketLaunchOutlined';
 import RecordVoiceOverOutlinedIcon from '@mui/icons-material/RecordVoiceOverOutlined';
 import LeaderboardOutlinedIcon from '@mui/icons-material/LeaderboardOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
@@ -45,6 +46,7 @@ const GROUPS = [
   { heading: 'Assess', items: [
     { to: '/student/tests', label: 'Tests', icon: QuizOutlinedIcon },
     { to: '/student/projects', label: 'Projects', icon: AssignmentOutlinedIcon },
+    { to: '/student/capstone', label: 'Capstone', icon: RocketLaunchOutlinedIcon },
     { to: '/student/interviews', label: 'Interviews', icon: RecordVoiceOverOutlinedIcon },
     { to: '/student/leaderboard', label: 'Leaderboard', icon: LeaderboardOutlinedIcon },
   ] },
@@ -68,6 +70,7 @@ const TOUR_STEPS = [
   { selector: '[data-tour="/student/forum"]', icon: '💬', title: 'Forum', body: 'Stuck on something? Post a doubt and your trainers will answer.' },
   { selector: '[data-tour="/student/tests"]', icon: '📝', title: 'Tests', body: 'Attempt mock tests and instantly see your score.' },
   { selector: '[data-tour="/student/projects"]', icon: '🗂️', title: 'Projects', body: 'Submit your projects (live + GitHub links) and get graded with feedback.' },
+  { selector: '[data-tour="/student/capstone"]', icon: '🚀', title: 'Capstone', body: 'Your big end-of-course project — submit your deployed link + repo and get graded.' },
   { selector: '[data-tour="/student/interviews"]', icon: '🎤', title: 'Mock Interviews', body: 'See your interview slots, join links and the feedback you receive.' },
   { selector: '[data-tour="/student/leaderboard"]', icon: '🏆', title: 'Leaderboard', body: 'See where you rank — combining tests, projects, attendance and interviews.' },
   { selector: '[data-tour="/student/certificate"]', icon: '📜', title: 'Certificate', body: 'Track your completion requirements and claim your certificate when you qualify.' },

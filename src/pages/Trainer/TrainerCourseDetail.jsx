@@ -18,12 +18,12 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import MergeIcon from '@mui/icons-material/CallMerge';
 import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
 import { PageHeader, Card, EmptyState, Badge, Btn, Progress, ACCENT } from '../../lib/lmsUi';
-import { coursesApi, classesApi, learningApi } from '../../lib/endpoints';
+import { coursesApi, classesApi, learningApi, capstoneApi } from '../../lib/endpoints';
 import { isRole } from '../../lib/rbac';
 import { fmtDate } from '../Accounts/utils';
 import StudentProfileDialog from '../../components/StudentProfileDialog/StudentProfileDialog';
 
-const TAB_INDEX = { modules: 0, trainers: 1, batches: 2, attendance: 3 };
+const TAB_INDEX = { modules: 0, trainers: 1, batches: 2, attendance: 3, capstone: 4 };
 
 export default function TrainerCourseDetail() {
   const { programId } = useParams();
@@ -56,12 +56,14 @@ export default function TrainerCourseDetail() {
         <Tab label="Trainers" />
         <Tab label="Batches" />
         <Tab label="Attendance" />
+        <Tab label="Capstone" />
       </Tabs>
 
       {tab === 0 && <ModulesTab programId={programId} notify={notify} canManage={canManage} />}
       {tab === 1 && <TrainersTab programId={programId} notify={notify} canManage={canManage} />}
       {tab === 2 && <BatchesTab programId={programId} notify={notify} canManage={canManage} />}
       {tab === 3 && <AttendanceTab programId={programId} notify={notify} />}
+      {tab === 4 && <CapstoneTab programId={programId} notify={notify} canManage={canManage} />}
 
       <Snackbar open={!!toast} autoHideDuration={4000} onClose={() => setToast(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         {toast ? <Alert severity={toast.severity} onClose={() => setToast(null)}>{toast.text}</Alert> : undefined}
@@ -481,6 +483,113 @@ function AttendanceTab({ programId, notify }) {
         </Table>
       )}
     </Card>
+  );
+}
+
+// ---------- Capstone (course-level project) ----------
+function CapstoneTab({ programId, notify, canManage }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [subsFor, setSubsFor] = useState(null);
+  const load = useCallback(() => { setLoading(true); capstoneApi.list(programId).then((r) => setRows(r?.data || [])).catch((e) => notify('error', e.message)).finally(() => setLoading(false)); }, [programId, notify]);
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <CircularProgress />;
+  return (
+    <div>
+      {canManage && <div style={{ marginBottom: 12 }}><Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} sx={{ textTransform: 'none', bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' } }}>New capstone</Button></div>}
+      {rows.length === 0 ? (
+        <Card><EmptyState icon="🚀" title="No capstone yet" text={canManage ? 'Add a capstone brief — students submit a live link + GitHub for you to grade.' : 'No capstone has been set for this course yet.'} /></Card>
+      ) : (
+        <Card pad={0} style={{ overflow: 'hidden' }}>
+          <Table size="small">
+            <TableHead><TableRow sx={{ background: '#fafbfc', '& th': { color: '#64748b', fontWeight: 700, fontSize: 12 } }}><TableCell>Capstone</TableCell><TableCell align="center">Max</TableCell><TableCell align="center">Submitted</TableCell><TableCell align="center">Graded</TableCell><TableCell align="right" /></TableRow></TableHead>
+            <TableBody>{rows.map((c) => (
+              <TableRow key={c.id} hover>
+                <TableCell>{c.title}</TableCell><TableCell align="center">{c.max_marks}</TableCell><TableCell align="center">{c.submission_count}</TableCell><TableCell align="center">{c.graded_count}</TableCell>
+                <TableCell align="right"><Button size="small" onClick={() => setSubsFor(c)} sx={{ textTransform: 'none' }}>Submissions</Button></TableCell>
+              </TableRow>
+            ))}</TableBody>
+          </Table>
+        </Card>
+      )}
+      {createOpen && <CreateCapstoneDialog programId={programId} onClose={() => setCreateOpen(false)} onDone={() => { setCreateOpen(false); load(); notify('success', 'Capstone created'); }} onError={(m) => notify('error', m)} />}
+      {subsFor && <CapstoneSubmissionsDialog capstone={subsFor} onClose={() => setSubsFor(null)} onGraded={() => { load(); }} onError={(m) => notify('error', m)} />}
+    </div>
+  );
+}
+
+function CreateCapstoneDialog({ programId, onClose, onDone, onError }) {
+  const [f, setF] = useState({ title: '', brief: '', marking_scheme: '', max_marks: 100, deadline: '' });
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
+  const submit = async () => {
+    if (!f.title.trim()) { onError('Title required'); return; }
+    setBusy(true);
+    try { await capstoneApi.create({ program_id: programId, title: f.title.trim(), brief: f.brief || null, marking_scheme: f.marking_scheme || null, max_marks: Number(f.max_marks) || 100, deadline: f.deadline ? new Date(f.deadline).toISOString() : null }); onDone(); }
+    catch (e) { onError(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>New capstone</DialogTitle>
+      <DialogContent sx={{ display: 'grid', gap: 2, pt: 1 }}>
+        <TextField size="small" label="Title" value={f.title} onChange={set('title')} />
+        <TextField size="small" label="Brief" multiline minRows={2} value={f.brief} onChange={set('brief')} />
+        <TextField size="small" label="Marking scheme" multiline minRows={2} value={f.marking_scheme} onChange={set('marking_scheme')} />
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <TextField size="small" type="number" label="Max marks" value={f.max_marks} onChange={set('max_marks')} sx={{ width: 130 }} />
+          <TextField size="small" type="datetime-local" label="Deadline" InputLabelProps={{ shrink: true }} value={f.deadline} onChange={set('deadline')} />
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} sx={{ textTransform: 'none' }}>Cancel</Button>
+        <Button variant="contained" onClick={submit} disabled={busy} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>Create</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function CapstoneSubmissionsDialog({ capstone, onClose, onGraded, onError }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(() => { setLoading(true); capstoneApi.submissions(capstone.id).then((r) => setRows(r?.data || [])).catch((e) => onError(e.message)).finally(() => setLoading(false)); }, [capstone.id, onError]);
+  useEffect(() => { load(); }, [load]);
+  const grade = async (submissionId, marks, feedback) => { try { await capstoneApi.grade(capstone.id, { submission_id: submissionId, marks: Number(marks), feedback }); load(); onGraded(); } catch (e) { onError(e.message); } };
+  return (
+    <Dialog open onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>{capstone.title} — submissions (max {capstone.max_marks})</DialogTitle>
+      <DialogContent>
+        {loading ? <CircularProgress /> : rows.length === 0 ? <EmptyState icon="🚀" title="No submissions yet" text="Students' capstone submissions will show up here to grade." /> : (
+          <Table size="small">
+            <TableHead><TableRow sx={{ background: '#fafbfc' }}><TableCell>Student</TableCell><TableCell>Links</TableCell><TableCell align="right">Marks</TableCell><TableCell align="right" /></TableRow></TableHead>
+            <TableBody>{rows.map((s) => <CapstoneGradeRow key={s.id} s={s} max={capstone.max_marks} onGrade={grade} />)}</TableBody>
+          </Table>
+        )}
+      </DialogContent>
+      <DialogActions><Button onClick={onClose} sx={{ textTransform: 'none' }}>Close</Button></DialogActions>
+    </Dialog>
+  );
+}
+
+function CapstoneGradeRow({ s, max, onGrade }) {
+  const [marks, setMarks] = useState(s.marks ?? '');
+  const [fb, setFb] = useState(s.feedback ?? '');
+  return (
+    <TableRow>
+      <TableCell>{s.name}<div style={{ fontSize: 11, color: '#94a3b8' }}>{s.email}</div></TableCell>
+      <TableCell sx={{ fontSize: 12 }}>
+        {s.live_url && <a href={s.live_url} target="_blank" rel="noreferrer" style={{ color: '#2563eb', display: 'block' }}>Live ↗</a>}
+        {s.github_url && <a href={s.github_url} target="_blank" rel="noreferrer" style={{ color: '#2563eb', display: 'block' }}>GitHub ↗</a>}
+        {s.file_url && <a href={s.file_url} target="_blank" rel="noreferrer" style={{ color: '#2563eb', display: 'block' }}>File ↗</a>}
+        {!s.live_url && !s.github_url && !s.file_url && <span style={{ color: '#94a3b8' }}>—</span>}
+      </TableCell>
+      <TableCell align="right"><TextField size="small" type="number" value={marks} onChange={(e) => setMarks(e.target.value)} sx={{ width: 80 }} inputProps={{ min: 0, max }} /></TableCell>
+      <TableCell align="right">
+        <TextField size="small" placeholder="Feedback" value={fb} onChange={(e) => setFb(e.target.value)} sx={{ width: 150, mr: 1 }} />
+        <Button size="small" onClick={() => onGrade(s.id, marks, fb)} disabled={marks === ''} sx={{ textTransform: 'none' }}>Save</Button>
+      </TableCell>
+    </TableRow>
   );
 }
 

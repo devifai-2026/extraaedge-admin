@@ -121,6 +121,10 @@ export const studentApi = {
   certificate: () => doFetch('/learning/student/certificate', { method: 'GET' }),
   claimCertificate: () => doFetch('/learning/student/certificate/claim', { method: 'POST', body: '{}' }),
   homeExtras: () => doFetch('/learning/student/home-extras', { method: 'POST', body: '{}' }),
+  // Capstone.
+  capstones: () => doFetch('/capstone/student', { method: 'GET' }),
+  submitCapstone: (id, body) => doFetch(`/capstone/student/${id}/submit`, { method: 'POST', body: JSON.stringify(body) }),
+  // Profile presign is reused for capstone file uploads (kind handled server-side).
 };
 
 export { StudentApiError };

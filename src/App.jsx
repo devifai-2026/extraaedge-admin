@@ -97,6 +97,7 @@ import StudentLeaderboard from './pages/Student/StudentLeaderboard'
 import StudentInterviews from './pages/Student/StudentInterviews'
 import StudentMaterials from './pages/Student/StudentMaterials'
 import StudentCertificate from './pages/Student/StudentCertificate'
+import StudentCapstone from './pages/Student/StudentCapstone'
 import StudentHowItWorks from './pages/Student/StudentHowItWorks'
 import TrainerMaterials from './pages/Trainer/TrainerMaterials'
 import TrainerDashboard from './pages/Trainer/TrainerDashboard'
@@ -137,6 +138,7 @@ function App() {
           <Route path="leaderboard" element={<StudentLeaderboard />} />
           <Route path="interviews" element={<StudentInterviews />} />
           <Route path="materials" element={<StudentMaterials />} />
+          <Route path="capstone" element={<StudentCapstone />} />
           <Route path="certificate" element={<StudentCertificate />} />
           <Route path="how-it-works" element={<StudentHowItWorks />} />
           <Route path="catalog" element={<StudentCatalog />} />

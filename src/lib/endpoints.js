@@ -806,6 +806,15 @@ export const interviewsApi = {
   hrQueue: () => api.get('/interviews/hr/queue'),
 };
 
+// ---- LMS: capstone (course-level project) — trainer/head/admin ----
+export const capstoneApi = {
+  list: (programId) => api.get('/capstone', { programId }),
+  create: (body) => api.post('/capstone', body),
+  remove: (id) => api.delete(`/capstone/${id}`),
+  submissions: (id) => api.get(`/capstone/${id}/submissions`),
+  grade: (id, body) => api.post(`/capstone/${id}/grade`, body),
+};
+
 // ---- LMS: admin analytics + student sudo-login (super_admin/branch_mgr) ----
 export const lmsAnalyticsApi = {
   dashboard: () => api.get('/lms-analytics/dashboard'),
