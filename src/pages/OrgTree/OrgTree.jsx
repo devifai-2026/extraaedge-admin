@@ -13,18 +13,35 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { useNavigate } from 'react-router-dom';
 import { usersApi } from '../../lib/endpoints';
 
-const ROLE_TIER = { super_admin: 0, branch_manager: 1, sales_manager: 2, counsellor: 3 };
+// Full-institute tiers: owner → branch → department leads → front-line staff.
+// Sales, Accounts, Training, HR and Placement all sit under the branch tier.
+const ROLE_TIER = {
+  super_admin: 0,
+  branch_manager: 1,
+  sales_manager: 2, account_manager: 2, head_trainer: 2, hr: 2, placement: 2,
+  counsellor: 3, trainer: 3,
+};
 const ROLE_COLOR = {
   super_admin: '#E53935',
   branch_manager: '#8e24aa',
   sales_manager: '#1976d2',
+  account_manager: '#0891b2',
+  head_trainer: '#c2410c',
+  hr: '#0d9488',
+  placement: '#7c3aed',
   counsellor: '#2e7d32',
+  trainer: '#ea580c',
 };
 const ROLE_LABEL = {
   super_admin: 'Super Admin',
   branch_manager: 'Branch Manager',
   sales_manager: 'Sales Manager',
+  account_manager: 'Accounts',
+  head_trainer: 'Head Trainer',
+  hr: 'HR',
+  placement: 'Placement',
   counsellor: 'Counsellor',
+  trainer: 'Trainer',
 };
 
 // Tier-based layout: place each role tier on its own horizontal row,
@@ -140,10 +157,17 @@ export default function OrgTree() {
   const { nodes, edges } = useMemo(() => layout(raw.nodes, raw.edges), [raw]);
 
   const tierCounts = useMemo(() => {
-    const c = { super_admin: 0, branch_manager: 0, sales_manager: 0, counsellor: 0 };
+    const c = {};
     for (const n of raw.nodes) c[n.role] = (c[n.role] || 0) + 1;
     return c;
   }, [raw]);
+  // A compact "N Label · M Label" summary across every role actually present,
+  // ordered by tier then label.
+  const summary = useMemo(() => Object.entries(tierCounts)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => (ROLE_TIER[a[0]] ?? 9) - (ROLE_TIER[b[0]] ?? 9))
+    .map(([role, n]) => `${n} ${ROLE_LABEL[role] || role}`)
+    .join(' · '), [tierCounts]);
 
   return (
     <Box sx={{ height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}>
@@ -151,7 +175,7 @@ export default function OrgTree() {
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 600 }}>Org Tree</Typography>
           <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
-            {tierCounts.super_admin} super admin · {tierCounts.branch_manager} branch manager{tierCounts.branch_manager === 1 ? '' : 's'} · {tierCounts.sales_manager} manager{tierCounts.sales_manager === 1 ? '' : 's'} · {tierCounts.counsellor} counsellor{tierCounts.counsellor === 1 ? '' : 's'}
+            {summary || 'No staff yet'}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
