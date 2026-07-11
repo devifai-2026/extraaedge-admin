@@ -3,7 +3,7 @@
 // toggle that drives the certificate + dashboard.
 import { useEffect, useState } from 'react';
 import { studentApi } from '../../lib/studentApi';
-import { PageHeader, Card, EmptyState, Badge, Skeleton, Progress, Toast, ACCENT } from '../../lib/lmsUi';
+import { PageHeader, Card, EmptyState, Badge, Skeleton, ACCENT } from '../../lib/lmsUi';
 import SchoolIcon from '@mui/icons-material/SchoolOutlined';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
@@ -12,33 +12,17 @@ export default function StudentHome() {
   const [view, setView] = useState(null);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
-  const [done, setDone] = useState({});      // moduleId → bool
+  const [done, setDone] = useState({});      // moduleId → bool (certified by trainer)
   const [pct, setPct] = useState(0);
-  const [busy, setBusy] = useState('');
-  const [toast, setToast] = useState('');
-
-  const loadProgress = () => studentApi.progress().then((r) => {
-    const d = r?.data ?? r;
-    setDone(Object.fromEntries((d.modules || []).map((m) => [m.id, m.completed])));
-    setPct(d.pct || 0);
-  }).catch(() => {});
 
   useEffect(() => {
     studentApi.myCourse().then((r) => setView(r?.data ?? r)).catch((e) => setErr(e?.message || 'Could not load your course')).finally(() => setLoading(false));
-    loadProgress();
-  }, []);
-
-  const toggle = async (moduleId) => {
-    const next = !done[moduleId];
-    setBusy(moduleId);
-    try {
-      const r = await studentApi.setProgress(moduleId, next);
+    studentApi.progress().then((r) => {
       const d = r?.data ?? r;
       setDone(Object.fromEntries((d.modules || []).map((m) => [m.id, m.completed])));
       setPct(d.pct || 0);
-      setToast(next ? 'Module marked complete 🎉' : 'Module marked incomplete');
-    } catch (e) { setToast(e.message); } finally { setBusy(''); }
-  };
+    }).catch(() => {});
+  }, []);
 
   const course = view?.course;
   const modules = view?.modules || [];
@@ -89,11 +73,10 @@ export default function StudentHome() {
                       <span style={{ width: 28, height: 28, borderRadius: 8, background: `color-mix(in srgb, ${ACCENT} 12%, transparent)`, color: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13 }}>{i + 1}</span>
                       <div style={{ fontWeight: 700, color: '#0f172a', flex: 1 }}>{m.name}</div>
                       {m.trainer_name && <Badge tone="neutral">{m.trainer_name}</Badge>}
-                      <button onClick={() => toggle(m.id)} disabled={busy === m.id}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, border: `1px solid ${isDone ? '#16a34a' : '#cbd5e1'}`, background: isDone ? '#dcfce7' : '#fff', color: isDone ? '#15803d' : '#475569', borderRadius: 999, padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                        {isDone ? <CheckCircleIcon sx={{ fontSize: 16 }} /> : <RadioButtonUncheckedIcon sx={{ fontSize: 16 }} />}
-                        {isDone ? 'Completed' : 'Mark complete'}
-                      </button>
+                      {/* Completion is certified by the trainer — read-only for students. */}
+                      {isDone
+                        ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#15803d', fontSize: 12.5, fontWeight: 700 }}><CheckCircleIcon sx={{ fontSize: 16 }} /> Completed</span>
+                        : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12.5, fontWeight: 600 }}><RadioButtonUncheckedIcon sx={{ fontSize: 16 }} /> In progress</span>}
                     </div>
                     {m.description && <div style={{ fontSize: 13, color: '#64748b', margin: '0 0 8px 38px' }}>{m.description}</div>}
                     {Array.isArray(m.syllabus) && m.syllabus.length > 0 && (
@@ -108,7 +91,6 @@ export default function StudentHome() {
           )}
         </>
       )}
-      <Toast msg={toast} onClose={() => setToast('')} />
     </div>
   );
 }

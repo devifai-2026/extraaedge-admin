@@ -117,8 +117,7 @@ export const studentApi = {
   // Learning layer.
   materials: () => doFetch('/learning/student/materials', { method: 'GET' }),
   materialUrl: (id) => doFetch(`/learning/student/materials/${id}/download`, { method: 'GET' }),
-  progress: () => doFetch('/learning/student/progress', { method: 'GET' }),
-  setProgress: (moduleId, completed) => doFetch(`/learning/student/progress/${moduleId}`, { method: 'PUT', body: JSON.stringify({ completed }) }),
+  progress: () => doFetch('/learning/student/progress', { method: 'GET' }), // read-only; trainers certify completion
   certificate: () => doFetch('/learning/student/certificate', { method: 'GET' }),
   claimCertificate: () => doFetch('/learning/student/certificate/claim', { method: 'POST', body: '{}' }),
   homeExtras: () => doFetch('/learning/student/home-extras', { method: 'POST', body: '{}' }),

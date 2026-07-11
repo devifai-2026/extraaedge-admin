@@ -810,6 +810,8 @@ export const lmsAnalyticsApi = {
 
 // ---- LMS: learning layer (materials, progress, certificates) — trainer/admin ----
 export const learningApi = {
+  moduleCompletion: (moduleId, programId) => api.get(`/learning/module/${moduleId}/completion`, { programId }),
+  markModuleCompletion: (body) => api.post('/learning/module-completion', body),
   listMaterials: (programId) => api.get('/learning/materials', { programId }),
   createMaterial: (body) => api.post('/learning/materials', body),
   deleteMaterial: (id) => api.delete(`/learning/materials/${id}`),

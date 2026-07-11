@@ -81,6 +81,7 @@ function ModulesTab({ programId, notify, canManage }) {
   const [open, setOpen] = useState({}); // moduleId → expanded
   const [topicInput, setTopicInput] = useState({}); // moduleId → draft topic
   const [scheduleFor, setScheduleFor] = useState(null); // module to schedule a class in
+  const [completionFor, setCompletionFor] = useState(null); // module to certify completion
 
   const load = useCallback(() => {
     Promise.all([
@@ -178,6 +179,12 @@ function ModulesTab({ programId, notify, canManage }) {
                         </div>
                       )}
                     </div>
+                    {canManage && (
+                      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <SubHead>Completion</SubHead>
+                        <Button size="small" onClick={() => setCompletionFor(m)} sx={{ textTransform: 'none', color: '#E53935' }}>Certify students →</Button>
+                      </div>
+                    )}
                     <div style={{ marginBottom: 12 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <SubHead>Classes ({mClasses.length})</SubHead>
@@ -218,7 +225,63 @@ function ModulesTab({ programId, notify, canManage }) {
       )}
       {scheduleFor && <ScheduleClassDialog programId={programId} moduleId={scheduleFor.id} moduleName={scheduleFor.name} batches={batches}
         onClose={() => setScheduleFor(null)} onDone={() => { setScheduleFor(null); load(); notify('success', 'Class scheduled'); }} onError={(m) => notify('error', m)} />}
+      {completionFor && <ModuleCompletionDialog programId={programId} moduleId={completionFor.id} moduleName={completionFor.name}
+        onClose={() => setCompletionFor(null)} onSaved={() => { load(); }} onError={(m) => notify('error', m)} notify={notify} />}
     </div>
+  );
+}
+
+// Trainer certifies which students have completed a module (per-student + a
+// "mark all" bulk action). Drives student progress + certificate eligibility.
+function ModuleCompletionDialog({ programId, moduleId, moduleName, onClose, onSaved, onError, notify }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    setLoading(true);
+    learningApi.moduleCompletion(moduleId, programId).then((r) => setRows(r?.data || [])).catch((e) => onError(e.message)).finally(() => setLoading(false));
+  }, [moduleId, programId, onError]);
+  useEffect(() => { load(); }, [load]);
+
+  const set = async (studentIds, completed) => {
+    if (!studentIds.length) return;
+    setBusy(true);
+    try { const r = await learningApi.markModuleCompletion({ program_id: programId, module_id: moduleId, student_ids: studentIds, completed }); setRows(r?.data || []); onSaved(); notify('success', completed ? 'Marked complete' : 'Marked incomplete'); }
+    catch (e) { onError(e.message); } finally { setBusy(false); }
+  };
+
+  const allIds = rows.map((r) => r.student_id);
+  const doneCount = rows.filter((r) => r.completed).length;
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Completion · {moduleName}</DialogTitle>
+      <DialogContent>
+        {loading ? <CircularProgress /> : rows.length === 0 ? <EmptyState icon="👥" title="No students" text="No students are enrolled in this course yet." /> : (
+          <>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <div style={{ fontSize: 13, color: '#64748b' }}>{doneCount}/{rows.length} completed</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button size="small" disabled={busy} onClick={() => set(allIds, true)} sx={{ textTransform: 'none' }}>Mark all complete</Button>
+                <Button size="small" disabled={busy} onClick={() => set(allIds, false)} sx={{ textTransform: 'none', color: '#64748b' }}>Clear all</Button>
+              </div>
+            </Box>
+            <Table size="small">
+              <TableHead><TableRow sx={{ background: '#fafbfc', '& th': { color: '#64748b', fontWeight: 700, fontSize: 12 } }}><TableCell>Student</TableCell><TableCell>Batch</TableCell><TableCell align="center">Completed</TableCell></TableRow></TableHead>
+              <TableBody>
+                {rows.map((r) => (
+                  <TableRow key={r.student_id} hover>
+                    <TableCell>{r.name}<div style={{ fontSize: 11, color: '#94a3b8' }}>{r.email}</div></TableCell>
+                    <TableCell sx={{ color: '#64748b' }}>{r.batch_name || '—'}</TableCell>
+                    <TableCell align="center"><Checkbox size="small" checked={!!r.completed} disabled={busy} onChange={(e) => set([r.student_id], e.target.checked)} /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </>
+        )}
+      </DialogContent>
+      <DialogActions><Button onClick={onClose} sx={{ textTransform: 'none' }}>Done</Button></DialogActions>
+    </Dialog>
   );
 }
 
