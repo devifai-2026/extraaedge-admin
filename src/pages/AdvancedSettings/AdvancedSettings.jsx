@@ -15,6 +15,7 @@ import AutorenewIcon from "@mui/icons-material/Autorenew";
 import RuleFolderOutlinedIcon from "@mui/icons-material/RuleFolderOutlined";
 import AccountBalanceOutlinedIcon from "@mui/icons-material/AccountBalanceOutlined";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
+import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import "./AdvancedSettings.css";
 
 const sections = [
@@ -37,6 +38,17 @@ const sections = [
         label: "Receipt Settings",
         description: "Organisation details on the receipt header, receipt number format, and footer terms — with a live preview.",
         path: "/advancedsettings/receipts",
+      },
+    ],
+  },
+  {
+    icon: <GraphicEqIcon sx={{ fontSize: 20, color: "#7b6b3a" }} />,
+    title: "Mobile Call Recorder",
+    items: [
+      {
+        label: "Recorder App Settings",
+        description: "Folder path the counsellor app scans for call recordings and the daily upload time.",
+        path: "/advancedsettings/recorder",
       },
     ],
   },

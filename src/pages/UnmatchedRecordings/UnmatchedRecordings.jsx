@@ -1,10 +1,16 @@
 import React, { useCallback, useEffect, useState } from "react";
 import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import IconButton from "@mui/material/IconButton";
 import Button from "@mui/material/Button";
 import Tooltip from "@mui/material/Tooltip";
 import CircularProgress from "@mui/material/CircularProgress";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogActions from "@mui/material/DialogActions";
 import { deviceRecordingsApi } from "../../lib/endpoints";
 import AddNewLead from "../../components/AddNewLead/AddNewLead";
 
@@ -58,6 +64,9 @@ export default function UnmatchedRecordings() {
   const [page, setPage] = useState(1);
   // Create-lead modal state: holds the recording we're creating a lead for.
   const [createFor, setCreateFor] = useState(null);
+  // Delete-confirm state: holds the recording pending deletion.
+  const [deleteFor, setDeleteFor] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -87,6 +96,21 @@ export default function UnmatchedRecordings() {
       }
     }
     load();
+  };
+
+  const handleDelete = async () => {
+    if (!deleteFor) return;
+    setDeleting(true); setError("");
+    try {
+      await deviceRecordingsApi.delete(deleteFor.id);
+      setDeleteFor(null);
+      load();
+    } catch (e) {
+      setError(e?.message || "Failed to delete recording");
+      setDeleteFor(null);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -129,6 +153,12 @@ export default function UnmatchedRecordings() {
                       Create Lead
                     </Button>
                   </Tooltip>
+                  <Tooltip title="Delete recording">
+                    <IconButton size="small" color="error" sx={{ ml: 1 }}
+                      onClick={() => setDeleteFor(r)}>
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 </td>
               </tr>
             ))}
@@ -144,6 +174,24 @@ export default function UnmatchedRecordings() {
           onCreated={handleCreated}
         />
       )}
+
+      <Dialog open={Boolean(deleteFor)} onClose={() => !deleting && setDeleteFor(null)}>
+        <DialogTitle>Delete this recording?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            The recording from <b>{deleteFor?.phone_raw || "this number"}</b> will be removed
+            permanently and can’t be recovered.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteFor(null)} disabled={deleting}>Cancel</Button>
+          <Button color="error" variant="contained" disableElevation onClick={handleDelete}
+            disabled={deleting}
+            startIcon={deleting ? <CircularProgress size={14} color="inherit" /> : <DeleteOutlineIcon />}>
+            {deleting ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
