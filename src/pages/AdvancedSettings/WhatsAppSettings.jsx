@@ -106,8 +106,76 @@ export default function WhatsAppSettings() {
               }} />
             </Paper>
           )}
+
+          <TemplatesManager />
         </>
       )}
     </Box>
+  );
+}
+
+// Register WABridge-approved templates by portal id + body + variables, so the
+// chat composer can send them (needed outside the 24h window).
+function TemplatesManager() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ template_id: '', label: '', body: '', category: '' });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const load = () => whatsappApi.inbox.templates().then((r) => setRows(r?.data || [])).catch(() => setRows([])).finally(() => setLoading(false));
+  useEffect(() => { load(); }, []);
+
+  const varCount = (form.body.match(/\{\{\d+\}\}/g) || []).length;
+
+  const add = async () => {
+    if (!form.template_id.trim() || !form.label.trim() || !form.body.trim()) { setMsg({ severity: 'warning', text: 'Template id, label and body are required.' }); return; }
+    setBusy(true); setMsg(null);
+    try {
+      await whatsappApi.inbox.addTemplate(form);
+      setForm({ template_id: '', label: '', body: '', category: '' });
+      await load();
+      setMsg({ severity: 'success', text: 'Template saved.' });
+    } catch (err) { setMsg({ severity: 'error', text: err.message || 'Failed to save template' }); }
+    finally { setBusy(false); }
+  };
+  const remove = async (id) => { await whatsappApi.inbox.deleteTemplate(id).catch(() => {}); load(); };
+
+  return (
+    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, mt: 3 }}>
+      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Message Templates</Typography>
+      <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
+        Create the template in your WABridge portal (Meta-approved), then register it here with its
+        template id and message text. Use <code>{'{{1}}'}</code>, <code>{'{{2}}'}</code>… for variables.
+        Templates let you message customers outside the 24-hour window.
+      </Typography>
+      {msg && <Alert severity={msg.severity} sx={{ mb: 2 }} onClose={() => setMsg(null)}>{msg.text}</Alert>}
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+        <TextField label="Template ID (from WABridge)" size="small" value={form.template_id} onChange={(e) => setForm((f) => ({ ...f, template_id: e.target.value }))} />
+        <TextField label="Label" size="small" value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} />
+      </Box>
+      <TextField label="Message body" size="small" fullWidth multiline minRows={2} sx={{ mt: 1.5 }}
+        value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+        helperText={`Detected variables: ${varCount}`} />
+      <Box sx={{ mt: 1.5, display: 'flex', gap: 1.5, alignItems: 'center' }}>
+        <TextField label="Category (optional)" size="small" value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} sx={{ width: 220 }} />
+        <Button variant="outlined" disabled={busy} onClick={add} sx={{ textTransform: 'none' }}>{busy ? 'Saving…' : 'Add template'}</Button>
+      </Box>
+
+      <Box sx={{ mt: 2.5 }}>
+        {loading ? <CircularProgress size={20} /> : rows.length === 0 ? (
+          <Typography variant="body2" sx={{ color: '#94a3b8' }}>No templates registered yet.</Typography>
+        ) : rows.map((t) => (
+          <Box key={t.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', py: 1, borderTop: '1px solid #eef2f6' }}>
+            <Box sx={{ pr: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>{t.label} <span style={{ color: '#94a3b8', fontWeight: 400 }}>· id {t.template_id} · {t.variable_count} vars</span></Typography>
+              <Typography variant="body2" sx={{ color: '#64748b', whiteSpace: 'pre-wrap' }}>{t.body}</Typography>
+            </Box>
+            <Button size="small" color="error" onClick={() => remove(t.id)} sx={{ textTransform: 'none', flexShrink: 0 }}>Delete</Button>
+          </Box>
+        ))}
+      </Box>
+    </Paper>
   );
 }
