@@ -231,11 +231,19 @@ export default function WhatsAppList() {
     try {
       const r = await whatsappApi.connection.status();
       const d = r?.data || {};
-      setStatus(d.status || "disconnected");
+      // Trust the live gateway status when present (it reflects the socket that
+      // actually holds the WhatsApp session); fall back to the DB row.
+      const effective = d.live_status || d.status || "disconnected";
+      setStatus(effective);
       setPhone(d.phone || null);
-      // If the gateway is holding a QR (pulled via /status), show it — this is
-      // the reliable fallback when the socket push doesn't arrive.
-      if ((d.live_status === "pending_qr" || d.status === "pending_qr") && d.qr) {
+
+      if (effective === "connected") {
+        // Pairing finished — flip the UI to the chat view even if the
+        // whatsapp_ready socket push never arrived (pull beats push).
+        setQrOpen(false);
+        setQr(null);
+      } else if ((d.live_status === "pending_qr" || d.status === "pending_qr") && d.qr) {
+        // Gateway is holding a QR — show it (reliable fallback to the push).
         qrArrivedRef.current = true;
         setQr(d.qr);
         setQrOpen(true);
@@ -289,14 +297,16 @@ export default function WhatsAppList() {
     return off;
   }, [activeLeadId, loadConversations, loadMessages]);
 
-  // While waiting on a QR, poll /status every 4s so the shown QR stays fresh
-  // (it rotates ~every 20s) even if socket pushes are missed. Stops once the
-  // dialog closes or we leave pending_qr.
+  // While pending_qr, poll /status every 4s so (a) the shown QR stays fresh (it
+  // rotates ~every 20s) and (b) we detect the flip to "connected" even if the
+  // whatsapp_ready socket push is missed. Runs whenever we're waiting to link,
+  // not just while the dialog is open, so the UI still flips to connected if the
+  // user leaves the dialog open in the background.
   useEffect(() => {
-    if (!qrOpen || status !== "pending_qr") return undefined;
+    if (status !== "pending_qr") return undefined;
     const t = setInterval(() => { loadStatus(); }, 4000);
     return () => clearInterval(t);
-  }, [qrOpen, status, loadStatus]);
+  }, [status, loadStatus]);
 
   // Auto-scroll thread to bottom on new messages.
   useEffect(() => {
