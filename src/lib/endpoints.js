@@ -332,6 +332,9 @@ export const whatsappApi = {
     markRead: (phone) => api.patch(`/whatsapp/inbox/chats/${encodeURIComponent(phone)}/read`),
     send: (phone, body) => api.post(`/whatsapp/inbox/chats/${encodeURIComponent(phone)}/send`, body), // { type, message | templateId+variables }
     templates: () => api.get('/whatsapp/inbox/templates'),
+    // Per-tenant WhatsApp config (super_admin) — WABridge keys + webhook URL.
+    getSettings: () => api.get('/whatsapp/inbox/settings'),
+    saveSettings: (body) => api.put('/whatsapp/inbox/settings', body),
   },
 };
 

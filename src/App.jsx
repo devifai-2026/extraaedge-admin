@@ -29,6 +29,7 @@ import Branches from './pages/AdvancedSettings/Branches'
 import TenantBranding from './pages/AdvancedSettings/TenantBranding'
 import ReceiptSettings from './pages/AdvancedSettings/ReceiptSettings'
 import RecorderSettings from './pages/AdvancedSettings/RecorderSettings'
+import WhatsAppSettings from './pages/AdvancedSettings/WhatsAppSettings'
 import DiscountApprovals from './pages/DiscountApprovals/DiscountApprovals'
 import TemplatesHub from './pages/AdvancedSettings/TemplatesHub'
 import SubscriptionPage from './pages/AdvancedSettings/SubscriptionPage'
@@ -193,6 +194,7 @@ function App() {
         <Route path="/advancedsettings/branding" element={<ProtectedRoute><Layout><TenantBranding /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/receipts" element={<ProtectedRoute><Layout><ReceiptSettings /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/recorder" element={<ProtectedRoute><Layout><RecorderSettings /></Layout></ProtectedRoute>} />
+        <Route path="/advancedsettings/whatsapp" element={<ProtectedRoute><Layout><WhatsAppSettings /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/dropdowns" element={<ProtectedRoute tab="advanced.dropdowns"><Layout><DropdownsHub /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/dropdowns/:type" element={<ProtectedRoute tab="advanced.dropdowns"><Layout><DropdownDetail /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/users" element={<ProtectedRoute tab="advanced.users_roles"><Layout><UsersAndRoles /></Layout></ProtectedRoute>} />

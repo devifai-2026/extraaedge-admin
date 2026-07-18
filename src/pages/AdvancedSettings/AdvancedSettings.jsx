@@ -11,6 +11,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import PublicIcon from "@mui/icons-material/Public";
 import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
+import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import AutorenewIcon from "@mui/icons-material/Autorenew";
 import RuleFolderOutlinedIcon from "@mui/icons-material/RuleFolderOutlined";
 import AccountBalanceOutlinedIcon from "@mui/icons-material/AccountBalanceOutlined";
@@ -49,6 +50,17 @@ const sections = [
         label: "Recorder App Settings",
         description: "Folder path the counsellor app scans for call recordings and the daily upload time.",
         path: "/advancedsettings/recorder",
+      },
+    ],
+  },
+  {
+    icon: <WhatsAppIcon sx={{ fontSize: 20, color: "#25D366" }} />,
+    title: "WhatsApp",
+    items: [
+      {
+        label: "WhatsApp Settings",
+        description: "Connect your WABridge account/number, and get the webhook URL for incoming messages.",
+        path: "/advancedsettings/whatsapp",
       },
     ],
   },
