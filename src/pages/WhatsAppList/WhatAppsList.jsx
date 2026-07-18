@@ -119,12 +119,14 @@ function TemplateDialog({ open, onClose, onSend }) {
       .catch(() => setTemplates([]))
       .finally(() => setLoading(false));
   }, [open]);
-  const pick = (t) => { setSelected(t); setVars(Array.from({ length: t.variableCount || 0 }, () => "")); };
-  const preview = selected ? (selected.bodyText || "").replace(/\{\{(\d+)\}\}/g, (_, n) => vars[Number(n) - 1] || `{{${n}}}`) : "";
+  // Local wa_templates rows: { id, template_id, label, body, variable_count }.
+  const pick = (t) => { setSelected(t); setVars(Array.from({ length: t?.variable_count || 0 }, () => "")); };
+  const preview = selected ? (selected.body || "").replace(/\{\{(\d+)\}\}/g, (_, n) => vars[Number(n) - 1] || `{{${n}}}`) : "";
   const send = async () => {
     if (!selected) return;
     setSending(true);
-    try { await onSend(selected.id, vars); onClose(); }
+    // Send the WABridge portal template_id, NOT our local row id.
+    try { await onSend(selected.template_id, vars); onClose(); }
     finally { setSending(false); }
   };
   return (
@@ -135,8 +137,8 @@ function TemplateDialog({ open, onClose, onSend }) {
           <>
             <TextField select fullWidth size="small" label="Template" value={selected?.id || ""}
               onChange={(e) => pick(templates.find((t) => t.id === e.target.value))} sx={{ mt: 1 }}>
-              {templates.length === 0 && <MenuItem value="" disabled>No approved templates</MenuItem>}
-              {templates.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+              {templates.length === 0 && <MenuItem value="" disabled>No templates. Add one in Settings → WhatsApp.</MenuItem>}
+              {templates.map((t) => <MenuItem key={t.id} value={t.id}>{t.label}</MenuItem>)}
             </TextField>
             {selected && (
               <>
