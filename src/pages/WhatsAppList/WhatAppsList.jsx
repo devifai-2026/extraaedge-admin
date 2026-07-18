@@ -230,8 +230,16 @@ export default function WhatsAppList() {
   const loadStatus = useCallback(async () => {
     try {
       const r = await whatsappApi.connection.status();
-      setStatus(r?.data?.status || "disconnected");
-      setPhone(r?.data?.phone || null);
+      const d = r?.data || {};
+      setStatus(d.status || "disconnected");
+      setPhone(d.phone || null);
+      // If the gateway is holding a QR (pulled via /status), show it — this is
+      // the reliable fallback when the socket push doesn't arrive.
+      if ((d.live_status === "pending_qr" || d.status === "pending_qr") && d.qr) {
+        qrArrivedRef.current = true;
+        setQr(d.qr);
+        setQrOpen(true);
+      }
     } catch { setStatus("disconnected"); }
   }, []);
 
@@ -281,6 +289,15 @@ export default function WhatsAppList() {
     return off;
   }, [activeLeadId, loadConversations, loadMessages]);
 
+  // While waiting on a QR, poll /status every 4s so the shown QR stays fresh
+  // (it rotates ~every 20s) even if socket pushes are missed. Stops once the
+  // dialog closes or we leave pending_qr.
+  useEffect(() => {
+    if (!qrOpen || status !== "pending_qr") return undefined;
+    const t = setInterval(() => { loadStatus(); }, 4000);
+    return () => clearInterval(t);
+  }, [qrOpen, status, loadStatus]);
+
   // Auto-scroll thread to bottom on new messages.
   useEffect(() => {
     if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
@@ -301,11 +318,13 @@ export default function WhatsAppList() {
       setStatus("pending_qr");
       setQrOpen(true);
 
-      // Fallback: if no QR shows up shortly (e.g. it fired before we joined, or
-      // a cold gateway was still waking), re-call connect. The backend re-emits
-      // the QR it's already holding, so this is cheap and idempotent.
-      for (let i = 0; i < 3 && !qrArrivedRef.current; i++) {
-        await new Promise((r) => setTimeout(r, 4000));
+      // Fallback: if no QR shows up shortly (socket push missed, or a cold
+      // gateway was still waking), poll /status — which now returns the QR the
+      // gateway is holding — and re-poke connect. Pull beats push here.
+      for (let i = 0; i < 6 && !qrArrivedRef.current; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        if (qrArrivedRef.current) break;
+        await loadStatus();                        // pulls the QR if the gateway has one
         if (qrArrivedRef.current) break;
         try { await whatsappApi.connection.connect(); } catch { /* keep waiting */ }
       }
