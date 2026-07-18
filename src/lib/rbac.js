@@ -55,6 +55,7 @@ const ROLE_COUNSELLOR_TABS = [
 // entirely from counsellors / managers. They never see /leadlist or
 // /followupmanager (those are sales-team surfaces).
 const ROLE_ACCOUNT_MANAGER_TABS = [
+  'whatsapp', // accounts team gets full WhatsApp visibility (all conversations)
   'accounts.dashboard',
   'accounts.pending_admissions',
   'accounts.this_month_admissions',
