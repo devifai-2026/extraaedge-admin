@@ -331,6 +331,11 @@ export const whatsappApi = {
     conversations: () => api.get('/whatsapp/connection/conversations'),
     messages: (lead_id) => api.get('/whatsapp/connection/messages', { lead_id }),
     send: (body) => api.post('/whatsapp/connection/send', body), // { lead_id, body }
+    // Full inbox (all WhatsApp chats mirrored from the linked account, not just
+    // CRM leads). Each chat is flagged with lead_id/lead_name when it matches.
+    allChats: () => api.get('/whatsapp/connection/all-chats'),
+    allMessages: (chat_id) => api.get('/whatsapp/connection/all-messages', { chat_id }),
+    allSend: (body) => api.post('/whatsapp/connection/all-send', body), // { chat_id, body }
   },
 };
 

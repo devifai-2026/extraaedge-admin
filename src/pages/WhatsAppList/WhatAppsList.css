@@ -243,6 +243,14 @@
 }
 .wa-convo-time { font-size: 11px; color: #8696a0; flex-shrink: 0; }
 
+/* "Lead" badge on chats that match a CRM lead */
+.wa-lead-badge {
+  display: inline-block; margin-left: 6px; padding: 0 6px;
+  font-size: 10px; font-weight: 700; line-height: 16px; vertical-align: middle;
+  color: #fff; background: #25D366; border-radius: 4px; text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
 /* Contact avatar */
 .wa-avatar {
   width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;

@@ -206,8 +206,11 @@ export default function WhatsAppList() {
   const [qr, setQr] = useState(null);
   const [qrOpen, setQrOpen] = useState(false);
 
+  // Full-inbox model: chats come from /all-chats (every WhatsApp chat mirrored
+  // from the linked account, each flagged with lead_id/lead_name when matched).
+  // The active thread is keyed by chat_id.
   const [conversations, setConversations] = useState([]);
-  const [activeLeadId, setActiveLeadId] = useState(null);
+  const [activeChatId, setActiveChatId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [loadingConvos, setLoadingConvos] = useState(false);
@@ -254,16 +257,16 @@ export default function WhatsAppList() {
   const loadConversations = useCallback(async () => {
     setLoadingConvos(true);
     try {
-      const r = await whatsappApi.connection.conversations();
+      const r = await whatsappApi.connection.allChats();
       setConversations(r?.data || []);
     } catch { setConversations([]); }
     finally { setLoadingConvos(false); }
   }, []);
 
-  const loadMessages = useCallback(async (leadId) => {
-    if (!leadId) return;
+  const loadMessages = useCallback(async (chatId) => {
+    if (!chatId) return;
     try {
-      const r = await whatsappApi.connection.messages(leadId);
+      const r = await whatsappApi.connection.allMessages(chatId);
       setMessages(r?.data || []);
     } catch { setMessages([]); }
   }, []);
@@ -285,7 +288,7 @@ export default function WhatsAppList() {
           setStatus("disconnected"); setPhone(null); break;
         case "whatsapp_message":
           loadConversations();
-          if (evt.lead_id && evt.lead_id === activeLeadId) loadMessages(activeLeadId);
+          if (activeChatId) loadMessages(activeChatId);
           break;
         case "whatsapp_status":
           setMessages((prev) => prev.map((m) =>
@@ -295,7 +298,19 @@ export default function WhatsAppList() {
       }
     });
     return off;
-  }, [activeLeadId, loadConversations, loadMessages]);
+  }, [activeChatId, loadConversations, loadMessages]);
+
+  // Real-time via pull: while connected, refresh the chat list (and the open
+  // thread) every ~6s. The gateway→API socket push is unreliable on free-tier
+  // hosting, so polling guarantees new/incoming messages appear regardless.
+  useEffect(() => {
+    if (status !== "connected") return undefined;
+    const t = setInterval(() => {
+      loadConversations();
+      if (activeChatId) loadMessages(activeChatId);
+    }, 6000);
+    return () => clearInterval(t);
+  }, [status, activeChatId, loadConversations, loadMessages]);
 
   // While pending_qr, poll /status every 4s so (a) the shown QR stays fresh (it
   // rotates ~every 20s) and (b) we detect the flip to "connected" even if the
@@ -347,48 +362,71 @@ export default function WhatsAppList() {
 
   const handleLogout = async () => {
     setBusy(true);
-    try { await whatsappApi.connection.logout(); setStatus("disconnected"); setPhone(null); setConversations([]); setMessages([]); setActiveLeadId(null); }
+    try { await whatsappApi.connection.logout(); setStatus("disconnected"); setPhone(null); setConversations([]); setMessages([]); setActiveChatId(null); }
     catch (e) { alert(e.message || "Failed to disconnect"); }
     finally { setBusy(false); }
   };
 
-  const openConversation = (leadId) => { setActiveLeadId(leadId); loadMessages(leadId); };
+  const openConversation = (chatId) => { setActiveChatId(chatId); loadMessages(chatId); };
 
-  // From the "Start new chat" picker: open an empty thread for the chosen lead.
-  // If they already have history it just selects the existing conversation;
-  // otherwise we seed a draft conversation so the thread renders immediately.
-  const openLeadChat = (lead) => {
+  // From the "Start new chat" picker: send to the chosen lead via the lead path
+  // (creates/rolls the lead conversation); the gateway mirrors it into the inbox,
+  // so after a refresh the chat appears in the unified list and we select it.
+  const openLeadChat = async (lead) => {
     setNewChatOpen(false);
     if (!lead) return;
-    const existing = conversations.find((c) => c.lead_id === lead.id);
-    if (!existing) {
-      setDraftConvo({
-        lead_id: lead.id,
-        lead_name: lead.name,
-        phone: lead.phone,
-        whatsapp_number: lead.whatsapp_number,
-        last_body: "",
-        last_at: null,
-        unread: 0,
-      });
-    }
-    setActiveLeadId(lead.id);
-    loadMessages(lead.id);
+    const num = (lead.whatsapp_number || lead.phone || "").replace(/\D+/g, "");
+    // Try to find an existing inbox chat for this lead's number.
+    await loadConversations();
+    const existing = conversations.find(
+      (c) => c.lead_id === lead.id || (num && (c.phone || "").endsWith(num.slice(-10))),
+    );
+    if (existing) { setActiveChatId(existing.id); loadMessages(existing.id); return; }
+    // No chat yet — seed a lightweight draft so the composer opens; the first
+    // send (via the lead path) creates the real chat.
+    setDraftConvo({
+      id: null,
+      lead_id: lead.id,
+      lead_name: lead.name,
+      phone: lead.phone,
+      name: lead.name,
+      last_body: "",
+      last_at: null,
+      unread: 0,
+      _leadFallback: lead,
+    });
+    setActiveChatId("__draft__");
+    setMessages([]);
   };
 
-  // Text send (optionally carrying an already-uploaded attachment key).
+  // Text/media send. Routes to the right backend:
+  //  - a real inbox chat  → /all-send { chat_id } (works for any chat)
+  //  - the lead draft      → /send { lead_id }     (media supported; creates the chat)
   const sendMessage = async ({ body, mediaKey }) => {
-    if (!activeLeadId) return;
+    const draftLead = activeChatId === "__draft__" ? (draftConvo?._leadFallback) : null;
+    if (!activeChatId) return false;
     setSending(true);
     try {
-      await whatsappApi.connection.send({
-        lead_id: activeLeadId,
-        ...(body ? { body } : {}),
-        ...(mediaKey ? { media_r2_key: mediaKey } : {}),
-      });
-      setDraftConvo((d) => (d && d.lead_id === activeLeadId ? null : d)); // real row replaces the draft
-      await loadMessages(activeLeadId);
-      loadConversations();
+      if (draftLead) {
+        await whatsappApi.connection.send({
+          lead_id: draftLead.id,
+          ...(body ? { body } : {}),
+          ...(mediaKey ? { media_r2_key: mediaKey } : {}),
+        });
+        // The gateway mirrors this into the inbox; reload and select the new chat.
+        setDraftConvo(null);
+        const r = await whatsappApi.connection.allChats();
+        const chats = r?.data || [];
+        setConversations(chats);
+        const num = (draftLead.whatsapp_number || draftLead.phone || "").replace(/\D+/g, "").slice(-10);
+        const match = chats.find((c) => c.lead_id === draftLead.id || (num && (c.phone || "").endsWith(num)));
+        if (match) { setActiveChatId(match.id); loadMessages(match.id); }
+      } else {
+        if (mediaKey) { alert("Attachments are supported on lead chats for now."); return false; }
+        await whatsappApi.connection.allSend({ chat_id: activeChatId, body });
+        await loadMessages(activeChatId);
+        loadConversations();
+      }
       return true;
     } catch (e) {
       alert(e.message || "Failed to send");
@@ -400,7 +438,7 @@ export default function WhatsAppList() {
 
   const handleSend = async () => {
     const body = draft.trim();
-    if (!body || !activeLeadId) return;
+    if (!body || !activeChatId) return;
     setDraft("");
     const ok = await sendMessage({ body });
     if (!ok) setDraft(body); // restore on failure so the user doesn't lose it
@@ -414,7 +452,7 @@ export default function WhatsAppList() {
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-picking the same file
-    if (!file || !activeLeadId) return;
+    if (!file || !activeChatId) return;
     if (file.size > MAX_ATTACH_BYTES) { alert("File is over 16 MB. Pick a smaller one."); return; }
 
     const caption = draft.trim();
@@ -447,15 +485,15 @@ export default function WhatsAppList() {
 
   // Merge any draft conversation into the list (at the top) so the new chat is
   // visible and selectable before the first message lands.
-  const allConversations = draftConvo && !conversations.some((c) => c.lead_id === draftConvo.lead_id)
+  const allConversations = draftConvo
     ? [draftConvo, ...conversations]
     : conversations;
   const q = search.trim().toLowerCase();
   const shownConversations = q
     ? allConversations.filter((c) =>
-        `${c.lead_name || ""} ${c.phone || ""} ${c.whatsapp_number || ""}`.toLowerCase().includes(q))
+        `${c.name || ""} ${c.lead_name || ""} ${c.phone || ""}`.toLowerCase().includes(q))
     : allConversations;
-  const activeConvo = allConversations.find((c) => c.lead_id === activeLeadId);
+  const activeConvo = allConversations.find((c) => (c.id ?? "__draft__") === activeChatId);
 
   return (
     <div className="wa-container">
@@ -492,23 +530,27 @@ export default function WhatsAppList() {
             {loadingConvos && <div style={{ padding: 16, textAlign: "center" }}><CircularProgress size={20} /></div>}
             {!loadingConvos && shownConversations.length === 0 && (
               <div className="wa-empty-note">
-                {q ? "No chats match your search." : "No conversations yet. Start one with “New chat”, or replies will appear here."}
+                {q ? "No chats match your search." : "Syncing your WhatsApp chats… this can take a minute after linking. New messages will also appear here."}
               </div>
             )}
             {shownConversations.map((c) => {
-              const label = c.lead_name || c.phone || c.whatsapp_number || "Unknown";
+              const chatKey = c.id ?? "__draft__";
+              const label = c.name || c.lead_name || c.phone || "Unknown";
               return (
                 <div
-                  key={c.lead_id}
-                  className={`wa-convo-item ${c.lead_id === activeLeadId ? "active" : ""}`}
-                  onClick={() => openConversation(c.lead_id)}
+                  key={chatKey}
+                  className={`wa-convo-item ${chatKey === activeChatId ? "active" : ""}`}
+                  onClick={() => (c.id ? openConversation(c.id) : null)}
                 >
-                  <div className="wa-avatar" style={{ background: colorFor(c.lead_id || label) }}>
+                  <div className="wa-avatar" style={{ background: colorFor(chatKey + label) }}>
                     {initialsOf(label)}
                   </div>
                   <div className="wa-convo-body">
                     <div className="wa-convo-top">
-                      <span className="wa-convo-name">{label}</span>
+                      <span className="wa-convo-name">
+                        {label}
+                        {c.lead_id && <span className="wa-lead-badge">Lead</span>}
+                      </span>
                       <span className="wa-convo-time">{fmtTime(c.last_at)}</span>
                     </div>
                     <div className="wa-convo-bottom">
@@ -523,21 +565,24 @@ export default function WhatsAppList() {
 
           {/* Thread */}
           <div className="wa-thread-pane">
-            {activeLeadId ? (
+            {activeChatId ? (
               <>
                 <div className="wa-thread-header">
                   <div className="wa-thread-head-left">
                     {(() => {
-                      const label = activeConvo?.lead_name || activeConvo?.phone || "Conversation";
+                      const label = activeConvo?.name || activeConvo?.lead_name || activeConvo?.phone || "Conversation";
                       return (
                         <>
-                          <div className="wa-avatar wa-avatar-sm" style={{ background: colorFor(activeLeadId || label) }}>
+                          <div className="wa-avatar wa-avatar-sm" style={{ background: colorFor(activeChatId + label) }}>
                             {initialsOf(label)}
                           </div>
                           <div>
-                            <div className="wa-thread-name">{label}</div>
-                            {activeConvo?.whatsapp_number || activeConvo?.phone ? (
-                              <div className="wa-thread-sub">{activeConvo.whatsapp_number || activeConvo.phone}</div>
+                            <div className="wa-thread-name">
+                              {label}
+                              {activeConvo?.lead_id && <span className="wa-lead-badge">Lead</span>}
+                            </div>
+                            {activeConvo?.phone ? (
+                              <div className="wa-thread-sub">+{activeConvo.phone}</div>
                             ) : null}
                           </div>
                         </>
