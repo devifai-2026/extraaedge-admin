@@ -254,21 +254,39 @@ export default function WhatsAppList() {
     } catch { setStatus("disconnected"); }
   }, []);
 
-  const loadConversations = useCallback(async () => {
-    setLoadingConvos(true);
+  const loadConversations = useCallback(async ({ background = false } = {}) => {
+    if (!background) setLoadingConvos(true);
     try {
       const r = await whatsappApi.connection.allChats();
-      setConversations(r?.data || []);
-    } catch { setConversations([]); }
-    finally { setLoadingConvos(false); }
+      const next = r?.data || [];
+      // Only replace state when the data actually changed, so a background poll
+      // doesn't re-render (and flicker) the list every few seconds.
+      setConversations((prev) => {
+        if (prev.length === next.length &&
+            prev.every((p, i) => p.id === next[i].id && p.last_at === next[i].last_at && p.unread === next[i].unread)) {
+          return prev;
+        }
+        return next;
+      });
+    } catch { if (!background) setConversations([]); }
+    finally { if (!background) setLoadingConvos(false); }
   }, []);
 
-  const loadMessages = useCallback(async (chatId) => {
-    if (!chatId) return;
+  const loadMessages = useCallback(async (chatId, { background = false } = {}) => {
+    if (!chatId || chatId === "__draft__") return;
     try {
       const r = await whatsappApi.connection.allMessages(chatId);
-      setMessages(r?.data || []);
-    } catch { setMessages([]); }
+      const next = r?.data || [];
+      setMessages((prev) => {
+        // Skip the state update on a background poll if nothing changed, so the
+        // thread doesn't re-render/re-scroll every few seconds.
+        if (background && prev.length === next.length &&
+            prev.every((p, i) => p.id === next[i].id && p.status === next[i].status)) {
+          return prev;
+        }
+        return next;
+      });
+    } catch { if (!background) setMessages([]); }
   }, []);
 
   // Initial status; load conversations once connected.
@@ -306,8 +324,8 @@ export default function WhatsAppList() {
   useEffect(() => {
     if (status !== "connected") return undefined;
     const t = setInterval(() => {
-      loadConversations();
-      if (activeChatId) loadMessages(activeChatId);
+      loadConversations({ background: true });
+      if (activeChatId && activeChatId !== "__draft__") loadMessages(activeChatId, { background: true });
     }, 6000);
     return () => clearInterval(t);
   }, [status, activeChatId, loadConversations, loadMessages]);
