@@ -14,15 +14,69 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import SendIcon from "@mui/icons-material/Send";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import AddCommentIcon from "@mui/icons-material/AddComment";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
+import SearchIcon from "@mui/icons-material/Search";
+import DoneAllIcon from "@mui/icons-material/DoneAll";
+import CloseIcon from "@mui/icons-material/Close";
 import QRCode from "qrcode";
 import "./WhatAppsList.css";
-import { whatsappApi, leadsApi } from "../../lib/endpoints";
+import { whatsappApi, leadsApi, uploadsApi } from "../../lib/endpoints";
 import { onNotification } from "../../lib/socket";
-import { useNavigate } from "react-router-dom";
 import AddNewLead from "../../components/AddNewLead/AddNewLead";
+
+const MAX_ATTACH_BYTES = 16 * 1024 * 1024; // WhatsApp media cap is ~16 MB
 
 const fmtTime = (iso) =>
   iso ? new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }) : "";
+
+// Two initials for the contact avatar.
+const initialsOf = (name) =>
+  (name || "?").split(" ").map((s) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+
+// Deterministic avatar tint from a string, so each contact keeps a stable color.
+const AVATAR_COLORS = ["#0088cc", "#e17076", "#7bc862", "#a695e7", "#ee9e58", "#6ec9cb", "#faa774", "#5ca6e0"];
+const colorFor = (key) => {
+  let h = 0;
+  for (let i = 0; i < (key || "").length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+};
+
+// Lazily resolves an r2_key to a short-lived signed URL and renders the media.
+// Images show inline; anything else shows as a download chip. Used for both
+// outbound (message_log.media_r2_key) and inbound (message_reply.media_urls[]).
+function MediaAttachment({ mediaKey, mediaType }) {
+  const [url, setUrl] = useState(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    if (!mediaKey) return;
+    uploadsApi
+      .signedUrl(mediaKey)
+      .then((r) => { if (alive) setUrl(r?.data?.url || r?.url || null); })
+      .catch(() => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+  }, [mediaKey]);
+
+  const isImage = mediaType ? mediaType.startsWith("image/") : /\.(png|jpe?g|gif|webp)$/i.test(mediaKey || "");
+  const name = (mediaKey || "attachment").split("/").pop();
+
+  if (failed) return <div className="wa-media-fallback">📎 Attachment unavailable</div>;
+  if (!url) return <div className="wa-media-loading"><CircularProgress size={16} /></div>;
+  if (isImage) {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" className="wa-media-img-link">
+        <img src={url} alt="attachment" className="wa-media-img" />
+      </a>
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="wa-media-file">
+      <InsertDriveFileIcon fontSize="small" />
+      <span className="wa-media-file-name">{name}</span>
+    </a>
+  );
+}
 
 // ---- Connection banner (status + connect/logout) ----
 function ConnectionBar({ status, phone, onConnect, onLogout, busy }) {
@@ -146,7 +200,6 @@ function NewChatDialog({ open, onClose, onPick }) {
 }
 
 export default function WhatsAppList() {
-  const navigate = useNavigate();
   const [status, setStatus] = useState("loading"); // loading|disconnected|pending_qr|connected|logged_out
   const [phone, setPhone] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -158,6 +211,9 @@ export default function WhatsAppList() {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [loadingConvos, setLoadingConvos] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sending, setSending] = useState(false);
+  const fileInputRef = useRef(null);
 
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
@@ -264,24 +320,86 @@ export default function WhatsAppList() {
     loadMessages(lead.id);
   };
 
+  // Text send (optionally carrying an already-uploaded attachment key).
+  const sendMessage = async ({ body, mediaKey }) => {
+    if (!activeLeadId) return;
+    setSending(true);
+    try {
+      await whatsappApi.connection.send({
+        lead_id: activeLeadId,
+        ...(body ? { body } : {}),
+        ...(mediaKey ? { media_r2_key: mediaKey } : {}),
+      });
+      setDraftConvo((d) => (d && d.lead_id === activeLeadId ? null : d)); // real row replaces the draft
+      await loadMessages(activeLeadId);
+      loadConversations();
+      return true;
+    } catch (e) {
+      alert(e.message || "Failed to send");
+      return false;
+    } finally {
+      setSending(false);
+    }
+  };
+
   const handleSend = async () => {
     const body = draft.trim();
     if (!body || !activeLeadId) return;
     setDraft("");
+    const ok = await sendMessage({ body });
+    if (!ok) setDraft(body); // restore on failure so the user doesn't lose it
+  };
+
+  // Attach: upload the file via the shared presign → PUT to GCS → confirm
+  // pipeline (same as AvatarUploader), then send it as a WhatsApp message with
+  // whatever text is currently in the composer as the caption.
+  const handlePickFile = () => fileInputRef.current?.click();
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file || !activeLeadId) return;
+    if (file.size > MAX_ATTACH_BYTES) { alert("File is over 16 MB. Pick a smaller one."); return; }
+
+    const caption = draft.trim();
+    setSending(true);
     try {
-      await whatsappApi.connection.send({ lead_id: activeLeadId, body });
-      setDraftConvo((d) => (d && d.lead_id === activeLeadId ? null : d)); // real row replaces the draft
-      await loadMessages(activeLeadId);
-      loadConversations();
-    } catch (e) { alert(e.message || "Failed to send"); setDraft(body); }
+      const presign = await uploadsApi.presign({
+        purpose: "whatsapp",
+        content_type: file.type || "application/octet-stream",
+        size_bytes: file.size,
+        filename: file.name,
+      });
+      const { upload_url, method, headers, r2_key } = presign?.data ?? presign;
+      const putRes = await fetch(upload_url, {
+        method: method || "PUT",
+        headers: headers || { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
+      await uploadsApi.confirm({ purpose: "whatsapp", r2_key });
+
+      setDraft("");
+      const ok = await sendMessage({ body: caption, mediaKey: r2_key });
+      if (!ok) setDraft(caption);
+    } catch (err) {
+      alert(err?.message || "Failed to attach file");
+    } finally {
+      setSending(false);
+    }
   };
 
   // Merge any draft conversation into the list (at the top) so the new chat is
   // visible and selectable before the first message lands.
-  const shownConversations = draftConvo && !conversations.some((c) => c.lead_id === draftConvo.lead_id)
+  const allConversations = draftConvo && !conversations.some((c) => c.lead_id === draftConvo.lead_id)
     ? [draftConvo, ...conversations]
     : conversations;
-  const activeConvo = shownConversations.find((c) => c.lead_id === activeLeadId);
+  const q = search.trim().toLowerCase();
+  const shownConversations = q
+    ? allConversations.filter((c) =>
+        `${c.lead_name || ""} ${c.phone || ""} ${c.whatsapp_number || ""}`.toLowerCase().includes(q))
+    : allConversations;
+  const activeConvo = allConversations.find((c) => c.lead_id === activeLeadId);
 
   return (
     <div className="wa-container">
@@ -306,24 +424,45 @@ export default function WhatsAppList() {
                 New chat
               </Button>
             </div>
+            <div className="wa-convo-search">
+              <SearchIcon fontSize="small" className="wa-convo-search-icon" />
+              <input
+                className="wa-convo-search-input"
+                placeholder="Search chats"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
             {loadingConvos && <div style={{ padding: 16, textAlign: "center" }}><CircularProgress size={20} /></div>}
             {!loadingConvos && shownConversations.length === 0 && (
-              <div className="wa-empty-note">No conversations yet. Start one with “New chat”, or replies will appear here.</div>
-            )}
-            {shownConversations.map((c) => (
-              <div
-                key={c.lead_id}
-                className={`wa-convo-item ${c.lead_id === activeLeadId ? "active" : ""}`}
-                onClick={() => openConversation(c.lead_id)}
-              >
-                <div className="wa-convo-top">
-                  <span className="wa-convo-name">{c.lead_name || c.phone || c.whatsapp_number || "Unknown"}</span>
-                  {c.unread > 0 && <span className="wa-convo-unread">{c.unread}</span>}
-                </div>
-                <div className="wa-convo-preview">{c.last_body || ""}</div>
-                <div className="wa-convo-time">{fmtTime(c.last_at)}</div>
+              <div className="wa-empty-note">
+                {q ? "No chats match your search." : "No conversations yet. Start one with “New chat”, or replies will appear here."}
               </div>
-            ))}
+            )}
+            {shownConversations.map((c) => {
+              const label = c.lead_name || c.phone || c.whatsapp_number || "Unknown";
+              return (
+                <div
+                  key={c.lead_id}
+                  className={`wa-convo-item ${c.lead_id === activeLeadId ? "active" : ""}`}
+                  onClick={() => openConversation(c.lead_id)}
+                >
+                  <div className="wa-avatar" style={{ background: colorFor(c.lead_id || label) }}>
+                    {initialsOf(label)}
+                  </div>
+                  <div className="wa-convo-body">
+                    <div className="wa-convo-top">
+                      <span className="wa-convo-name">{label}</span>
+                      <span className="wa-convo-time">{fmtTime(c.last_at)}</span>
+                    </div>
+                    <div className="wa-convo-bottom">
+                      <span className="wa-convo-preview">{c.last_body || ""}</span>
+                      {c.unread > 0 && <span className="wa-convo-unread">{c.unread}</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Thread */}
@@ -331,7 +470,24 @@ export default function WhatsAppList() {
             {activeLeadId ? (
               <>
                 <div className="wa-thread-header">
-                  <span className="wa-thread-name">{activeConvo?.lead_name || activeConvo?.phone || "Conversation"}</span>
+                  <div className="wa-thread-head-left">
+                    {(() => {
+                      const label = activeConvo?.lead_name || activeConvo?.phone || "Conversation";
+                      return (
+                        <>
+                          <div className="wa-avatar wa-avatar-sm" style={{ background: colorFor(activeLeadId || label) }}>
+                            {initialsOf(label)}
+                          </div>
+                          <div>
+                            <div className="wa-thread-name">{label}</div>
+                            {activeConvo?.whatsapp_number || activeConvo?.phone ? (
+                              <div className="wa-thread-sub">{activeConvo.whatsapp_number || activeConvo.phone}</div>
+                            ) : null}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
                   {activeConvo?.lead_id && (
                     <Tooltip title="Open lead">
                       <IconButton size="small" onClick={() => { setSelectedLead({ id: activeConvo.lead_id }); setEditLeadOpen(true); }}>
@@ -341,24 +497,49 @@ export default function WhatsAppList() {
                   )}
                 </div>
                 <div className="wa-thread-body" ref={threadRef}>
-                  {messages.map((m) => (
-                    <div key={`${m.direction}-${m.id}`} className={`wa-bubble ${m.direction === "out" ? "out" : "in"}`}>
-                      <div className="wa-bubble-text">{m.body}</div>
-                      <div className="wa-bubble-meta">
-                        {fmtTime(m.at)}{m.direction === "out" && m.status ? ` · ${m.status}` : ""}
+                  {messages.map((m) => {
+                    const mediaKey = Array.isArray(m.media_keys) ? m.media_keys[0] : null;
+                    const seen = m.status === "seen" || m.status === "read";
+                    return (
+                      <div key={`${m.direction}-${m.id}`} className={`wa-bubble ${m.direction === "out" ? "out" : "in"}`}>
+                        {mediaKey && <MediaAttachment mediaKey={mediaKey} mediaType={m.media_type} />}
+                        {m.body ? <div className="wa-bubble-text">{m.body}</div> : null}
+                        <div className="wa-bubble-meta">
+                          <span>{fmtTime(m.at)}</span>
+                          {m.direction === "out" && m.status && (
+                            <DoneAllIcon className={`wa-tick ${seen ? "seen" : ""}`} style={{ fontSize: 14 }} />
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {messages.length === 0 && <div className="wa-empty-note">No messages yet — say hello.</div>}
                 </div>
                 <div className="wa-composer">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,application/pdf,audio/*,video/*,.doc,.docx,.xls,.xlsx,.csv"
+                    onChange={handleFileChange}
+                    style={{ display: "none" }}
+                  />
+                  <Tooltip title="Attach file">
+                    <span>
+                      <IconButton onClick={handlePickFile} disabled={sending}>
+                        <AttachFileIcon />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                   <TextField
                     fullWidth size="small" placeholder="Type a message…"
                     value={draft} onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                     multiline maxRows={4}
+                    disabled={sending}
                   />
-                  <IconButton color="primary" onClick={handleSend} disabled={!draft.trim()}><SendIcon /></IconButton>
+                  <IconButton color="primary" onClick={handleSend} disabled={!draft.trim() || sending}>
+                    {sending ? <CircularProgress size={20} /> : <SendIcon />}
+                  </IconButton>
                 </div>
               </>
             ) : (
