@@ -243,6 +243,22 @@
 }
 .wa-convo-time { font-size: 11px; color: #8696a0; flex-shrink: 0; }
 
+/* New-chat lead picker rows */
+.wa-newchat-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 6px;
+  cursor: pointer; border-radius: 8px;
+}
+.wa-newchat-item:hover { background: #f2f4f7; }
+
+/* Template preview + composer note */
+.wa-tmpl-preview {
+  margin-top: 12px; padding: 10px 12px; background: #d9fdd3; border-radius: 8px;
+  font-size: 14px; white-space: pre-wrap; color: #111b21;
+}
+.wa-composer-note {
+  padding: 4px 14px 8px; font-size: 11px; color: #8696a0; background: #f0f2f5;
+}
+
 /* "Lead" badge on chats that match a CRM lead */
 .wa-lead-badge {
   display: inline-block; margin-left: 6px; padding: 0 6px;

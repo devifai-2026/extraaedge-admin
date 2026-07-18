@@ -322,20 +322,16 @@ export const whatsappApi = {
   inbox: (params) => api.get('/whatsapp/inbox', params),
   numbers: () => api.get('/whatsapp/numbers'),
   usage: () => api.get('/whatsapp/usage'),
-  // Per-user personal-number WhatsApp (whatsapp-web.js gateway). Each user
-  // links their own number; sends go out from it and replies route back to them.
-  connection: {
-    connect: () => api.post('/whatsapp/connection/connect'),
-    status: () => api.get('/whatsapp/connection/status'),
-    logout: () => api.post('/whatsapp/connection/logout'),
-    conversations: () => api.get('/whatsapp/connection/conversations'),
-    messages: (lead_id) => api.get('/whatsapp/connection/messages', { lead_id }),
-    send: (body) => api.post('/whatsapp/connection/send', body), // { lead_id, body }
-    // Full inbox (all WhatsApp chats mirrored from the linked account, not just
-    // CRM leads). Each chat is flagged with lead_id/lead_name when it matches.
-    allChats: () => api.get('/whatsapp/connection/all-chats'),
-    allMessages: (chat_id) => api.get('/whatsapp/connection/all-messages', { chat_id }),
-    allSend: (body) => api.post('/whatsapp/connection/all-send', body), // { chat_id, body }
+  // WhatsApp inbox — a SHARED business number per tenant (WABridge send + Meta
+  // webhook receive). No per-user linking/QR. Chats are keyed by phone; each is
+  // flagged with lead_id/lead_name when it matches a CRM lead.
+  inbox: {
+    status: () => api.get('/whatsapp/inbox/status'),
+    chats: () => api.get('/whatsapp/inbox/chats'),
+    messages: (phone) => api.get(`/whatsapp/inbox/chats/${encodeURIComponent(phone)}/messages`),
+    markRead: (phone) => api.patch(`/whatsapp/inbox/chats/${encodeURIComponent(phone)}/read`),
+    send: (phone, body) => api.post(`/whatsapp/inbox/chats/${encodeURIComponent(phone)}/send`, body), // { type, message | templateId+variables }
+    templates: () => api.get('/whatsapp/inbox/templates'),
   },
 };
 

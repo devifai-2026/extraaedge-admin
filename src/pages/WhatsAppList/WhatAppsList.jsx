@@ -1,40 +1,32 @@
-// WhatsApp (personal number) — real, per-user connection via the
-// whatsapp-web.js gateway. Each user links their OWN WhatsApp by scanning a QR;
-// the page then shows their conversations and lets them send free text. QR,
-// ready, inbound message and delivery-ack events arrive over socket.io
-// ('notification' events with a whatsapp_* type).
+// WhatsApp Chat — a shared per-tenant business inbox (WABridge send + Meta
+// webhook receive). No QR/linking: the business number is configured server-side.
+// Chats are keyed by phone; each shows a "Lead" badge when it matches a CRM lead.
+// Incoming messages arrive via the Meta webhook and appear here (socket + 6s poll).
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   IconButton, Button, CircularProgress, Dialog, DialogTitle, DialogContent,
-  DialogActions, Chip, TextField, Tooltip, Autocomplete,
+  DialogActions, TextField, Tooltip, MenuItem, Alert,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
-import LogoutIcon from "@mui/icons-material/Logout";
 import SendIcon from "@mui/icons-material/Send";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import AddCommentIcon from "@mui/icons-material/AddComment";
-import AttachFileIcon from "@mui/icons-material/AttachFile";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import SearchIcon from "@mui/icons-material/Search";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
-import CloseIcon from "@mui/icons-material/Close";
-import QRCode from "qrcode";
+import DescriptionIcon from "@mui/icons-material/Description";
 import "./WhatAppsList.css";
 import { whatsappApi, leadsApi, uploadsApi } from "../../lib/endpoints";
-import { onNotification, connectSocket, isSocketConnected } from "../../lib/socket";
+import { onNotification } from "../../lib/socket";
 import AddNewLead from "../../components/AddNewLead/AddNewLead";
-
-const MAX_ATTACH_BYTES = 16 * 1024 * 1024; // WhatsApp media cap is ~16 MB
 
 const fmtTime = (iso) =>
   iso ? new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }) : "";
 
-// Two initials for the contact avatar.
 const initialsOf = (name) =>
   (name || "?").split(" ").map((s) => s[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 
-// Deterministic avatar tint from a string, so each contact keeps a stable color.
 const AVATAR_COLORS = ["#0088cc", "#e17076", "#7bc862", "#a695e7", "#ee9e58", "#6ec9cb", "#faa774", "#5ca6e0"];
 const colorFor = (key) => {
   let h = 0;
@@ -42,642 +34,361 @@ const colorFor = (key) => {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 };
 
-// Lazily resolves an r2_key to a short-lived signed URL and renders the media.
-// Images show inline; anything else shows as a download chip. Used for both
-// outbound (message_log.media_r2_key) and inbound (message_reply.media_urls[]).
+const normPhone = (raw) => {
+  const d = String(raw || "").replace(/\D/g, "");
+  return d.length === 10 ? `91${d}` : d;
+};
+
+// Lazily resolve an r2_key to a signed URL and render inline (image) or as a
+// download chip (other). Used for inbound media.
 function MediaAttachment({ mediaKey, mediaType }) {
   const [url, setUrl] = useState(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let alive = true;
     if (!mediaKey) return;
-    uploadsApi
-      .signedUrl(mediaKey)
+    uploadsApi.signedUrl(mediaKey)
       .then((r) => { if (alive) setUrl(r?.data?.url || r?.url || null); })
       .catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
   }, [mediaKey]);
-
   const isImage = mediaType ? mediaType.startsWith("image/") : /\.(png|jpe?g|gif|webp)$/i.test(mediaKey || "");
   const name = (mediaKey || "attachment").split("/").pop();
-
   if (failed) return <div className="wa-media-fallback">📎 Attachment unavailable</div>;
   if (!url) return <div className="wa-media-loading"><CircularProgress size={16} /></div>;
   if (isImage) {
-    return (
-      <a href={url} target="_blank" rel="noreferrer" className="wa-media-img-link">
-        <img src={url} alt="attachment" className="wa-media-img" />
-      </a>
-    );
+    return <a href={url} target="_blank" rel="noreferrer" className="wa-media-img-link"><img src={url} alt="attachment" className="wa-media-img" /></a>;
   }
-  return (
-    <a href={url} target="_blank" rel="noreferrer" className="wa-media-file">
-      <InsertDriveFileIcon fontSize="small" />
-      <span className="wa-media-file-name">{name}</span>
-    </a>
-  );
+  return <a href={url} target="_blank" rel="noreferrer" className="wa-media-file"><InsertDriveFileIcon fontSize="small" /><span className="wa-media-file-name">{name}</span></a>;
 }
 
-// ---- Connection banner (status + connect/logout) ----
-function ConnectionBar({ status, phone, onConnect, onLogout, busy }) {
-  const isConnected = status === "connected";
-  return (
-    <div className="wa-conn-bar">
-      <div className="wa-conn-left">
-        <WhatsAppIcon style={{ color: isConnected ? "#25D366" : "#9e9e9e" }} />
-        <div>
-          <div className="wa-conn-status">
-            {isConnected ? "Connected" : status === "pending_qr" ? "Waiting for QR scan…" : "Not connected"}
-          </div>
-          <div className="wa-conn-phone">{isConnected && phone ? `+${phone}` : "Link your WhatsApp to send & receive"}</div>
-        </div>
-      </div>
-      <div className="wa-conn-actions">
-        {isConnected ? (
-          <Button size="small" variant="outlined" color="error" startIcon={<LogoutIcon />} onClick={onLogout} disabled={busy}>
-            Disconnect
-          </Button>
-        ) : (
-          <Button size="small" variant="contained" startIcon={<WhatsAppIcon />} onClick={onConnect} disabled={busy}>
-            Connect WhatsApp
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ---- QR dialog ----
-function QrDialog({ open, qr, onClose }) {
-  const [dataUrl, setDataUrl] = useState("");
-  useEffect(() => {
-    let alive = true;
-    if (qr) QRCode.toDataURL(qr, { width: 280, margin: 1 }).then((u) => { if (alive) setDataUrl(u); }).catch(() => {});
-    return () => { alive = false; };
-  }, [qr]);
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs">
-      <DialogTitle>Link WhatsApp</DialogTitle>
-      <DialogContent style={{ textAlign: "center", paddingBottom: 24 }}>
-        <p style={{ fontSize: 13, color: "#555", marginTop: 0 }}>
-          Open WhatsApp on your phone → <strong>Linked devices</strong> → <strong>Link a device</strong>, then scan:
-        </p>
-        {dataUrl ? (
-          <img src={dataUrl} alt="WhatsApp QR" style={{ width: 280, height: 280 }} />
-        ) : (
-          <div style={{ padding: 40 }}><CircularProgress /></div>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ---- "Start new chat" lead picker ----
-// Debounced search over /leads (q matches name/email/phone). Only leads that
-// actually have a WhatsApp/phone number are selectable — you can't message a
-// lead with no number.
+// "Start new chat" — pick a lead (with a number) to open/seed a conversation.
 function NewChatDialog({ open, onClose, onPick }) {
   const [q, setQ] = useState("");
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [picked, setPicked] = useState(null);
-
-  useEffect(() => {
-    if (!open) { setQ(""); setOptions([]); setPicked(null); return; }
-  }, [open]);
-
+  useEffect(() => { if (!open) { setQ(""); setOptions([]); } }, [open]);
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(async () => {
       setLoading(true);
       try {
         const r = await leadsApi.list({ q: q.trim() || undefined, limit: 20, sort: "updated_desc" });
-        // Only leads we can actually message.
         setOptions((r?.data || []).filter((l) => l.whatsapp_number || l.phone));
-      } catch { setOptions([]); }
-      finally { setLoading(false); }
+      } catch { setOptions([]); } finally { setLoading(false); }
     }, 300);
     return () => clearTimeout(t);
   }, [q, open]);
-
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>Start new chat</DialogTitle>
       <DialogContent>
-        <Autocomplete
-          autoFocus
-          options={options}
-          loading={loading}
-          filterOptions={(x) => x}            /* server-side search; don't re-filter */
-          getOptionLabel={(o) => o.name || o.phone || o.whatsapp_number || "Unnamed"}
-          isOptionEqualToValue={(o, v) => o.id === v.id}
-          value={picked}
-          onChange={(_e, v) => setPicked(v)}
-          onInputChange={(_e, v) => setQ(v)}
-          noOptionsText={q ? "No leads with a number" : "Type to search leads"}
-          renderOption={(props, o) => (
-            <li {...props} key={o.id}>
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <span style={{ fontWeight: 600, fontSize: 14 }}>{o.name || "Unnamed"}</span>
-                <span style={{ fontSize: 12, color: "#777" }}>{o.whatsapp_number || o.phone}</span>
+        <TextField autoFocus fullWidth size="small" placeholder="Search leads by name or phone" value={q} onChange={(e) => setQ(e.target.value)} sx={{ mt: 1 }} />
+        <div style={{ maxHeight: 320, overflowY: "auto", marginTop: 8 }}>
+          {loading && <div style={{ textAlign: "center", padding: 12 }}><CircularProgress size={20} /></div>}
+          {!loading && options.length === 0 && <div className="wa-empty-note">{q ? "No leads with a number" : "Type to search leads"}</div>}
+          {options.map((o) => (
+            <div key={o.id} className="wa-newchat-item" onClick={() => onPick(o)}>
+              <div className="wa-avatar wa-avatar-sm" style={{ background: colorFor(o.id) }}>{initialsOf(o.name)}</div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{o.name || "Unnamed"}</div>
+                <div style={{ fontSize: 12, color: "#777" }}>{o.whatsapp_number || o.phone}</div>
               </div>
-            </li>
-          )}
-          renderInput={(params) => (
-            <TextField {...params} placeholder="Search by name, email or phone" size="small" sx={{ mt: 1 }} />
-          )}
-          sx={{ minWidth: 320 }}
-        />
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+      <DialogActions><Button onClick={onClose}>Cancel</Button></DialogActions>
+    </Dialog>
+  );
+}
+
+// Template picker — send a WABridge-approved template (needed outside the 24h
+// free-text window). Collects a value per {{N}} variable.
+function TemplateDialog({ open, onClose, onSend }) {
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [vars, setVars] = useState([]);
+  const [sending, setSending] = useState(false);
+  useEffect(() => {
+    if (!open) { setSelected(null); setVars([]); return; }
+    setLoading(true);
+    whatsappApi.inbox.templates()
+      .then((r) => setTemplates(r?.data || []))
+      .catch(() => setTemplates([]))
+      .finally(() => setLoading(false));
+  }, [open]);
+  const pick = (t) => { setSelected(t); setVars(Array.from({ length: t.variableCount || 0 }, () => "")); };
+  const preview = selected ? (selected.bodyText || "").replace(/\{\{(\d+)\}\}/g, (_, n) => vars[Number(n) - 1] || `{{${n}}}`) : "";
+  const send = async () => {
+    if (!selected) return;
+    setSending(true);
+    try { await onSend(selected.id, vars); onClose(); }
+    finally { setSending(false); }
+  };
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Send a template</DialogTitle>
+      <DialogContent>
+        {loading ? <div style={{ textAlign: "center", padding: 24 }}><CircularProgress size={22} /></div> : (
+          <>
+            <TextField select fullWidth size="small" label="Template" value={selected?.id || ""}
+              onChange={(e) => pick(templates.find((t) => t.id === e.target.value))} sx={{ mt: 1 }}>
+              {templates.length === 0 && <MenuItem value="" disabled>No approved templates</MenuItem>}
+              {templates.map((t) => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+            </TextField>
+            {selected && (
+              <>
+                {vars.map((v, i) => (
+                  <TextField key={i} fullWidth size="small" label={`Variable {{${i + 1}}}`} value={v}
+                    onChange={(e) => setVars((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))} sx={{ mt: 1.5 }} />
+                ))}
+                <div className="wa-tmpl-preview">{preview}</div>
+              </>
+            )}
+          </>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" disabled={!picked} onClick={() => { onPick(picked); setPicked(null); }}>
-          Open chat
-        </Button>
+        <Button variant="contained" disabled={!selected || sending} onClick={send}>{sending ? "Sending…" : "Send"}</Button>
       </DialogActions>
     </Dialog>
   );
 }
 
 export default function WhatsAppList() {
-  const [status, setStatus] = useState("loading"); // loading|disconnected|pending_qr|connected|logged_out
-  const [phone, setPhone] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [qr, setQr] = useState(null);
-  const [qrOpen, setQrOpen] = useState(false);
-
-  // Full-inbox model: chats come from /all-chats (every WhatsApp chat mirrored
-  // from the linked account, each flagged with lead_id/lead_name when matched).
-  // The active thread is keyed by chat_id.
+  const [configured, setConfigured] = useState(true);
   const [conversations, setConversations] = useState([]);
-  const [activeChatId, setActiveChatId] = useState(null);
+  const [activePhone, setActivePhone] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [loadingConvos, setLoadingConvos] = useState(false);
   const [search, setSearch] = useState("");
   const [sending, setSending] = useState(false);
-  const fileInputRef = useRef(null);
-  // True once a QR has arrived since the last connect attempt (see handleConnect
-  // retry loop + the whatsapp_qr notification handler).
-  const qrArrivedRef = useRef(false);
-
+  const [newChatOpen, setNewChatOpen] = useState(false);
+  const [tmplOpen, setTmplOpen] = useState(false);
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
-  const [newChatOpen, setNewChatOpen] = useState(false);
-  // A "draft" conversation for a lead with no WhatsApp history yet. It's shown
-  // in the list and as the open thread until the first message lands, at which
-  // point loadConversations() returns the real row and this is dropped.
   const [draftConvo, setDraftConvo] = useState(null);
   const threadRef = useRef(null);
 
   const loadStatus = useCallback(async () => {
-    try {
-      const r = await whatsappApi.connection.status();
-      const d = r?.data || {};
-      // Trust the live gateway status when present (it reflects the socket that
-      // actually holds the WhatsApp session); fall back to the DB row.
-      const effective = d.live_status || d.status || "disconnected";
-      setStatus(effective);
-      setPhone(d.phone || null);
-
-      if (effective === "connected") {
-        // Pairing finished — flip the UI to the chat view even if the
-        // whatsapp_ready socket push never arrived (pull beats push).
-        setQrOpen(false);
-        setQr(null);
-      } else if ((d.live_status === "pending_qr" || d.status === "pending_qr") && d.qr) {
-        // Gateway is holding a QR — show it (reliable fallback to the push).
-        qrArrivedRef.current = true;
-        setQr(d.qr);
-        setQrOpen(true);
-      }
-    } catch { setStatus("disconnected"); }
+    try { const r = await whatsappApi.inbox.status(); setConfigured(r?.data?.configured !== false); }
+    catch { /* keep default */ }
   }, []);
 
   const loadConversations = useCallback(async ({ background = false } = {}) => {
     if (!background) setLoadingConvos(true);
     try {
-      const r = await whatsappApi.connection.allChats();
+      const r = await whatsappApi.inbox.chats();
       const next = r?.data || [];
-      // Only replace state when the data actually changed, so a background poll
-      // doesn't re-render (and flicker) the list every few seconds.
       setConversations((prev) => {
         if (prev.length === next.length &&
-            prev.every((p, i) => p.id === next[i].id && p.last_at === next[i].last_at && p.unread === next[i].unread)) {
-          return prev;
-        }
+            prev.every((p, i) => p.id === next[i].id && p.last_at === next[i].last_at && p.unread === next[i].unread)) return prev;
         return next;
       });
     } catch { if (!background) setConversations([]); }
     finally { if (!background) setLoadingConvos(false); }
   }, []);
 
-  const loadMessages = useCallback(async (chatId, { background = false } = {}) => {
-    if (!chatId || chatId === "__draft__") return;
+  const loadMessages = useCallback(async (phone, { background = false } = {}) => {
+    if (!phone) return;
     try {
-      const r = await whatsappApi.connection.allMessages(chatId);
+      const r = await whatsappApi.inbox.messages(phone);
       const next = r?.data || [];
       setMessages((prev) => {
-        // Skip the state update on a background poll if nothing changed, so the
-        // thread doesn't re-render/re-scroll every few seconds.
-        if (background && prev.length === next.length &&
-            prev.every((p, i) => p.id === next[i].id && p.status === next[i].status)) {
-          return prev;
-        }
+        if (background && prev.length === next.length && prev.every((p, i) => p.id === next[i].id && p.status === next[i].status)) return prev;
         return next;
       });
     } catch { if (!background) setMessages([]); }
   }, []);
 
-  // Initial status; load conversations once connected.
-  useEffect(() => { loadStatus(); }, [loadStatus]);
-  useEffect(() => { if (status === "connected") loadConversations(); }, [status, loadConversations]);
+  useEffect(() => { loadStatus(); loadConversations(); }, [loadStatus, loadConversations]);
 
-  // Realtime: QR / ready / disconnect / inbound message / ack.
+  // Realtime: inbound message / delivery status.
   useEffect(() => {
     const off = onNotification((evt) => {
       switch (evt?.type) {
-        case "whatsapp_qr":
-          qrArrivedRef.current = true;
-          setQr(evt.qr); setStatus("pending_qr"); setQrOpen(true); break;
-        case "whatsapp_ready":
-          setStatus("connected"); setPhone(evt.phone || null); setQrOpen(false); setQr(null); loadConversations(); break;
-        case "whatsapp_disconnected":
-          setStatus("disconnected"); setPhone(null); break;
         case "whatsapp_message":
-          loadConversations();
-          if (activeChatId) loadMessages(activeChatId);
+          loadConversations({ background: true });
+          if (activePhone && normPhone(evt.phone) === normPhone(activePhone)) loadMessages(activePhone, { background: true });
           break;
         case "whatsapp_status":
-          setMessages((prev) => prev.map((m) =>
-            m.provider_message_id === evt.provider_message_id ? { ...m, status: evt.status } : m));
+          setMessages((prev) => prev.map((m) => (m.provider_message_id === evt.wa_message_id ? { ...m, status: evt.status } : m)));
           break;
         default: break;
       }
     });
     return off;
-  }, [activeChatId, loadConversations, loadMessages]);
+  }, [activePhone, loadConversations, loadMessages]);
 
-  // Real-time via pull: while connected, refresh the chat list (and the open
-  // thread) every ~6s. The gateway→API socket push is unreliable on free-tier
-  // hosting, so polling guarantees new/incoming messages appear regardless.
+  // Pull-based realtime fallback (webhook push can be missed on free hosting).
   useEffect(() => {
-    if (status !== "connected") return undefined;
     const t = setInterval(() => {
       loadConversations({ background: true });
-      if (activeChatId && activeChatId !== "__draft__") loadMessages(activeChatId, { background: true });
+      if (activePhone) loadMessages(activePhone, { background: true });
     }, 6000);
     return () => clearInterval(t);
-  }, [status, activeChatId, loadConversations, loadMessages]);
+  }, [activePhone, loadConversations, loadMessages]);
 
-  // While pending_qr, poll /status every 4s so (a) the shown QR stays fresh (it
-  // rotates ~every 20s) and (b) we detect the flip to "connected" even if the
-  // whatsapp_ready socket push is missed. Runs whenever we're waiting to link,
-  // not just while the dialog is open, so the UI still flips to connected if the
-  // user leaves the dialog open in the background.
-  useEffect(() => {
-    if (status !== "pending_qr") return undefined;
-    const t = setInterval(() => { loadStatus(); }, 4000);
-    return () => clearInterval(t);
-  }, [status, loadStatus]);
+  useEffect(() => { if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight; }, [messages]);
 
-  // Auto-scroll thread to bottom on new messages.
-  useEffect(() => {
-    if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
-  }, [messages]);
+  const openConversation = (phone) => { setActivePhone(phone); setDraftConvo(null); loadMessages(phone); whatsappApi.inbox.markRead(phone).catch(() => {}); };
 
-  const handleConnect = async () => {
-    setBusy(true);
-    qrArrivedRef.current = false;
-    try {
-      // Make sure the socket is connected BEFORE we ask for a QR, so we don't
-      // miss the first emission (the classic socket-join race). Give it a
-      // moment to actually establish.
-      if (!isSocketConnected()) {
-        connectSocket();
-        await new Promise((r) => setTimeout(r, 800));
-      }
-      await whatsappApi.connection.connect();
-      setStatus("pending_qr");
-      setQrOpen(true);
-
-      // Fallback: if no QR shows up shortly (socket push missed, or a cold
-      // gateway was still waking), poll /status — which now returns the QR the
-      // gateway is holding — and re-poke connect. Pull beats push here.
-      for (let i = 0; i < 6 && !qrArrivedRef.current; i++) {
-        await new Promise((r) => setTimeout(r, 3000));
-        if (qrArrivedRef.current) break;
-        await loadStatus();                        // pulls the QR if the gateway has one
-        if (qrArrivedRef.current) break;
-        try { await whatsappApi.connection.connect(); } catch { /* keep waiting */ }
-      }
-    } catch (e) {
-      alert(e.message || "Failed to start WhatsApp connection");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    setBusy(true);
-    try { await whatsappApi.connection.logout(); setStatus("disconnected"); setPhone(null); setConversations([]); setMessages([]); setActiveChatId(null); }
-    catch (e) { alert(e.message || "Failed to disconnect"); }
-    finally { setBusy(false); }
-  };
-
-  const openConversation = (chatId) => { setActiveChatId(chatId); loadMessages(chatId); };
-
-  // From the "Start new chat" picker: send to the chosen lead via the lead path
-  // (creates/rolls the lead conversation); the gateway mirrors it into the inbox,
-  // so after a refresh the chat appears in the unified list and we select it.
-  const openLeadChat = async (lead) => {
+  const openLeadChat = (lead) => {
     setNewChatOpen(false);
     if (!lead) return;
-    const num = (lead.whatsapp_number || lead.phone || "").replace(/\D+/g, "");
-    // Try to find an existing inbox chat for this lead's number.
-    await loadConversations();
-    const existing = conversations.find(
-      (c) => c.lead_id === lead.id || (num && (c.phone || "").endsWith(num.slice(-10))),
-    );
-    if (existing) { setActiveChatId(existing.id); loadMessages(existing.id); return; }
-    // No chat yet — seed a lightweight draft so the composer opens; the first
-    // send (via the lead path) creates the real chat.
-    setDraftConvo({
-      id: null,
-      lead_id: lead.id,
-      lead_name: lead.name,
-      phone: lead.phone,
-      name: lead.name,
-      last_body: "",
-      last_at: null,
-      unread: 0,
-      _leadFallback: lead,
-    });
-    setActiveChatId("__draft__");
+    const phone = normPhone(lead.whatsapp_number || lead.phone);
+    const existing = conversations.find((c) => normPhone(c.phone) === phone);
+    if (existing) { openConversation(existing.phone); return; }
+    setDraftConvo({ id: null, phone, name: lead.name, lead_id: lead.id, lead_name: lead.name, last_body: "", last_at: null, unread: 0 });
+    setActivePhone(phone);
     setMessages([]);
   };
 
-  // Text/media send. Routes to the right backend:
-  //  - a real inbox chat  → /all-send { chat_id } (works for any chat)
-  //  - the lead draft      → /send { lead_id }     (media supported; creates the chat)
-  const sendMessage = async ({ body, mediaKey }) => {
-    const draftLead = activeChatId === "__draft__" ? (draftConvo?._leadFallback) : null;
-    if (!activeChatId) return false;
+  const doSend = async (payload) => {
+    if (!activePhone) return false;
     setSending(true);
     try {
-      if (draftLead) {
-        await whatsappApi.connection.send({
-          lead_id: draftLead.id,
-          ...(body ? { body } : {}),
-          ...(mediaKey ? { media_r2_key: mediaKey } : {}),
-        });
-        // The gateway mirrors this into the inbox; reload and select the new chat.
-        setDraftConvo(null);
-        const r = await whatsappApi.connection.allChats();
-        const chats = r?.data || [];
-        setConversations(chats);
-        const num = (draftLead.whatsapp_number || draftLead.phone || "").replace(/\D+/g, "").slice(-10);
-        const match = chats.find((c) => c.lead_id === draftLead.id || (num && (c.phone || "").endsWith(num)));
-        if (match) { setActiveChatId(match.id); loadMessages(match.id); }
-      } else {
-        if (mediaKey) { alert("Attachments are supported on lead chats for now."); return false; }
-        await whatsappApi.connection.allSend({ chat_id: activeChatId, body });
-        await loadMessages(activeChatId);
-        loadConversations();
-      }
+      await whatsappApi.inbox.send(activePhone, payload);
+      setDraftConvo(null);
+      await loadMessages(activePhone);
+      loadConversations({ background: true });
       return true;
-    } catch (e) {
-      alert(e.message || "Failed to send");
-      return false;
-    } finally {
-      setSending(false);
-    }
+    } catch (e) { alert(e.message || "Failed to send"); return false; }
+    finally { setSending(false); }
   };
 
   const handleSend = async () => {
-    const body = draft.trim();
-    if (!body || !activeChatId) return;
+    const message = draft.trim();
+    if (!message || !activePhone) return;
     setDraft("");
-    const ok = await sendMessage({ body });
-    if (!ok) setDraft(body); // restore on failure so the user doesn't lose it
+    const ok = await doSend({ type: "text", message });
+    if (!ok) setDraft(message);
   };
 
-  // Attach: upload the file via the shared presign → PUT to GCS → confirm
-  // pipeline (same as AvatarUploader), then send it as a WhatsApp message with
-  // whatever text is currently in the composer as the caption.
-  const handlePickFile = () => fileInputRef.current?.click();
-
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-picking the same file
-    if (!file || !activeChatId) return;
-    if (file.size > MAX_ATTACH_BYTES) { alert("File is over 16 MB. Pick a smaller one."); return; }
-
-    const caption = draft.trim();
-    setSending(true);
-    try {
-      const presign = await uploadsApi.presign({
-        purpose: "whatsapp",
-        content_type: file.type || "application/octet-stream",
-        size_bytes: file.size,
-        filename: file.name,
-      });
-      const { upload_url, method, headers, r2_key } = presign?.data ?? presign;
-      const putRes = await fetch(upload_url, {
-        method: method || "PUT",
-        headers: headers || { "Content-Type": file.type || "application/octet-stream" },
-        body: file,
-      });
-      if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
-      await uploadsApi.confirm({ purpose: "whatsapp", r2_key });
-
-      setDraft("");
-      const ok = await sendMessage({ body: caption, mediaKey: r2_key });
-      if (!ok) setDraft(caption);
-    } catch (err) {
-      alert(err?.message || "Failed to attach file");
-    } finally {
-      setSending(false);
-    }
+  const handleSendTemplate = async (templateId, variables) => {
+    await doSend({ type: "template", templateId, variables });
   };
 
-  // Merge any draft conversation into the list (at the top) so the new chat is
-  // visible and selectable before the first message lands.
-  const allConversations = draftConvo
-    ? [draftConvo, ...conversations]
-    : conversations;
+  const allConversations = draftConvo ? [draftConvo, ...conversations] : conversations;
   const q = search.trim().toLowerCase();
-  const shownConversations = q
-    ? allConversations.filter((c) =>
-        `${c.name || ""} ${c.lead_name || ""} ${c.phone || ""}`.toLowerCase().includes(q))
-    : allConversations;
-  const activeConvo = allConversations.find((c) => (c.id ?? "__draft__") === activeChatId);
+  const shown = q ? allConversations.filter((c) => `${c.name || ""} ${c.lead_name || ""} ${c.phone || ""}`.toLowerCase().includes(q)) : allConversations;
+  const activeConvo = allConversations.find((c) => normPhone(c.phone) === normPhone(activePhone));
 
   return (
     <div className="wa-container">
       <div className="wa-header">
         <h2 className="wa-title">WhatsApp Chat</h2>
         <div className="wa-header-icons">
-          <IconButton size="small" className="wa-header-icon" onClick={() => { loadStatus(); loadConversations(); }}>
+          <IconButton size="small" className="wa-header-icon" onClick={() => { loadConversations(); if (activePhone) loadMessages(activePhone); }}>
             <RefreshIcon />
           </IconButton>
         </div>
       </div>
 
-      <ConnectionBar status={status} phone={phone} onConnect={handleConnect} onLogout={handleLogout} busy={busy} />
-
-      {status === "connected" ? (
-        <div className="wa-chat-layout">
-          {/* Conversation list */}
-          <div className="wa-convo-list">
-            <div className="wa-convo-list-head">
-              <span>Chats</span>
-              <Button size="small" startIcon={<AddCommentIcon fontSize="small" />} onClick={() => setNewChatOpen(true)}>
-                New chat
-              </Button>
-            </div>
-            <div className="wa-convo-search">
-              <SearchIcon fontSize="small" className="wa-convo-search-icon" />
-              <input
-                className="wa-convo-search-input"
-                placeholder="Search chats"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            {loadingConvos && <div style={{ padding: 16, textAlign: "center" }}><CircularProgress size={20} /></div>}
-            {!loadingConvos && shownConversations.length === 0 && (
-              <div className="wa-empty-note">
-                {q ? "No chats match your search." : "Syncing your WhatsApp chats… this can take a minute after linking. New messages will also appear here."}
-              </div>
-            )}
-            {shownConversations.map((c) => {
-              const chatKey = c.id ?? "__draft__";
-              const label = c.name || c.lead_name || c.phone || "Unknown";
-              return (
-                <div
-                  key={chatKey}
-                  className={`wa-convo-item ${chatKey === activeChatId ? "active" : ""}`}
-                  onClick={() => (c.id ? openConversation(c.id) : null)}
-                >
-                  <div className="wa-avatar" style={{ background: colorFor(chatKey + label) }}>
-                    {initialsOf(label)}
-                  </div>
-                  <div className="wa-convo-body">
-                    <div className="wa-convo-top">
-                      <span className="wa-convo-name">
-                        {label}
-                        {c.lead_id && <span className="wa-lead-badge">Lead</span>}
-                      </span>
-                      <span className="wa-convo-time">{fmtTime(c.last_at)}</span>
-                    </div>
-                    <div className="wa-convo-bottom">
-                      <span className="wa-convo-preview">{c.last_body || ""}</span>
-                      {c.unread > 0 && <span className="wa-convo-unread">{c.unread}</span>}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Thread */}
-          <div className="wa-thread-pane">
-            {activeChatId ? (
-              <>
-                <div className="wa-thread-header">
-                  <div className="wa-thread-head-left">
-                    {(() => {
-                      const label = activeConvo?.name || activeConvo?.lead_name || activeConvo?.phone || "Conversation";
-                      return (
-                        <>
-                          <div className="wa-avatar wa-avatar-sm" style={{ background: colorFor(activeChatId + label) }}>
-                            {initialsOf(label)}
-                          </div>
-                          <div>
-                            <div className="wa-thread-name">
-                              {label}
-                              {activeConvo?.lead_id && <span className="wa-lead-badge">Lead</span>}
-                            </div>
-                            {activeConvo?.phone ? (
-                              <div className="wa-thread-sub">+{activeConvo.phone}</div>
-                            ) : null}
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                  {activeConvo?.lead_id && (
-                    <Tooltip title="Open lead">
-                      <IconButton size="small" onClick={() => { setSelectedLead({ id: activeConvo.lead_id }); setEditLeadOpen(true); }}>
-                        <OpenInNewIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </div>
-                <div className="wa-thread-body" ref={threadRef}>
-                  {messages.map((m) => {
-                    const mediaKey = Array.isArray(m.media_keys) ? m.media_keys[0] : null;
-                    const seen = m.status === "seen" || m.status === "read";
-                    return (
-                      <div key={`${m.direction}-${m.id}`} className={`wa-bubble ${m.direction === "out" ? "out" : "in"}`}>
-                        {mediaKey && <MediaAttachment mediaKey={mediaKey} mediaType={m.media_type} />}
-                        {m.body ? <div className="wa-bubble-text">{m.body}</div> : null}
-                        <div className="wa-bubble-meta">
-                          <span>{fmtTime(m.at)}</span>
-                          {m.direction === "out" && m.status && (
-                            <DoneAllIcon className={`wa-tick ${seen ? "seen" : ""}`} style={{ fontSize: 14 }} />
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {messages.length === 0 && <div className="wa-empty-note">No messages yet — say hello.</div>}
-                </div>
-                <div className="wa-composer">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*,application/pdf,audio/*,video/*,.doc,.docx,.xls,.xlsx,.csv"
-                    onChange={handleFileChange}
-                    style={{ display: "none" }}
-                  />
-                  <Tooltip title="Attach file">
-                    <span>
-                      <IconButton onClick={handlePickFile} disabled={sending}>
-                        <AttachFileIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                  <TextField
-                    fullWidth size="small" placeholder="Type a message…"
-                    value={draft} onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    multiline maxRows={4}
-                    disabled={sending}
-                  />
-                  <IconButton color="primary" onClick={handleSend} disabled={!draft.trim() || sending}>
-                    {sending ? <CircularProgress size={20} /> : <SendIcon />}
-                  </IconButton>
-                </div>
-              </>
-            ) : (
-              <div className="wa-empty-note" style={{ margin: "auto" }}>Select a conversation</div>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="wa-disconnected-hint">
-          <WhatsAppIcon style={{ fontSize: 48, color: "#25D366" }} />
-          <p>Connect your WhatsApp to chat with leads from your own number.</p>
-          <Chip size="small" label="Unofficial WhatsApp Web link — avoid bulk messaging to reduce ban risk" sx={{ fontSize: 11 }} />
-        </div>
+      {!configured && (
+        <Alert severity="warning" sx={{ mb: 1.5 }}>WhatsApp sending isn’t configured. Set the WABridge keys on the server to send messages.</Alert>
       )}
 
-      <QrDialog open={qrOpen} qr={qr} onClose={() => setQrOpen(false)} />
+      <div className="wa-chat-layout">
+        {/* Conversation list */}
+        <div className="wa-convo-list">
+          <div className="wa-convo-list-head">
+            <span>Chats</span>
+            <Button size="small" startIcon={<AddCommentIcon fontSize="small" />} onClick={() => setNewChatOpen(true)}>New chat</Button>
+          </div>
+          <div className="wa-convo-search">
+            <SearchIcon fontSize="small" className="wa-convo-search-icon" />
+            <input className="wa-convo-search-input" placeholder="Search chats" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          {loadingConvos && <div style={{ padding: 16, textAlign: "center" }}><CircularProgress size={20} /></div>}
+          {!loadingConvos && shown.length === 0 && (
+            <div className="wa-empty-note">{q ? "No chats match your search." : "No conversations yet. Incoming WhatsApp messages will appear here, or start one with “New chat”."}</div>
+          )}
+          {shown.map((c) => {
+            const label = c.name || c.lead_name || c.phone || "Unknown";
+            const key = c.phone;
+            return (
+              <div key={key} className={`wa-convo-item ${normPhone(c.phone) === normPhone(activePhone) ? "active" : ""}`} onClick={() => (c.id === null && !c.phone ? null : openConversation(c.phone))}>
+                <div className="wa-avatar" style={{ background: colorFor(key + label) }}>{initialsOf(label)}</div>
+                <div className="wa-convo-body">
+                  <div className="wa-convo-top">
+                    <span className="wa-convo-name">{label}{c.lead_id && <span className="wa-lead-badge">Lead</span>}</span>
+                    <span className="wa-convo-time">{fmtTime(c.last_at)}</span>
+                  </div>
+                  <div className="wa-convo-bottom">
+                    <span className="wa-convo-preview">{c.last_body || ""}</span>
+                    {c.unread > 0 && <span className="wa-convo-unread">{c.unread}</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Thread */}
+        <div className="wa-thread-pane">
+          {activePhone ? (
+            <>
+              <div className="wa-thread-header">
+                <div className="wa-thread-head-left">
+                  {(() => {
+                    const label = activeConvo?.name || activeConvo?.lead_name || activeConvo?.phone || "Conversation";
+                    return (
+                      <>
+                        <div className="wa-avatar wa-avatar-sm" style={{ background: colorFor(activePhone + label) }}>{initialsOf(label)}</div>
+                        <div>
+                          <div className="wa-thread-name">{label}{activeConvo?.lead_id && <span className="wa-lead-badge">Lead</span>}</div>
+                          {activeConvo?.phone ? <div className="wa-thread-sub">+{activeConvo.phone}</div> : null}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+                {activeConvo?.lead_id && (
+                  <Tooltip title="Open lead">
+                    <IconButton size="small" onClick={() => { setSelectedLead({ id: activeConvo.lead_id }); setEditLeadOpen(true); }}><OpenInNewIcon fontSize="small" /></IconButton>
+                  </Tooltip>
+                )}
+              </div>
+              <div className="wa-thread-body" ref={threadRef}>
+                {messages.map((m) => {
+                  const mediaKey = Array.isArray(m.media_keys) ? m.media_keys[0] : null;
+                  const seen = m.status === "seen" || m.status === "read";
+                  return (
+                    <div key={`${m.direction}-${m.id}`} className={`wa-bubble ${m.direction === "out" ? "out" : "in"}`}>
+                      {mediaKey && <MediaAttachment mediaKey={mediaKey} mediaType={m.media_type} />}
+                      {m.body ? <div className="wa-bubble-text">{m.body}</div> : null}
+                      <div className="wa-bubble-meta">
+                        <span>{fmtTime(m.at)}</span>
+                        {m.direction === "out" && m.status && <DoneAllIcon className={`wa-tick ${seen ? "seen" : ""}`} style={{ fontSize: 14 }} />}
+                      </div>
+                    </div>
+                  );
+                })}
+                {messages.length === 0 && <div className="wa-empty-note">No messages yet — say hello.</div>}
+              </div>
+              <div className="wa-composer">
+                <Tooltip title="Send a template (needed outside the 24h window)">
+                  <span><IconButton onClick={() => setTmplOpen(true)} disabled={sending}><DescriptionIcon /></IconButton></span>
+                </Tooltip>
+                <TextField fullWidth size="small" placeholder="Type a message…" value={draft} onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} multiline maxRows={4} disabled={sending} />
+                <IconButton color="primary" onClick={handleSend} disabled={!draft.trim() || sending}>{sending ? <CircularProgress size={20} /> : <SendIcon />}</IconButton>
+              </div>
+              <div className="wa-composer-note">Free text only delivers within 24h of the customer’s last message. Otherwise use a template.</div>
+            </>
+          ) : (
+            <div className="wa-empty-note" style={{ margin: "auto" }}>Select a conversation</div>
+          )}
+        </div>
+      </div>
 
       <NewChatDialog open={newChatOpen} onClose={() => setNewChatOpen(false)} onPick={openLeadChat} />
-
+      <TemplateDialog open={tmplOpen} onClose={() => setTmplOpen(false)} onSend={handleSendTemplate} />
       <AddNewLead open={editLeadOpen} onClose={() => setEditLeadOpen(false)} leadData={selectedLead} />
     </div>
   );
