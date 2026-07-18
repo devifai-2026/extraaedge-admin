@@ -22,7 +22,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import QRCode from "qrcode";
 import "./WhatAppsList.css";
 import { whatsappApi, leadsApi, uploadsApi } from "../../lib/endpoints";
-import { onNotification } from "../../lib/socket";
+import { onNotification, connectSocket, isSocketConnected } from "../../lib/socket";
 import AddNewLead from "../../components/AddNewLead/AddNewLead";
 
 const MAX_ATTACH_BYTES = 16 * 1024 * 1024; // WhatsApp media cap is ~16 MB
@@ -214,6 +214,9 @@ export default function WhatsAppList() {
   const [search, setSearch] = useState("");
   const [sending, setSending] = useState(false);
   const fileInputRef = useRef(null);
+  // True once a QR has arrived since the last connect attempt (see handleConnect
+  // retry loop + the whatsapp_qr notification handler).
+  const qrArrivedRef = useRef(false);
 
   const [editLeadOpen, setEditLeadOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
@@ -258,6 +261,7 @@ export default function WhatsAppList() {
     const off = onNotification((evt) => {
       switch (evt?.type) {
         case "whatsapp_qr":
+          qrArrivedRef.current = true;
           setQr(evt.qr); setStatus("pending_qr"); setQrOpen(true); break;
         case "whatsapp_ready":
           setStatus("connected"); setPhone(evt.phone || null); setQrOpen(false); setQr(null); loadConversations(); break;
@@ -284,9 +288,32 @@ export default function WhatsAppList() {
 
   const handleConnect = async () => {
     setBusy(true);
-    try { await whatsappApi.connection.connect(); setStatus("pending_qr"); setQrOpen(true); }
-    catch (e) { alert(e.message || "Failed to start WhatsApp connection"); }
-    finally { setBusy(false); }
+    qrArrivedRef.current = false;
+    try {
+      // Make sure the socket is connected BEFORE we ask for a QR, so we don't
+      // miss the first emission (the classic socket-join race). Give it a
+      // moment to actually establish.
+      if (!isSocketConnected()) {
+        connectSocket();
+        await new Promise((r) => setTimeout(r, 800));
+      }
+      await whatsappApi.connection.connect();
+      setStatus("pending_qr");
+      setQrOpen(true);
+
+      // Fallback: if no QR shows up shortly (e.g. it fired before we joined, or
+      // a cold gateway was still waking), re-call connect. The backend re-emits
+      // the QR it's already holding, so this is cheap and idempotent.
+      for (let i = 0; i < 3 && !qrArrivedRef.current; i++) {
+        await new Promise((r) => setTimeout(r, 4000));
+        if (qrArrivedRef.current) break;
+        try { await whatsappApi.connection.connect(); } catch { /* keep waiting */ }
+      }
+    } catch (e) {
+      alert(e.message || "Failed to start WhatsApp connection");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleLogout = async () => {
