@@ -1,7 +1,8 @@
 // Recorder App Settings — super_admin configures the counsellor Android
-// recorder app: the folder on the phone that is scanned for call .mp3 files
-// and the local hour the daily auto-upload runs. Saved to the tenant via the
-// shared /tenant-branding endpoint; the app reads both from /auth/me.
+// recorder app: the folder on the phone that is scanned for call recordings
+// (.mp3/.m4a) and the local hour the daily auto-upload runs. Saved to the
+// tenant via the shared /tenant-branding endpoint; the app reads both from
+// /auth/me.
 import { useState } from 'react';
 import {
   Box, Typography, Button, Alert, CircularProgress, Paper, TextField,
@@ -32,8 +33,13 @@ export default function RecorderSettings() {
     setMsg(null);
     setBusy(true);
     try {
+      const trimmedPath = folderPath.trim();
+      // A relative path (no leading slash) silently breaks the app's file
+      // scan — it resolves against the wrong base directory on the device
+      // and always finds zero recordings, with no error surfaced anywhere.
+      const normalizedPath = trimmedPath && !trimmedPath.startsWith('/') ? `/${trimmedPath}` : trimmedPath;
       const body = {
-        recorder_folder_path: folderPath.trim() || null,
+        recorder_folder_path: normalizedPath || null,
         recorder_sync_hour: Number(syncHour),
       };
       const res = await brandingApi.update(body);
@@ -41,6 +47,7 @@ export default function RecorderSettings() {
       // Reflect on the cached tenant so a re-open prefills the saved values.
       const nextTenant = { ...(auth.getTenant() || {}), ...body, ...saved };
       auth.setSession({ tenant: nextTenant });
+      setFolderPath(normalizedPath);
       try { window.dispatchEvent(new CustomEvent('ee:user-updated')); } catch { /* no-op */ }
       setMsg({ severity: 'success', text: 'Recorder settings saved. Counsellor apps pick this up before their next sync.' });
     } catch (err) {
@@ -55,8 +62,8 @@ export default function RecorderSettings() {
       <Typography variant="h6" sx={{ mb: 0.5 }}>Recorder App Settings</Typography>
       <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
         The counsellor mobile app scans this folder on the phone every day and uploads each call
-        recording (.mp3). Recordings whose number matches a lead attach automatically; the rest
-        appear under Unmatched Recordings.
+        recording (.mp3 or .m4a). Recordings whose number matches a lead attach automatically; the
+        rest appear under Unmatched Recordings.
       </Typography>
 
       {!canManage && (
@@ -72,7 +79,7 @@ export default function RecorderSettings() {
               label="Recording folder path" fullWidth size="small"
               value={folderPath} onChange={(e) => setFolderPath(e.target.value)}
               placeholder={DEFAULT_PATH}
-              helperText="Folder on the counsellor's phone that the recorder app scans for .mp3 files. Leave blank to disable syncing until configured."
+              helperText="Folder on the counsellor's phone that the recorder app scans for .mp3/.m4a files. Must start with a leading slash (e.g. /storage/...). Leave blank to disable syncing until configured."
             />
             <FormControl size="small" sx={{ mt: 3, width: 220 }}>
               <InputLabel id="recorder-sync-hour-label">Daily upload time</InputLabel>
