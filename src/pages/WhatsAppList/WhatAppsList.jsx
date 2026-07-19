@@ -325,6 +325,7 @@ export default function WhatsAppList() {
                     <span className="wa-convo-preview">{c.last_body || ""}</span>
                     {c.unread > 0 && <span className="wa-convo-unread">{c.unread}</span>}
                   </div>
+                  {c.lead_owner_name && <div className="wa-convo-owner">👤 {c.lead_owner_name}</div>}
                 </div>
               </div>
             );
@@ -344,7 +345,10 @@ export default function WhatsAppList() {
                         <div className="wa-avatar wa-avatar-sm" style={{ background: colorFor(activePhone + label) }}>{initialsOf(label)}</div>
                         <div>
                           <div className="wa-thread-name">{label}{activeConvo?.lead_id && <span className="wa-lead-badge">Lead</span>}</div>
-                          {activeConvo?.phone ? <div className="wa-thread-sub">+{activeConvo.phone}</div> : null}
+                          <div className="wa-thread-sub">
+                            {activeConvo?.phone ? `+${activeConvo.phone}` : ""}
+                            {activeConvo?.lead_owner_name ? `  ·  👤 ${activeConvo.lead_owner_name}` : ""}
+                          </div>
                         </div>
                       </>
                     );
