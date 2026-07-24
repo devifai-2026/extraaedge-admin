@@ -328,6 +328,7 @@ export const whatsappApi = {
   inbox: {
     status: () => api.get('/whatsapp/inbox/status'),
     chats: () => api.get('/whatsapp/inbox/chats'),
+    unreadCount: () => api.get('/whatsapp/inbox/unread-count'),
     messages: (phone) => api.get(`/whatsapp/inbox/chats/${encodeURIComponent(phone)}/messages`),
     markRead: (phone) => api.patch(`/whatsapp/inbox/chats/${encodeURIComponent(phone)}/read`),
     send: (phone, body) => api.post(`/whatsapp/inbox/chats/${encodeURIComponent(phone)}/send`, body), // { type, message | templateId+variables }

@@ -158,8 +158,11 @@ function Header() {
                 handleTabPermsChanged()
                 return
             }
+            // Skip our own outbound WhatsApp echoes — only inbound is worth a
+            // bell notification (titleFor returns null for these too).
+            if (evt?.type === 'whatsapp_message' && evt?.direction === 'out') return
             // Push newest first, cap at 50.
-            setLiveEvents((prev) => [{ ...evt, id: `${evt.type}-${evt.lead_id || ''}-${evt.occurred_at}` }, ...prev].slice(0, 50))
+            setLiveEvents((prev) => [{ ...evt, id: `${evt.type}-${evt.lead_id || evt.phone || ''}-${evt.occurred_at}` }, ...prev].slice(0, 50))
             // Bump the badge unless the notification panel is currently open.
             setUnreadCount((n) => (anchorNotification ? 0 : n + 1))
         })
@@ -759,6 +762,13 @@ function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLi
             const who = p.requested_by_name || 'A counsellor'
             return `Discount approval needed · ${p.discount_percent}% on ${p.lead_name || 'a lead'} (by ${who})`
         }
+        if (e.type === 'whatsapp_message') {
+            // Only inbound messages are worth notifying about (direction 'out'
+            // is our own send echo). Fields are top-level (see socket wrap()).
+            if (e.direction === 'out') return null
+            const preview = (e.body || '').slice(0, 60)
+            return `New WhatsApp message${e.phone ? ` · +${e.phone}` : ''}${preview ? ` — ${preview}` : ''}`
+        }
         if (e.type === 'discount.decided') {
             const p = e.payload || {}
             if (p.decision === 'approved') {
@@ -778,6 +788,7 @@ function NotificationsPopover({ anchor, onClose, liveEvents, followUps, socketLi
         if (e.type === 'bulk_import.completed') return '#7E57C2'
         if (e.type === 'discount.requested')    return '#F9A825'
         if (e.type === 'discount.decided')      return '#43A047'
+        if (e.type === 'whatsapp_message')      return '#25D366'
         return colors.primary
     }
     const fmtRel = (iso) => {

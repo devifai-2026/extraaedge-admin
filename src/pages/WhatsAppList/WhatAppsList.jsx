@@ -245,7 +245,14 @@ export default function WhatsAppList() {
     const phone = normPhone(lead.whatsapp_number || lead.phone);
     const existing = conversations.find((c) => normPhone(c.phone) === phone);
     if (existing) { openConversation(existing.phone); return; }
-    setDraftConvo({ id: null, phone, name: lead.name, lead_id: lead.id, lead_name: lead.name, last_body: "", last_at: null, unread: 0 });
+    setDraftConvo({
+      id: null, phone, name: lead.name, lead_id: lead.id, lead_name: lead.name,
+      // Carry the lead's current owner so the chat header shows "👤 <counsellor>"
+      // for a freshly-started (draft) conversation, matching existing chats.
+      lead_owner_id: lead.assigned_to || null,
+      lead_owner_name: lead.assigned_to_name || null,
+      last_body: "", last_at: null, unread: 0,
+    });
     setActivePhone(phone);
     setMessages([]);
   };

@@ -37,7 +37,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import { hasTab, currentRole, ROLES } from '../../lib/rbac';
-import { admissionsApi, leadDiscountsApi } from '../../lib/endpoints';
+import { admissionsApi, leadDiscountsApi, whatsappApi } from '../../lib/endpoints';
 import { onNotification } from '../../lib/socket';
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ const menuSections = [
     section: true,
     children: [
       { id: 3, label: 'Raw Data Manager', icon: FolderIcon, path: '/rawdata', tab: 'raw_data' },
-      { id: 4, label: 'WhatsApp Chat', icon: WhatsAppIcon, path: '/whatsapplist', tab: 'whatsapp' },
+      { id: 4, label: 'WhatsApp Chat', icon: WhatsAppIcon, path: '/whatsapplist', tab: 'whatsapp', badgeKey: 'whatsapp' },
       { id: 5, label: 'Follow-ups Manager', icon: CalendarTodayIcon, path: '/followupmanager', tab: 'followups' },
       { id: 6, label: 'Upload Failed Leads', icon: UploadFileIcon, path: '/failedleads', tab: 'failed_leads' },
       { id: 7, label: 'Bulk Action Stage', icon: SettingsIcon, path: '/bulkuploadlist', tab: 'bulk_upload' },
@@ -262,6 +262,25 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
     refresh();
     const off = onNotification((evt) => {
       if (evt?.type === 'discount.requested' || evt?.type === 'discount.decided') refresh();
+    });
+    const t = setInterval(refresh, 15_000);
+    return () => { alive = false; off(); clearInterval(t); };
+  }, []);
+
+  // WhatsApp unread badge. Gated on the 'whatsapp' tab. Live via the
+  // 'whatsapp_message' socket event (emitted on every inbound) + a poll.
+  useEffect(() => {
+    if (!hasTab('whatsapp')) return undefined;
+    let alive = true;
+    const refresh = async () => {
+      try {
+        const r = await whatsappApi.inbox.unreadCount();
+        if (alive) setBadges((b) => ({ ...b, whatsapp: r?.data?.unread_chats || 0 }));
+      } catch { /* ignore */ }
+    };
+    refresh();
+    const off = onNotification((evt) => {
+      if (evt?.type === 'whatsapp_message') refresh();
     });
     const t = setInterval(refresh, 15_000);
     return () => { alive = false; off(); clearInterval(t); };
