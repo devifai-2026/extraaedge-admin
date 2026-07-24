@@ -562,8 +562,10 @@ export const admissionsApi = {
   // the switcher's branch; a branch_manager is scoped to their branch server-side.
   dashboard: (params) => api.get('/admissions/dashboard', withBranch(params || {})),
 
-  // Pending admissions queue (converted leads w/o admission + pending_approval)
-  pendingAdmissions: () => api.get('/admissions/pending-admissions'),
+  // Pending admissions queue (converted leads w/o admission + pending_approval).
+  // Optional filters: { search, programId, ownerId, leadOwnerId, state, from, to }.
+  // Empty values are stripped by api.get, so passing {} returns the full list.
+  pendingAdmissions: (params) => api.get('/admissions/pending-admissions', params || {}),
   pendingAdmissionsCount: () => api.get('/admissions/pending-admissions/count'),
   // Tenant-wide admission pipeline snapshot: status counts + list of every
   // converted lead with their current admission state. Feeds the Admission

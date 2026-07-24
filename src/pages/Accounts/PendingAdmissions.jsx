@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button, IconButton, Chip, CircularProgress, Tooltip, Snackbar, Alert,
+  TextField, MenuItem, InputAdornment,
 } from '@mui/material';
 import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -9,13 +10,32 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import TuneIcon from '@mui/icons-material/Tune';
-import { admissionsApi, leadsApi } from '../../lib/endpoints';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
+import { admissionsApi, leadsApi, programsApi, usersApi } from '../../lib/endpoints';
 import AddNewLead from '../../components/AddNewLead/AddNewLead';
 import ConfigureFeeOffer from '../../components/ConfigureFeeOffer/ConfigureFeeOffer';
 import VerifyAdmissionDialog from '../../components/VerifyAdmissionDialog/VerifyAdmissionDialog';
+import DateRangePicker from '../../components/DatePicker/DatePicker';
 import { onNotification } from '../../lib/socket';
 import { fmtDate } from './utils';
 import './Accounts.css';
+
+// Local YYYY-MM-DD (avoids the UTC shift toISOString() would introduce for
+// users east of UTC — our tenants are in Asia/Kolkata).
+const ymd = (d) => {
+  if (!d) return undefined;
+  const dt = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(dt.getTime())) return undefined;
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${dt.getFullYear()}-${m}-${day}`;
+};
+
+const EMPTY_FILTERS = {
+  search: '', programId: '', ownerId: '', leadOwnerId: '', state: '',
+  from: '', to: '', datePreset: '', // datePreset is UI-only
+};
 
 // Unified "what's next on the accounts team's plate" queue. Two row kinds
 // share this table:
@@ -31,6 +51,16 @@ const PendingAdmissions = () => {
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Filter state. `filters` drives the API query (server-side filtering).
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  // Dropdown option sources.
+  const [programs, setPrograms] = useState([]);
+  const [users, setUsers] = useState([]);
+  const setFilter = useCallback((k, v) => setFilters((f) => ({ ...f, [k]: v })), []);
+  const activeFilterCount = useMemo(
+    () => ['search', 'programId', 'ownerId', 'leadOwnerId', 'state', 'from'].filter((k) => filters[k]).length,
+    [filters],
+  );
   // Lead currently being inspected in the read-only modal. Hydrated from
   // leadsApi.get on click so AddNewLead has every field to render.
   const [viewLead, setViewLead] = useState(null);
@@ -82,16 +112,65 @@ const PendingAdmissions = () => {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await admissionsApi.pendingAdmissions();
+      const r = await admissionsApi.pendingAdmissions({
+        search: filters.search,
+        programId: filters.programId,
+        ownerId: filters.ownerId,
+        leadOwnerId: filters.leadOwnerId,
+        state: filters.state,
+        from: filters.from,
+        to: filters.to,
+      });
       setRows(r?.data || []);
     } catch {
       setRows([]);
     } finally {
       setLoading(false);
     }
+  }, [filters]);
+
+  // Debounce so typing in the search box (or rapid filter changes) doesn't
+  // fire a request per keystroke. reload already depends on `filters`.
+  useEffect(() => {
+    const t = setTimeout(reload, 300);
+    return () => clearTimeout(t);
+  }, [reload]);
+
+  // Load dropdown option sources once. Failures degrade gracefully to empty
+  // dropdowns (the rest of the filters still work).
+  useEffect(() => {
+    (async () => {
+      try {
+        const [pr, us] = await Promise.all([
+          programsApi.list().catch(() => ({ data: [] })),
+          usersApi.list().catch(() => ({ data: [] })),
+        ]);
+        setPrograms(pr?.data || []);
+        // Only counsellors/managers/admins are meaningful owners; keep all
+        // active users and let the label carry the role for disambiguation.
+        setUsers((us?.data || []).filter((u) => u?.is_active !== false));
+      } catch { /* dropdowns stay empty */ }
+    })();
   }, []);
 
-  useEffect(() => { reload(); }, [reload]);
+  // Date-range presets. 'last7' → converted/created in the last 7 days.
+  // 'thisMonth' → since the 1st of the current month. 'custom' opens the
+  // DateRangePicker. Selecting a preset sets from/to (YYYY-MM-DD).
+  const applyDatePreset = useCallback((preset) => {
+    const now = new Date();
+    if (preset === 'last7') {
+      const from = new Date(now); from.setDate(now.getDate() - 6); // inclusive 7-day window
+      setFilters((f) => ({ ...f, datePreset: 'last7', from: ymd(from), to: ymd(now) }));
+    } else if (preset === 'thisMonth') {
+      const from = new Date(now.getFullYear(), now.getMonth(), 1);
+      setFilters((f) => ({ ...f, datePreset: 'thisMonth', from: ymd(from), to: ymd(now) }));
+    } else {
+      // '' → clear the date range
+      setFilters((f) => ({ ...f, datePreset: '', from: '', to: '' }));
+    }
+  }, []);
+
+  const clearAllFilters = useCallback(() => setFilters(EMPTY_FILTERS), []);
 
   // Live refresh on three signals:
   //   1. Socket: BE emits 'admission.pending' whenever a lead converts
@@ -133,12 +212,111 @@ const PendingAdmissions = () => {
         </Tooltip>
       </div>
 
+      {/* ---------------- Filter bar ---------------- */}
+      <div
+        className="accounts-filter-bar"
+        style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 16 }}
+      >
+        <TextField
+          size="small"
+          placeholder="Search name, email, phone"
+          value={filters.search}
+          onChange={(e) => setFilter('search', e.target.value)}
+          sx={{ minWidth: 240 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>
+            ),
+          }}
+        />
+
+        <TextField
+          select size="small" label="Course" value={filters.programId}
+          onChange={(e) => setFilter('programId', e.target.value)} sx={{ minWidth: 200 }}
+        >
+          <MenuItem value="">All courses</MenuItem>
+          {programs.map((p) => (
+            <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+          ))}
+        </TextField>
+
+        <TextField
+          select size="small" label="Owner" value={filters.ownerId}
+          onChange={(e) => setFilter('ownerId', e.target.value)} sx={{ minWidth: 180 }}
+        >
+          <MenuItem value="">All owners</MenuItem>
+          {users.map((u) => (
+            <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>
+          ))}
+        </TextField>
+
+        <TextField
+          select size="small" label="Lead Owner" value={filters.leadOwnerId}
+          onChange={(e) => setFilter('leadOwnerId', e.target.value)} sx={{ minWidth: 180 }}
+        >
+          <MenuItem value="">All lead owners</MenuItem>
+          {users.map((u) => (
+            <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>
+          ))}
+        </TextField>
+
+        <TextField
+          select size="small" label="State" value={filters.state}
+          onChange={(e) => setFilter('state', e.target.value)} sx={{ minWidth: 180 }}
+        >
+          <MenuItem value="">All states</MenuItem>
+          <MenuItem value="lead">No admission form</MenuItem>
+          <MenuItem value="pending_approval">Awaiting verification</MenuItem>
+          <MenuItem value="on_break">On Break</MenuItem>
+        </TextField>
+
+        {/* Date presets */}
+        <TextField
+          select size="small" label="Converted" value={filters.datePreset}
+          onChange={(e) => applyDatePreset(e.target.value)} sx={{ minWidth: 170 }}
+        >
+          <MenuItem value="">Any time</MenuItem>
+          <MenuItem value="last7">Last 7 days</MenuItem>
+          <MenuItem value="thisMonth">This month</MenuItem>
+        </TextField>
+
+        {/* Custom date range picker (returns {startDate,endDate}) */}
+        <DateRangePicker
+          onApply={(r) => setFilters((f) => ({
+            ...f,
+            datePreset: '',
+            from: ymd(r?.startDate) || '',
+            to: ymd(r?.endDate) || '',
+          }))}
+        />
+
+        {(filters.from || filters.to) && (
+          <Chip
+            size="small"
+            label={`${filters.from || '…'} → ${filters.to || '…'}`}
+            onDelete={() => applyDatePreset('')}
+            sx={{ height: 26 }}
+          />
+        )}
+
+        {activeFilterCount > 0 && (
+          <Button
+            size="small" startIcon={<ClearIcon />} onClick={clearAllFilters}
+            sx={{ textTransform: 'none', color: '#6b7280' }}
+          >
+            Clear all
+          </Button>
+        )}
+      </div>
+
       <div className="accounts-table-card">
         {loading ? (
           <div className="accounts-empty"><CircularProgress size={20} /></div>
         ) : rows.length === 0 ? (
           <div className="accounts-empty">
-            🎉 All clear. No leads are waiting on admission.
+            {activeFilterCount > 0 || filters.from || filters.to
+              ? 'No pending admissions match these filters.'
+              : '🎉 All clear. No leads are waiting on admission.'}
           </div>
         ) : (
           <table className="accounts-table">
@@ -148,6 +326,7 @@ const PendingAdmissions = () => {
                 <th>Student</th>
                 <th>Course</th>
                 <th>Owner</th>
+                <th>Lead Owner</th>
                 <th>State</th>
                 <th style={{ textAlign: 'right' }}>Action</th>
               </tr>
@@ -232,6 +411,7 @@ const PendingRow = ({ row, onChanged, navigate, onView, busyView, onCopyLink, on
       </td>
       <td>{row.program_name || '—'}</td>
       <td style={{ fontSize: 12, color: '#6b7280' }}>{row.owner_name || '—'}</td>
+      <td style={{ fontSize: 12, color: '#6b7280' }}>{row.lead_owner_name || '—'}</td>
       <td>
         {isLead ? (
           <Chip
