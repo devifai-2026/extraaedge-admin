@@ -30,9 +30,10 @@ const STATUS_META = {
   on_break:         { label: 'On Break',         color: '#fb923c', bg: '#ffedd5', fg: '#9a3412' },
   completed:        { label: 'Completed',        color: '#3b82f6', bg: '#dbeafe', fg: '#1e40af' },
   rejected:         { label: 'Rejected',         color: '#ef4444', bg: '#fee2e2', fg: '#991b1b' },
-  // Synthetic status. Backend now returns converted leads with no admission
-  // row tagged as status='unrouted' so the same table can render them.
-  unrouted:         { label: 'Unrouted',         color: '#64748b', bg: '#f3f4f6', fg: '#374151' },
+  // Synthetic status. Backend returns converted leads with no admission row
+  // tagged as status='unrouted'; we surface them under a clearer, user-facing
+  // label ("No Admission Yet") — the internal key stays 'unrouted'.
+  unrouted:         { label: 'No Admission Yet', color: '#64748b', bg: '#f3f4f6', fg: '#374151' },
 };
 
 const fmtDateTime = (s) => {
@@ -194,7 +195,7 @@ export default function AdmissionPipeline() {
             <StatusChip
               key={key}
               active={filter === key}
-              label={key === 'unrouted' ? 'Unrouted (converted, no admission)' : meta.label}
+              label={meta.label}
               count={count}
               onClick={() => setFilter(key)}
               fg={meta.fg}
