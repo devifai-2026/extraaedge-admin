@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button, IconButton, Chip, CircularProgress, Tooltip, Snackbar, Alert,
-  TextField, MenuItem, InputAdornment,
+  TextField, MenuItem, InputAdornment, Autocomplete,
 } from '@mui/material';
 import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -230,35 +230,38 @@ const PendingAdmissions = () => {
           }}
         />
 
-        <TextField
-          select size="small" label="Course" value={filters.programId}
-          onChange={(e) => setFilter('programId', e.target.value)} sx={{ minWidth: 200 }}
-        >
-          <MenuItem value="">All courses</MenuItem>
-          {programs.map((p) => (
-            <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
-          ))}
-        </TextField>
+        <Autocomplete
+          size="small"
+          options={programs}
+          getOptionLabel={(o) => o?.name || ''}
+          isOptionEqualToValue={(o, v) => o.id === v.id}
+          value={programs.find((p) => p.id === filters.programId) || null}
+          onChange={(_e, opt) => setFilter('programId', opt?.id || '')}
+          sx={{ minWidth: 220 }}
+          renderInput={(params) => <TextField {...params} label="Course" placeholder="All courses" />}
+        />
 
-        <TextField
-          select size="small" label="Owner" value={filters.ownerId}
-          onChange={(e) => setFilter('ownerId', e.target.value)} sx={{ minWidth: 180 }}
-        >
-          <MenuItem value="">All owners</MenuItem>
-          {users.map((u) => (
-            <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>
-          ))}
-        </TextField>
+        <Autocomplete
+          size="small"
+          options={users}
+          getOptionLabel={(o) => o?.name || ''}
+          isOptionEqualToValue={(o, v) => o.id === v.id}
+          value={users.find((u) => u.id === filters.ownerId) || null}
+          onChange={(_e, opt) => setFilter('ownerId', opt?.id || '')}
+          sx={{ minWidth: 200 }}
+          renderInput={(params) => <TextField {...params} label="Owner" placeholder="All owners" />}
+        />
 
-        <TextField
-          select size="small" label="Lead Owner" value={filters.leadOwnerId}
-          onChange={(e) => setFilter('leadOwnerId', e.target.value)} sx={{ minWidth: 180 }}
-        >
-          <MenuItem value="">All lead owners</MenuItem>
-          {users.map((u) => (
-            <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>
-          ))}
-        </TextField>
+        <Autocomplete
+          size="small"
+          options={users}
+          getOptionLabel={(o) => o?.name || ''}
+          isOptionEqualToValue={(o, v) => o.id === v.id}
+          value={users.find((u) => u.id === filters.leadOwnerId) || null}
+          onChange={(_e, opt) => setFilter('leadOwnerId', opt?.id || '')}
+          sx={{ minWidth: 200 }}
+          renderInput={(params) => <TextField {...params} label="Lead Owner" placeholder="All lead owners" />}
+        />
 
         <TextField
           select size="small" label="State" value={filters.state}
