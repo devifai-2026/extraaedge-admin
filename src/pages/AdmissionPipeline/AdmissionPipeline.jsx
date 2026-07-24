@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box, Typography, Chip, CircularProgress, IconButton, Tooltip,
-  TextField, InputAdornment, Popover, Button,
+  TextField, InputAdornment, Popover, Button, Autocomplete,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
@@ -55,6 +55,13 @@ export default function AdmissionPipeline() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [dateAnchor, setDateAnchor] = useState(null);
+  // Dropdown filters (client-side; options derived from the loaded rows).
+  const [counsellor, setCounsellor] = useState('');
+  const [program, setProgram] = useState('');
+  const [center, setCenter] = useState('');
+  // "Last updated" date range — distinct from the converted-date range above.
+  const [updFrom, setUpdFrom] = useState('');
+  const [updTo, setUpdTo] = useState('');
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -76,9 +83,22 @@ export default function AdmissionPipeline() {
   // re-runs every render (eslint react-hooks/exhaustive-deps warning).
   const rows = useMemo(() => snapshot?.rows || [], [snapshot]);
 
+  // Distinct dropdown options derived from the loaded rows (sorted). No
+  // backend round-trip — everything the table shows is already in `rows`.
+  const uniqueSorted = (key) => Array.from(
+    new Set(rows.map((r) => r[key]).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b));
+  const counsellorOptions = useMemo(() => uniqueSorted('counsellor_name'), [rows]); // eslint-disable-line react-hooks/exhaustive-deps
+  const programOptions = useMemo(() => uniqueSorted('program_name'), [rows]); // eslint-disable-line react-hooks/exhaustive-deps
+  const centerOptions = useMemo(() => uniqueSorted('center_name'), [rows]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const filteredRows = useMemo(() => {
     let out = rows;
     if (filter !== 'all') out = out.filter((r) => r.status === filter);
+    // Dropdown filters (exact match on the row's denormalized name fields).
+    if (counsellor) out = out.filter((r) => r.counsellor_name === counsellor);
+    if (program) out = out.filter((r) => r.program_name === program);
+    if (center) out = out.filter((r) => r.center_name === center);
     // Date filter on converted_at — inclusive at both ends. "to" extends
     // to the end of that day so picking the same value as "from" yields
     // a single-day window.
@@ -90,30 +110,46 @@ export default function AdmissionPipeline() {
       const toMs = new Date(dateTo).getTime() + 24 * 3600 * 1000 - 1;
       out = out.filter((r) => r.converted_at && new Date(r.converted_at).getTime() <= toMs);
     }
+    // Date filter on updated_at (Last Updated column).
+    if (updFrom) {
+      const fromMs = new Date(updFrom).getTime();
+      out = out.filter((r) => r.updated_at && new Date(r.updated_at).getTime() >= fromMs);
+    }
+    if (updTo) {
+      const toMs = new Date(updTo).getTime() + 24 * 3600 * 1000 - 1;
+      out = out.filter((r) => r.updated_at && new Date(r.updated_at).getTime() <= toMs);
+    }
     const q = search.trim().toLowerCase();
     if (q) {
       out = out.filter((r) => {
         const blob = [
           r.lead_name, r.first_name, r.last_name, r.email,
-          r.whatsapp_number, r.program_name, r.counsellor_name,
+          r.whatsapp_number, r.program_name, r.counsellor_name, r.center_name,
         ].filter(Boolean).join(' ').toLowerCase();
         return blob.includes(q);
       });
     }
     return out;
-  }, [rows, filter, search, dateFrom, dateTo]);
+  }, [rows, filter, search, dateFrom, dateTo, updFrom, updTo, counsellor, program, center]);
+
+  const activeFilterCount = [counsellor, program, center, dateFrom, dateTo, updFrom, updTo, search]
+    .filter(Boolean).length + (filter !== 'all' ? 1 : 0);
+
+  const clearAll = () => {
+    setCounsellor(''); setProgram(''); setCenter('');
+    setDateFrom(''); setDateTo(''); setUpdFrom(''); setUpdTo('');
+    setSearch(''); setFilter('all');
+  };
 
   const dateLabel = useMemo(() => {
-    if (!dateFrom && !dateTo) return 'All dates';
-    const fmt = (d) => {
-      try {
-        return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-      } catch { return d; }
-    };
-    if (dateFrom && dateTo) return `${fmt(dateFrom)} → ${fmt(dateTo)}`;
-    if (dateFrom) return `From ${fmt(dateFrom)}`;
-    return `Until ${fmt(dateTo)}`;
-  }, [dateFrom, dateTo]);
+    const anyConv = dateFrom || dateTo;
+    const anyUpd = updFrom || updTo;
+    if (!anyConv && !anyUpd) return 'All dates';
+    const parts = [];
+    if (anyConv) parts.push('Converted');
+    if (anyUpd) parts.push('Updated');
+    return `${parts.join(' + ')} filtered`;
+  }, [dateFrom, dateTo, updFrom, updTo]);
 
   const openView = async (leadId) => {
     if (!leadId) return;
@@ -180,8 +216,34 @@ export default function AdmissionPipeline() {
               <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: '#94a3b8' }} /></InputAdornment>
             ),
           }}
-          sx={{ flex: '1 1 360px', maxWidth: 520 }}
+          sx={{ flex: '1 1 300px', maxWidth: 460 }}
         />
+
+        <Autocomplete
+          size="small"
+          options={counsellorOptions}
+          value={counsellor || null}
+          onChange={(_e, v) => setCounsellor(v || '')}
+          sx={{ minWidth: 200 }}
+          renderInput={(params) => <TextField {...params} label="Counsellor" placeholder="All" />}
+        />
+        <Autocomplete
+          size="small"
+          options={programOptions}
+          value={program || null}
+          onChange={(_e, v) => setProgram(v || '')}
+          sx={{ minWidth: 220 }}
+          renderInput={(params) => <TextField {...params} label="Program" placeholder="All" />}
+        />
+        <Autocomplete
+          size="small"
+          options={centerOptions}
+          value={center || null}
+          onChange={(_e, v) => setCenter(v || '')}
+          sx={{ minWidth: 170 }}
+          renderInput={(params) => <TextField {...params} label="Center" placeholder="All" />}
+        />
+
         <Button
           variant="outlined"
           size="small"
@@ -189,50 +251,55 @@ export default function AdmissionPipeline() {
           onClick={(e) => setDateAnchor(e.currentTarget)}
           sx={{
             textTransform: 'none',
-            borderColor: (dateFrom || dateTo) ? '#E87B2F' : '#cbd5e1',
-            color: (dateFrom || dateTo) ? '#E87B2F' : '#475569',
+            borderColor: (dateFrom || dateTo || updFrom || updTo) ? '#E87B2F' : '#cbd5e1',
+            color: (dateFrom || dateTo || updFrom || updTo) ? '#E87B2F' : '#475569',
             height: 40,
           }}
         >
           {dateLabel}
         </Button>
-        {(dateFrom || dateTo) && (
-          <Tooltip title="Clear date filter">
-            <IconButton size="small" onClick={() => { setDateFrom(''); setDateTo(''); }}>
-              <ClearIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+        {activeFilterCount > 0 && (
+          <Button
+            size="small" startIcon={<ClearIcon />} onClick={clearAll}
+            sx={{ textTransform: 'none', color: '#6b7280' }}
+          >
+            Clear all ({activeFilterCount})
+          </Button>
         )}
+        <Box sx={{ ml: 'auto', fontSize: 13, color: '#64748b', fontWeight: 600 }}>
+          {filteredRows.length} result{filteredRows.length === 1 ? '' : 's'}
+        </Box>
         <Popover
           open={Boolean(dateAnchor)}
           anchorEl={dateAnchor}
           onClose={() => setDateAnchor(null)}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
         >
-          <Box sx={{ p: 2, width: 280 }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 1.5 }}>
-              Filter by converted date
-            </Typography>
-            <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>FROM</Typography>
-            <TextField
-              type="date"
-              size="small"
-              fullWidth
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              sx={{ mb: 1.5 }}
-            />
-            <Typography sx={{ fontSize: 11, fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>TO</Typography>
-            <TextField
-              type="date"
-              size="small"
-              fullWidth
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              sx={{ mb: 2 }}
-            />
+          <Box sx={{ p: 2, width: 300 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 1 }}>Converted date</Typography>
+            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+              <TextField type="date" size="small" fullWidth label="From"
+                InputLabelProps={{ shrink: true }}
+                value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              <TextField type="date" size="small" fullWidth label="To"
+                InputLabelProps={{ shrink: true }}
+                value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            </Box>
+
+            <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 1 }}>Last updated</Typography>
+            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+              <TextField type="date" size="small" fullWidth label="From"
+                InputLabelProps={{ shrink: true }}
+                value={updFrom} onChange={(e) => setUpdFrom(e.target.value)} />
+              <TextField type="date" size="small" fullWidth label="To"
+                InputLabelProps={{ shrink: true }}
+                value={updTo} onChange={(e) => setUpdTo(e.target.value)} />
+            </Box>
+
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Button size="small" onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear</Button>
+              <Button size="small" onClick={() => { setDateFrom(''); setDateTo(''); setUpdFrom(''); setUpdTo(''); }}>
+                Clear dates
+              </Button>
               <Button size="small" variant="contained" onClick={() => setDateAnchor(null)} sx={{ background: '#E87B2F' }}>
                 Apply
               </Button>
