@@ -1,19 +1,40 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button, IconButton, TextField, InputAdornment, CircularProgress, Tooltip,
+  Autocomplete, MenuItem, Chip,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
+import ClearIcon from '@mui/icons-material/Clear';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import PauseCircleIcon from '@mui/icons-material/PauseCircle';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
-import { admissionsApi } from '../../lib/endpoints';
+import { admissionsApi, programsApi, usersApi } from '../../lib/endpoints';
 import { fullName, fmtDate, fmtMoney } from './utils';
 import StatusPill from './StatusPill';
 import './Accounts.css';
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'All statuses' },
+  { value: 'pending_approval', label: 'Pending Approval' },
+  { value: 'attending', label: 'Attending' },
+  { value: 'on_break', label: 'On Break' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'rejected', label: 'Rejected' },
+];
+
+// Local YYYY-MM-DD helper (avoids UTC shift for Asia/Kolkata users).
+const ymd = (d) => {
+  if (!d) return '';
+  const dt = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(dt.getTime())) return '';
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${dt.getFullYear()}-${m}-${day}`;
+};
 
 // One component, five list pages — the page-specific behavior is fully
 // driven by props (status filter, page title, action set). Keeps the
@@ -34,13 +55,37 @@ const AdmissionsList = ({
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState('');
+  // Filters (server-side via the existing /admissions list params).
+  const [programId, setProgramId] = useState('');
+  const [centerId, setCenterId] = useState('');
+  const [counsellorId, setCounsellorId] = useState('');
+  const [status, setStatus] = useState('');   // only used when the page isn't status-locked
+  const [dateFrom, setDateFrom] = useState(''); // admission_date >=
+  const [dateTo, setDateTo] = useState('');     // admission_date <=
+
+  // Dropdown option sources.
+  const [programs, setPrograms] = useState([]);
+  const [centers, setCenters] = useState([]);
+  const [users, setUsers] = useState([]);
+
+  const activeFilterCount = useMemo(
+    () => [programId, centerId, counsellorId, status, dateFrom, dateTo, q].filter(Boolean).length,
+    [programId, centerId, counsellorId, status, dateFrom, dateTo, q],
+  );
 
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { limit: 100 };
+      const params = { limit: 200 };
+      // statusFilter (page-locked) wins; otherwise honor the status dropdown.
       if (statusFilter) params.status = statusFilter;
+      else if (status) params.status = status;
       if (q) params.q = q;
+      if (programId) params.program_id = programId;
+      if (centerId) params.center_id = centerId;
+      if (counsellorId) params.guided_by_counsellor_id = counsellorId;
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
       if (monthScope) {
         const now = new Date();
         params.month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -52,9 +97,34 @@ const AdmissionsList = ({
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, q, monthScope]);
+  }, [statusFilter, status, q, monthScope, programId, centerId, counsellorId, dateFrom, dateTo]);
 
-  useEffect(() => { reload(); }, [reload]);
+  // Debounce so typing search / rapid filter changes don't fire per keystroke.
+  useEffect(() => {
+    const t = setTimeout(reload, 300);
+    return () => clearTimeout(t);
+  }, [reload]);
+
+  // Load dropdown option sources once. Failures degrade to empty dropdowns.
+  useEffect(() => {
+    (async () => {
+      try {
+        const [pr, ce, us] = await Promise.all([
+          programsApi.list().catch(() => ({ data: [] })),
+          admissionsApi.centers.list().catch(() => ({ data: [] })),
+          usersApi.list().catch(() => ({ data: [] })),
+        ]);
+        setPrograms(pr?.data || []);
+        setCenters(ce?.data || []);
+        setUsers((us?.data || []).filter((u) => u?.is_active !== false));
+      } catch { /* dropdowns stay empty */ }
+    })();
+  }, []);
+
+  const clearAll = () => {
+    setQ(''); setProgramId(''); setCenterId(''); setCounsellorId('');
+    setStatus(''); setDateFrom(''); setDateTo('');
+  };
 
   return (
     <div className="accounts-page">
@@ -75,23 +145,96 @@ const AdmissionsList = ({
         )}
       </div>
 
-      <div className="accounts-filter-bar">
-        <div className="accounts-filter-field" style={{ flex: 1, maxWidth: 320 }}>
-          <span className="accounts-filter-label">Search</span>
+      <div
+        className="accounts-filter-bar"
+        style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}
+      >
+        <TextField
+          size="small"
+          placeholder="Name, email or contact"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          sx={{ minWidth: 240 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>
+            ),
+          }}
+        />
+
+        <Autocomplete
+          size="small"
+          options={programs}
+          getOptionLabel={(o) => o?.name || ''}
+          isOptionEqualToValue={(o, v) => o.id === v.id}
+          value={programs.find((p) => p.id === programId) || null}
+          onChange={(_e, opt) => setProgramId(opt?.id || '')}
+          sx={{ minWidth: 210 }}
+          renderInput={(params) => <TextField {...params} label="Course" placeholder="All courses" />}
+        />
+
+        <Autocomplete
+          size="small"
+          options={users}
+          getOptionLabel={(o) => o?.name || ''}
+          isOptionEqualToValue={(o, v) => o.id === v.id}
+          value={users.find((u) => u.id === counsellorId) || null}
+          onChange={(_e, opt) => setCounsellorId(opt?.id || '')}
+          sx={{ minWidth: 200 }}
+          renderInput={(params) => <TextField {...params} label="Counsellor" placeholder="All counsellors" />}
+        />
+
+        <Autocomplete
+          size="small"
+          options={centers}
+          getOptionLabel={(o) => o?.name || ''}
+          isOptionEqualToValue={(o, v) => o.id === v.id}
+          value={centers.find((c) => c.id === centerId) || null}
+          onChange={(_e, opt) => setCenterId(opt?.id || '')}
+          sx={{ minWidth: 180 }}
+          renderInput={(params) => <TextField {...params} label="Center" placeholder="All centers" />}
+        />
+
+        {/* Status dropdown only when the page isn't already locked to one status. */}
+        {!statusFilter && (
           <TextField
-            size="small"
-            placeholder="Name, email or contact"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-          />
-        </div>
+            select size="small" label="Status" value={status}
+            onChange={(e) => setStatus(e.target.value)} sx={{ minWidth: 170 }}
+          >
+            {STATUS_OPTIONS.map((s) => (
+              <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
+            ))}
+          </TextField>
+        )}
+
+        {/* Admission-date range. Disabled when the page is month-scoped
+            (This Month page already restricts to the current month). */}
+        <TextField
+          type="date" size="small" label="From"
+          InputLabelProps={{ shrink: true }}
+          value={dateFrom} onChange={(e) => setDateFrom(ymd(e.target.value))}
+          disabled={monthScope} sx={{ minWidth: 150 }}
+        />
+        <TextField
+          type="date" size="small" label="To"
+          InputLabelProps={{ shrink: true }}
+          value={dateTo} onChange={(e) => setDateTo(ymd(e.target.value))}
+          disabled={monthScope} sx={{ minWidth: 150 }}
+        />
+
+        {activeFilterCount > 0 && (
+          <Button
+            size="small" startIcon={<ClearIcon />} onClick={clearAll}
+            sx={{ textTransform: 'none', color: '#6b7280' }}
+          >
+            Clear all
+          </Button>
+        )}
+        <Chip
+          size="small"
+          label={`${rows.length} result${rows.length === 1 ? '' : 's'}`}
+          sx={{ ml: 'auto', height: 26, fontWeight: 600 }}
+        />
       </div>
 
       <div className="accounts-table-card">
@@ -106,6 +249,8 @@ const AdmissionsList = ({
                 <th>Admission Date</th>
                 <th>Student</th>
                 <th>Course</th>
+                <th>Counsellor</th>
+                <th>Center</th>
                 <th>Mode</th>
                 <th>Status</th>
                 {showFees && <th style={{ textAlign: 'right' }}>Fees</th>}
@@ -162,6 +307,8 @@ const AdmissionRow = ({ row, actions, showFees, onChanged }) => {
       <td>{fmtDate(row.admission_date)}</td>
       <td>{fullName(row)}<div style={{ fontSize: 11, color: '#9ca3af' }}>{row.email || '—'}</div></td>
       <td>{row.program_name || '—'}</td>
+      <td style={{ fontSize: 12, color: '#6b7280' }}>{row.guided_by_counsellor_name || '—'}</td>
+      <td style={{ fontSize: 12, color: '#6b7280' }}>{row.center_name || '—'}</td>
       <td>{row.mode_of_training || '—'}</td>
       <td><StatusPill status={row.status} /></td>
       {showFees && <td style={{ textAlign: 'right' }}>₹ {fmtMoney(row.total_fees)}</td>}
