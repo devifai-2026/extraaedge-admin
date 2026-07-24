@@ -8,7 +8,7 @@
 // API call from the Render-hosted frontend never tries to reach localhost:4000.
 // `api.js` and `socket.js` additionally honor VITE_API_BASE_URL, which wins
 // over everything here when set.
-const PROD_HOST = 'https://extraaedge-server.onrender.com';
+const PROD_HOST = 'https://admissioncrm.live';
 const LOCAL_HOST = 'http://localhost:4000';
 
 const env = (typeof import.meta !== 'undefined' && import.meta.env) || {};
