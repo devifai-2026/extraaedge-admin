@@ -626,7 +626,7 @@ export default function AnalyticsDashboard() {
             <Kpi label="Completed"        value={admStatus?.counts?.completed ?? '—'}        accent="#3b82f6" />
             <Kpi label="Rejected"         value={admStatus?.counts?.rejected ?? '—'}         accent="#ef4444" />
             <Kpi
-              label="Unrouted (converted, no admission)"
+              label="No Admission Yet"
               value={admStatus?.unrouted_converted ?? '—'}
               hint="Lead converted but accounts hasn't created an admission yet."
               accent="#64748b"
