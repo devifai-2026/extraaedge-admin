@@ -538,6 +538,9 @@ export const remarketingApi = {
   // "Connect with Facebook" OAuth — returns { url } to open in a popup. After
   // the user authorizes, the backend callback stores their ad accounts + pages.
   oauthStart: () => api.get('/remarketing/oauth/start'),
+  // Per-tenant Facebook app credentials (App ID + App Secret).
+  fbSettings: () => api.get('/remarketing/fb-settings'),
+  saveFbSettings: (body) => api.put('/remarketing/fb-settings', body),
 };
 
 export const leadScoreApi = {

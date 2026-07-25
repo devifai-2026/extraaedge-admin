@@ -202,6 +202,45 @@ function CreateAudienceDialog({
 }
 
 // ---- Connect-ad-account dialog ----
+// Per-tenant Facebook App credentials (App ID + Secret). Shows the exact OAuth
+// redirect URI the user must add in their Meta app.
+function FbAppSettingsDialog({ open, onClose, current, onSave }) {
+  const [appId, setAppId] = useState("");
+  const [appSecret, setAppSecret] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    if (open) { setAppId(current?.app_id || ""); setAppSecret(current?.app_secret || ""); setErr(""); }
+  }, [open, current]);
+  const redirectUri = `${(import.meta.env.VITE_API_BASE_URL || "https://admissioncrm.live/api/v1").replace(/\/api\/v1\/?$/, "")}/api/v1/remarketing/oauth/callback`;
+  const submit = async () => {
+    setSaving(true); setErr("");
+    try { await onSave({ app_id: appId.trim(), app_secret: appSecret === "••••••••" ? undefined : appSecret.trim(), enabled: true }); }
+    catch (e) { setErr(e?.message || "Save failed"); }
+    finally { setSaving(false); }
+  };
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Facebook App settings</DialogTitle>
+      <DialogContent>
+        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 12 }}>
+          Enter your Meta app's ID and secret (from developers.facebook.com → App settings → Basic).
+          Then in your Meta app → <b>Facebook Login for Business → Settings</b>, add this exact
+          <b> Valid OAuth Redirect URI</b>:
+        </div>
+        <TextField size="small" fullWidth value={redirectUri} InputProps={{ readOnly: true }} onFocus={(e) => e.target.select()} sx={{ mb: 2 }} />
+        <TextField size="small" fullWidth label="App ID" value={appId} onChange={(e) => setAppId(e.target.value)} sx={{ mb: 2 }} />
+        <TextField size="small" fullWidth label="App Secret" type="password" value={appSecret} onChange={(e) => setAppSecret(e.target.value)} helperText="Leave the •••• to keep the saved secret." />
+        {err && <Alert severity="error" sx={{ mt: 2 }}>{err}</Alert>}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" disabled={saving || !appId.trim()} onClick={submit}>{saving ? "Saving…" : "Save"}</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function ConnectAccountDialog({ open, onClose, onConnect }) {
   const [adAccountId, setAdAccountId] = useState("");
   const [name, setName] = useState("");
@@ -303,6 +342,15 @@ export default function Remarketing() {
   const [createOpen, setCreateOpen] = useState(false);
   const [syncingId, setSyncingId] = useState(null);
   const [toast, setToast] = useState("");
+  // Per-tenant Facebook app settings (App ID + Secret) — required before OAuth.
+  const [fbSettings, setFbSettings] = useState(null);
+  const [fbSettingsOpen, setFbSettingsOpen] = useState(false);
+  const loadFbSettings = useCallback(async () => {
+    if (!canManage) return;
+    try { const r = await remarketingApi.fbSettings(); setFbSettings(r?.data || null); }
+    catch { setFbSettings(null); }
+  }, [canManage]);
+  useEffect(() => { loadFbSettings(); }, [loadFbSettings]);
 
   // Filter-builder option sources.
   const [options, setOptions] = useState({
@@ -403,6 +451,13 @@ export default function Remarketing() {
     await loadAudiences();
   };
 
+  const handleSaveFbSettings = async (body) => {
+    await remarketingApi.saveFbSettings(body);
+    setToast("Facebook app settings saved.");
+    setFbSettingsOpen(false);
+    await loadFbSettings();
+  };
+
   const handleSync = async (id) => {
     setSyncingId(id);
     try {
@@ -457,12 +512,23 @@ export default function Remarketing() {
             </div>
             {canManage && (
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <Tooltip title={fbSettings?.configured ? "" : "Add your Facebook App ID + Secret first"}>
+                  <span>
+                    <Button
+                      size="small" variant="contained" disabled={oauthBusy || !fbSettings?.configured}
+                      onClick={connectWithFacebook}
+                      sx={{ textTransform: "none", bgcolor: "#1877F2", "&:hover": { bgcolor: "#166FE0" } }}
+                    >
+                      {oauthBusy ? "Connecting…" : "Connect with Facebook"}
+                    </Button>
+                  </span>
+                </Tooltip>
                 <Button
-                  size="small" variant="contained" disabled={oauthBusy}
-                  onClick={connectWithFacebook}
-                  sx={{ textTransform: "none", bgcolor: "#1877F2", "&:hover": { bgcolor: "#166FE0" } }}
+                  size="small" variant="outlined"
+                  onClick={() => setFbSettingsOpen(true)}
+                  sx={{ textTransform: "none" }}
                 >
-                  {oauthBusy ? "Connecting…" : "Connect with Facebook"}
+                  {fbSettings?.configured ? "Facebook App ✓" : "Set up Facebook App"}
                 </Button>
                 {/* Advanced/manual fallback (paste a token) */}
                 <Button
@@ -584,6 +650,12 @@ export default function Remarketing() {
         </section>
       </div>
 
+      <FbAppSettingsDialog
+        open={fbSettingsOpen}
+        onClose={() => setFbSettingsOpen(false)}
+        current={fbSettings}
+        onSave={handleSaveFbSettings}
+      />
       <ConnectAccountDialog
         open={connectOpen}
         onClose={() => setConnectOpen(false)}
