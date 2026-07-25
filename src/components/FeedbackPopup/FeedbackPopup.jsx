@@ -58,7 +58,7 @@ function FeedbackPopup() {
   return (
     <div style={S.overlay} role="dialog" aria-modal="true" aria-label="Feedback">
       <div style={S.card}>
-        <p style={S.interrupt}>Sorry to interrupt your work — your rating matters to us.</p>
+        <p style={S.interrupt}>We're building this for you. A few seconds of feedback helps us get it right.</p>
         <h2 style={S.title}>How are we doing?</h2>
         <p style={S.subtitle}>Please share a quick rating and comment to continue.</p>
 
