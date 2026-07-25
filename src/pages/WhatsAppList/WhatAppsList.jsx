@@ -16,8 +16,10 @@ import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import SearchIcon from "@mui/icons-material/Search";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
 import DescriptionIcon from "@mui/icons-material/Description";
+import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import "./WhatAppsList.css";
-import { whatsappApi, leadsApi, uploadsApi } from "../../lib/endpoints";
+import { whatsappApi, leadsApi, uploadsApi, usersApi } from "../../lib/endpoints";
+import { auth } from "../../lib/api";
 import { onNotification } from "../../lib/socket";
 import AddNewLead from "../../components/AddNewLead/AddNewLead";
 
@@ -175,6 +177,18 @@ export default function WhatsAppList() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [draftConvo, setDraftConvo] = useState(null);
   const threadRef = useRef(null);
+  // Create-lead-from-chat (admins / account_managers only).
+  const currentRole = auth.getUser()?.role;
+  const canCreateLead = currentRole === "super_admin" || currentRole === "account_manager";
+  const [createLeadOpen, setCreateLeadOpen] = useState(false);
+  const [createLeadName, setCreateLeadName] = useState("");
+  const [createLeadOwner, setCreateLeadOwner] = useState("");
+  const [creatingLead, setCreatingLead] = useState(false);
+  const [counsellors, setCounsellors] = useState([]);
+  useEffect(() => {
+    if (!canCreateLead) return;
+    usersApi.list().then((r) => setCounsellors((r?.data || []).filter((u) => u?.is_active !== false))).catch(() => {});
+  }, [canCreateLead]);
 
   const loadStatus = useCallback(async () => {
     try { const r = await whatsappApi.inbox.status(); setConfigured(r?.data?.configured !== false); }
@@ -255,6 +269,23 @@ export default function WhatsAppList() {
     });
     setActivePhone(phone);
     setMessages([]);
+  };
+
+  const submitCreateLead = async () => {
+    if (!activePhone || !createLeadName.trim() || !createLeadOwner) return;
+    setCreatingLead(true);
+    try {
+      await whatsappApi.inbox.createLead(activePhone, {
+        name: createLeadName.trim(),
+        assigned_to: createLeadOwner,
+      });
+      setCreateLeadOpen(false);
+      await loadConversations();
+      // Refresh the active thread's header (now linked to the new lead).
+      if (activePhone) loadMessages(activePhone);
+    } catch (e) {
+      alert(e?.message || "Could not create lead");
+    } finally { setCreatingLead(false); }
   };
 
   const doSend = async (payload) => {
@@ -361,11 +392,19 @@ export default function WhatsAppList() {
                     );
                   })()}
                 </div>
-                {activeConvo?.lead_id && (
+                {activeConvo?.lead_id ? (
                   <Tooltip title="Open lead">
                     <IconButton size="small" onClick={() => { setSelectedLead({ id: activeConvo.lead_id }); setEditLeadOpen(true); }}><OpenInNewIcon fontSize="small" /></IconButton>
                   </Tooltip>
-                )}
+                ) : canCreateLead ? (
+                  <Button
+                    size="small" variant="outlined" startIcon={<PersonAddIcon fontSize="small" />}
+                    onClick={() => { setCreateLeadName(activeConvo?.name || ""); setCreateLeadOwner(""); setCreateLeadOpen(true); }}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Create lead
+                  </Button>
+                ) : null}
               </div>
               <div className="wa-thread-body" ref={threadRef}>
                 {messages.map((m) => {
@@ -403,6 +442,40 @@ export default function WhatsAppList() {
       <NewChatDialog open={newChatOpen} onClose={() => setNewChatOpen(false)} onPick={openLeadChat} />
       <TemplateDialog open={tmplOpen} onClose={() => setTmplOpen(false)} onSend={handleSendTemplate} />
       <AddNewLead open={editLeadOpen} onClose={() => setEditLeadOpen(false)} leadData={selectedLead} />
+
+      {/* Create a lead from this chat + assign to a counsellor (admin/AM only). */}
+      <Dialog open={createLeadOpen} onClose={() => setCreateLeadOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Create lead from chat</DialogTitle>
+        <DialogContent>
+          <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 12 }}>
+            {activePhone ? `+${activePhone}` : ""}
+          </div>
+          <TextField
+            label="Lead name" size="small" fullWidth autoFocus
+            value={createLeadName} onChange={(e) => setCreateLeadName(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            select label="Assign to counsellor" size="small" fullWidth
+            value={createLeadOwner} onChange={(e) => setCreateLeadOwner(e.target.value)}
+          >
+            <MenuItem value="">Select…</MenuItem>
+            {counsellors.map((u) => (
+              <MenuItem key={u.id} value={u.id}>{u.name}{u.role ? ` (${String(u.role).replace("_", " ")})` : ""}</MenuItem>
+            ))}
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateLeadOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={creatingLead || !createLeadName.trim() || !createLeadOwner}
+            onClick={submitCreateLead}
+          >
+            {creatingLead ? "Creating…" : "Create & assign"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
