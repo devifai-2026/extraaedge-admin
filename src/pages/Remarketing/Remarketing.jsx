@@ -374,6 +374,29 @@ export default function Remarketing() {
     await loadAccounts();
   };
 
+  // "Connect with Facebook" — open the OAuth dialog in a popup. The backend
+  // callback stores the user's ad accounts + pages and postMessages back.
+  const [oauthBusy, setOauthBusy] = useState(false);
+  const connectWithFacebook = async () => {
+    setOauthBusy(true);
+    try {
+      const r = await remarketingApi.oauthStart();
+      const url = r?.data?.url;
+      if (!url) throw new Error("Facebook is not configured on the server.");
+      const popup = window.open(url, "fb-oauth", "width=600,height=720");
+      const onMsg = async (e) => {
+        if (e?.data?.source !== "fb-oauth") return;
+        window.removeEventListener("message", onMsg);
+        try { popup && popup.close(); } catch { /* ignore */ }
+        if (e.data.ok) { setToast("Facebook connected."); await loadAccounts(); await loadAudiences(); }
+        else setToast("Facebook connection was cancelled or failed.");
+      };
+      window.addEventListener("message", onMsg);
+    } catch (err) {
+      setToast(err?.message || "Could not start Facebook connect.");
+    } finally { setOauthBusy(false); }
+  };
+
   const handleCreate = async (body) => {
     await remarketingApi.createAudience(body);
     setToast("Custom audience created.");
@@ -433,13 +456,23 @@ export default function Remarketing() {
               <LinkIcon fontSize="small" /> Connected ad accounts
             </div>
             {canManage && (
-              <Button
-                size="small" variant="outlined" startIcon={<AddIcon />}
-                onClick={() => setConnectOpen(true)}
-                sx={{ textTransform: "none", borderColor: colors.primary, color: colors.primary }}
-              >
-                Connect ad account
-              </Button>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <Button
+                  size="small" variant="contained" disabled={oauthBusy}
+                  onClick={connectWithFacebook}
+                  sx={{ textTransform: "none", bgcolor: "#1877F2", "&:hover": { bgcolor: "#166FE0" } }}
+                >
+                  {oauthBusy ? "Connecting…" : "Connect with Facebook"}
+                </Button>
+                {/* Advanced/manual fallback (paste a token) */}
+                <Button
+                  size="small" variant="text" startIcon={<AddIcon />}
+                  onClick={() => setConnectOpen(true)}
+                  sx={{ textTransform: "none", color: "#6b7280" }}
+                >
+                  Enter token manually
+                </Button>
+              </div>
             )}
           </div>
 

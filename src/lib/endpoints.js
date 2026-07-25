@@ -535,6 +535,9 @@ export const remarketingApi = {
   // The backend OAuth/connect flow is still being implemented and may return
   // 501 (Not Implemented) until FB app credentials are configured.
   connectAccount: (body) => api.post('/remarketing/accounts/connect', body),
+  // "Connect with Facebook" OAuth — returns { url } to open in a popup. After
+  // the user authorizes, the backend callback stores their ad accounts + pages.
+  oauthStart: () => api.get('/remarketing/oauth/start'),
 };
 
 export const leadScoreApi = {
