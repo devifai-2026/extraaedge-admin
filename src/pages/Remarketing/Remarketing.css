@@ -40,6 +40,123 @@
   height: calc(100vh - 70px);
 }
 
+/* ---- Remarketing page ---- */
+.rm-container {
+  height: auto;
+  min-height: 100vh;
+  padding-bottom: 32px;
+}
+.rm-content {
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.rm-section {
+  background: var(--white);
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 18px 20px;
+}
+.rm-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.rm-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+.rm-loading {
+  display: flex;
+  justify-content: center;
+  padding: 28px 0;
+}
+.rm-empty {
+  padding: 22px;
+  text-align: center;
+  color: #757575;
+  font-size: 14px;
+  background: #fafafa;
+  border: 1px dashed #e0e0e0;
+  border-radius: 6px;
+}
+.rm-account-grid,
+.rm-aud-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.rm-account-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: #fafafa;
+}
+.rm-account-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 15px;
+  color: #333;
+  margin-bottom: 6px;
+}
+.rm-account-meta {
+  font-size: 12px;
+  color: #757575;
+}
+.rm-aud-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rm-aud-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.rm-aud-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: #333;
+}
+.rm-aud-desc {
+  font-size: 13px;
+  color: #555;
+}
+.rm-aud-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: #757575;
+}
+.rm-aud-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.rm-filter-heading {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid #eee;
+}
+
 /* Floating Button */
 .fb-fab {
   position: fixed !important;

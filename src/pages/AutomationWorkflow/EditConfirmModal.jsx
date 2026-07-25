@@ -29,7 +29,7 @@ const EditConfirmModal = ({ open, onClose, onConfirm }) => {
           py: 1.5
         }}
       >
-        Edit Drip Marketing Rule
+        Edit Automation Workflow
         <IconButton size="small" onClick={onClose}>
           <CloseIcon fontSize="small" />
         </IconButton>

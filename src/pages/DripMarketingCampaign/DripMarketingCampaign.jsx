@@ -19,7 +19,10 @@ import {
     Menu,
     Dialog,
     DialogContent,
-    DialogActions
+    DialogActions,
+    CircularProgress,
+    Alert,
+    Snackbar
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
@@ -27,67 +30,97 @@ import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import "./DripMarketingCampaign.css";
 import { colors } from "../../theme/colors";
+import { campaignsDripApi, usersApi } from "../../lib/endpoints";
+import { auth } from "../../lib/api";
 import EditRuleModal from "./EditRuleModal";
-import AddRuleModal from "./AddRuleModal";
+import CreateDripModal from "./CreateDripModal";
+import DripRulesDrawer from "./DripRulesDrawer";
 
-const data = [
-    {
-        description: "Followup Msg",
-        createdBy: "Abhijeet Salgar",
-        createdOn: "Aug 11, 2025 5:23 PM",
-        startTime: "Aug 11, 2025 8:07 PM",
-        active: false
-    },
-    {
-        description: "Demo Attended",
-        createdBy: "Abhijeet Salgar",
-        createdOn: "Aug 11, 2025 5:15 PM",
-        startTime: "Aug 11, 2025 6:07 PM",
-        active: false
-    },
-    {
-        description: "Demo After visit+Followup Msg",
-        createdBy: "Abhijeet Salgar",
-        createdOn: "Aug 11, 2025 5:11 PM",
-        startTime: "Aug 11, 2025 6:07 PM",
-        active: false
-    },
-    {
-        description: "will visit",
-        createdBy: "Abhijeet Salgar",
-        createdOn: "Aug 11, 2025 4:22 PM",
-        startTime: "Aug 11, 2025 5:07 PM",
-        active: false
-    },
-    {
-        description: "visited",
-        createdBy: "Abhijeet Salgar",
-        createdOn: "Aug 11, 2025 4:30 PM",
-        startTime: "Aug 11, 2025 5:07 PM",
-        active: false
-    },
-    {
-        description: "Untouched",
-        createdBy: "Abhijeet Salgar",
-        createdOn: "Aug 11, 2025 4:12 PM",
-        startTime: "Aug 12, 2025 10:07 AM",
-        active: false
-    }
-];
+const ROLES_ALLOWED = ["super_admin", "branch_manager", "sales_manager"];
+
+const fmtDateTime = (iso) =>
+    iso
+        ? new Date(iso).toLocaleString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true
+          })
+        : "-";
 
 const DripCampaignRules = () => {
-    const [rows, setRows] = React.useState(data);
+    const currentRole = auth.getUser()?.role;
+    const canManage = ROLES_ALLOWED.includes(currentRole);
+
+    const [rows, setRows] = React.useState([]);
+    const [loading, setLoading] = React.useState(true);
+    const [error, setError] = React.useState("");
+
     const [filterAnchorEl, setFilterAnchorEl] = React.useState(null);
     const [selectedCounselor, setSelectedCounselor] = React.useState("");
+    const [appliedCounselor, setAppliedCounselor] = React.useState("");
+    const [counselors, setCounselors] = React.useState([]);
+
     const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
     const [activeRowIndex, setActiveRowIndex] = React.useState(null);
+
     const [openStopModal, setOpenStopModal] = React.useState(false);
     const [openToggleModal, setOpenToggleModal] = React.useState(false);
     const [toggleRowIndex, setToggleRowIndex] = React.useState(null);
+
     const [openEditConfirmModal, setOpenEditConfirmModal] = React.useState(false);
     const [openEditRuleModal, setOpenEditRuleModal] = React.useState(false);
     const [editRowIndex, setEditRowIndex] = React.useState(null);
-    const [openAddRuleModal, setOpenAddRuleModal] = React.useState(false);
+
+    const [openCreateDrip, setOpenCreateDrip] = React.useState(false);
+
+    const [rulesDrawerDrip, setRulesDrawerDrip] = React.useState(null);
+
+    const [busy, setBusy] = React.useState(false);
+    const [toast, setToast] = React.useState(null); // { severity, message }
+
+    const showToast = (message, severity = "success") => setToast({ message, severity });
+
+    const load = React.useCallback(async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const res = await campaignsDripApi.list();
+            setRows(res?.data || []);
+        } catch (e) {
+            setError(e?.message || "Failed to load drip campaigns");
+            setRows([]);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    React.useEffect(() => {
+        load();
+    }, [load]);
+
+    // Counselor filter options (created_by owners). Best-effort; hide filter if it fails.
+    React.useEffect(() => {
+        usersApi
+            .list()
+            .then((r) => setCounselors((r?.data || []).filter((u) => u?.is_active !== false)))
+            .catch(() => setCounselors([]));
+    }, []);
+
+    const userNameById = React.useMemo(() => {
+        const m = {};
+        counselors.forEach((u) => {
+            m[u.id] = u.name;
+        });
+        return m;
+    }, [counselors]);
+
+    const visibleRows = React.useMemo(() => {
+        if (!appliedCounselor) return rows;
+        return rows.filter((r) => r.created_by === appliedCounselor);
+    }, [rows, appliedCounselor]);
 
     const handleMenuOpen = (event, index) => {
         setMenuAnchorEl(event.currentTarget);
@@ -119,18 +152,34 @@ const DripCampaignRules = () => {
         setEditRowIndex(null);
     };
 
+    const handleManageRules = () => {
+        setMenuAnchorEl(null);
+        if (activeRowIndex !== null) setRulesDrawerDrip(visibleRows[activeRowIndex]);
+    };
+
     const handleDeleteClick = () => {
         setOpenStopModal(true);
         setMenuAnchorEl(null);
     };
 
-    const handleConfirmDelete = () => {
-        if (activeRowIndex !== null) {
-            const updated = rows.filter((_, i) => i !== activeRowIndex);
-            setRows(updated);
+    const handleConfirmDelete = async () => {
+        const target = activeRowIndex !== null ? visibleRows[activeRowIndex] : null;
+        if (!target) {
+            setOpenStopModal(false);
+            return;
         }
-        setOpenStopModal(false);
-        setActiveRowIndex(null);
+        setBusy(true);
+        try {
+            await campaignsDripApi.delete(target.id);
+            showToast("Drip campaign deleted");
+            await load();
+        } catch (e) {
+            showToast(e?.message || "Failed to delete campaign", "error");
+        } finally {
+            setBusy(false);
+            setOpenStopModal(false);
+            setActiveRowIndex(null);
+        }
     };
 
     const handleToggle = (index) => {
@@ -138,14 +187,24 @@ const DripCampaignRules = () => {
         setOpenToggleModal(true);
     };
 
-    const handleConfirmToggle = () => {
-        if (toggleRowIndex !== null) {
-            const updated = [...rows];
-            updated[toggleRowIndex].active = !updated[toggleRowIndex].active;
-            setRows(updated);
+    const handleConfirmToggle = async () => {
+        const target = toggleRowIndex !== null ? visibleRows[toggleRowIndex] : null;
+        if (!target) {
+            setOpenToggleModal(false);
+            return;
         }
-        setOpenToggleModal(false);
-        setToggleRowIndex(null);
+        setBusy(true);
+        try {
+            await campaignsDripApi.toggle(target.id);
+            showToast(target.active ? "Campaign deactivated" : "Campaign activated");
+            await load();
+        } catch (e) {
+            showToast(e?.message || "Failed to update campaign", "error");
+        } finally {
+            setBusy(false);
+            setOpenToggleModal(false);
+            setToggleRowIndex(null);
+        }
     };
 
     const handleCancelToggle = () => {
@@ -163,21 +222,21 @@ const DripCampaignRules = () => {
 
     const handleClearFilter = () => {
         setSelectedCounselor("");
+        setAppliedCounselor("");
     };
 
     const handleApplyFilter = () => {
+        setAppliedCounselor(selectedCounselor);
         handleFilterClose();
     };
 
     const isFilterOpen = Boolean(filterAnchorEl);
-
-
+    const editRow = editRowIndex !== null ? visibleRows[editRowIndex] : null;
 
     return (
         <div className="drip-container">
             {/* Header */}
             <div className="drip-header">
-                
                 <div className="drip-tab-active">Drip Marketing Campaign Rules</div>
                 <Button
                     variant="outlined"
@@ -209,12 +268,18 @@ const DripCampaignRules = () => {
                             value={selectedCounselor}
                             onChange={(e) => setSelectedCounselor(e.target.value)}
                             renderValue={(selected) =>
-                                selected ? selected : <span className="counselor-placeholder">Select...</span>
+                                selected ? (
+                                    userNameById[selected] || "Selected"
+                                ) : (
+                                    <span className="counselor-placeholder">Select...</span>
+                                )
                             }
                         >
-                            <MenuItem value="Abhijeet Salgar">Abhijeet Salgar</MenuItem>
-                            <MenuItem value="Priya Sharma">Priya Sharma</MenuItem>
-                            <MenuItem value="Rahul Verma">Rahul Verma</MenuItem>
+                            {counselors.map((u) => (
+                                <MenuItem key={u.id} value={u.id}>
+                                    {u.name}
+                                </MenuItem>
+                            ))}
                         </Select>
                     </FormControl>
 
@@ -237,56 +302,113 @@ const DripCampaignRules = () => {
                 </Popover>
             </div>
 
+            {error && (
+                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
+                    {error}
+                </Alert>
+            )}
+
             {/* Table */}
-            <TableContainer component={Paper} className="table-container">
-                <Table>
-                    <TableHead>
-                        <TableRow className="table-head">
-                            <TableCell>DESCRIPTION</TableCell>
-                            <TableCell>CREATED BY</TableCell>
-                            <TableCell>CREATED ON</TableCell>
-                            <TableCell>START TIME</TableCell>
-                            <TableCell>ACTIVE</TableCell>
-                            <TableCell></TableCell>
-                        </TableRow>
-                    </TableHead>
-
-                    <TableBody>
-                        {rows.map((row, index) => (
-                            <TableRow key={index} className="table-row">
-                                <TableCell>{row.description}</TableCell>
-                                <TableCell>{row.createdBy}</TableCell>
-                                <TableCell>{row.createdOn}</TableCell>
-                                <TableCell>{row.startTime}</TableCell>
-                                <TableCell>
-                                    <Switch
-                                        checked={row.active}
-                                        onChange={() => handleToggle(index)}
-                                        size="small"
-                                    />
-                                </TableCell>
-                                <TableCell>
-                                    <IconButton
-                                        size="small"
-                                        onClick={(e) => handleMenuOpen(e, index)}
-                                    >
-                                        <MoreVertIcon />
-                                    </IconButton>
-                                </TableCell>
+            {loading ? (
+                <div style={{ textAlign: "center", padding: "48px 0" }}>
+                    <CircularProgress />
+                </div>
+            ) : visibleRows.length === 0 ? (
+                <Paper
+                    style={{
+                        padding: "48px 24px",
+                        textAlign: "center",
+                        color: colors.textSecondary
+                    }}
+                >
+                    <Typography style={{ fontSize: "16px", marginBottom: "6px" }}>
+                        No drip campaigns yet
+                    </Typography>
+                    <Typography style={{ fontSize: "13px", color: colors.textMuted }}>
+                        {appliedCounselor
+                            ? "No campaigns match the selected counselor."
+                            : canManage
+                            ? "Create your first drip campaign using the + button."
+                            : "Drip campaigns will appear here once created."}
+                    </Typography>
+                </Paper>
+            ) : (
+                <TableContainer component={Paper} className="table-container">
+                    <Table>
+                        <TableHead>
+                            <TableRow className="table-head">
+                                <TableCell>DESCRIPTION</TableCell>
+                                <TableCell>CREATED BY</TableCell>
+                                <TableCell>CREATED ON</TableCell>
+                                <TableCell>START TIME</TableCell>
+                                <TableCell>ACTIVE</TableCell>
+                                <TableCell></TableCell>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+                        </TableHead>
 
-            {/* Floating Button */}
-            <Fab className="fab-btn" onClick={() => setOpenAddRuleModal(true)}>
-                <AddIcon sx={{ color: colors.white }}/>
-            </Fab>
+                        <TableBody>
+                            {visibleRows.map((row, index) => (
+                                <TableRow key={row.id} className="table-row">
+                                    <TableCell
+                                        style={{ cursor: "pointer", color: colors.primary }}
+                                        onClick={() => setRulesDrawerDrip(row)}
+                                    >
+                                        {row.name || row.description || "Untitled"}
+                                    </TableCell>
+                                    <TableCell>
+                                        {userNameById[row.created_by] || "-"}
+                                    </TableCell>
+                                    <TableCell>{fmtDateTime(row.created_at)}</TableCell>
+                                    <TableCell>{fmtDateTime(row.start_time)}</TableCell>
+                                    <TableCell>
+                                        <Switch
+                                            checked={!!row.active}
+                                            onChange={() => handleToggle(index)}
+                                            size="small"
+                                            disabled={!canManage || busy}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <IconButton
+                                            size="small"
+                                            onClick={(e) => handleMenuOpen(e, index)}
+                                        >
+                                            <MoreVertIcon />
+                                        </IconButton>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            )}
 
-            <AddRuleModal
-                open={openAddRuleModal}
-                onClose={() => setOpenAddRuleModal(false)}
+            {/* Floating Button — create a new drip campaign (role-gated) */}
+            {canManage && (
+                <Fab className="fab-btn" onClick={() => setOpenCreateDrip(true)}>
+                    <AddIcon sx={{ color: colors.white }} />
+                </Fab>
+            )}
+
+            <CreateDripModal
+                open={openCreateDrip}
+                onClose={() => setOpenCreateDrip(false)}
+                onCreated={(created) => {
+                    setOpenCreateDrip(false);
+                    showToast("Drip campaign created");
+                    load().then(() => {
+                        if (created) setRulesDrawerDrip(created);
+                    });
+                }}
+            />
+
+            <DripRulesDrawer
+                drip={rulesDrawerDrip}
+                open={Boolean(rulesDrawerDrip)}
+                canManage={canManage}
+                onClose={() => setRulesDrawerDrip(null)}
+                onChanged={load}
+                onToast={showToast}
             />
 
             <Menu
@@ -296,8 +418,13 @@ const DripCampaignRules = () => {
                 anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                 transformOrigin={{ vertical: "top", horizontal: "right" }}
             >
-                <MenuItem onClick={handleEdit}>Edit</MenuItem>
-                <MenuItem onClick={handleDeleteClick}>Delete</MenuItem>
+                <MenuItem onClick={handleManageRules}>Manage Steps</MenuItem>
+                <MenuItem onClick={handleEdit} disabled={!canManage}>
+                    Edit
+                </MenuItem>
+                <MenuItem onClick={handleDeleteClick} disabled={!canManage}>
+                    Delete
+                </MenuItem>
             </Menu>
 
             <Dialog
@@ -316,7 +443,7 @@ const DripCampaignRules = () => {
                         color: colors.white
                     }}
                 >
-                    <span style={{ fontWeight: 600 }}>Stop Campaign</span>
+                    <span style={{ fontWeight: 600 }}>Delete Campaign</span>
                     <IconButton size="small" onClick={() => setOpenStopModal(false)}>
                         <CloseIcon sx={{ color: colors.white }} />
                     </IconButton>
@@ -324,7 +451,7 @@ const DripCampaignRules = () => {
 
                 <DialogContent style={{ padding: "24px" }}>
                     <p style={{ fontSize: "25px", color: colors.textDark }}>
-                        Do you want to stop the Campaign?
+                        Do you want to delete the Campaign?
                     </p>
                 </DialogContent>
 
@@ -340,13 +467,14 @@ const DripCampaignRules = () => {
                     <Button
                         variant="contained"
                         onClick={handleConfirmDelete}
+                        disabled={busy}
                         sx={{
                             textTransform: "none",
                             backgroundColor: colors.primary,
                             "&:hover": { backgroundColor: colors.primaryDark }
                         }}
                     >
-                        Yes
+                        {busy ? "Deleting…" : "Yes"}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -377,10 +505,10 @@ const DripCampaignRules = () => {
 
                 <DialogContent style={{ padding: "24px" }}>
                     <p style={{ fontSize: "18px", color: colors.textDark, margin: 0, fontWeight: 500 }}>
-                        Do you want to update the rule?
+                        Do you want to update the campaign?
                     </p>
                     <p style={{ fontSize: "14px", color: colors.textSecondary, marginTop: "8px" }}>
-                        After editing the rule all the existing lead will not receive communication
+                        After editing, active leads may not receive further communication until re-processed.
                     </p>
                 </DialogContent>
 
@@ -410,7 +538,13 @@ const DripCampaignRules = () => {
             <EditRuleModal
                 open={openEditRuleModal}
                 onClose={handleCloseEditRule}
-                ruleName={editRowIndex !== null ? rows[editRowIndex]?.description : ""}
+                drip={editRow}
+                onSaved={() => {
+                    handleCloseEditRule();
+                    showToast("Campaign updated");
+                    load();
+                }}
+                onToast={showToast}
             />
 
             <Dialog
@@ -430,9 +564,9 @@ const DripCampaignRules = () => {
                     }}
                 >
                     <span style={{ fontWeight: 600 }}>
-                        {toggleRowIndex !== null && rows[toggleRowIndex]?.active
-                            ? "Deactivate Segment"
-                            : "Activate Segment"}
+                        {toggleRowIndex !== null && visibleRows[toggleRowIndex]?.active
+                            ? "Deactivate Campaign"
+                            : "Activate Campaign"}
                     </span>
                     <IconButton size="small" onClick={handleCancelToggle}>
                         <CloseIcon sx={{ color: colors.white }} />
@@ -441,14 +575,14 @@ const DripCampaignRules = () => {
 
                 <DialogContent style={{ padding: "24px" }}>
                     <p style={{ fontSize: "20px", color: colors.textDark, margin: 0 }}>
-                        {toggleRowIndex !== null && rows[toggleRowIndex]?.active
-                            ? "Do you want to deactivate the rule?"
-                            : "Do you want to activate the rule?"}
+                        {toggleRowIndex !== null && visibleRows[toggleRowIndex]?.active
+                            ? "Do you want to deactivate the campaign?"
+                            : "Do you want to activate the campaign?"}
                     </p>
                     <p style={{ fontSize: "14px", color: colors.textDark, marginTop: "8px" }}>
-                        {toggleRowIndex !== null && rows[toggleRowIndex]?.active
-                            ? "Once the rule is inactive all the communication will stop"
-                            : "Once the rule is active all the communication will start going again"}
+                        {toggleRowIndex !== null && visibleRows[toggleRowIndex]?.active
+                            ? "Once inactive all communication will stop"
+                            : "Once active all communication will start going again"}
                     </p>
                 </DialogContent>
 
@@ -464,16 +598,34 @@ const DripCampaignRules = () => {
                     <Button
                         variant="contained"
                         onClick={handleConfirmToggle}
+                        disabled={busy}
                         sx={{
                             textTransform: "none",
                             backgroundColor: colors.primary,
                             "&:hover": { backgroundColor: colors.primaryDark }
                         }}
                     >
-                        Yes
+                        {busy ? "Saving…" : "Yes"}
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            <Snackbar
+                open={Boolean(toast)}
+                autoHideDuration={4000}
+                onClose={() => setToast(null)}
+                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            >
+                {toast ? (
+                    <Alert
+                        onClose={() => setToast(null)}
+                        severity={toast.severity}
+                        sx={{ width: "100%" }}
+                    >
+                        {toast.message}
+                    </Alert>
+                ) : undefined}
+            </Snackbar>
         </div>
     );
 };

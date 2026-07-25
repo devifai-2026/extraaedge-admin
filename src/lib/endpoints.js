@@ -486,6 +486,10 @@ export const workflowsApi = {
   test: (id, lead_id) => api.post(`/workflows/${id}/test`, { lead_id }),
   runs: (id) => api.get(`/workflows/${id}/runs`),
   categories: () => api.get('/workflows/categories'),
+  // Workflow categories are tenant-defined rows (workflow_categories). Create /
+  // update are super_admin / branch_manager only at the API layer.
+  createCategory: (body) => api.post('/workflows/categories', body),
+  updateCategory: (id, body) => api.put(`/workflows/categories/${id}`, body),
 };
 
 export const rawDataApi = {
@@ -527,6 +531,10 @@ export const remarketingApi = {
   deleteAudience: (id) => api.delete(`/remarketing/audiences/${id}`),
   syncAudience: (id) => api.post(`/remarketing/audiences/${id}/sync`),
   accounts: () => api.get('/remarketing/accounts'),
+  // Connect a Facebook ad account. Body: { ad_account_id, name, access_token }.
+  // The backend OAuth/connect flow is still being implemented and may return
+  // 501 (Not Implemented) until FB app credentials are configured.
+  connectAccount: (body) => api.post('/remarketing/accounts/connect', body),
 };
 
 export const leadScoreApi = {

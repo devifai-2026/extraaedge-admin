@@ -1,11 +1,28 @@
-import React from "react";
-import { Box, Typography, IconButton } from "@mui/material";
+import React, { useState, useEffect } from "react";
+import {
+  Box,
+  Typography,
+  IconButton,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Chip,
+  Snackbar,
+  Alert
+} from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import SmsOutlinedIcon from "@mui/icons-material/SmsOutlined";
 import AddCircleIcon from "@mui/icons-material/AddCircle";
 import "./CreateWorkflowCategory.css";
+import { workflowsApi } from "../../lib/endpoints";
+import { auth } from "../../lib/api";
+
+const MANAGE_ROLES = ["super_admin", "branch_manager"];
 
 const categories = [
   {
@@ -160,6 +177,51 @@ const PreviewBlock = ({ type }) => {
 };
 
 const CreateWorkflowCategory = ({ onBack, onSelect }) => {
+  const [dbCategories, setDbCategories] = useState([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState({ open: false, msg: "", severity: "success" });
+
+  const canManage = MANAGE_ROLES.includes(auth.getUser()?.role);
+  const notify = (msg, severity = "success") =>
+    setToast({ open: true, msg, severity });
+
+  const loadCategories = () => {
+    workflowsApi
+      .categories()
+      .then((r) => setDbCategories(r?.data || []))
+      .catch(() => setDbCategories([]));
+  };
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const handleCreateCategory = async () => {
+    if (!newName.trim()) {
+      notify("Please enter a category name.", "warning");
+      return;
+    }
+    setSaving(true);
+    try {
+      await workflowsApi.createCategory({
+        name: newName.trim(),
+        description: newDesc.trim() || undefined
+      });
+      notify("Category created.");
+      setCreateOpen(false);
+      setNewName("");
+      setNewDesc("");
+      loadCategories();
+    } catch (e) {
+      notify(e?.message || "Could not create category.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Box className="create-workflow-wrapper">
       <Box className="create-workflow-title">
@@ -174,6 +236,39 @@ const CreateWorkflowCategory = ({ onBack, onSelect }) => {
       <Typography className="create-workflow-subtitle">
         Select the category best suited to create workflow of your choice:
       </Typography>
+
+      {dbCategories.length > 0 && (
+        <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1, mb: 2 }}>
+          <Typography variant="body2" sx={{ color: "#777", mr: 1 }}>
+            Your categories:
+          </Typography>
+          {dbCategories.map((c) => (
+            <Chip key={c.id} label={c.name} size="small" />
+          ))}
+          {canManage && (
+            <Button
+              size="small"
+              startIcon={<AddCircleIcon fontSize="small" />}
+              onClick={() => setCreateOpen(true)}
+              sx={{ textTransform: "none" }}
+            >
+              New category
+            </Button>
+          )}
+        </Box>
+      )}
+      {dbCategories.length === 0 && canManage && (
+        <Box sx={{ mb: 2 }}>
+          <Button
+            size="small"
+            startIcon={<AddCircleIcon fontSize="small" />}
+            onClick={() => setCreateOpen(true)}
+            sx={{ textTransform: "none" }}
+          >
+            New category
+          </Button>
+        </Box>
+      )}
 
       <Box className="create-workflow-grid">
         {categories.map((cat) => (
@@ -196,6 +291,54 @@ const CreateWorkflowCategory = ({ onBack, onSelect }) => {
           </Box>
         ))}
       </Box>
+
+      {/* Create workflow category */}
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>New workflow category</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            size="small"
+            label="Category name"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            sx={{ mt: 1, mb: 2 }}
+          />
+          <TextField
+            fullWidth
+            size="small"
+            label="Description (optional)"
+            value={newDesc}
+            onChange={(e) => setNewDesc(e.target.value)}
+            multiline
+            minRows={2}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateOpen(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button variant="contained" onClick={handleCreateCategory} disabled={saving}>
+            {saving ? "Saving…" : "Create"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity={toast.severity}
+          onClose={() => setToast((t) => ({ ...t, open: false }))}
+          sx={{ width: "100%" }}
+        >
+          {toast.msg}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

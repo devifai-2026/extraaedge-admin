@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -17,11 +17,16 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  CircularProgress,
+  Alert,
+  Snackbar,
+  Tooltip
 } from "@mui/material";
 import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import AddIcon from "@mui/icons-material/Add";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { colors } from "../../theme/colors";
 import "./AutomationWorkflow.css";
 import {
@@ -34,53 +39,64 @@ import EditConfirmModal from "./EditConfirmModal";
 import EditAutomationWorkflow from "./EditAutomationWorkflow";
 import CreateWorkflowCategory from "./CreateWorkflowCategory";
 import WorkflowBuilder from "./WorkflowBuilder";
+import { workflowsApi } from "../../lib/endpoints";
+import { auth } from "../../lib/api";
 
-const rowsData = [
-  {
-    name: "WDay2026",
-    category: "Send immediate communication",
-    createdBy: "Abhijeet Salgar",
-    createdOn: "Mar 7, 2026 10:42 AM",
-    startTime: "Mar 7, 2026 10:50 AM",
-    active: false
-  },
-  {
-    name: "Drip followup",
-    category: "Nurture with time based workflow",
-    createdBy: "Akansha Kondalwade",
-    createdOn: "Feb 19, 2026 11:29 AM",
-    startTime: "Feb 20, 2026 6:30 AM",
-    active: false
-  },
-  {
-    name: "Drip clod junk",
-    category: "Nurture with time based workflow",
-    createdBy: "Akansha Kondalwade",
-    createdOn: "Feb 11, 2026 7:20 PM",
-    startTime: "Feb 12, 2026 9:15 PM",
-    active: false
-  },
-  {
-    name: "Drip New",
-    category: "Nurture with time based workflow",
-    createdBy: "Akansha Kondalwade",
-    createdOn: "Feb 11, 2026 7:17 PM",
-    startTime: "Feb 12, 2026 8:30 PM",
-    active: false
-  }
-];
+const fmtDateTime = (iso) =>
+  iso
+    ? new Date(iso).toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true
+      })
+    : "—";
+
+// Roles that may create / toggle / execute workflows (mirrors the BE rbac on
+// the workflow routes: super_admin, branch_manager, sales_manager).
+const MANAGE_ROLES = ["super_admin", "branch_manager", "sales_manager"];
 
 const AutomationWorkflows = () => {
-  const [rows, setRows] = useState(rowsData);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [anchorEl, setAnchorEl] = useState(null);
   const [anchorElFilter, setAnchorElFilter] = useState(null);
   const [confirmIndex, setConfirmIndex] = useState(null);
   const [menuIndex, setMenuIndex] = useState(null);
   const [deleteIndex, setDeleteIndex] = useState(null);
   const [editConfirmIndex, setEditConfirmIndex] = useState(null);
-  const [editIndex, setEditIndex] = useState(null);
+  const [editWorkflow, setEditWorkflow] = useState(null);
   const [showCreateCategory, setShowCreateCategory] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState({ open: false, msg: "", severity: "success" });
+
+  const currentRole = auth.getUser()?.role;
+  const canManage = MANAGE_ROLES.includes(currentRole);
+
+  const notify = (msg, severity = "success") =>
+    setToast({ open: true, msg, severity });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await workflowsApi.list();
+      setRows(res?.data || []);
+    } catch (e) {
+      setError(e?.message || "Failed to load workflows");
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleFilterClick = (event) => {
     setAnchorElFilter(event.currentTarget);
@@ -93,6 +109,10 @@ const AutomationWorkflows = () => {
   const openFilter = Boolean(anchorElFilter);
 
   const handleToggleClick = (index) => {
+    if (!canManage) {
+      notify("You don't have permission to change workflow status.", "warning");
+      return;
+    }
     setConfirmIndex(index);
   };
 
@@ -100,12 +120,38 @@ const AutomationWorkflows = () => {
     setConfirmIndex(null);
   };
 
-  const handleConfirmYes = () => {
+  const handleConfirmYes = async () => {
     if (confirmIndex === null) return;
-    const updated = [...rows];
-    updated[confirmIndex].active = !updated[confirmIndex].active;
-    setRows(updated);
-    setConfirmIndex(null);
+    const row = rows[confirmIndex];
+    setBusy(true);
+    try {
+      const res = await workflowsApi.toggle(row.id);
+      const updated = [...rows];
+      updated[confirmIndex] = { ...row, ...(res?.data || {}) };
+      setRows(updated);
+      notify(res?.data?.is_active ? "Workflow activated." : "Workflow deactivated.");
+    } catch (e) {
+      notify(e?.message || "Could not update workflow.", "error");
+    } finally {
+      setBusy(false);
+      setConfirmIndex(null);
+    }
+  };
+
+  const handleExecute = async (row) => {
+    if (!canManage) {
+      notify("You don't have permission to run workflows.", "warning");
+      return;
+    }
+    setBusy(true);
+    try {
+      await workflowsApi.execute(row.id, {});
+      notify("Workflow run queued.");
+    } catch (e) {
+      notify(e?.message || "Could not run workflow.", "error");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleMenuOpen = (event, index) => {
@@ -134,13 +180,13 @@ const AutomationWorkflows = () => {
   };
 
   const handleEditConfirmYes = () => {
-    setEditIndex(editConfirmIndex);
+    setEditWorkflow(rows[editConfirmIndex] || null);
     setEditConfirmIndex(null);
     setMenuIndex(null);
   };
 
   const handleEditBack = () => {
-    setEditIndex(null);
+    setEditWorkflow(null);
   };
 
   const handleDeleteClose = () => {
@@ -148,21 +194,33 @@ const AutomationWorkflows = () => {
     setMenuIndex(null);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deleteIndex === null) return;
-    const updated = rows.filter((_, i) => i !== deleteIndex);
-    setRows(updated);
-    setDeleteIndex(null);
-    setMenuIndex(null);
+    const row = rows[deleteIndex];
+    setBusy(true);
+    try {
+      await workflowsApi.delete(row.id);
+      setRows(rows.filter((_, i) => i !== deleteIndex));
+      notify("Workflow deleted.");
+    } catch (e) {
+      notify(e?.message || "Could not delete workflow.", "error");
+    } finally {
+      setBusy(false);
+      setDeleteIndex(null);
+      setMenuIndex(null);
+    }
   };
 
-  if (editIndex !== null) {
+  if (editWorkflow) {
     return (
       <EditAutomationWorkflow
-        workflow={rows[editIndex]}
+        workflow={editWorkflow}
         onBack={handleEditBack}
         onCancel={handleEditBack}
-        onSave={handleEditBack}
+        onSave={() => {
+          handleEditBack();
+          load();
+        }}
       />
     );
   }
@@ -179,6 +237,7 @@ const AutomationWorkflows = () => {
         onSave={() => {
           setSelectedCategory(null);
           setShowCreateCategory(false);
+          load();
         }}
       />
     );
@@ -196,13 +255,7 @@ const AutomationWorkflows = () => {
   return (
     <Box sx={{ p: 3, background: "#f6f6f6", minHeight: "100vh" }}>
       {/* Header */}
-      <Box
-
-        className="automation-header"
-      >
-        {/* <Typography variant="h5" fontWeight={600}>
-          Automation Workflows
-        </Typography> */}
+      <Box className="automation-header">
         <div className="automation-tab-active">Automation Workflows</div>
 
         <Button
@@ -225,6 +278,12 @@ const AutomationWorkflows = () => {
         </Button>
       </Box>
 
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
+          {error}
+        </Alert>
+      )}
+
       {/* Table */}
       <Paper elevation={0} sx={{ borderRadius: "10px", overflow: "hidden" }}>
         <Table>
@@ -232,7 +291,6 @@ const AutomationWorkflows = () => {
             <TableRow sx={{ background: colors.primary, color: colors.white }}>
               <TableCell><b>WORKFLOW NAME</b></TableCell>
               <TableCell><b>WORKFLOW CATEGORY</b></TableCell>
-              <TableCell><b>CREATED BY</b></TableCell>
               <TableCell><b>CREATED ON</b></TableCell>
               <TableCell><b>START TIME</b></TableCell>
               <TableCell align="center"><b>ACTIVE</b></TableCell>
@@ -241,28 +299,61 @@ const AutomationWorkflows = () => {
           </TableHead>
 
           <TableBody>
-            {rows.map((row, index) => (
-              <TableRow key={index} hover>
-                <TableCell>{row.name}</TableCell>
-                <TableCell>{row.category}</TableCell>
-                <TableCell>{row.createdBy}</TableCell>
-                <TableCell>{row.createdOn}</TableCell>
-                <TableCell>{row.startTime}</TableCell>
-
-                <TableCell align="center">
-                  <Switch
-                    checked={row.active}
-                    onChange={() => handleToggleClick(index)}
-                  />
-                </TableCell>
-
-                <TableCell align="right">
-                  <IconButton onClick={(e) => handleMenuOpen(e, index)}>
-                    <MoreVertIcon />
-                  </IconButton>
+            {loading && (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                  <CircularProgress size={28} />
                 </TableCell>
               </TableRow>
-            ))}
+            )}
+
+            {!loading && rows.length === 0 && !error && (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 6, color: "#777" }}>
+                  No automation workflows yet.
+                  {canManage
+                    ? " Use the + button to create your first one."
+                    : ""}
+                </TableCell>
+              </TableRow>
+            )}
+
+            {!loading &&
+              rows.map((row, index) => (
+                <TableRow key={row.id} hover>
+                  <TableCell>{row.name}</TableCell>
+                  <TableCell>{row.category_name || "—"}</TableCell>
+                  <TableCell>{fmtDateTime(row.created_at)}</TableCell>
+                  <TableCell>{fmtDateTime(row.start_time)}</TableCell>
+
+                  <TableCell align="center">
+                    <Switch
+                      checked={!!row.is_active}
+                      disabled={!canManage || busy}
+                      onChange={() => handleToggleClick(index)}
+                    />
+                  </TableCell>
+
+                  <TableCell align="right">
+                    {canManage && (
+                      <Tooltip title="Run now">
+                        <span>
+                          <IconButton
+                            size="small"
+                            disabled={busy}
+                            onClick={() => handleExecute(row)}
+                          >
+                            <PlayArrowIcon />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    )}
+                    <IconButton onClick={(e) => handleMenuOpen(e, index)}>
+                      <MoreVertIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
           </TableBody>
         </Table>
       </Paper>
@@ -274,23 +365,25 @@ const AutomationWorkflows = () => {
         onClose={handleMenuClose}
       >
         <MenuItem onClick={handleEditClick}>Edit</MenuItem>
-        <MenuItem onClick={handleDeleteClick}>Delete</MenuItem>
+        {canManage && <MenuItem onClick={handleDeleteClick}>Delete</MenuItem>}
       </Menu>
 
       {/* Floating Add Button */}
-      <Fab
-        color="warning"
-        onClick={() => setShowCreateCategory(true)}
-        sx={{
-          position: "fixed",
-          bottom: 30,
-          right: 30,
-          backgroundColor: colors.primary,
-          "&:hover": { backgroundColor: colors.primaryDark }
-        }}
-      >
-        <AddIcon />
-      </Fab>
+      {canManage && (
+        <Fab
+          color="warning"
+          onClick={() => setShowCreateCategory(true)}
+          sx={{
+            position: "fixed",
+            bottom: 30,
+            right: 30,
+            backgroundColor: colors.primary,
+            "&:hover": { backgroundColor: colors.primaryDark }
+          }}
+        >
+          <AddIcon />
+        </Fab>
+      )}
       <Popover
         open={openFilter}
         anchorEl={anchorElFilter}
@@ -380,9 +473,9 @@ const AutomationWorkflows = () => {
             py: 1.5
           }}
         >
-          {confirmIndex !== null && rows[confirmIndex]?.active
-            ? "Deactivate Segment"
-            : "Activate Segment"}
+          {confirmIndex !== null && rows[confirmIndex]?.is_active
+            ? "Deactivate Workflow"
+            : "Activate Workflow"}
           <IconButton size="small" onClick={handleConfirmClose}>
             <CloseIcon fontSize="small" />
           </IconButton>
@@ -390,12 +483,12 @@ const AutomationWorkflows = () => {
 
         <DialogContent sx={{ pt: 2 }}>
           <Typography fontWeight={600} sx={{ mb: 1, mt: 1 }}>
-            {confirmIndex !== null && rows[confirmIndex]?.active
+            {confirmIndex !== null && rows[confirmIndex]?.is_active
               ? "Do you want to deactivate the rule?"
               : "Do you want to activate the rule?"}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {confirmIndex !== null && rows[confirmIndex]?.active
+            {confirmIndex !== null && rows[confirmIndex]?.is_active
               ? "Once the rule is inactive all the communication will stop."
               : "Once the rule is active all the communication will start going again"}
           </Typography>
@@ -405,6 +498,7 @@ const AutomationWorkflows = () => {
           <Button
             onClick={handleConfirmClose}
             variant="outlined"
+            disabled={busy}
             sx={{
               textTransform: "none",
               borderRadius: "6px",
@@ -417,6 +511,7 @@ const AutomationWorkflows = () => {
           <Button
             onClick={handleConfirmYes}
             variant="contained"
+            disabled={busy}
             sx={{
               textTransform: "none",
               borderRadius: "6px",
@@ -453,7 +548,7 @@ const AutomationWorkflows = () => {
             py: 1.5
           }}
         >
-          Delete Drip Marketing Rule
+          Delete Automation Workflow
           <IconButton size="small" onClick={handleDeleteClose}>
             <CloseIcon fontSize="small" />
           </IconButton>
@@ -469,6 +564,7 @@ const AutomationWorkflows = () => {
           <Button
             onClick={handleDeleteClose}
             variant="outlined"
+            disabled={busy}
             sx={{
               textTransform: "none",
               borderRadius: "6px",
@@ -481,6 +577,7 @@ const AutomationWorkflows = () => {
           <Button
             onClick={handleDeleteConfirm}
             variant="contained"
+            disabled={busy}
             sx={{
               textTransform: "none",
               borderRadius: "6px",
@@ -492,6 +589,21 @@ const AutomationWorkflows = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((t) => ({ ...t, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity={toast.severity}
+          onClose={() => setToast((t) => ({ ...t, open: false }))}
+          sx={{ width: "100%" }}
+        >
+          {toast.msg}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
