@@ -333,6 +333,7 @@ export const whatsappApi = {
     createLead: (phone, body) => api.post(`/whatsapp/inbox/chats/${encodeURIComponent(phone)}/create-lead`, body), // { name, assigned_to, email? }
     messages: (phone) => api.get(`/whatsapp/inbox/chats/${encodeURIComponent(phone)}/messages`),
     markRead: (phone) => api.patch(`/whatsapp/inbox/chats/${encodeURIComponent(phone)}/read`),
+    deleteChat: (phone) => api.delete(`/whatsapp/inbox/chats/${encodeURIComponent(phone)}`), // super_admin only
     send: (phone, body) => api.post(`/whatsapp/inbox/chats/${encodeURIComponent(phone)}/send`, body), // { type, message | templateId+variables }
     templates: () => api.get('/whatsapp/inbox/templates'),
     addTemplate: (body) => api.post('/whatsapp/inbox/templates', body), // { template_id, label, body, category? }

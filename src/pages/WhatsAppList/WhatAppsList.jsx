@@ -17,6 +17,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
 import DescriptionIcon from "@mui/icons-material/Description";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import "./WhatAppsList.css";
 import { whatsappApi, leadsApi, uploadsApi, usersApi } from "../../lib/endpoints";
 import { auth } from "../../lib/api";
@@ -180,6 +181,7 @@ export default function WhatsAppList() {
   // Create-lead-from-chat (admins / account_managers only).
   const currentRole = auth.getUser()?.role;
   const canCreateLead = currentRole === "super_admin" || currentRole === "account_manager";
+  const canDeleteChat = currentRole === "super_admin";
   const [createLeadOpen, setCreateLeadOpen] = useState(false);
   const [createLeadName, setCreateLeadName] = useState("");
   const [createLeadOwner, setCreateLeadOwner] = useState("");
@@ -286,6 +288,20 @@ export default function WhatsAppList() {
     } catch (e) {
       alert(e?.message || "Could not create lead");
     } finally { setCreatingLead(false); }
+  };
+
+  const deleteChatHistory = async () => {
+    if (!activePhone) return;
+    if (!window.confirm("Delete this entire chat history? All messages and the conversation will be permanently removed. The linked lead (if any) is NOT deleted.")) return;
+    try {
+      await whatsappApi.inbox.deleteChat(activePhone);
+      setActivePhone(null);
+      setMessages([]);
+      setDraftConvo(null);
+      await loadConversations();
+    } catch (e) {
+      alert(e?.message || "Could not delete chat");
+    }
   };
 
   const doSend = async (payload) => {
@@ -405,6 +421,13 @@ export default function WhatsAppList() {
                     Create lead
                   </Button>
                 ) : null}
+                {canDeleteChat && (
+                  <Tooltip title="Delete chat history">
+                    <IconButton size="small" onClick={deleteChatHistory} sx={{ ml: 0.5, color: "#dc2626" }}>
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                )}
               </div>
               <div className="wa-thread-body" ref={threadRef}>
                 {messages.map((m) => {
