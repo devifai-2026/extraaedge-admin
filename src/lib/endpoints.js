@@ -41,6 +41,12 @@ export const authApi = {
   changePassword: (body) => api.post('/auth/change-password', body),
 };
 
+export const feedbackApi = {
+  status: () => api.get('/feedback/status'),
+  submit: ({ rating, comment }) => api.post('/feedback/submit', { rating, comment }),
+  dismiss: () => api.post('/feedback/dismiss'),
+};
+
 export const leadsApi = {
   list: (params) => api.get('/leads', withBranch(params)),
   stageCounts: (params) => api.get('/leads/stage-counts', withBranch(params)),

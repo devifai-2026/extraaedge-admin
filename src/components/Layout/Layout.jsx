@@ -4,6 +4,7 @@ import Header from './Header';
 import Sidebar from './Sidebar';
 import BranchSetupDialog from '../BranchSetupDialog/BranchSetupDialog';
 import PhoneCaptureDialog from '../PhoneCaptureDialog/PhoneCaptureDialog';
+import FeedbackPopup from '../FeedbackPopup/FeedbackPopup';
 import { auth } from '../../lib/api';
 import { authApi } from '../../lib/endpoints';
 import { ROLES } from '../../lib/rbac';
@@ -94,6 +95,9 @@ function Layout({ children }) {
         open={needsPhone && !needsBranchSetup}
         onDone={() => setNeedsPhone(false)}
       />
+      {/* Recurring feedback popup — only once the blocking gates are cleared,
+          so it never stacks on top of branch/phone setup. */}
+      {!needsBranchSetup && !needsPhone ? <FeedbackPopup /> : null}
     </div>
   );
 }
