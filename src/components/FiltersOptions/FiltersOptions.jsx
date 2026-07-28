@@ -121,7 +121,13 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
     const [openFilter, setOpenFilter] = useState(false);
 
     // "Not updated" (stale) report dialog — super_admin / managers only.
-    const canStaleReport = isRole(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER, ROLES.SALES_MANAGER);
+    // Stale/"Not updated" report is available to every lead-working role. The
+    // backend already scopes results by role (a counsellor only sees their own
+    // leads), so counsellors get a personal stale list; managers/admins can also
+    // scope by a specific counsellor via the picker below.
+    const canStaleReport = isRole(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER, ROLES.SALES_MANAGER, ROLES.COUNSELLOR);
+    // Only managers/admins can scope the stale report to a specific counsellor.
+    const canPickCounsellor = !isRole(ROLES.COUNSELLOR);
     const [openStale, setOpenStale] = useState(false);
     // "Not touched since" cutoff — leads whose last activity/update is OLDER than
     // this date (gone quiet). Sent to the backend as no_activity_from.
@@ -129,11 +135,11 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
     const [staleCounsellor, setStaleCounsellor] = useState(''); // '' = all (global)
     const [counsellors, setCounsellors] = useState([]);
     React.useEffect(() => {
-        if (!openStale || counsellors.length) return;
+        if (!openStale || counsellors.length || !canPickCounsellor) return;
         usersApi.list({ role: 'counsellor', limit: 200 })
             .then((r) => setCounsellors((r?.data || []).filter((u) => u.is_active !== false)))
             .catch(() => setCounsellors([]));
-    }, [openStale, counsellors.length]);
+    }, [openStale, counsellors.length, canPickCounsellor]);
     const applyStale = () => {
         // Stale = last touch before the cutoff date + optional counsellor scope.
         // Layers onto the current advanced filter.
@@ -473,23 +479,26 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         Shows <b>stale leads</b> — no activity or update since the date below
                         (their “Last Updated” is older than this). A lead touched more recently
-                        is excluded. Pick a counsellor to scope it, or leave as
-                        “All counsellors” for a global view.
+                        is excluded.{canPickCounsellor
+                            ? ' Pick a counsellor to scope it, or leave as “All counsellors”.'
+                            : ' Shows your own leads.'}
                     </Typography>
                     <TextField
                         label="Not touched since" type="date" size="small" fullWidth sx={{ mb: 2 }}
                         InputLabelProps={{ shrink: true }}
                         value={staleSince} onChange={(e) => setStaleSince(e.target.value)}
                     />
-                    <TextField
-                        label="Counsellor" select size="small" fullWidth
-                        value={staleCounsellor} onChange={(e) => setStaleCounsellor(e.target.value)}
-                    >
-                        <MuiMenuItem value=""><em>All counsellors (global)</em></MuiMenuItem>
-                        {counsellors.map((u) => (
-                            <MuiMenuItem key={u.id} value={u.id}>{u.name || u.email}</MuiMenuItem>
-                        ))}
-                    </TextField>
+                    {canPickCounsellor && (
+                        <TextField
+                            label="Counsellor" select size="small" fullWidth
+                            value={staleCounsellor} onChange={(e) => setStaleCounsellor(e.target.value)}
+                        >
+                            <MuiMenuItem value=""><em>All counsellors (global)</em></MuiMenuItem>
+                            {counsellors.map((u) => (
+                                <MuiMenuItem key={u.id} value={u.id}>{u.name || u.email}</MuiMenuItem>
+                            ))}
+                        </TextField>
+                    )}
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
                         e.g. pick <b>1 Jul</b> to see every lead not worked on since 1 Jul.
                     </Typography>
