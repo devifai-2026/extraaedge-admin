@@ -129,7 +129,7 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
     const [counsellors, setCounsellors] = useState([]);
     React.useEffect(() => {
         if (!openStale || counsellors.length) return;
-        usersApi.list({ role: 'counsellor', limit: 500 })
+        usersApi.list({ role: 'counsellor', limit: 200 })
             .then((r) => setCounsellors((r?.data || []).filter((u) => u.is_active !== false)))
             .catch(() => setCounsellors([]));
     }, [openStale, counsellors.length]);
