@@ -36,6 +36,7 @@ import AddNoteDrawer from "../AddNoteDrawer/AddNoteDrawer";
 import { followUpsApi, leadsApi } from "../../lib/endpoints";
 import { useDropdown } from "../../lib/useDropdowns";
 import { flagForLead, TONE_BG, formatLeadAge, formatTimestamp } from "../../lib/leadFlags";
+import { originBadge } from "../../lib/leadOrigin";
 import { isRole, ROLES } from "../../lib/rbac";
 
 import "./LeadCard.css";
@@ -165,6 +166,7 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
     if (!lead) return null;
 
     const flag = flagForLead(lead);
+    const origin = originBadge(lead);
     const stageLabel = lead.stage_name ? `${lead.stage_name}` : 'Unassigned stage';
     const subStageLabel = lead.sub_stage_name || (flag ? '' : '—');
 
@@ -217,6 +219,16 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                     </div>
 
                     <div className="status-block">
+                        {origin && (
+                            <Tooltip title={`Lead came in via ${origin.label}`}>
+                                <Chip
+                                    icon={origin.key === 'whatsapp' ? <WhatsAppIcon sx={{ fontSize: 14, color: '#fff !important' }} /> : undefined}
+                                    label={origin.label}
+                                    size="small"
+                                    sx={{ height: 22, fontSize: 11, fontWeight: 600, background: origin.color, color: '#fff', '& .MuiChip-icon': { color: '#fff' } }}
+                                />
+                            </Tooltip>
+                        )}
                         <Chip label={stageLabel} size="small" className="status-chip" />
                         {subStageLabel && subStageLabel !== '—' && (
                             <span className="sub-status">{subStageLabel}</span>

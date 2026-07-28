@@ -164,6 +164,7 @@ export const analyticsApi = {
   leadsTimeline: (params) => api.get('/analytics/leads-timeline', withBranch(params)),
   programWise: (params) => api.get('/analytics/program-wise', withBranch(params)),
   channelSource: (params) => api.get('/analytics/channel-source', withBranch(params)),
+  leadOrigin: (params) => api.get('/analytics/lead-origin', withBranch(params)),
   programStatus: (params) => api.get('/analytics/program-status', withBranch(params)),
   coldEnquiries: (params) => api.get('/analytics/cold-enquiries', withBranch(params)),
   counselorPerformance: (params) => api.get('/analytics/counselor-performance', withBranch(params)),

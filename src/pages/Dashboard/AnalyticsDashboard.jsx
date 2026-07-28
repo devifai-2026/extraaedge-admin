@@ -161,6 +161,8 @@ export default function AnalyticsDashboard() {
   const [timeline, setTimeline] = useState([]);
   const [programWise, setProgramWise] = useState([]);
   const [channelSource, setChannelSource] = useState([]);
+  // WhatsApp / Facebook origin counts + 30-day new-WhatsApp-lead trend.
+  const [leadOrigin, setLeadOrigin] = useState(null);
   const [programStatus, setProgramStatus] = useState([]);
   const [perfTeam, setPerfTeam] = useState([]);
   const [myFollowups, setMyFollowups] = useState([]);
@@ -278,6 +280,12 @@ export default function AnalyticsDashboard() {
       .then((r) => setChannelSource(r?.data || []))
       .catch(() => setChannelSource([]))
       .finally(() => flag('channelSource', false));
+
+    // WhatsApp-lead KPI + trend. Reuses the same date/user range as the rest of
+    // the dashboard so the count matches the filtered view.
+    analyticsApi.leadOrigin({ ...params, trend_days: 30 })
+      .then((r) => setLeadOrigin(r?.data || null))
+      .catch(() => setLeadOrigin(null));
 
     flag('programStatus', true);
     analyticsApi.programStatus(params)
@@ -478,6 +486,14 @@ export default function AnalyticsDashboard() {
           value={summary?.new_leads_7d ?? '—'}
           hint={summary ? `${summary.new_leads_today ?? 0} today` : ''}
           accent="#FB8C00"
+        />
+        <Kpi
+          label="WhatsApp leads"
+          value={leadOrigin?.counts?.whatsapp ?? '—'}
+          hint={leadOrigin?.counts
+            ? `${leadOrigin.counts.whatsapp_converted ?? 0} enrolled${leadOrigin.counts.facebook ? ` · ${leadOrigin.counts.facebook} from Facebook` : ''}`
+            : 'Leads that came in via WhatsApp'}
+          accent="#25D366"
         />
         {!isCounsellor && (
           <>
@@ -760,6 +776,34 @@ export default function AnalyticsDashboard() {
               )}
             </tbody>
           </table>
+        </ChartCard>
+      </Box>
+
+      {/* ============ WHATSAPP LEADS TREND (everyone) ============ */}
+      <Box sx={{ mt: 2 }}>
+        <ChartCard
+          title="WhatsApp leads · last 30 days"
+          loading={false}
+          lastSynced={lastSynced}
+          onRefresh={reloadAll}
+          csvRows={leadOrigin?.whatsapp_trend || []}
+          fullHeight={300}
+        >
+          {(!leadOrigin || (leadOrigin.whatsapp_trend || []).every((d) => !d.leads)) ? (
+            <Box sx={{ p: 4, textAlign: 'center', color: '#888' }}>
+              No WhatsApp leads in this range yet.
+            </Box>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={(leadOrigin.whatsapp_trend || []).map((d) => ({ ...d, day: fmtDate(d.day) }))}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <RTooltip />
+                <Bar dataKey="leads" name="WhatsApp leads" fill="#25D366" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </ChartCard>
       </Box>
 

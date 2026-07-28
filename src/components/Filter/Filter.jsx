@@ -42,6 +42,7 @@ const LANGUAGE_OPTIONS = ['en', 'hi', 'mr', 'ta', 'te', 'kn', 'ml', 'gu', 'bn', 
 // Anything left as '' is stripped before sending.
 const blankFilter = {
     // Lead details
+    lead_origin: '',          // '' | 'whatsapp' | 'facebook' — acquisition channel
     is_touched: '',           // '' | 'true' | 'false'
     // Assignment state: '' | 'unassigned' | 'assigned' — maps to flag=unassigned
     // (or we drop the filter when 'assigned' is picked since the default lead
@@ -252,6 +253,14 @@ const FilterLeadsModal = ({ open, onClose, value, onApply, onReset }) => {
                     {activeSection === "Lead Details" && (
                         <>
                             <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+                                <FormControl size="small" fullWidth sx={inputStyle}>
+                                    <InputLabel>Lead Origin</InputLabel>
+                                    <Select label="Lead Origin" value={filter.lead_origin} onChange={setF('lead_origin')}>
+                                        <MenuItem value=""><em>Any</em></MenuItem>
+                                        <MenuItem value="whatsapp">WhatsApp</MenuItem>
+                                        <MenuItem value="facebook">Facebook</MenuItem>
+                                    </Select>
+                                </FormControl>
                                 <FormControl size="small" fullWidth sx={inputStyle}>
                                     <InputLabel>Assignment</InputLabel>
                                     <Select label="Assignment" value={filter.assignment} onChange={setF('assignment')}>

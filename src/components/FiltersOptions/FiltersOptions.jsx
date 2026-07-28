@@ -187,6 +187,36 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                         </Box>
                     )}
 
+                    {/* Quick origin filter — one-click toggle for WhatsApp leads.
+                        Writes lead_origin into the advanced filter so it layers
+                        with the stage tab + search. Only shown when the parent
+                        wires onApplyFilter (LeadList does). */}
+                    {typeof onApplyFilter === 'function' && (
+                        <Tooltip title={advancedFilter?.lead_origin === 'whatsapp'
+                            ? 'Showing only WhatsApp leads — click to clear'
+                            : 'Show only leads that came in via WhatsApp'}>
+                            <Button
+                                size="small"
+                                variant={advancedFilter?.lead_origin === 'whatsapp' ? 'contained' : 'outlined'}
+                                startIcon={<WhatsAppIcon fontSize="small" />}
+                                onClick={() => {
+                                    const next = { ...(advancedFilter || {}) };
+                                    if (next.lead_origin === 'whatsapp') delete next.lead_origin;
+                                    else next.lead_origin = 'whatsapp';
+                                    onApplyFilter(next);
+                                }}
+                                sx={{
+                                    textTransform: 'none', fontSize: 12, ml: 0.5,
+                                    ...(advancedFilter?.lead_origin === 'whatsapp'
+                                        ? { background: '#25D366', color: '#fff', '&:hover': { background: '#1da851' } }
+                                        : { color: '#25D366', borderColor: '#25D366', '&:hover': { borderColor: '#1da851', background: '#f0fff6' } }),
+                                }}
+                            >
+                                WhatsApp
+                            </Button>
+                        </Tooltip>
+                    )}
+
                     <Box sx={{ display: "flex", gap: 1 }}>
 
                         {/* GROUP / bulk-reassign opener — hidden for counsellors

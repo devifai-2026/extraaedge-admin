@@ -17,6 +17,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import ViewTimelineModal from '../ViewTimelineModal/ViewTimelineModal';
 import AddNewLead from '../AddNewLead/AddNewLead';
 import { flagForLead, TONE_BG, formatLeadAge, formatTimestamp } from '../../lib/leadFlags';
+import { originBadge } from '../../lib/leadOrigin';
 import { leadsApi } from '../../lib/endpoints';
 import { isRole, ROLES } from '../../lib/rbac';
 
@@ -301,7 +302,25 @@ const LeadsTable = ({
                   <Checkbox size="small" checked={isSelected} onChange={() => onToggleSelect?.(lead.id)} />
                 </td>
                 <td style={{ ...cellStyle, fontWeight: 600, cursor: 'pointer', color: '#222' }} onClick={() => setEditLead(lead)} title="Click to edit">
-                  {lead.name || '—'}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    {lead.name || '—'}
+                    {(() => {
+                      const origin = originBadge(lead);
+                      if (!origin) return null;
+                      return (
+                        <Tooltip title={`Lead came in via ${origin.label}`}>
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            padding: '1px 6px', borderRadius: 10, fontSize: 10, fontWeight: 700,
+                            background: origin.color, color: '#fff',
+                          }}>
+                            {origin.key === 'whatsapp' && <WhatsAppIcon sx={{ fontSize: 11 }} />}
+                            {origin.label}
+                          </span>
+                        </Tooltip>
+                      );
+                    })()}
+                  </span>
                 </td>
                 <td style={cellStyle}>{lead.phone || lead.whatsapp_number || '-'}</td>
                 <td style={cellStyle}>
