@@ -123,8 +123,9 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
     // "Not updated" (stale) report dialog — super_admin / managers only.
     const canStaleReport = isRole(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER, ROLES.SALES_MANAGER);
     const [openStale, setOpenStale] = useState(false);
-    const [staleFrom, setStaleFrom] = useState('');
-    const [staleTo, setStaleTo] = useState('');
+    // "Not touched since" cutoff — leads whose last activity/update is OLDER than
+    // this date (gone quiet). Sent to the backend as no_activity_from.
+    const [staleSince, setStaleSince] = useState('');
     const [staleCounsellor, setStaleCounsellor] = useState(''); // '' = all (global)
     const [counsellors, setCounsellors] = useState([]);
     React.useEffect(() => {
@@ -134,11 +135,11 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
             .catch(() => setCounsellors([]));
     }, [openStale, counsellors.length]);
     const applyStale = () => {
-        // Build a stale filter: no human activity/follow-up in the window +
-        // optional counsellor scope. Layers onto the current advanced filter.
+        // Stale = last touch before the cutoff date + optional counsellor scope.
+        // Layers onto the current advanced filter.
         const next = { ...(advancedFilter || {}) };
-        if (staleFrom) next.no_activity_from = `${staleFrom}T00:00:00`; else delete next.no_activity_from;
-        if (staleTo) next.no_activity_to = `${staleTo}T23:59:59.999`; else delete next.no_activity_to;
+        if (staleSince) next.no_activity_from = `${staleSince}T00:00:00`; else delete next.no_activity_from;
+        delete next.no_activity_to; // single-cutoff semantics
         if (staleCounsellor) next.assigned_to = staleCounsellor; else delete next.assigned_to;
         onApplyFilter?.(next);
         setOpenStale(false);
@@ -246,21 +247,20 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                         Opens a dialog for a date window + counsellor scope and
                         filters to leads with no activity/follow-up in it. */}
                     {canStaleReport && typeof onApplyFilter === 'function' && (
-                        <Tooltip title="Find leads that were NOT updated (no activity or follow-up) in a date range">
+                        <Tooltip title="Find stale leads — not touched (no activity/update) since a chosen date">
                             <Button
                                 size="small"
-                                variant={advancedFilter?.no_activity_from || advancedFilter?.no_activity_to ? 'contained' : 'outlined'}
+                                variant={advancedFilter?.no_activity_from ? 'contained' : 'outlined'}
                                 startIcon={<HistoryToggleOffIcon fontSize="small" />}
                                 onClick={() => {
                                     // Seed dialog from any active stale filter.
-                                    setStaleFrom((advancedFilter?.no_activity_from || '').slice(0, 10));
-                                    setStaleTo((advancedFilter?.no_activity_to || '').slice(0, 10));
+                                    setStaleSince((advancedFilter?.no_activity_from || '').slice(0, 10));
                                     setStaleCounsellor(advancedFilter?.assigned_to || '');
                                     setOpenStale(true);
                                 }}
                                 sx={{
                                     textTransform: 'none', fontSize: 12, ml: 0.5,
-                                    ...(advancedFilter?.no_activity_from || advancedFilter?.no_activity_to
+                                    ...(advancedFilter?.no_activity_from
                                         ? { background: colors.primary, color: '#fff' }
                                         : { color: colors.primary, borderColor: colors.primary }),
                                 }}
@@ -468,27 +468,19 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
 
             {/* ================= NOT-UPDATED (STALE) REPORT ================= */}
             <Dialog open={openStale} onClose={() => setOpenStale(false)} maxWidth="xs" fullWidth>
-                <DialogTitle sx={{ fontWeight: 700 }}>Leads not updated</DialogTitle>
+                <DialogTitle sx={{ fontWeight: 700 }}>Leads not updated (stale)</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Shows leads with <b>no activity or follow-up</b> in the selected window —
-                        i.e. leads that were left untouched. Pick a counsellor to scope it, or
-                        leave as “All counsellors” for a global view.
+                        Shows <b>stale leads</b> — no activity or update since the date below
+                        (their “Last Updated” is older than this). A lead touched more recently
+                        is excluded. Pick a counsellor to scope it, or leave as
+                        “All counsellors” for a global view.
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                        <TextField
-                            label="From" type="date" size="small" fullWidth
-                            InputLabelProps={{ shrink: true }}
-                            value={staleFrom} onChange={(e) => setStaleFrom(e.target.value)}
-                            inputProps={{ max: staleTo || undefined }}
-                        />
-                        <TextField
-                            label="To" type="date" size="small" fullWidth
-                            InputLabelProps={{ shrink: true }}
-                            value={staleTo} onChange={(e) => setStaleTo(e.target.value)}
-                            inputProps={{ min: staleFrom || undefined }}
-                        />
-                    </Box>
+                    <TextField
+                        label="Not touched since" type="date" size="small" fullWidth sx={{ mb: 2 }}
+                        InputLabelProps={{ shrink: true }}
+                        value={staleSince} onChange={(e) => setStaleSince(e.target.value)}
+                    />
                     <TextField
                         label="Counsellor" select size="small" fullWidth
                         value={staleCounsellor} onChange={(e) => setStaleCounsellor(e.target.value)}
@@ -499,7 +491,7 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                         ))}
                     </TextField>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
-                        Tip: leave <b>From</b> blank to catch everything not touched up to the <b>To</b> date.
+                        e.g. pick <b>1 Jul</b> to see every lead not worked on since 1 Jul.
                     </Typography>
                 </DialogContent>
                 <DialogActions>
@@ -507,14 +499,14 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                         // Clear the stale filter entirely.
                         const next = { ...(advancedFilter || {}) };
                         delete next.no_activity_from; delete next.no_activity_to;
-                        setStaleFrom(''); setStaleTo(''); setStaleCounsellor('');
+                        setStaleSince(''); setStaleCounsellor('');
                         onApplyFilter?.(next); setOpenStale(false);
                     }}>Clear</Button>
                     <Button onClick={() => setOpenStale(false)}>Cancel</Button>
                     <Button
                         variant="contained"
                         onClick={applyStale}
-                        disabled={!staleFrom && !staleTo}
+                        disabled={!staleSince}
                         className="assign-btn-filter"
                     >
                         Show leads
