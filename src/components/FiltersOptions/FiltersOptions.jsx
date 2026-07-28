@@ -15,9 +15,10 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import FileDownloadIcon from "@mui/icons-material/FileDownloadOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
-import { Tooltip, CircularProgress, InputBase } from "@mui/material";
+import HistoryToggleOffIcon from "@mui/icons-material/HistoryToggleOff";
+import { Tooltip, CircularProgress, InputBase, TextField, MenuItem as MuiMenuItem } from "@mui/material";
 import { isRole, ROLES } from "../../lib/rbac";
-import { leadsApi } from "../../lib/endpoints";
+import { leadsApi, usersApi } from "../../lib/endpoints";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import WhatsappModal from "../WhatsApp/WhatsApp"
 import SavedList from "../SavedList/SavedList";
@@ -119,6 +120,30 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
     const [openListDrawer, setOpenListDrawer] = useState(false);
     const [openFilter, setOpenFilter] = useState(false);
 
+    // "Not updated" (stale) report dialog — super_admin / managers only.
+    const canStaleReport = isRole(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER, ROLES.SALES_MANAGER);
+    const [openStale, setOpenStale] = useState(false);
+    const [staleFrom, setStaleFrom] = useState('');
+    const [staleTo, setStaleTo] = useState('');
+    const [staleCounsellor, setStaleCounsellor] = useState(''); // '' = all (global)
+    const [counsellors, setCounsellors] = useState([]);
+    React.useEffect(() => {
+        if (!openStale || counsellors.length) return;
+        usersApi.list({ role: 'counsellor', limit: 500 })
+            .then((r) => setCounsellors((r?.data || []).filter((u) => u.is_active !== false)))
+            .catch(() => setCounsellors([]));
+    }, [openStale, counsellors.length]);
+    const applyStale = () => {
+        // Build a stale filter: no human activity/follow-up in the window +
+        // optional counsellor scope. Layers onto the current advanced filter.
+        const next = { ...(advancedFilter || {}) };
+        if (staleFrom) next.no_activity_from = `${staleFrom}T00:00:00`; else delete next.no_activity_from;
+        if (staleTo) next.no_activity_to = `${staleTo}T23:59:59.999`; else delete next.no_activity_to;
+        if (staleCounsellor) next.assigned_to = staleCounsellor; else delete next.assigned_to;
+        onApplyFilter?.(next);
+        setOpenStale(false);
+    };
+
     const activeSort = SORT_OPTIONS.find((s) => s.key === sort) || SORT_OPTIONS[0];
 
     const handleRefresh = () => {
@@ -213,6 +238,34 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                                 }}
                             >
                                 WhatsApp
+                            </Button>
+                        </Tooltip>
+                    )}
+
+                    {/* "Not updated" (stale) report — super_admin/managers.
+                        Opens a dialog for a date window + counsellor scope and
+                        filters to leads with no activity/follow-up in it. */}
+                    {canStaleReport && typeof onApplyFilter === 'function' && (
+                        <Tooltip title="Find leads that were NOT updated (no activity or follow-up) in a date range">
+                            <Button
+                                size="small"
+                                variant={advancedFilter?.no_activity_from || advancedFilter?.no_activity_to ? 'contained' : 'outlined'}
+                                startIcon={<HistoryToggleOffIcon fontSize="small" />}
+                                onClick={() => {
+                                    // Seed dialog from any active stale filter.
+                                    setStaleFrom((advancedFilter?.no_activity_from || '').slice(0, 10));
+                                    setStaleTo((advancedFilter?.no_activity_to || '').slice(0, 10));
+                                    setStaleCounsellor(advancedFilter?.assigned_to || '');
+                                    setOpenStale(true);
+                                }}
+                                sx={{
+                                    textTransform: 'none', fontSize: 12, ml: 0.5,
+                                    ...(advancedFilter?.no_activity_from || advancedFilter?.no_activity_to
+                                        ? { background: colors.primary, color: '#fff' }
+                                        : { color: colors.primary, borderColor: colors.primary }),
+                                }}
+                            >
+                                Not updated
                             </Button>
                         </Tooltip>
                     )}
@@ -409,6 +462,62 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                         startIcon={deleting ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <DeleteOutlineIcon fontSize="small" />}
                     >
                         {deleting ? 'Deleting…' : `Yes, delete ${selectedCount} lead${selectedCount === 1 ? '' : 's'}`}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ================= NOT-UPDATED (STALE) REPORT ================= */}
+            <Dialog open={openStale} onClose={() => setOpenStale(false)} maxWidth="xs" fullWidth>
+                <DialogTitle sx={{ fontWeight: 700 }}>Leads not updated</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Shows leads with <b>no activity or follow-up</b> in the selected window —
+                        i.e. leads that were left untouched. Pick a counsellor to scope it, or
+                        leave as “All counsellors” for a global view.
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                        <TextField
+                            label="From" type="date" size="small" fullWidth
+                            InputLabelProps={{ shrink: true }}
+                            value={staleFrom} onChange={(e) => setStaleFrom(e.target.value)}
+                            inputProps={{ max: staleTo || undefined }}
+                        />
+                        <TextField
+                            label="To" type="date" size="small" fullWidth
+                            InputLabelProps={{ shrink: true }}
+                            value={staleTo} onChange={(e) => setStaleTo(e.target.value)}
+                            inputProps={{ min: staleFrom || undefined }}
+                        />
+                    </Box>
+                    <TextField
+                        label="Counsellor" select size="small" fullWidth
+                        value={staleCounsellor} onChange={(e) => setStaleCounsellor(e.target.value)}
+                    >
+                        <MuiMenuItem value=""><em>All counsellors (global)</em></MuiMenuItem>
+                        {counsellors.map((u) => (
+                            <MuiMenuItem key={u.id} value={u.id}>{u.name || u.email}</MuiMenuItem>
+                        ))}
+                    </TextField>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+                        Tip: leave <b>From</b> blank to catch everything not touched up to the <b>To</b> date.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => {
+                        // Clear the stale filter entirely.
+                        const next = { ...(advancedFilter || {}) };
+                        delete next.no_activity_from; delete next.no_activity_to;
+                        setStaleFrom(''); setStaleTo(''); setStaleCounsellor('');
+                        onApplyFilter?.(next); setOpenStale(false);
+                    }}>Clear</Button>
+                    <Button onClick={() => setOpenStale(false)}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        onClick={applyStale}
+                        disabled={!staleFrom && !staleTo}
+                        className="assign-btn-filter"
+                    >
+                        Show leads
                     </Button>
                 </DialogActions>
             </Dialog>
