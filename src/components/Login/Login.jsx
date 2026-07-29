@@ -99,8 +99,8 @@ function Login() {
         <div className="login-card">
           <div className="logo-container">
             <div className="logo">
-              <span style={{ color: colors.black }}>EXTRA</span>
-              <span style={{ color: colors.primary }}>EDGE</span>
+              <span style={{ color: colors.black }}>CLOSE</span>
+              <span style={{ color: colors.primary }}>FLOW</span>
               <div style={{ color: colors.black, fontSize: '10px', letterSpacing: '2px' }}>ADMIN</div>
             </div>
           </div>
