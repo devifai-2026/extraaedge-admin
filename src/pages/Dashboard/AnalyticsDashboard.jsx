@@ -491,9 +491,17 @@ export default function AnalyticsDashboard() {
           label="WhatsApp leads"
           value={leadOrigin?.counts?.whatsapp ?? '—'}
           hint={leadOrigin?.counts
-            ? `${leadOrigin.counts.whatsapp_converted ?? 0} enrolled${leadOrigin.counts.facebook ? ` · ${leadOrigin.counts.facebook} from Facebook` : ''}`
+            ? `${leadOrigin.counts.whatsapp_converted ?? 0} enrolled`
             : 'Leads that came in via WhatsApp'}
           accent="#25D366"
+        />
+        <Kpi
+          label="Facebook leads"
+          value={leadOrigin?.counts?.facebook ?? '—'}
+          hint={leadOrigin?.counts
+            ? `${leadOrigin.counts.facebook_converted ?? 0} enrolled`
+            : 'Leads that came in via Facebook'}
+          accent="#1877F2"
         />
         {!isCounsellor && (
           <>
@@ -801,6 +809,34 @@ export default function AnalyticsDashboard() {
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <RTooltip />
                 <Bar dataKey="leads" name="WhatsApp leads" fill="#25D366" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+      </Box>
+
+      {/* ============ FACEBOOK LEADS TREND (everyone) ============ */}
+      <Box sx={{ mt: 2 }}>
+        <ChartCard
+          title="Facebook leads · last 30 days"
+          loading={false}
+          lastSynced={lastSynced}
+          onRefresh={reloadAll}
+          csvRows={leadOrigin?.facebook_trend || []}
+          fullHeight={300}
+        >
+          {(!leadOrigin || (leadOrigin.facebook_trend || []).every((d) => !d.leads)) ? (
+            <Box sx={{ p: 4, textAlign: 'center', color: '#888' }}>
+              No Facebook leads in this range yet.
+            </Box>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={(leadOrigin.facebook_trend || []).map((d) => ({ ...d, day: fmtDate(d.day) }))}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <RTooltip />
+                <Bar dataKey="leads" name="Facebook leads" fill="#1877F2" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
