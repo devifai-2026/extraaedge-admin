@@ -20,6 +20,7 @@ import { Tooltip, CircularProgress, InputBase, TextField, MenuItem as MuiMenuIte
 import { isRole, ROLES } from "../../lib/rbac";
 import { leadsApi, usersApi } from "../../lib/endpoints";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import FacebookIcon from '@mui/icons-material/Facebook';
 import WhatsappModal from "../WhatsApp/WhatsApp"
 import SavedList from "../SavedList/SavedList";
 
@@ -245,6 +246,33 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                                 }}
                             >
                                 WhatsApp
+                            </Button>
+                        </Tooltip>
+                    )}
+
+                    {/* Quick origin filter — one-click toggle for Facebook leads. */}
+                    {typeof onApplyFilter === 'function' && (
+                        <Tooltip title={advancedFilter?.lead_origin === 'facebook'
+                            ? 'Showing only Facebook leads — click to clear'
+                            : 'Show only leads that came in via Facebook'}>
+                            <Button
+                                size="small"
+                                variant={advancedFilter?.lead_origin === 'facebook' ? 'contained' : 'outlined'}
+                                startIcon={<FacebookIcon fontSize="small" />}
+                                onClick={() => {
+                                    const next = { ...(advancedFilter || {}) };
+                                    if (next.lead_origin === 'facebook') delete next.lead_origin;
+                                    else next.lead_origin = 'facebook';
+                                    onApplyFilter(next);
+                                }}
+                                sx={{
+                                    textTransform: 'none', fontSize: 12, ml: 0.5,
+                                    ...(advancedFilter?.lead_origin === 'facebook'
+                                        ? { background: '#1877F2', color: '#fff', '&:hover': { background: '#145dbf' } }
+                                        : { color: '#1877F2', borderColor: '#1877F2', '&:hover': { borderColor: '#145dbf', background: '#f0f6ff' } }),
+                                }}
+                            >
+                                Facebook
                             </Button>
                         </Tooltip>
                     )}
