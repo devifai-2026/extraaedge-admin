@@ -104,6 +104,11 @@ const sections = [
         description: "Round-robin, load-balanced, and program-based auto-assignment.",
         path: "/advancedsettings/assignment-rules",
       },
+      {
+        label: "JustDial Lead Assignment",
+        description: "Choose which counsellors receive JustDial (Gmail) leads — they'll be round-robin'd only among the selected counsellors.",
+        path: "/advancedsettings/justdial-assignment",
+      },
     ],
   },
   {

@@ -30,6 +30,7 @@ import TenantBranding from './pages/AdvancedSettings/TenantBranding'
 import ReceiptSettings from './pages/AdvancedSettings/ReceiptSettings'
 import RecorderSettings from './pages/AdvancedSettings/RecorderSettings'
 import WhatsAppSettings from './pages/AdvancedSettings/WhatsAppSettings'
+import JustDialAssignment from './pages/AdvancedSettings/JustDialAssignment'
 import DiscountApprovals from './pages/DiscountApprovals/DiscountApprovals'
 import TemplatesHub from './pages/AdvancedSettings/TemplatesHub'
 import SubscriptionPage from './pages/AdvancedSettings/SubscriptionPage'
@@ -202,6 +203,7 @@ function App() {
         <Route path="/discount-approvals" element={<ProtectedRoute tab="lead_transfer_report"><Layout><DiscountApprovals /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/templates" element={<ProtectedRoute tab="advanced.communications"><Layout><TemplatesHub /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/assignment-rules" element={<ProtectedRoute tab="settings.assignment_rules"><Layout><AssignmentRules /></Layout></ProtectedRoute>} />
+        <Route path="/advancedsettings/justdial-assignment" element={<ProtectedRoute><Layout><JustDialAssignment /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/subscription" element={<ProtectedRoute tab="advanced.subscription"><Layout><SubscriptionPage /></Layout></ProtectedRoute>} />
         <Route path="/thirdpartyintegration" element={<ProtectedRoute tab="third_party_integration"><Layout><ThirdPartyIntegration /></Layout></ProtectedRoute>} />
         {/* Admin: post-conversion admission pipeline overview. */}

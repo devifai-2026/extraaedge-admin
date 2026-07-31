@@ -360,6 +360,9 @@ export const integrationsApi = {
   toggle: (id) => api.post(`/integrations/${id}/toggle`),
   test: (id) => api.post(`/integrations/${id}/test`),
   getWebhookUrl: (id) => api.post(`/integrations/${id}/webhook-url`),
+  // JustDial lead-assignment pool (counsellors who receive JD/Gmail leads).
+  getJustDialPool: () => api.get('/integrations/justdial/assignee-pool'),
+  saveJustDialPool: (pool) => api.put('/integrations/justdial/assignee-pool', { pool }),
 };
 
 // Tenant self-branding (super_admin). updateLogo saves the uploaded logo's

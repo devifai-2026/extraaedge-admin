@@ -21,6 +21,7 @@ import { isRole, ROLES } from "../../lib/rbac";
 import { leadsApi, usersApi } from "../../lib/endpoints";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import FacebookIcon from '@mui/icons-material/Facebook';
+import StorefrontIcon from '@mui/icons-material/Storefront';
 import WhatsappModal from "../WhatsApp/WhatsApp"
 import SavedList from "../SavedList/SavedList";
 
@@ -273,6 +274,33 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                                 }}
                             >
                                 Facebook
+                            </Button>
+                        </Tooltip>
+                    )}
+
+                    {/* Quick origin filter — one-click toggle for JustDial leads. */}
+                    {typeof onApplyFilter === 'function' && (
+                        <Tooltip title={advancedFilter?.lead_origin === 'justdial'
+                            ? 'Showing only JustDial leads — click to clear'
+                            : 'Show only leads that came in via JustDial'}>
+                            <Button
+                                size="small"
+                                variant={advancedFilter?.lead_origin === 'justdial' ? 'contained' : 'outlined'}
+                                startIcon={<StorefrontIcon fontSize="small" />}
+                                onClick={() => {
+                                    const next = { ...(advancedFilter || {}) };
+                                    if (next.lead_origin === 'justdial') delete next.lead_origin;
+                                    else next.lead_origin = 'justdial';
+                                    onApplyFilter(next);
+                                }}
+                                sx={{
+                                    textTransform: 'none', fontSize: 12, ml: 0.5,
+                                    ...(advancedFilter?.lead_origin === 'justdial'
+                                        ? { background: '#F26722', color: '#fff', '&:hover': { background: '#d4551a' } }
+                                        : { color: '#F26722', borderColor: '#F26722', '&:hover': { borderColor: '#d4551a', background: '#fff5ef' } }),
+                                }}
+                            >
+                                JustDial
                             </Button>
                         </Tooltip>
                     )}

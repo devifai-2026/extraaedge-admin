@@ -259,6 +259,7 @@ const FilterLeadsModal = ({ open, onClose, value, onApply, onReset }) => {
                                         <MenuItem value=""><em>Any</em></MenuItem>
                                         <MenuItem value="whatsapp">WhatsApp</MenuItem>
                                         <MenuItem value="facebook">Facebook</MenuItem>
+                                        <MenuItem value="justdial">JustDial</MenuItem>
                                     </Select>
                                 </FormControl>
                                 <FormControl size="small" fullWidth sx={inputStyle}>

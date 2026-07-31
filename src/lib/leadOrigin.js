@@ -19,10 +19,17 @@ export const isFacebookLead = (lead) => {
     || norm(lead.first_touch_channel).includes('facebook');
 };
 
+export const isJustDialLead = (lead) => {
+  if (!lead) return false;
+  return norm(lead.first_touch_source).includes('justdial')
+    || norm(lead.first_touch_channel).includes('justdial');
+};
+
 // Returns a small badge descriptor for the lead's origin, or null when it has
 // no notable origin (plain manual / bulk-import lead).
 export const originBadge = (lead) => {
   if (isWhatsAppLead(lead)) return { key: 'whatsapp', label: 'WhatsApp', color: '#25D366' };
   if (isFacebookLead(lead)) return { key: 'facebook', label: 'Facebook', color: '#1877F2' };
+  if (isJustDialLead(lead)) return { key: 'justdial', label: 'JustDial', color: '#F26722' };
   return null;
 };

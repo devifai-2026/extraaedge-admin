@@ -503,6 +503,14 @@ export default function AnalyticsDashboard() {
             : 'Leads that came in via Facebook'}
           accent="#1877F2"
         />
+        <Kpi
+          label="JustDial leads"
+          value={leadOrigin?.counts?.justdial ?? '—'}
+          hint={leadOrigin?.counts
+            ? `${leadOrigin.counts.justdial_converted ?? 0} enrolled`
+            : 'Leads that came in via JustDial'}
+          accent="#F26722"
+        />
         {!isCounsellor && (
           <>
             <Kpi
@@ -837,6 +845,34 @@ export default function AnalyticsDashboard() {
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <RTooltip />
                 <Bar dataKey="leads" name="Facebook leads" fill="#1877F2" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+      </Box>
+
+      {/* ============ JUSTDIAL LEADS TREND (everyone) ============ */}
+      <Box sx={{ mt: 2 }}>
+        <ChartCard
+          title="JustDial leads · last 30 days"
+          loading={false}
+          lastSynced={lastSynced}
+          onRefresh={reloadAll}
+          csvRows={leadOrigin?.justdial_trend || []}
+          fullHeight={300}
+        >
+          {(!leadOrigin || (leadOrigin.justdial_trend || []).every((d) => !d.leads)) ? (
+            <Box sx={{ p: 4, textAlign: 'center', color: '#888' }}>
+              No JustDial leads in this range yet.
+            </Box>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={(leadOrigin.justdial_trend || []).map((d) => ({ ...d, day: fmtDate(d.day) }))}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <RTooltip />
+                <Bar dataKey="leads" name="JustDial leads" fill="#F26722" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
