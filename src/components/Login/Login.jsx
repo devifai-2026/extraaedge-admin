@@ -264,65 +264,62 @@ function Login() {
             {/* ---- WhatsApp OTP sign-in ---- */}
             {!passwordUi && stage === 'credentials' && (
               <div className="form-group">
-                <label htmlFor="phone" style={{ color: colors.textDark }}>
-                  {needsPhone ? 'Mobile Number (WhatsApp)' : 'Registered Mobile Number'}
-                </label>
-                <input
-                  type="tel"
-                  id="phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/[^\d+]/g, ''))}
-                  placeholder="10-digit number"
-                  required
-                  style={{ borderColor: colors.borderGrey, backgroundColor: colors.inputGrey, color: colors.textDark }}
-                />
+                <label htmlFor="phone" style={{ color: colors.textDark }}>WhatsApp Number</label>
+                <div className="phone-input-wrapper" style={{ borderColor: colors.borderGrey, backgroundColor: colors.inputGrey }}>
+                  <span className="phone-prefix">+91</span>
+                  <input
+                    type="tel"
+                    id="phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="98765 43210"
+                    autoComplete="tel-national"
+                    required
+                    style={{ backgroundColor: colors.inputGrey, color: colors.textDark }}
+                  />
+                </div>
                 {needsPhone ? (
-                  <div style={{ fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 10px', marginTop: 8 }}>
-                    No mobile number is saved on this account yet. Enter the number you use on
-                    WhatsApp — we&apos;ll send a code there and link it to your account.
+                  <div className="otp-notice">
+                    No number is saved on this account yet — we&apos;ll send the code here and link it.
                   </div>
                 ) : (
-                  <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 6 }}>
-                    Must match the number saved on your account. Your admin can update it for you.
-                  </div>
+                  <div className="field-hint">We&apos;ll send a {otpLength}-digit code here.</div>
                 )}
               </div>
             )}
 
             {!passwordUi && stage === 'otp' && (
               <div className="form-group">
-                <label htmlFor="otp" style={{ color: colors.textDark }}>
-                  Enter the {otpLength}-digit code
-                </label>
+                <label htmlFor="otp" style={{ color: colors.textDark }}>Enter Code</label>
                 <input
                   type="text"
                   inputMode="numeric"
+                  autoComplete="one-time-code"
+                  className="otp-input"
                   id="otp"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, otpLength))}
-                  placeholder={'•'.repeat(otpLength)}
+                  placeholder={'0'.repeat(otpLength)}
                   autoFocus
                   required
-                  style={{ borderColor: colors.borderGrey, backgroundColor: colors.inputGrey, color: colors.textDark, letterSpacing: 6, fontSize: 18 }}
+                  style={{ borderColor: colors.borderGrey, backgroundColor: colors.inputGrey, color: colors.textDark }}
                 />
-                <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 6 }}>
-                  Sent on WhatsApp{sentTo ? ` to ${sentTo}` : ''}.{' '}
+                <div className="otp-meta">
+                  <span>Sent on WhatsApp{sentTo ? ` to ${sentTo}` : ''}</span>
                   <button
                     type="button"
+                    className="otp-link-btn"
                     onClick={handleRequestOtp}
                     disabled={submitting || resendIn > 0}
-                    style={{
-                      background: 'none', border: 'none', padding: 0, cursor: resendIn > 0 ? 'default' : 'pointer',
-                      color: resendIn > 0 ? colors.textMuted : colors.primary, fontSize: 12,
-                    }}
                   >
                     {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend'}
                   </button>
                 </div>
                 <button
                   type="button"
+                  className="otp-link-btn"
+                  style={{ color: colors.textMuted, alignSelf: 'flex-start' }}
                   onClick={() => { setStage('credentials'); setOtp(''); setError('') }}
-                  style={{ background: 'none', border: 'none', padding: 0, marginTop: 8, cursor: 'pointer', color: colors.textMuted, fontSize: 12 }}
                 >
                   ← Use a different account
                 </button>
@@ -345,7 +342,10 @@ function Login() {
             </button>
           </form>
 
-          {/* Dev-only: pre-filled demo credentials. Remove before production. */}
+          {/* Pre-filled demo credentials. Rendered only on the demo tenant —
+              it was previously on every institute's login page, publishing
+              working logins to anyone who opened the site. */}
+          {passwordUi && (
           <div style={{ marginTop: 16, padding: 12, background: '#fffbe6', border: '1px solid #fde68a', borderRadius: 6, fontSize: 12, color: '#78350f' }}>
             <div style={{ fontWeight: 600, marginBottom: 6 }}>Demo credentials — tenant: <code>demo</code></div>
             <div style={{ display: 'grid', gap: 4 }}>
@@ -370,6 +370,7 @@ function Login() {
             <div style={{ marginTop: 4, fontSize: 11 }}>Student portal: <a href="/student/login" style={{ color: '#2563eb', wordBreak: 'break-all' }}>{`${window.location.origin}/student/login`}</a></div>
             <div style={{ marginTop: 4, fontSize: 11 }}>Product Owner: <a href="http://localhost:5174" style={{ color: '#2563eb' }}>localhost:5174</a></div>
           </div>
+          )}
         </div>
       </div>
     </div>
