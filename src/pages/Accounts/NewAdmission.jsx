@@ -184,7 +184,7 @@ const NewAdmission = () => {
         body: file,
       });
       if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
-      await uploadsApi.confirm({ r2_key: presign.r2_key, content_type: file.type });
+      await uploadsApi.confirm({ purpose: 'admission_photo', r2_key: presign.r2_key });
       setForm((p) => ({ ...p, [field]: presign.r2_key }));
     } catch (err) {
       setError(err.message || 'Photo upload failed');

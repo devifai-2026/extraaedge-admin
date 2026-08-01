@@ -2062,7 +2062,7 @@ const darken = (hex, pct) => {
 // every time and they're equally happy in the live tab.
 const buildAdmissionFormHtml = ({
     admission, accountManager, resolvedManager, tenant,
-    photoUrl,
+    photoUrl, paymentProofUrl,
     courseFeeSource, totalFees, paid, pending,
     feeSchedule, receipts, education,
 }) => {
@@ -2189,6 +2189,30 @@ const buildAdmissionFormHtml = ({
           </td>
         </tr>
       </table>
+    `;
+
+    // Payment the student submitted with the public admission form
+    // (registration / pay-now). Shown until accounts verifies it into a
+    // receipt — mirrors the "Payment submitted by student" card on the
+    // admission detail page, including the proof screenshot when we could
+    // resolve a signed URL for it.
+    const hasStudentPayment = a.payment_amount != null || a.payment_utr || a.payment_proof_r2_key;
+    const studentPaymentBlock = `
+      <table class="kv-table" cellspacing="0" cellpadding="0"><tbody>
+        ${row('Amount paid', `<strong>${escMoney(a.payment_amount ?? 0)}</strong>`)}
+        ${row('UTR / Reference', esc(a.payment_utr))}
+        ${row('Status', a.payment_verified_at ? 'Verified' : 'Awaiting verification')}
+      </tbody></table>
+      ${paymentProofUrl
+          ? `<div style="margin-top:10px">
+               <div class="muted" style="font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px">Payment proof</div>
+               <img src="${esc(paymentProofUrl)}" alt="Payment screenshot"
+                    crossorigin="anonymous"
+                    style="max-width:260px;max-height:340px;border:1px solid #e2e8f0;border-radius:8px;display:block;" />
+             </div>`
+          : a.payment_proof_r2_key
+              ? `<div class="empty" style="margin-top:8px">Payment screenshot on file but preview unavailable.</div>`
+              : ''}
     `;
 
     // Account manager block — table-based, with an avatar disk on the left
@@ -2380,6 +2404,7 @@ const buildAdmissionFormHtml = ({
 
           ${sect('Course fees', courseFeesBlock)}
           ${sect('Payment summary', paymentSummaryBlock)}
+          ${hasStudentPayment ? sect('Payment submitted by student', studentPaymentBlock) : ''}
           ${sect(`Receipts (${receipts.length})`, receiptsTable)}
           ${sect(`Fee schedule (${feeSchedule.length})`, scheduleTable)}
 
@@ -2459,6 +2484,7 @@ function AdmissionTimelineTab({ leadId }) {
     // it for a short-lived signed download URL we can drop straight into
     // an <img src> on both the in-tab view and the html2canvas PDF capture.
     const [photoUrl, setPhotoUrl] = useState(null);
+    const [paymentProofUrl, setPaymentProofUrl] = useState(null);
 
     // Gate for the View / Download admission form buttons. Originally
     // locked to super_admin per spec, but the accounts team also needs
@@ -2506,6 +2532,18 @@ function AdmissionTimelineTab({ leadId }) {
             .catch(() => { if (alive) setPhotoUrl(null); });
         return () => { alive = false; };
     }, [photoKey]);
+
+    // Same exchange for the student's payment-proof screenshot, so both the
+    // tab and the printable form can show it.
+    const proofKey = admission?.payment_proof_r2_key || null;
+    useEffect(() => {
+        if (!proofKey) { setPaymentProofUrl(null); return undefined; }
+        let alive = true;
+        uploadsApi.signedUrl(proofKey)
+            .then((r) => { if (alive) setPaymentProofUrl(r?.data?.url || null); })
+            .catch(() => { if (alive) setPaymentProofUrl(null); });
+        return () => { alive = false; };
+    }, [proofKey]);
 
     if (loading) {
         return (
@@ -2568,6 +2606,7 @@ function AdmissionTimelineTab({ leadId }) {
         admission, accountManager, resolvedManager,
         tenant: auth.getTenant() || null,
         photoUrl, // signed download URL for admission.photo_r2_key, or null
+        paymentProofUrl, // signed URL for admission.payment_proof_r2_key, or null
         courseFeeSource, totalFees, paid, pending,
         feeSchedule, receipts, education,
     };
@@ -2805,6 +2844,44 @@ function AdmissionTimelineTab({ leadId }) {
                     Heads up: receipts exist but no course fee is set, so &quot;Remaining&quot;
                     cannot be computed. Set a custom offer or programme catalogue price.
                 </div>
+            )}
+
+            {/* ----- Payment submitted by student ---------------------------
+                The registration / pay-now payment the student declared on the
+                public admission form (amount + UTR + proof screenshot). Stays
+                visible until accounts verifies it into a receipt. */}
+            {(a.payment_amount != null || a.payment_utr || a.payment_proof_r2_key) && (
+                <>
+                    <SectionHeader>Payment submitted by student</SectionHeader>
+                    <div style={{
+                        border: '1px solid #e2e8f0', borderRadius: 8,
+                        padding: '12px 14px', marginBottom: 16,
+                    }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                            <Field label="Amount paid" value={a.payment_amount != null ? fmtMoney(a.payment_amount) : null} />
+                            <Field label="UTR / Reference" value={a.payment_utr} />
+                            <Field label="Status" value={a.payment_verified_at ? 'Verified' : 'Awaiting verification'} />
+                            <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 2 }}>
+                                    Payment proof
+                                </div>
+                                {a.payment_proof_r2_key ? (
+                                    <Button
+                                        size="small"
+                                        className="always-clickable"
+                                        disabled={!paymentProofUrl}
+                                        onClick={() => paymentProofUrl && window.open(paymentProofUrl, '_blank', 'noopener')}
+                                        sx={{ textTransform: 'none', p: 0, minWidth: 0, fontSize: 13 }}
+                                    >
+                                        {paymentProofUrl ? 'View screenshot' : 'Loading…'}
+                                    </Button>
+                                ) : (
+                                    <div style={{ fontSize: 13, color: '#0f172a' }}>—</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </>
             )}
 
             {/* ----- Receipts table ---------------------------------------- */}

@@ -792,7 +792,7 @@ const AddReceiptDialog = ({ open, onClose, admissionId, onSaved, prefill, instal
         body: file,
       });
       if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
-      await uploadsApi.confirm({ r2_key: presign.r2_key });
+      await uploadsApi.confirm({ purpose: 'receipt_screenshot', r2_key: presign.r2_key });
       setForm((f) => ({ ...f, payment_screenshot_r2_key: presign.r2_key }));
     } catch (uploadErr) {
       setErr(uploadErr?.message || 'Screenshot upload failed');
