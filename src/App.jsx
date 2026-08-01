@@ -11,6 +11,7 @@ import LeadTransferReport from './pages/Reports/LeadTransferReport'
 import RawDataManager from './pages/RawDataManager/RawDataManager'
 import FailedLeads from './pages/FailedLeads/FailedLeads'
 import UnmatchedRecordings from './pages/UnmatchedRecordings/UnmatchedRecordings'
+import SudoLanding from './pages/SudoLanding/SudoLanding'
 import QaReviewQueue from './pages/QaReviews/QaReviewQueue'
 import QaFeedback from './pages/QaReviews/QaFeedback'
 import BulkUploadList from './pages/BulkUplodList/BulkUploadList'
@@ -133,6 +134,8 @@ function App() {
 
         {/* Public student admission form — outside auth + outside Layout.
             The :token comes from the BE share-link generator. */}
+        {/* Product-owner handoff: redeems a one-time code into a session. */}
+        <Route path="/sudo" element={<SudoLanding />} />
         <Route path="/apply/:token" element={<PublicAdmission />} />
 
         {/* Public receipt view — share URL the accounts team copies. */}

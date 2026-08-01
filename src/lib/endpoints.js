@@ -140,6 +140,13 @@ export const deviceRecordingsApi = {
   delete: (id) => api.delete(`/device-recordings/${id}`),
 };
 
+// Product-owner impersonation handoff. exchange() is called with no session —
+// the single-use code minted by the PO console is the credential.
+export const impersonationApi = {
+  exchange: (code) => api.post('/platform/impersonate/exchange', { code }),
+  stop: () => api.post('/platform/impersonate/stop', {}),
+};
+
 // QA call reviews. The queue and submit are the QA reviewer's surface; list
 // and summary are the manager read-back, both branch-filterable.
 export const qaReviewsApi = {
