@@ -534,8 +534,12 @@ function UserProfileDialog({ open, user, users, onClose, onSaved, onResetPasswor
           <TextField size="small" label="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} disabled={!canManage} />
           <TextField size="small" type="email" label="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled={!canManage}
             error={!!form.email && !isEmail(form.email)} helperText={form.email && !isEmail(form.email) ? 'Enter a valid email' : ''} />
-          <TextField size="small" label="WhatsApp Number" value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizeDigits(e.target.value) })} disabled={!canManage}
-            error={!!form.phone && form.phone.length < 7} helperText={form.phone && form.phone.length < 7 ? 'At least 7 digits' : ''} inputProps={{ inputMode: 'numeric' }} />
+          {/* This number is now the user's sign-in credential: the login OTP
+              goes here, so changing it moves account access to that handset. */}
+          <TextField size="small" label="WhatsApp Number (login OTP)" value={form.phone} onChange={(e) => setForm({ ...form, phone: sanitizeDigits(e.target.value) })} disabled={!canManage}
+            error={!!form.phone && form.phone.length < 7}
+            helperText={form.phone && form.phone.length < 7 ? 'At least 7 digits' : 'Login OTPs are sent to this number'}
+            inputProps={{ inputMode: 'numeric' }} />
           <TextField
             size="small"
             label="Official Designation"
