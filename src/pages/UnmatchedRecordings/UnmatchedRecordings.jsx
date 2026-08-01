@@ -1,20 +1,30 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import IconButton from "@mui/material/IconButton";
 import Button from "@mui/material/Button";
 import Tooltip from "@mui/material/Tooltip";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
+import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogActions from "@mui/material/DialogActions";
-import { deviceRecordingsApi } from "../../lib/endpoints";
+import { deviceRecordingsApi, auth } from "../../lib/endpoints";
+import { ROLES } from "../../lib/rbac";
 import AddNewLead from "../../components/AddNewLead/AddNewLead";
 
 const PAGE_SIZE = 50;
+
+// Only manager-tier roles may delete an uploaded recording. Mirrors the
+// backend's requireRole on DELETE /device-recordings/:id — the server is the
+// real enforcer, this just hides the button from counsellors.
+const DELETE_ROLES = [ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER, ROLES.SALES_MANAGER];
 
 const fmt = (v) => {
   if (!v) return "-";
@@ -58,7 +68,9 @@ function RecordingPlayer({ recordingId }) {
 }
 
 export default function UnmatchedRecordings() {
+  const [tab, setTab] = useState("matched"); // matched | unmatched
   const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
@@ -68,19 +80,25 @@ export default function UnmatchedRecordings() {
   const [deleteFor, setDeleteFor] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  const canDelete = DELETE_ROLES.includes(auth.getUser()?.role);
+  const isMatched = tab === "matched";
+
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const r = await deviceRecordingsApi.list({ match_status: "unmatched", page, limit: PAGE_SIZE });
+      const r = await deviceRecordingsApi.list({ match_status: tab, page, limit: PAGE_SIZE });
       setRows(Array.isArray(r?.data) ? r.data : []);
+      setTotal(Number(r?.meta?.total) || 0);
     } catch (e) {
       setError(e?.message || "Failed to load recordings");
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [tab, page]);
 
   useEffect(() => { load(); }, [load]);
+
+  const switchTab = (_e, next) => { setTab(next); setPage(1); };
 
   // After a lead is created from a recording, link the recording to it and
   // drop it from the unmatched list.
@@ -113,16 +131,24 @@ export default function UnmatchedRecordings() {
     }
   };
 
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const columns = isMatched ? 6 : 5;
+
   return (
     <div style={{ padding: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
         <GraphicEqIcon />
-        <h2 style={{ margin: 0 }}>Unmatched Recordings</h2>
+        <h2 style={{ margin: 0 }}>Call Recordings</h2>
       </div>
-      <p style={{ color: "#666", marginTop: 0 }}>
-        Call recordings uploaded from the mobile app whose number didn’t match any lead.
-        Play a recording, then create a lead from its number.
+      <p style={{ color: "#666", marginTop: 4 }}>
+        Recordings uploaded from the mobile app. Matched recordings are attached to the lead whose
+        number appears in the file name; unmatched ones are waiting for review.
       </p>
+
+      <Tabs value={tab} onChange={switchTab} sx={{ mb: 1, minHeight: 40 }}>
+        <Tab value="matched" label="Matched" sx={{ minHeight: 40 }} />
+        <Tab value="unmatched" label="Unmatched" sx={{ minHeight: 40 }} />
+      </Tabs>
 
       {error && <div style={{ color: "#d32f2f", marginBottom: 12 }}>{error}</div>}
 
@@ -131,6 +157,8 @@ export default function UnmatchedRecordings() {
           <thead>
             <tr style={{ textAlign: "left", borderBottom: "2px solid #eee" }}>
               <th style={{ padding: "10px 8px" }}>Phone number</th>
+              {isMatched && <th style={{ padding: "10px 8px" }}>Lead</th>}
+              <th style={{ padding: "10px 8px" }}>Uploaded by</th>
               <th style={{ padding: "10px 8px" }}>Uploaded</th>
               <th style={{ padding: "10px 8px" }}>Recording</th>
               <th style={{ padding: "10px 8px" }}>Action</th>
@@ -138,32 +166,66 @@ export default function UnmatchedRecordings() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={4} style={{ padding: 24, textAlign: "center" }}><CircularProgress size={22} /></td></tr>
+              <tr><td colSpan={columns} style={{ padding: 24, textAlign: "center" }}><CircularProgress size={22} /></td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={4} style={{ padding: 24, textAlign: "center", color: "#888" }}>No unmatched recordings.</td></tr>
+              <tr><td colSpan={columns} style={{ padding: 24, textAlign: "center", color: "#888" }}>
+                {isMatched ? "No matched recordings yet." : "No unmatched recordings."}
+              </td></tr>
             ) : rows.map((r) => (
               <tr key={r.id} style={{ borderBottom: "1px solid #f2f2f2" }}>
                 <td style={{ padding: "10px 8px", fontWeight: 600 }}>{r.phone_raw || "-"}</td>
+                {isMatched && (
+                  <td style={{ padding: "10px 8px" }}>
+                    {r.lead_id ? (
+                      <Link to={`/leadlist?focus=${r.lead_id}`} style={{ textDecoration: "none" }}>
+                        {r.lead_name || "View lead"}
+                      </Link>
+                    ) : "-"}
+                    {r.multi_match && (
+                      <Tooltip title="This number matched more than one lead; the recording is attached to all of them.">
+                        <Chip label="multi" size="small" sx={{ ml: 0.5, height: 18, fontSize: 10 }} />
+                      </Tooltip>
+                    )}
+                  </td>
+                )}
+                <td style={{ padding: "10px 8px", color: "#666" }}>{r.uploaded_by_name || "-"}</td>
                 <td style={{ padding: "10px 8px", color: "#666" }}>{fmt(r.uploaded_at)}</td>
                 <td style={{ padding: "10px 8px" }}><RecordingPlayer recordingId={r.id} /></td>
-                <td style={{ padding: "10px 8px" }}>
-                  <Tooltip title="Create a lead from this number">
-                    <Button variant="outlined" size="small" startIcon={<PersonAddIcon />}
-                      onClick={() => setCreateFor(r)}>
-                      Create Lead
-                    </Button>
-                  </Tooltip>
-                  <Tooltip title="Delete recording">
-                    <IconButton size="small" color="error" sx={{ ml: 1 }}
-                      onClick={() => setDeleteFor(r)}>
-                      <DeleteOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
+                <td style={{ padding: "10px 8px", whiteSpace: "nowrap" }}>
+                  {!isMatched && (
+                    <Tooltip title="Create a lead from this number">
+                      <Button variant="outlined" size="small" startIcon={<PersonAddIcon />}
+                        onClick={() => setCreateFor(r)}>
+                        Create Lead
+                      </Button>
+                    </Tooltip>
+                  )}
+                  {canDelete && (
+                    <Tooltip title="Delete recording">
+                      <IconButton size="small" color="error" sx={{ ml: 1 }}
+                        onClick={() => setDeleteFor(r)}>
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+        <span style={{ color: "#888", fontSize: 13 }}>
+          {total} recording{total === 1 ? "" : "s"}
+        </span>
+        {pageCount > 1 && (
+          <span>
+            <Button size="small" disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>Previous</Button>
+            <span style={{ margin: "0 8px", fontSize: 13, color: "#666" }}>Page {page} of {pageCount}</span>
+            <Button size="small" disabled={page >= pageCount || loading} onClick={() => setPage((p) => p + 1)}>Next</Button>
+          </span>
+        )}
       </div>
 
       {createFor && (

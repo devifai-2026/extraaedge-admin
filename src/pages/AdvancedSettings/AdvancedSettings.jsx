@@ -48,7 +48,7 @@ const sections = [
     items: [
       {
         label: "Recorder App Settings",
-        description: "Folder path the counsellor app scans for call recordings and the daily upload time.",
+        description: "Daily time at which the counsellor app uploads the call recordings found on the phone.",
         path: "/advancedsettings/recorder",
       },
     ],
