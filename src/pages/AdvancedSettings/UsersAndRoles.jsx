@@ -49,6 +49,10 @@ const TAB_KEYS = [
   'accounts.report',
   'accounts.pay_schedule',
   'accounts.collection_receipt_wise',
+  // Call recordings + QA call reviews.
+  'unmatched_recordings',
+  'qa.reviews',
+  'qa.feedback',
 ];
 const PERM_LEVELS = ['hidden', 'read_only', 'full'];
 const blankTabPerms = () => Object.fromEntries(TAB_KEYS.map((k) => [k, 'hidden']));
@@ -62,6 +66,9 @@ const blankTabPerms = () => Object.fromEntries(TAB_KEYS.map((k) => [k, 'hidden']
 const isTabApplicable = (tabKey, scope) => {
   const isAccounts = tabKey.startsWith('accounts.');
   if (scope === 'account_manager') return isAccounts;
+  // A QA reviewer only ever works the review queue — granting them a CRM tab
+  // would land them on a page their role can't load server-side.
+  if (scope === 'qa') return tabKey.startsWith('qa.');
   return !isAccounts;
 };
 
@@ -71,6 +78,7 @@ const ACCESS_LEVEL_OPTIONS = [
   { value: 'sales_manager', label: 'Sales Manager (Operations)' },
   { value: 'counsellor', label: 'Counsellor (End User)' },
   { value: 'account_manager', label: 'Account Manager (Post-Conversion)' },
+  { value: 'qa', label: 'QA (Call Quality Reviewer)' },
 ];
 
 const initialsColor = (name = '') => {

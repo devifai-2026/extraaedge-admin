@@ -394,7 +394,7 @@ export default function Remarketing() {
     let alive = true;
     const pick = (r) => (alive ? r?.data || [] : []);
     Promise.allSettled([
-      dropdownsApi.stages(), programsApi.list(), usersApi.list(),
+      dropdownsApi.stages(), programsApi.list(), usersApi.options(),
       dropdownsApi.sources(), dropdownsApi.channels(), tagsApi.list(),
     ]).then(([st, pr, us, so, ch, tg]) => {
       if (!alive) return;

@@ -143,7 +143,7 @@ const PendingAdmissions = () => {
       try {
         const [pr, us] = await Promise.all([
           programsApi.list().catch(() => ({ data: [] })),
-          usersApi.list().catch(() => ({ data: [] })),
+          usersApi.options().catch(() => ({ data: [] })),
         ]);
         setPrograms(pr?.data || []);
         // Only counsellors/managers/admins are meaningful owners; keep all

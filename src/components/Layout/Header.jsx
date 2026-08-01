@@ -48,6 +48,9 @@ const ROUTE_TO_TAB = {
     '/automations': 'automation',
     '/connectedaccounts': 'connected_accounts',
     '/settings': 'settings.email_templates',
+    '/unmatched-recordings': 'unmatched_recordings',
+    '/qa/reviews': 'qa.reviews',
+    '/qa/feedback': 'qa.feedback',
 }
 
 function Header() {

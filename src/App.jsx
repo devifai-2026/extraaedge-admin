@@ -11,6 +11,8 @@ import LeadTransferReport from './pages/Reports/LeadTransferReport'
 import RawDataManager from './pages/RawDataManager/RawDataManager'
 import FailedLeads from './pages/FailedLeads/FailedLeads'
 import UnmatchedRecordings from './pages/UnmatchedRecordings/UnmatchedRecordings'
+import QaReviewQueue from './pages/QaReviews/QaReviewQueue'
+import QaFeedback from './pages/QaReviews/QaFeedback'
 import BulkUploadList from './pages/BulkUplodList/BulkUploadList'
 import FollowUpManager from './pages/FollowUpManager/FollowUpManager'
 import WhatsAppList from './pages/WhatsAppList/WhatAppsList'
@@ -181,6 +183,8 @@ function App() {
         <Route path="/profile"              element={<ProtectedRoute><Layout><Profile /></Layout></ProtectedRoute>} />
         <Route path="/rawdata"              element={<ProtectedRoute tab="raw_data"><Layout><RawDataManager /></Layout></ProtectedRoute>} />
         <Route path="/unmatched-recordings" element={<ProtectedRoute tab="unmatched_recordings"><Layout><UnmatchedRecordings /></Layout></ProtectedRoute>} />
+        <Route path="/qa/reviews" element={<ProtectedRoute tab="qa.reviews"><Layout><QaReviewQueue /></Layout></ProtectedRoute>} />
+        <Route path="/qa/feedback" element={<ProtectedRoute tab="qa.feedback"><Layout><QaFeedback /></Layout></ProtectedRoute>} />
         <Route path="/failedleads"          element={<ProtectedRoute tab="failed_leads"><Layout><FailedLeads /></Layout></ProtectedRoute>} />
         <Route path="/bulkuploadlist"       element={<ProtectedRoute tab="bulk_upload"><Layout><BulkUploadList /></Layout></ProtectedRoute>} />
         <Route path="/followupmanager"      element={<ProtectedRoute tab="followups"><Layout><FollowUpManager /></Layout></ProtectedRoute>} />

@@ -31,6 +31,9 @@ export const ROLES = {
   // session reports, used to gate the /student/* layout.
   STUDENT: 'student',
   // ---- Operations departments ----
+  // Call-quality reviewer: scores counsellors' matched call recordings
+  // against the QA rubric. Read-only everywhere else.
+  QA: 'qa',
   // HR: mock-interview soft-skill scoring + certificate issuance.
   HR: 'hr',
   // Placement: companies, job openings, applications, criteria firing.
@@ -82,6 +85,7 @@ const ROLE_STUDENT_TABS = [
   'student.projects', 'student.leaderboard', 'student.catalog',
   'student.materials', 'student.certificate', 'student.jobs',
 ];
+const ROLE_QA_TABS = ['qa.reviews'];
 const ROLE_HR_TABS = ['hr.dashboard', 'hr.interviews', 'hr.certificates'];
 const ROLE_PLACEMENT_TABS = ['placement.dashboard', 'placement.companies', 'placement.openings', 'placement.applications'];
 
@@ -96,6 +100,7 @@ const FALLBACK_TABS = {
   [ROLES.HEAD_TRAINER]: ROLE_HEAD_TRAINER_TABS,
   [ROLES.TRAINER]: ROLE_TRAINER_TABS,
   [ROLES.STUDENT]: ROLE_STUDENT_TABS,
+  [ROLES.QA]: ROLE_QA_TABS,
   [ROLES.HR]: ROLE_HR_TABS,
   [ROLES.PLACEMENT]: ROLE_PLACEMENT_TABS,
 };
@@ -169,6 +174,9 @@ const TAB_TO_ROUTE = {
   'accounts.collection_receipt_wise':'/accounts/collection-receipt-wise',
   // Counsellor scoped admissions.
   'admissions.my_students':          '/my-students',
+  // ---- QA call reviews ----
+  'qa.reviews':                      '/qa/reviews',
+  'qa.feedback':                     '/qa/feedback',
   // ---- LMS trainer surfaces (admin app, role-gated) ----
   'courses.manage':        '/trainer/courses',
   'trainer.classes':       '/trainer/classes',

@@ -189,7 +189,7 @@ export default function WhatsAppList() {
   const [counsellors, setCounsellors] = useState([]);
   useEffect(() => {
     if (!canCreateLead) return;
-    usersApi.list().then((r) => setCounsellors((r?.data || []).filter((u) => u?.is_active !== false))).catch(() => {});
+    usersApi.options().then((r) => setCounsellors((r?.data || []).filter((u) => u?.is_active !== false))).catch(() => {});
   }, [canCreateLead]);
 
   const loadStatus = useCallback(async () => {

@@ -35,6 +35,8 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
+import RateReviewIcon from '@mui/icons-material/RateReview';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import { hasTab, currentRole, ROLES } from '../../lib/rbac';
 import { admissionsApi, leadDiscountsApi, whatsappApi } from '../../lib/endpoints';
@@ -94,6 +96,10 @@ const menuSections = [
       { id: 20, label: 'Lead Report', icon: AssessmentIcon, path: '/reports/lead-transfers', tab: 'lead_transfer_report' },
       { id: 21, label: 'Discount Approvals', icon: ChecklistIcon, path: '/discount-approvals', tab: 'lead_transfer_report', badgeKey: 'discount_approvals' },
       { id: 22, label: 'Call Recordings', icon: GraphicEqIcon, path: '/unmatched-recordings', tab: 'unmatched_recordings' },
+      // QA: the review queue is the reviewer's surface, the feedback report is
+      // the manager read-back. Each is gated by its own tab key.
+      { id: 23, label: 'Call Reviews', icon: RateReviewIcon, path: '/qa/reviews', tab: 'qa.reviews' },
+      { id: 24, label: 'QA Feedback', icon: FactCheckIcon, path: '/qa/feedback', tab: 'qa.feedback' },
     ],
   },
   {

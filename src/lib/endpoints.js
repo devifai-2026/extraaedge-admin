@@ -140,6 +140,16 @@ export const deviceRecordingsApi = {
   delete: (id) => api.delete(`/device-recordings/${id}`),
 };
 
+// QA call reviews. The queue and submit are the QA reviewer's surface; list
+// and summary are the manager read-back, both branch-filterable.
+export const qaReviewsApi = {
+  parameters: () => api.get('/qa-reviews/parameters'),
+  queue: (params) => api.get('/qa-reviews/queue', withBranch(params)),
+  submit: (recordingId, body) => api.post(`/qa-reviews/${recordingId}`, body),
+  list: (params) => api.get('/qa-reviews', withBranch(params)),
+  summary: (params) => api.get('/qa-reviews/summary', withBranch(params)),
+};
+
 export const followUpsApi = {
   list: (params) => api.get('/follow-ups', params),
   // Per-day counts for the FollowUp Manager calendar dots.
@@ -174,6 +184,9 @@ export const analyticsApi = {
 
 export const usersApi = {
   list: (params) => api.get('/users', params),
+  // Label source for owner / counsellor filter dropdowns: every active user,
+  // no role gate and no 50-row page cap (unlike list()).
+  options: () => api.get('/users/options'),
   myTeam: () => api.get('/users/team'),
   get: (id) => api.get(`/users/${id}`),
   create: (body) => api.post('/users', body),

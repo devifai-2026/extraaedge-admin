@@ -115,7 +115,7 @@ const WorkflowBuilder = ({ category, onBack, onCancel, onSave, workflowId }) => 
         workflowsApi.categories(),
         emailApi.templates.list(),
         smsApi.templates.list(),
-        usersApi.list(),
+        usersApi.options(),
         tagsApi.list(),
         dropdownsApi.stages()
       ]);

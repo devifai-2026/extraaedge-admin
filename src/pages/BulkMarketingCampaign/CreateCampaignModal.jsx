@@ -71,7 +71,7 @@ const CreateCampaignModal = ({ open, onClose, onCreated }) => {
       const [st, pr, us, et, st2] = await Promise.all([
         dropdownsApi.stages().catch(() => ({ data: [] })),
         programsApi.list().catch(() => ({ data: [] })),
-        usersApi.list().catch(() => ({ data: [] })),
+        usersApi.options().catch(() => ({ data: [] })),
         emailApi.templates.list().catch(() => ({ data: [] })),
         smsApi.templates.list().catch(() => ({ data: [] })),
       ]);
