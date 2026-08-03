@@ -338,30 +338,37 @@ const UploadAdmissions = ({ open, onClose, onUploaded }) => {
                 <li><b>Paste a link</b> (<code>https://…</code>). We download a copy into your CRM, so it
                   survives the original being deleted later. Drive and Dropbox links work — set the file
                   to &ldquo;anyone with the link can view&rdquo;.</li>
-                <li><b>Type the file name</b> and attach the files below. Best for hundreds of images,
-                  where pasting them all in would make the workbook too heavy to open.</li>
+                <li>
+                  <b>Type the file name</b> — then the files have to come from somewhere, so attach them
+                  here. Best for hundreds of images, where pasting them all in would make the workbook
+                  too heavy to open.
+                  {/* Nested under this option on purpose: it's the ONLY one that
+                      needs it. Sitting below all three read as "everyone must
+                      click this". */}
+                  <div className="ua-file-row">
+                    <Button
+                      component="label"
+                      variant="outlined"
+                      startIcon={<ImageIcon />}
+                      size="small"
+                      sx={{ textTransform: 'none' }}
+                      disabled={busy}
+                    >
+                      Attach the named files
+                      <input ref={imageInputRef} type="file" accept="image/*" multiple hidden onChange={pickImages} />
+                    </Button>
+                    {images.length > 0 && (
+                      <span className="ua-file-name">
+                        {images.length} attached
+                        <Button size="small" onClick={() => setImages([])} sx={{ textTransform: 'none', ml: 1 }} disabled={busy}>
+                          Clear
+                        </Button>
+                      </span>
+                    )}
+                  </div>
+                </li>
               </ul>
-            </div>
-            <div className="ua-file-row">
-              <Button
-                component="label"
-                variant="outlined"
-                startIcon={<ImageIcon />}
-                size="small"
-                sx={{ textTransform: 'none' }}
-                disabled={busy}
-              >
-                Attach images
-                <input ref={imageInputRef} type="file" accept="image/*" multiple hidden onChange={pickImages} />
-              </Button>
-              {images.length > 0 && (
-                <span className="ua-file-name">
-                  {images.length} image{images.length === 1 ? '' : 's'} attached
-                  <Button size="small" onClick={() => setImages([])} sx={{ textTransform: 'none', ml: 1 }} disabled={busy}>
-                    Clear
-                  </Button>
-                </span>
-              )}
+              Using the first two? Nothing to do here.
             </div>
           </div>
         </div>
@@ -370,14 +377,7 @@ const UploadAdmissions = ({ open, onClose, onUploaded }) => {
         <div className="ua-step">
           <div className="ua-step-num">3</div>
           <div className="ua-step-body">
-            <div className="ua-step-title">Students not in your CRM yet</div>
-            <div className="ua-step-text">
-              Created for you automatically — you don&apos;t need to add them as leads first. Each one is
-              created already enrolled and owned by the counsellor in the sheet&apos;s{' '}
-              <code>lead_owner_email</code> column, and is not routed through your auto-assignment rule.
-            </div>
-
-            <div className="ua-step-title" style={{ marginTop: 14 }}>If a student is already in the CRM</div>
+            <div className="ua-step-title">If a student is already in the CRM</div>
             <FormControl size="small" sx={{ minWidth: 320, mt: 1 }} disabled={busy}>
               <Select value={duplicateHandling} onChange={(e) => setDuplicateHandling(e.target.value)}>
                 <MenuItem value="use_existing">Attach the admission to the existing lead (recommended)</MenuItem>
@@ -386,7 +386,9 @@ const UploadAdmissions = ({ open, onClose, onUploaded }) => {
             </FormControl>
             <div className="ua-step-text" style={{ marginTop: 6 }}>
               A student who already has an admission here is never given a second one, whichever you pick — so
-              re-uploading a corrected file is safe.
+              re-uploading a corrected file is safe. Anyone <b>not</b> in your CRM yet is simply created,
+              already enrolled and owned by the counsellor in the sheet&apos;s <code>lead_owner_email</code>{' '}
+              column — you don&apos;t need to add them as leads first.
             </div>
           </div>
         </div>

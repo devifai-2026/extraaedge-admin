@@ -176,3 +176,10 @@
 .ua-bullets li:last-child {
   margin-bottom: 0;
 }
+
+/* The attach-files control nested inside its bullet. Pulled in tight so it
+   reads as part of that one option rather than a step of its own — it is
+   only relevant to the "type the file name" route. */
+.ua-bullets .ua-file-row {
+  margin: 8px 0 2px;
+}
