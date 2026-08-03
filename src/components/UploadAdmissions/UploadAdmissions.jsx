@@ -12,7 +12,9 @@ import { bulkAdmissionsApi, uploadsApi } from '../../lib/endpoints';
 import { onNotification } from '../../lib/socket';
 import './UploadAdmissions.css';
 
-const MAX_SHEET_BYTES = 25 * 1024 * 1024;   // mirrors the csv_import presign cap
+// Mirrors UPLOAD_SIZE_LIMITS.admission_import. Far above the lead importer's
+// 25 MB because images pasted into cells live inside the .xlsx itself.
+const MAX_SHEET_BYTES = 150 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;   // mirrors admission_photo
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -101,8 +103,8 @@ const UploadAdmissions = ({ open, onClose, onUploaded }) => {
     }
     if (file.size > MAX_SHEET_BYTES) {
       setError(
-        `File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB; max 25 MB). `
-        + 'Re-save it as a fresh .xlsx (Save As → Excel Workbook) to drop hidden template data.',
+        `File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB; max 150 MB). `
+        + 'If it holds a lot of pasted images, link to them instead — put the image URL in the cell.',
       );
       setSheet(null);
       if (sheetInputRef.current) sheetInputRef.current.value = '';
@@ -141,7 +143,8 @@ const UploadAdmissions = ({ open, onClose, onUploaded }) => {
   };
 
   // Upload every attached image and build the { file name → r2 key } map the
-  // worker matches photo_file_name / *_proof_file_name against.
+  // worker matches the photo / *_proof columns against. Only needed for the
+  // type-a-file-name route — pasted images and URLs are handled server-side.
   const uploadImages = async () => {
     const map = {};
     for (const [i, file] of images.entries()) {
@@ -181,7 +184,7 @@ const UploadAdmissions = ({ open, onClose, onUploaded }) => {
       // 2. Presign + direct-to-storage PUT for the sheet itself.
       setBusyLabel('Requesting upload URL…');
       const ps = await uploadsApi.presign({
-        purpose: 'csv_import',
+        purpose: 'admission_import',
         content_type: sheet.type || 'application/octet-stream',
         size_bytes: sheet.size,
         filename: sheet.name,
@@ -197,7 +200,14 @@ const UploadAdmissions = ({ open, onClose, onUploaded }) => {
 
       // 3. Dry run. Nothing is written; this is what the user reviews.
       setBusyLabel('Checking rows…');
-      const kick = await bulkAdmissionsApi.preview({ r2_key: presign.r2_key, field_mapping: {}, defaults: {} });
+      // Attachments go in with the PREVIEW, not just the commit, so a typo'd
+      // file name is reported alongside every other problem instead of
+      // sailing through the check and failing after the import starts.
+      const kick = await bulkAdmissionsApi.preview({
+        r2_key: presign.r2_key,
+        field_mapping: {},
+        defaults: { attachments },
+      });
       const previewId = kick?.data?.id;
       if (!previewId) throw new Error('Preview returned no id');
 
@@ -321,8 +331,16 @@ const UploadAdmissions = ({ open, onClose, onUploaded }) => {
               Student photos &amp; payment proofs <span className="ua-optional">optional</span>
             </div>
             <div className="ua-step-text">
-              Attach the images your sheet names in <code>photo_file_name</code> and the{' '}
-              <code>*_proof_file_name</code> columns. File names are matched ignoring case.
+              The <code>photo</code>, <code>registration_proof</code> and <code>emi_N_proof</code> columns
+              take an image three ways — use whichever suits, even mixed within one sheet:
+              <ul className="ua-bullets">
+                <li><b>Paste the image into the cell.</b> Nothing to name or keep in sync.</li>
+                <li><b>Paste a link</b> (<code>https://…</code>). We download a copy into your CRM, so it
+                  survives the original being deleted later. Drive and Dropbox links work — set the file
+                  to &ldquo;anyone with the link can view&rdquo;.</li>
+                <li><b>Type the file name</b> and attach the files below. Best for hundreds of images,
+                  where pasting them all in would make the workbook too heavy to open.</li>
+              </ul>
             </div>
             <div className="ua-file-row">
               <Button
@@ -352,7 +370,14 @@ const UploadAdmissions = ({ open, onClose, onUploaded }) => {
         <div className="ua-step">
           <div className="ua-step-num">3</div>
           <div className="ua-step-body">
-            <div className="ua-step-title">If a student is already in the CRM</div>
+            <div className="ua-step-title">Students not in your CRM yet</div>
+            <div className="ua-step-text">
+              Created for you automatically — you don&apos;t need to add them as leads first. Each one is
+              created already enrolled and owned by the counsellor in the sheet&apos;s{' '}
+              <code>lead_owner_email</code> column, and is not routed through your auto-assignment rule.
+            </div>
+
+            <div className="ua-step-title" style={{ marginTop: 14 }}>If a student is already in the CRM</div>
             <FormControl size="small" sx={{ minWidth: 320, mt: 1 }} disabled={busy}>
               <Select value={duplicateHandling} onChange={(e) => setDuplicateHandling(e.target.value)}>
                 <MenuItem value="use_existing">Attach the admission to the existing lead (recommended)</MenuItem>
