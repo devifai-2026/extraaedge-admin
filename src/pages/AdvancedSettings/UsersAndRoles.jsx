@@ -49,6 +49,7 @@ const TAB_KEYS = [
   'accounts.report',
   'accounts.pay_schedule',
   'accounts.collection_receipt_wise',
+  'accounts.bulk_import',
   // Call recordings + QA call reviews.
   'unmatched_recordings',
   'qa.reviews',

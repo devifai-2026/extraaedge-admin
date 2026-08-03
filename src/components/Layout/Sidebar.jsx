@@ -140,6 +140,10 @@ const menuSections = [
       { id: 107, label: 'Pay Schedule',           icon: PaymentsIcon,        path: '/accounts/pay-schedule',               tab: 'accounts.pay_schedule' },
       { id: 108, label: 'Collection Receipt-wise',icon: ReceiptLongIcon,     path: '/accounts/collection-receipt-wise',    tab: 'accounts.collection_receipt_wise' },
       { id: 110, label: 'Payment Details',        icon: PaymentsIcon,        path: '/accounts/payment-details',            tab: 'accounts.payment_details' },
+      // Migration tool: bulk-import a previous CRM's admission + payment
+      // history. Last in the section because it's a one-off setup task, not
+      // part of the day-to-day accounts workflow above.
+      { id: 112, label: 'Import Past Admissions', icon: UploadFileIcon,      path: '/accounts/import-admissions',          tab: 'accounts.bulk_import' },
     ],
   },
   {

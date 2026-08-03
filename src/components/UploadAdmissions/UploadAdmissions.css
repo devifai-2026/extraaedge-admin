@@ -1,0 +1,162 @@
+/* Import past admissions dialog. Numbered-step layout rather than the
+   lead uploader's wizard: this importer writes money, so the operator wants
+   every step visible at once — what they're about to do, what was checked,
+   and what it will create — not a flow that hides the previous answer. */
+
+.ua-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px 14px;
+}
+
+.ua-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.ua-sub {
+  font-size: 12.5px;
+  color: #6b7280;
+  margin-top: 3px;
+  max-width: 62ch;
+  line-height: 1.5;
+}
+
+.ua-step {
+  display: flex;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ua-step:last-of-type {
+  border-bottom: none;
+}
+
+.ua-step-num {
+  flex: 0 0 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fdf3ed;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.ua-step-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ua-step-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: #1f2937;
+}
+
+.ua-optional {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-left: 6px;
+}
+
+.ua-step-text {
+  font-size: 12.5px;
+  color: #6b7280;
+  line-height: 1.55;
+  margin-top: 4px;
+  max-width: 72ch;
+}
+
+.ua-step-text code {
+  background: #f1f5f9;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 11.5px;
+  color: #334155;
+}
+
+.ua-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.ua-file-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: #374151;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ua-panel {
+  margin-top: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: #fafafa;
+}
+
+.ua-panel-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: #1f2937;
+}
+
+.ua-panel-sub {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.55;
+  margin-top: 8px;
+}
+
+.ua-counts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.ua-errors {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #374151;
+  line-height: 1.7;
+  /* Long validation lists shouldn't push the dialog past the viewport. */
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.ua-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.ua-busy {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 16px;
+  font-size: 12.5px;
+  color: #475569;
+}

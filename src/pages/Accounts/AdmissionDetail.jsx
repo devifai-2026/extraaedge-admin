@@ -693,6 +693,7 @@ const AddReceiptDialog = ({ open, onClose, admissionId, onSaved, prefill, instal
       receipt_date: new Date().toISOString().slice(0, 10),
       amount: prefill?.suggestedAmount != null ? String(prefill.suggestedAmount) : '',
       mode_of_payment: 'cash',
+      utr: '',
       transaction_details: '',
       is_old_collection: false,
       receipt_kind: prefill?.kind || 'misc',
@@ -823,6 +824,7 @@ const AddReceiptDialog = ({ open, onClose, admissionId, onSaved, prefill, instal
         receipt_date: form.receipt_date,
         amount: Number(form.amount),
         mode_of_payment: form.mode_of_payment,
+        utr: form.utr.trim() || null,
         transaction_details: form.transaction_details || null,
         is_old_collection: form.is_old_collection,
         receipt_kind: form.receipt_kind,
@@ -919,6 +921,18 @@ const AddReceiptDialog = ({ open, onClose, admissionId, onSaved, prefill, instal
             </FormControl>
           )}
 
+          {/* UTR is its own field, not part of the notes below: it identifies
+              one real bank transaction, so the DB holds a unique index on it
+              and re-entering the same reference is rejected instead of
+              quietly creating a second receipt for the same money. */}
+          <TextField
+            label="UTR / reference number"
+            size="small"
+            value={form.utr}
+            onChange={(e) => setForm({ ...form, utr: e.target.value })}
+            placeholder="Leave blank for cash"
+            helperText="Must be unique — the same transaction can't be receipted twice."
+          />
           <TextField label="Transaction details" size="small" value={form.transaction_details} onChange={(e) => setForm({ ...form, transaction_details: e.target.value })} multiline minRows={2} />
           <label style={{ fontSize: 12, color: '#374151', display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" checked={form.is_old_collection} onChange={(e) => setForm({ ...form, is_old_collection: e.target.checked })} />

@@ -58,6 +58,7 @@ import MyStudents from './pages/Accounts/MyStudents'
 import NewAdmission from './pages/Accounts/NewAdmission'
 import AdmissionDetail from './pages/Accounts/AdmissionDetail'
 import PaymentDetails from './pages/Accounts/PaymentDetails'
+import ImportAdmissions from './pages/Accounts/ImportAdmissions'
 import PendingAdmissions from './pages/Accounts/PendingAdmissions'
 import {
   PaySchedulePage,
@@ -267,6 +268,7 @@ function App() {
         <Route path="/accounts/pay-schedule"             element={<ProtectedRoute tab="accounts.pay_schedule"><Layout><PaySchedulePage /></Layout></ProtectedRoute>} />
         <Route path="/accounts/collection-receipt-wise"  element={<ProtectedRoute tab="accounts.collection_receipt_wise"><Layout><CollectionReceiptWisePage /></Layout></ProtectedRoute>} />
         <Route path="/accounts/payment-details"          element={<ProtectedRoute tab="accounts.payment_details"><Layout><PaymentDetails /></Layout></ProtectedRoute>} />
+        <Route path="/accounts/import-admissions"        element={<ProtectedRoute tab="accounts.bulk_import"><Layout><ImportAdmissions /></Layout></ProtectedRoute>} />
         {/* Admission form — `:leadId?` is optional; when present we hydrate from /leads/:id */}
         <Route path="/accounts/new-admission"            element={<ProtectedRoute tab="accounts.approvals"><Layout><NewAdmission /></Layout></ProtectedRoute>} />
         <Route path="/accounts/new-admission/:leadId"    element={<ProtectedRoute tab="accounts.approvals"><Layout><NewAdmission /></Layout></ProtectedRoute>} />

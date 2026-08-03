@@ -70,6 +70,7 @@ const ROLE_ACCOUNT_MANAGER_TABS = [
   'accounts.pay_schedule',
   'accounts.collection_receipt_wise',
   'accounts.payment_details',
+  'accounts.bulk_import',
 ];
 
 // LMS trainer surfaces (head_trainer additionally gets courses.manage).
@@ -172,6 +173,7 @@ const TAB_TO_ROUTE = {
   'accounts.report':                 '/accounts/report',
   'accounts.pay_schedule':           '/accounts/pay-schedule',
   'accounts.collection_receipt_wise':'/accounts/collection-receipt-wise',
+  'accounts.bulk_import':            '/accounts/import-admissions',
   // Counsellor scoped admissions.
   'admissions.my_students':          '/my-students',
   // ---- QA call reviews ----

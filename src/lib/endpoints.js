@@ -463,6 +463,58 @@ export const bulkApi = {
   bulkRefer: (body) => api.post('/bulk/leads/refer', body),
 };
 
+// Accounts-side importer for historical admissions migrated off a previous
+// CRM. Separate from bulkApi above: different template, different role gate,
+// and one row here creates a whole student (lead + admission + EMI schedule +
+// receipts for money already collected), not just a lead.
+export const bulkAdmissionsApi = {
+  templateFields: () => api.get('/bulk/admissions/template/fields'),
+  // Binary body, so this bypasses the JSON `api` client. Content-type is
+  // checked before saving — a stale server would otherwise hand back a JSON
+  // error page that Excel then refuses to open, with no clue why.
+  downloadTemplate: async () => {
+    const { auth, API_BASE } = await import('./api');
+    const token = auth.getAccess();
+    const res = await fetch(`${API_BASE}/bulk/admissions/template`, {
+      headers: token ? { authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      let detail = '';
+      try { const j = await res.json(); detail = j?.error?.message || ''; } catch { /* ignore */ }
+      throw new Error(`Template download failed (${res.status})${detail ? `: ${detail}` : ''}`);
+    }
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    if (!ct.includes('spreadsheetml')) {
+      throw new Error(
+        `Server returned ${ct || 'unknown content-type'} — expected XLSX. `
+        + 'Restart the server so the admission-import route is loaded.',
+      );
+    }
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = 'admission-import-template.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+  },
+  preview: (body) => api.post('/bulk/admissions/preview', body),
+  getPreview: (id) => api.get(`/bulk/admissions/previews/${id}`),
+  commit: (body) => api.post('/bulk/admissions/commit', body),
+  imports: (params) => api.get('/bulk/admissions/imports', params),
+  import: (id) => api.get(`/bulk/admissions/imports/${id}`),
+  importFile: (id) => api.get(`/bulk/admissions/imports/${id}/file`),
+  importFailures: (id) => api.get(`/bulk/admissions/imports/${id}/failures`),
+  // The two review tabs — same shape as the counsellors' Failed Leads page.
+  failures: (params) => api.get('/bulk/admissions/failures', params),
+  duplicates: (params) => api.get('/bulk/admissions/duplicates', params),
+  summary: (params) => api.get('/bulk/admissions/summary', params),
+  deleteFailures: (ids) => api.post('/bulk/admissions/failures/bulk-delete', { ids }),
+  deleteDuplicates: (ids) => api.post('/bulk/admissions/duplicates/bulk-delete', { ids }),
+};
+
 export const campaignsBulkApi = {
   list: (params) => api.get('/campaigns/bulk', params),
   get: (id) => api.get(`/campaigns/bulk/${id}`),
