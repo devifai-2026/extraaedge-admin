@@ -16,7 +16,14 @@ const groupKey = (e) => `${e.lat.toFixed(3)},${e.lng.toFixed(3)}`;
 
 export default function LoginActivityMap({ events }) {
   const points = useMemo(() => {
-    const withCoords = (events || []).filter((e) => e.lat != null && e.lng != null);
+    // lat/lng are Postgres `numeric` columns — node-postgres returns those as
+    // STRINGS (to avoid float precision loss), not numbers, so every value
+    // needs an explicit Number() before any numeric method (.toFixed, map
+    // centering) can touch it. Malformed values fall out here too (isNaN).
+    const withCoords = (events || [])
+      .filter((e) => e.lat != null && e.lng != null)
+      .map((e) => ({ ...e, lat: Number(e.lat), lng: Number(e.lng) }))
+      .filter((e) => !Number.isNaN(e.lat) && !Number.isNaN(e.lng));
     const groups = new Map();
     for (const e of withCoords) {
       const key = groupKey(e);
