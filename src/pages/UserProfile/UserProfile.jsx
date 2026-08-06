@@ -41,15 +41,28 @@ const fmtDuration = (sec) => {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 };
 
-const Kpi = ({ label, value, accent }) => (
-  <Box sx={{
-    flex: 1, minWidth: 160, background: '#fff', border: '1px solid #e8e8e8',
-    borderRadius: 1.5, p: 2, borderLeft: `4px solid ${accent || '#E53935'}`,
-  }}>
-    <Box sx={{ fontSize: 12, color: '#666', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</Box>
-    <Box sx={{ fontSize: 24, fontWeight: 700, color: '#222', mt: 0.5 }}>{value}</Box>
-  </Box>
+const Kpi = ({ label, value, accent, hint }) => (
+  <Tooltip title={hint || ''} disableHoverListener={!hint}>
+    <Box sx={{
+      flex: 1, minWidth: 160, background: '#fff', border: '1px solid #e8e8e8',
+      borderRadius: 1.5, p: 2, borderLeft: `4px solid ${accent || '#E53935'}`,
+    }}>
+      <Box sx={{ fontSize: 12, color: '#666', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</Box>
+      <Box sx={{ fontSize: 24, fontWeight: 700, color: '#222', mt: 0.5 }}>{value}</Box>
+    </Box>
+  </Tooltip>
 );
+
+// hours=87600 (~10y) is the backend's own cap for "lifetime" — sending a
+// literal no-filter option would need a separate code path server-side for
+// no real benefit at this scale.
+const RANGES = [
+  { key: '6h', label: '6h', hours: 6 },
+  { key: '24h', label: '24h', hours: 24 },
+  { key: '7d', label: '7d', hours: 168 },
+  { key: '30d', label: '30d', hours: 720 },
+  { key: 'lifetime', label: 'Lifetime', hours: 87600 },
+];
 
 export default function UserProfile() {
   const { id } = useParams();
@@ -59,6 +72,8 @@ export default function UserProfile() {
   const [tab, setTab] = useState(0);
   const [editLead, setEditLead] = useState(null);
   const [downloadAnchor, setDownloadAnchor] = useState(null);
+  const [rangeKey, setRangeKey] = useState('30d');
+  const range = RANGES.find((r) => r.key === rangeKey) || RANGES[3];
 
   // Tab data buckets
   const [currentLeads, setCurrentLeads] = useState([]);
@@ -66,7 +81,7 @@ export default function UserProfile() {
   const [sessions, setSessions] = useState([]);
   const [loginEvents, setLoginEvents] = useState([]);
   const [loginAgg, setLoginAgg] = useState([]); // per-day aggregate
-  const [activitySummary, setActivitySummary] = useState(null); // { active_minutes, genuine_minutes }
+  const [activitySummary, setActivitySummary] = useState(null); // { active_minutes, genuine_minutes, leads_created_*, lead_activity_count }
   const [loadingTab, setLoadingTab] = useState(false);
 
   // Header
@@ -80,29 +95,44 @@ export default function UserProfile() {
     return () => { alive = false; };
   }, [id]);
 
-  // Load all sections eagerly so the KPI strip can show real numbers.
+  // Current/past leads are present-state, not historical events — they don't
+  // depend on the time-range filter, so they're fetched once per id rather
+  // than re-fetched on every range change.
+  useEffect(() => {
+    if (!id) return;
+    let alive = true;
+    Promise.all([
+      usersApi.leads(id, { status: 'current' }).then((r) => r?.data || []).catch(() => []),
+      usersApi.leads(id, { status: 'past' }).then((r) => r?.data || []).catch(() => []),
+    ]).then(([cur, past]) => {
+      if (!alive) return;
+      setCurrentLeads(cur);
+      setPastLeads(past);
+    });
+    return () => { alive = false; };
+  }, [id]);
+
+  // Everything else is time-ranged — re-fetches whenever the 6h/24h/7d/30d/
+  // lifetime filter changes.
   useEffect(() => {
     if (!id) return;
     let alive = true;
     setLoadingTab(true);
+    const hours = range.hours;
     Promise.all([
-      usersApi.leads(id, { status: 'current' }).then((r) => r?.data || []).catch(() => []),
-      usersApi.leads(id, { status: 'past' }).then((r) => r?.data || []).catch(() => []),
-      usersApi.workSessions(id, { days: 30 }).then((r) => r?.data || []).catch(() => []),
-      usersApi.loginEvents(id, { days: 30 }).then((r) => r?.data || []).catch(() => []),
-      analyticsApi.loginEvents({ user_id: id, days: 30 }).then((r) => r?.data || []).catch(() => []),
-      usersApi.activitySummary(id, { days: 30 }).then((r) => r?.data || null).catch(() => null),
-    ]).then(([cur, past, ws, le, agg, activity]) => {
+      usersApi.workSessions(id, { hours }).then((r) => r?.data || []).catch(() => []),
+      usersApi.loginEvents(id, { hours }).then((r) => r?.data || []).catch(() => []),
+      analyticsApi.loginEvents({ user_id: id, days: Math.max(1, Math.ceil(hours / 24)) }).then((r) => r?.data || []).catch(() => []),
+      usersApi.activitySummary(id, { hours }).then((r) => r?.data || null).catch(() => null),
+    ]).then(([ws, le, agg, activity]) => {
       if (!alive) return;
-      setCurrentLeads(cur);
-      setPastLeads(past);
       setSessions(ws);
       setLoginEvents(le);
       setLoginAgg(agg);
       setActivitySummary(activity);
     }).finally(() => { if (alive) setLoadingTab(false); });
     return () => { alive = false; };
-  }, [id]);
+  }, [id, range.hours]);
 
   const totalActiveSeconds = useMemo(
     () => sessions.reduce((sum, s) => sum + (s.active_seconds ?? (s.active_minutes ?? 0) * 60), 0),
@@ -112,7 +142,7 @@ export default function UserProfile() {
     () => new Set(loginAgg.map((r) => r.day?.slice(0, 10))).size,
     [loginAgg],
   );
-  const autoClosedCount30d = useMemo(
+  const autoClosedCount = useMemo(
     () => sessions.filter((s) => s.auto_closed).length,
     [sessions],
   );
@@ -199,21 +229,51 @@ export default function UserProfile() {
         </Box>
       </Box>
 
+      {/* Time-range filter — everything below except Current/Past leads
+          (those are present-state, not history) re-fetches on change. */}
+      <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
+        {RANGES.map((r) => (
+          <Button
+            key={r.key}
+            size="small"
+            variant={r.key === rangeKey ? 'contained' : 'outlined'}
+            onClick={() => setRangeKey(r.key)}
+            sx={{ textTransform: 'none', minWidth: 0, px: 1.5 }}
+          >
+            {r.label}
+          </Button>
+        ))}
+      </Box>
+
       {/* KPI strip */}
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
         <Kpi label="Current leads" value={currentLeads.length} accent="#E53935" />
         <Kpi label="Past leads" value={pastLeads.length} accent="#FB8C00" />
-        <Kpi label="Login days (30d)" value={distinctLoginDays} accent="#1E88E5" />
-        <Kpi label="Active time (30d)" value={fmtDuration(totalActiveSeconds)} accent="#43A047" />
+        <Kpi label={`Login days (${range.label})`} value={distinctLoginDays} accent="#1E88E5" />
+        <Kpi label={`Active time (${range.label})`} value={fmtDuration(totalActiveSeconds)} accent="#43A047" />
         <Kpi
-          label="Genuine activity (30d)"
+          label={`Genuine activity (${range.label})`}
           value={genuinePct == null ? '—' : `${genuinePct}%`}
           accent={genuinePct != null && genuinePct < 50 ? '#dc2626' : '#00897B'}
         />
         <Kpi
-          label="Forgot to clock out (30d)"
-          value={autoClosedCount30d}
-          accent={autoClosedCount30d > 0 ? '#dc2626' : '#8E24AA'}
+          label={`Forgot to clock out (${range.label})`}
+          value={autoClosedCount}
+          accent={autoClosedCount > 0 ? '#dc2626' : '#8E24AA'}
+        />
+        <Kpi
+          label={`Leads created/assigned (${range.label})`}
+          value={(activitySummary?.leads_created_total ?? 0) + (activitySummary?.leads_assigned_by_system ?? 0)}
+          accent="#00838F"
+          hint={activitySummary
+            ? `${activitySummary.leads_created_manual ?? 0} manually created · ${activitySummary.leads_created_bulk ?? 0} via bulk upload · ${activitySummary.leads_assigned_by_system ?? 0} system-assigned (round-robin)`
+            : ''}
+        />
+        <Kpi
+          label={`Lead activity (${range.label})`}
+          value={activitySummary?.lead_activity_count ?? 0}
+          accent="#6D4C41"
+          hint="Stage moves + any other lead activity logged for this user"
         />
       </Box>
 
@@ -276,7 +336,7 @@ export default function UserProfile() {
               </TableHead>
               <TableBody>
                 {sessions.length === 0 && (
-                  <TableRow><TableCell colSpan={6} sx={{ p: 3, color: '#888', textAlign: 'center' }}>No sessions in the last 30 days.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} sx={{ p: 3, color: '#888', textAlign: 'center' }}>No sessions in this range.</TableCell></TableRow>
                 )}
                 {sessions.map((s) => (
                   <TableRow key={s.id} hover>
@@ -320,12 +380,14 @@ export default function UserProfile() {
                   <TableCell>When</TableCell>
                   <TableCell>Event</TableCell>
                   <TableCell>IP</TableCell>
+                  <TableCell>ISP</TableCell>
+                  <TableCell>Location</TableCell>
                   <TableCell>User-Agent</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {loginEvents.length === 0 && (
-                  <TableRow><TableCell colSpan={4} sx={{ p: 3, color: '#888', textAlign: 'center' }}>No login activity in the last 30 days.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} sx={{ p: 3, color: '#888', textAlign: 'center' }}>No login activity in this range.</TableCell></TableRow>
                 )}
                 {loginEvents.map((e, i) => (
                   <TableRow key={i} hover>
@@ -341,7 +403,13 @@ export default function UserProfile() {
                       />
                     </TableCell>
                     <TableCell sx={{ fontSize: 12, color: '#666' }}>{e.ip || '—'}</TableCell>
-                    <TableCell sx={{ fontSize: 12, color: '#666', maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <TableCell sx={{ fontSize: 12, color: '#666', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <Tooltip title={e.geo_isp || ''}><span>{e.geo_isp || '—'}</span></Tooltip>
+                    </TableCell>
+                    <TableCell sx={{ fontSize: 12, color: '#666' }}>
+                      {e.geo_city || e.geo_country ? `${e.geo_city || ''}${e.geo_city && e.geo_country ? ', ' : ''}${e.geo_country || ''}` : '—'}
+                    </TableCell>
+                    <TableCell sx={{ fontSize: 12, color: '#666', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <Tooltip title={e.user_agent || ''}><span>{e.user_agent || '—'}</span></Tooltip>
                     </TableCell>
                   </TableRow>

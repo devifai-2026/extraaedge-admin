@@ -69,6 +69,7 @@ export default function LoginActivityMap({ events }) {
                       <div style={{ fontWeight: 700, color: colorFor(e.kind), textTransform: 'capitalize' }}>{e.kind}</div>
                       <div>{new Date(e.created_at).toLocaleString()}</div>
                       <div style={{ color: '#666' }}>{e.geo_city || e.geo_country ? `${e.geo_city || ''}${e.geo_city && e.geo_country ? ', ' : ''}${e.geo_country || ''}` : 'Unknown location'}</div>
+                      {e.geo_isp && <div style={{ color: '#666' }}>{e.geo_isp}</div>}
                       <div style={{ color: '#999' }}>{e.ip || '—'}{e.location_source === 'gps' ? ' · GPS fix' : ''}</div>
                     </div>
                   ))}
