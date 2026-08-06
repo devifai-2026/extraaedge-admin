@@ -25,11 +25,20 @@ export const isJustDialLead = (lead) => {
     || norm(lead.first_touch_channel).includes('justdial');
 };
 
+// e.g. speedupinfotech.com's Free Demo form — see
+// extraaedge-server/src/modules/public-leads/service.js, which sets
+// first_touch_channel='Website' (first_touch_source carries the domain).
+export const isWebsiteLead = (lead) => {
+  if (!lead) return false;
+  return norm(lead.first_touch_channel).includes('website');
+};
+
 // Returns a small badge descriptor for the lead's origin, or null when it has
 // no notable origin (plain manual / bulk-import lead).
 export const originBadge = (lead) => {
   if (isWhatsAppLead(lead)) return { key: 'whatsapp', label: 'WhatsApp', color: '#25D366' };
   if (isFacebookLead(lead)) return { key: 'facebook', label: 'Facebook', color: '#1877F2' };
   if (isJustDialLead(lead)) return { key: 'justdial', label: 'JustDial', color: '#F26722' };
+  if (isWebsiteLead(lead)) return { key: 'website', label: 'Website', color: '#5C6BC0' };
   return null;
 };

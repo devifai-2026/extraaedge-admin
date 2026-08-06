@@ -169,6 +169,13 @@ const doFetch = async (path, init = {}, retried = false) => {
       const more = details.length > 3 ? ` (+${details.length - 3} more)` : '';
       msg = `${baseMsg} — ${lines.join('; ')}${more}`;
     }
+    // Broadcast so ClockInGate (mounted once in Layout) can react instantly
+    // from anywhere in the app, not just the call site that happened to hit
+    // this — a stale client shouldn't be able to dodge the gate just because
+    // the request that got blocked wasn't one the gate itself was watching.
+    if (data?.error?.code === 'CLOCK_IN_REQUIRED' && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ee:clock-in-required'));
+    }
     throw new ApiError(msg, res.status, data);
   }
   return data;

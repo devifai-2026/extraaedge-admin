@@ -8,13 +8,14 @@
 // - Daily reset at 00:00 local: any open session is auto-stopped so the
 //   "stopped today" gate flips back on for the new calendar day.
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Tooltip, IconButton, Button, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import StopIcon from '@mui/icons-material/Stop';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import { workSessionsApi, auth, authApi } from '../../lib/endpoints';
+import { useGenuineActivity } from '../../hooks/useGenuineActivity';
 
 const IDLE_LIMIT_SECONDS = 15 * 60; // 15 minutes
 const HEARTBEAT_EVERY_MS = 60 * 1000;
@@ -41,7 +42,7 @@ export default function WorkTimer() {
   const [activeSeconds, setActiveSeconds] = useState(0);
   const [busy, setBusy] = useState(false);
   const [restartConfirm, setRestartConfirm] = useState(false);
-  const lastApiCallRef = useRef(Date.now());
+  const { consumeGenuine, msSinceLastActivity } = useGenuineActivity();
 
   // Hide for super_admin
   const isSuperAdmin = user?.role === 'super_admin';
@@ -58,7 +59,6 @@ export default function WorkTimer() {
       });
       if (data.session?.active_seconds != null) setActiveSeconds(data.session.active_seconds);
       else if (!data.session) setActiveSeconds(0);
-      lastApiCallRef.current = Date.now();
     } catch {
       setState((s) => ({ ...s, loading: false }));
     }
@@ -66,25 +66,16 @@ export default function WorkTimer() {
 
   useEffect(() => { if (!isSuperAdmin) reload(); }, [isSuperAdmin, reload]);
 
-  // Patch fetch to detect idle (any role with timer enabled).
-  useEffect(() => {
-    if (isSuperAdmin) return;
-    const origFetch = window.fetch;
-    window.fetch = async (...args) => {
-      const res = await origFetch.apply(window, args);
-      if (res.ok) lastApiCallRef.current = Date.now();
-      return res;
-    };
-    return () => { window.fetch = origFetch; };
-  }, [isSuperAdmin]);
-
-  // Tick loop: idle check, heartbeat, local seconds counter.
+  // Tick loop: idle check, heartbeat, local seconds counter. Idle is judged
+  // on real mouse/keyboard/touch activity (useGenuineActivity), not "any API
+  // call happened" — that old signal was satisfied by the app's own
+  // background polling even while the person was away from the keyboard.
   useEffect(() => {
     if (isSuperAdmin) return;
     let lastHeartbeat = Date.now();
     const interval = setInterval(async () => {
       const now = Date.now();
-      const idleSec = (now - lastApiCallRef.current) / 1000;
+      const idleSec = msSinceLastActivity() / 1000;
       if (idleSec >= IDLE_LIMIT_SECONDS) {
         try { await authApi.logout(); } catch { /* ignore */ }
         auth.clear();
@@ -96,11 +87,11 @@ export default function WorkTimer() {
       }
       if (state.session && (now - lastHeartbeat) >= HEARTBEAT_EVERY_MS) {
         lastHeartbeat = now;
-        try { await workSessionsApi.heartbeat(); } catch { /* ignore */ }
+        try { await workSessionsApi.heartbeat(consumeGenuine()); } catch { /* ignore */ }
       }
     }, TICK_EVERY_MS);
     return () => clearInterval(interval);
-  }, [isSuperAdmin, state.session]);
+  }, [isSuperAdmin, state.session, msSinceLastActivity, consumeGenuine]);
 
   // Daily midnight reset: if a session is still open at 00:00, stop it
   // automatically so the "new day" rule kicks in. We schedule a single
@@ -162,7 +153,7 @@ export default function WorkTimer() {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px', borderLeft: '1px solid #eee', borderRight: '1px solid #eee' }}>
+      <div id="work-timer-anchor" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 8px', borderLeft: '1px solid #eee', borderRight: '1px solid #eee' }}>
         <span style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 700, color: colorByStatus, minWidth: 78 }}>
           {fmt(activeSeconds)}
         </span>

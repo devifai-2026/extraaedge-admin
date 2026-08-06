@@ -26,6 +26,7 @@ import "./BulkUploadList.css";
 import noLeadsImg from "../../assets/no-leads.svg";
 import { colors } from "../../theme/colors";
 import { bulkApi } from "../../lib/endpoints";
+import { isRole, ROLES } from "../../lib/rbac";
 
 const tabs = ["Bulk Upload", "Data Download", "Bulk Status Change", "Bulk Refer"];
 
@@ -42,18 +43,6 @@ const fmtStatus = (s) => {
   if (!s) return "—";
   return String(s).charAt(0).toUpperCase() + String(s).slice(1);
 };
-
-const dataDownloadData = [
-  { downloadedBy: "Abhijeet Salgar", personInCcBcc: "Abhijeet Salgar", downloadedFrom: "Leads", downloadDate: "Apr 8, 2026 1:24 PM", totalRecords: 28368, stage: "Completed" },
-  { downloadedBy: "Abhijeet Salgar", personInCcBcc: "Abhijeet Salgar", downloadedFrom: "Leads", downloadDate: "Apr 8, 2026 1:24 PM", totalRecords: 179, stage: "Completed" },
-  { downloadedBy: "ExtraaEdge Admin", personInCcBcc: "ExtraaEdge Admin", downloadedFrom: "Leads", downloadDate: "Apr 6, 2026 3:44 PM", totalRecords: 1, stage: "Completed" },
-  { downloadedBy: "ExtraaEdge Admin", personInCcBcc: "ExtraaEdge Admin", downloadedFrom: "Leads", downloadDate: "Apr 6, 2026 3:39 PM", totalRecords: 1, stage: "Completed" },
-  { downloadedBy: "Abhijeet Salgar", personInCcBcc: "Abhijeet Salgar", downloadedFrom: "Leads", downloadDate: "Apr 6, 2026 12:35 PM", totalRecords: 28240, stage: "Completed" },
-  { downloadedBy: "Abhijeet Salgar", personInCcBcc: "Abhijeet Salgar", downloadedFrom: "Leads", downloadDate: "Mar 2, 2026 5:10 PM", totalRecords: 26928, stage: "Completed" },
-  { downloadedBy: "Abhijeet Salgar", personInCcBcc: "Abhijeet Salgar", downloadedFrom: "Leads", downloadDate: "Mar 2, 2026 4:54 PM", totalRecords: 26928, stage: "Completed" },
-  { downloadedBy: "Abhijeet Salgar", personInCcBcc: "Abhijeet Salgar", downloadedFrom: "Leads", downloadDate: "Mar 2, 2026 2:54 PM", totalRecords: 20867, stage: "Completed" },
-  { downloadedBy: "Akansha Kondalwade", personInCcBcc: "Abhijeet Salgar,Akansha Kondalwade", downloadedFrom: "Leads", downloadDate: "Feb 11, 2026 3:41 PM", totalRecords: 7973, stage: "Completed" },
-];
 
 const bulkStatusChangeData = [
   { createdBy: "Abhijeet Salgar", createdDate: "Oct 11, 2025 2:06 PM", totalRecords: 3530, actionStatus: "Completed" },
@@ -161,6 +150,9 @@ const BulkUploadList = () => {
   const [importsTotal, setImportsTotal] = useState(0);
   const [importsLoading, setImportsLoading] = useState(false);
   const [importsError, setImportsError] = useState("");
+  const [dataDownloads, setDataDownloads] = useState([]);
+  const [dataDownloadsLoading, setDataDownloadsLoading] = useState(false);
+  const [dataDownloadsError, setDataDownloadsError] = useState("");
   const [uploaders, setUploaders] = useState([]);
   // Tracks which row's download is currently in flight so the icon can
   // show a spinner. We don't bother with a queue — single-click flow.
@@ -262,6 +254,38 @@ const BulkUploadList = () => {
     return () => { alive = false; };
   }, [activeTab, currentPage, rowsPerPage, debouncedSearch, selectedUserId, searchType, reloadTick]);
 
+  // Real download audit trail (bulk_exports) — super_admin sees every user's
+  // downloads; anyone else falls back to their own, since /exports/all is
+  // super_admin-only server-side.
+  useEffect(() => {
+    if (activeTab !== 1) return undefined;
+    let alive = true;
+    setDataDownloadsLoading(true);
+    setDataDownloadsError("");
+    const fetchExports = isRole(ROLES.SUPER_ADMIN) ? bulkApi.exportsAll() : bulkApi.exports();
+    fetchExports
+      .then((r) => {
+        if (!alive) return;
+        const rows = (r?.data || []).map((row) => ({
+          id: row.id,
+          downloadedBy: row.user_name || row.user_email || "—",
+          personInCcBcc: [row.cc_emails, row.bcc_emails].flat().filter(Boolean).join(", ") || row.user_name || "—",
+          downloadedFrom: "Leads",
+          downloadDate: fmtDate(row.completed_at || row.created_at),
+          totalRecords: row.row_count ?? 0,
+          stage: fmtStatus(row.status),
+        }));
+        setDataDownloads(rows);
+      })
+      .catch((e) => {
+        if (!alive) return;
+        setDataDownloadsError(e?.message || "Failed to load download history");
+        setDataDownloads([]);
+      })
+      .finally(() => { if (alive) setDataDownloadsLoading(false); });
+    return () => { alive = false; };
+  }, [activeTab, reloadTick]);
+
   const counselors = ["Abhijeet Salgar", "Divya Nair", "ExtraaEdge Admin", "Akansha Kondalwade"];
 
   const getTabRowsPerPage = rowsPerPage[activeTab];
@@ -280,7 +304,7 @@ const BulkUploadList = () => {
     switch (activeTab) {
       // Tab 0 is server-paginated; the rows we already fetched ARE the page.
       case 0: return imports;
-      case 1: return dataDownloadData;
+      case 1: return dataDownloads;
       case 2: return bulkStatusChangeData;
       case 3: return bulkReferData;
       default: return [];
@@ -642,6 +666,25 @@ const BulkUploadList = () => {
       );
     }
 
+    // Tab 1 pulls from the real bulk_exports audit log — same loading/error
+    // treatment as tab 0.
+    if (activeTab === 1) {
+      if (dataDownloadsLoading) {
+        return (
+          <div className="empty-state" style={{ padding: 64 }}>
+            <CircularProgress size={28} />
+          </div>
+        );
+      }
+      if (dataDownloadsError) {
+        return (
+          <div className="empty-state">
+            <h3 style={{ color: "#c62828" }}>{dataDownloadsError}</h3>
+          </div>
+        );
+      }
+    }
+
     if (!hasData) {
       return (
         <div className="empty-state">
@@ -678,7 +721,7 @@ const BulkUploadList = () => {
                   <td>{item.downloadDate}</td>
                   <td className="records-cell">{item.totalRecords}</td>
                   <td className="stage-cell">
-                    <span className="status-badge status-completed">{item.stage}</span>
+                    <span className={`status-badge ${item.stage === "Failed" ? "status-failed" : "status-completed"}`}>{item.stage}</span>
                   </td>
                 </tr>
               ))}

@@ -20,6 +20,8 @@ import { flagForLead, TONE_BG, formatLeadAge, formatTimestamp } from '../../lib/
 import { originBadge } from '../../lib/leadOrigin';
 import { leadsApi } from '../../lib/endpoints';
 import { isRole, ROLES } from '../../lib/rbac';
+import ProtectedLeadData from '../DataProtection/ProtectedLeadData';
+import MaskedPhone from '../DataProtection/MaskedPhone';
 
 const fmt = (v) => {
   if (!v) return '-';
@@ -253,6 +255,7 @@ const LeadsTable = ({
 
   return (
     <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 6, overflow: 'auto' }}>
+      <ProtectedLeadData>
       <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1400 }}>
         <thead>
           <tr>
@@ -322,7 +325,14 @@ const LeadsTable = ({
                     })()}
                   </span>
                 </td>
-                <td style={cellStyle}>{lead.phone || lead.whatsapp_number || '-'}</td>
+                <td style={cellStyle}>
+                  <MaskedPhone
+                    value={lead.phone || lead.whatsapp_number || '-'}
+                    leadId={lead.id}
+                    reveal={leadsApi.revealPhone}
+                    field={lead.phone ? 'phone' : 'whatsapp_number'}
+                  />
+                </td>
                 <td style={cellStyle}>
                   <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
                     {lead.stage_name ? <Chip size="small" label={lead.stage_name} sx={{ height: 22, fontSize: 11 }} /> : '-'}
@@ -430,6 +440,7 @@ const LeadsTable = ({
           })}
         </tbody>
       </table>
+      </ProtectedLeadData>
 
       <Menu
         anchorEl={menu.anchor}

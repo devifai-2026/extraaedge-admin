@@ -34,6 +34,7 @@ import AddNewLead from "../AddNewLead/AddNewLead";
 import AddFollowUpDrawer from "../AddFollowUpDrawer/AddFollowUpDrawer";
 import AddNoteDrawer from "../AddNoteDrawer/AddNoteDrawer";
 import { followUpsApi, leadsApi } from "../../lib/endpoints";
+import MaskedPhone from "../DataProtection/MaskedPhone";
 import { useDropdown } from "../../lib/useDropdowns";
 import { flagForLead, TONE_BG, formatLeadAge, formatTimestamp } from "../../lib/leadFlags";
 import { originBadge } from "../../lib/leadOrigin";
@@ -214,7 +215,16 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                             )}
                         </div>
                         <Typography className="phone" title={lead.phone || lead.whatsapp_number || lead.email || ''}>
-                            {lead.phone || lead.whatsapp_number || lead.email || '-'}
+                            {lead.phone || lead.whatsapp_number
+                                ? (
+                                    <MaskedPhone
+                                        value={lead.phone || lead.whatsapp_number}
+                                        leadId={lead.id}
+                                        reveal={leadsApi.revealPhone}
+                                        field={lead.phone ? 'phone' : 'whatsapp_number'}
+                                    />
+                                )
+                                : (lead.email || '-')}
                         </Typography>
                     </div>
 
@@ -452,8 +462,8 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                         <div className="grid">
                                             <Field label="EMAIL" value={fullLead.email} />
                                             <Field label="ALTERNATE EMAIL" value={fullLead.alternate_email} />
-                                            <Field label="PHONE" value={fullLead.phone} />
-                                            <Field label="WHATSAPP" value={fullLead.whatsapp_number} />
+                                            <Field label="PHONE" value={<MaskedPhone value={fullLead.phone} leadId={fullLead.id} reveal={leadsApi.revealPhone} field="phone" />} />
+                                            <Field label="WHATSAPP" value={<MaskedPhone value={fullLead.whatsapp_number} leadId={fullLead.id} reveal={leadsApi.revealPhone} field="whatsapp_number" />} />
                                             <Field label="ALTERNATE CONTACT" value={fullLead.alternate_contact} />
                                             <Field label="GENDER" value={fullLead.gender} />
                                             <Field label="LANGUAGE" value={fullLead.language} />

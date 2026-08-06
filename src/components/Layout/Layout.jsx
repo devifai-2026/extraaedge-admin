@@ -4,6 +4,8 @@ import Header from './Header';
 import Sidebar from './Sidebar';
 import BranchSetupDialog from '../BranchSetupDialog/BranchSetupDialog';
 import PhoneCaptureDialog from '../PhoneCaptureDialog/PhoneCaptureDialog';
+import ClockInGate from './ClockInGate';
+import LocationGate from './LocationGate';
 import FeedbackPopup from '../FeedbackPopup/FeedbackPopup';
 import { auth } from '../../lib/api';
 import { authApi } from '../../lib/endpoints';
@@ -38,6 +40,10 @@ function Layout({ children }) {
   // their mobile-app call recordings attribute to them. Optimistic from cache,
   // then confirmed by the /auth/me fetch below.
   const [needsPhone, setNeedsPhone] = useState(() => !auth.getUser()?.phone);
+  // Resolved once LocationGate either isn't active for this tenant or has
+  // successfully captured a GPS fix — gates ClockInGate so the two blocking
+  // screens never show stacked at once.
+  const [locationResolved, setLocationResolved] = useState(true);
   useEffect(() => {
     let cancelled = false;
     let timer = null;
@@ -56,6 +62,7 @@ function Layout({ children }) {
         // Cache the fresh user (carries branch_name, branch_id) + allowed_tabs
         // so the navbar / role checks reflect the latest server state.
         if (me?.user) auth.setSession({ user: me.user });
+        if (me?.tenant) auth.setSession({ tenant: me.tenant });
         if (me?.allowed_tabs) auth.setSession({ allowed_tabs: me.allowed_tabs });
         if (me?.tenant_setup) auth.setTenantSetup(me.tenant_setup);
         if (me?.tenant_setup?.needs_branch_setup) { if (!timer) reveal(true); }
@@ -95,9 +102,18 @@ function Layout({ children }) {
         open={needsPhone && !needsBranchSetup}
         onDone={() => setNeedsPhone(false)}
       />
+      {/* Location gate surfaces once branch/phone setup are resolved, before
+          the clock-in gate — the two never show stacked (see locationResolved). */}
+      <LocationGate
+        enabled={!needsBranchSetup && !needsPhone}
+        onResolvedChange={setLocationResolved}
+      />
+      {/* Clock-in gate only surfaces once branch/phone/location are resolved —
+          same stacking rule as the phone gate above. */}
+      <ClockInGate enabled={!needsBranchSetup && !needsPhone && locationResolved} />
       {/* Recurring feedback popup — only once the blocking gates are cleared,
-          so it never stacks on top of branch/phone setup. */}
-      {!needsBranchSetup && !needsPhone ? <FeedbackPopup /> : null}
+          so it never stacks on top of branch/phone/location/clock-in setup. */}
+      {!needsBranchSetup && !needsPhone && locationResolved ? <FeedbackPopup /> : null}
     </div>
   );
 }

@@ -21,6 +21,7 @@ import { isRole, ROLES } from '../../lib/rbac';
 import { isEmail, sanitizeDigits, emailError } from '../../lib/validators';
 import Breadcrumb from './Breadcrumb';
 import TrainerStudents from '../Trainer/TrainerStudents';
+import SecurityAnomaliesBanner from '../../components/SecurityAnomalies/SecurityAnomaliesBanner';
 
 // Scopes a branch_manager may NOT assign to a user (mirrors backend
 // BRANCH_MANAGER_FORBIDDEN_ROLES). A BM can't create admins or other BMs.
@@ -106,6 +107,7 @@ export default function UsersAndRoles() {
         </Tabs>
 
         <div style={{ paddingTop: 16 }}>
+          {tab === 0 && <SecurityAnomaliesBanner />}
           {tab === 0 && <UsersTab />}
           {tab === 1 && <TrainerStudents />}
           {tab === 2 && <RolesTab />}

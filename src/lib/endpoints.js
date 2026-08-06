@@ -39,6 +39,9 @@ export const authApi = {
   me: () => api.get('/auth/me'),
   heartbeat: () => api.post('/auth/session/heartbeat'),
   changePassword: (body) => api.post('/auth/change-password', body),
+  // Precise browser fix, refining the IP-derived location on the most
+  // recent login event — see LocationGate.jsx.
+  updateLocation: ({ lat, lng }) => api.post('/auth/location', { lat, lng }),
 };
 
 export const feedbackApi = {
@@ -52,6 +55,9 @@ export const leadsApi = {
   stageCounts: (params) => api.get('/leads/stage-counts', withBranch(params)),
   get: (id) => api.get(`/leads/${id}`),
   timeline: (id, params) => api.get(`/leads/${id}/timeline`, params),
+  // Full number only after an explicit click — every call is audit-logged
+  // server-side (audit_log, action lead.phone_revealed).
+  revealPhone: (id) => api.post(`/leads/${id}/reveal-phone`),
   create: (body) => api.post('/leads', body),
   update: (id, body, ifMatch) => api.put(`/leads/${id}`, body, ifMatch),
   delete: (id) => api.delete(`/leads/${id}`),
@@ -128,6 +134,7 @@ export const leadsApi = {
 export const leadPoolApi = {
   search: (params) => api.get('/lead-pool', params), // { q, limit? }
   get: (id) => api.get(`/lead-pool/${id}`),
+  revealPhone: (id) => api.post(`/lead-pool/${id}/reveal-phone`),
 };
 
 // Call recordings uploaded from the mobile app. Counsellors see only their own
@@ -187,6 +194,8 @@ export const analyticsApi = {
   counselorPerformance: (params) => api.get('/analytics/counselor-performance', withBranch(params)),
   communications: (params) => api.get('/analytics/communications', withBranch(params)),
   loginEvents: (params) => api.get('/analytics/login-events', params),
+  // Concurrent sessions / new devices / login-location anomalies — super_admin only.
+  securityAnomalies: () => api.get('/analytics/security-anomalies'),
 };
 
 export const usersApi = {
@@ -208,6 +217,7 @@ export const usersApi = {
   // Per-user views used by the user-profile page.
   leads: (id, params) => api.get(`/users/${id}/leads`, params),
   workSessions: (id, params) => api.get(`/users/${id}/work-sessions`, params),
+  activitySummary: (id, params) => api.get(`/users/${id}/activity-summary`, params),
   loginEvents: (id, params) => api.get(`/users/${id}/login-events`, params),
   orgTree: () => api.get('/users/org-tree'),
   // Per-user UI theme (Profile → Theme). Body shape:
@@ -346,7 +356,6 @@ export const whatsappApi = {
     delete: (id) => api.delete(`/whatsapp/templates/${id}`),
   },
   send: (body) => api.post('/whatsapp/send', body),
-  inbox: (params) => api.get('/whatsapp/inbox', params),
   numbers: () => api.get('/whatsapp/numbers'),
   usage: () => api.get('/whatsapp/usage'),
   // WhatsApp inbox — a SHARED business number per tenant (WABridge send + Meta
@@ -459,6 +468,8 @@ export const bulkApi = {
   retryFailures: (id) => api.post(`/bulk/leads/imports/${id}/retry-failures`),
   exportLeads: (body) => api.post('/bulk/leads/download', body),
   exports: () => api.get('/bulk/leads/exports'),
+  // Super_admin-only audit view — every user's downloads, not just the caller's.
+  exportsAll: () => api.get('/bulk/leads/exports/all'),
   bulkStatusChange: (body) => api.post('/bulk/leads/status-change', body),
   bulkRefer: (body) => api.post('/bulk/leads/refer', body),
 };
@@ -747,11 +758,19 @@ export const workSessionsApi = {
   // Manually open a brand-new session even after the user already stopped today.
   // The backend keeps the prior stopped row for audit and flags this one with restart_of_day=true.
   restartDay: () => api.post('/work-sessions/restart-day'),
-  heartbeat: () => api.post('/work-sessions/heartbeat'),
+  heartbeat: (genuine) => api.post('/work-sessions/heartbeat', { genuine: !!genuine }),
   me: () => api.get('/work-sessions/me'),
   today: () => api.get('/work-sessions/me/today'),
   list: (params) => api.get('/work-sessions', params),
   teamSummary: () => api.get('/work-sessions/team-summary'),
+};
+
+export const auditLogApi = {
+  list: (params) => api.get('/audit-log', params),
+  summary: (params) => api.get('/audit-log/summary', params),
+  // Fire-and-forget client security events (copy/right-click/blur/devtools) —
+  // see components/DataProtection/securityEvents.js for the batching wrapper.
+  logEvent: (action, extra) => api.post('/audit-log/events', { action, ...extra }),
 };
 
 export const customFieldsApi = {

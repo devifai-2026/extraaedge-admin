@@ -17,6 +17,8 @@ import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
 import HistoryIcon from '@mui/icons-material/History';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { leadPoolApi } from '../../lib/endpoints';
+import ProtectedLeadData from '../../components/DataProtection/ProtectedLeadData';
+import MaskedPhone from '../../components/DataProtection/MaskedPhone';
 
 // A tiny "person" cell: name on top, email/phone muted beneath. `empty` is the
 // dash shown when there's nobody (e.g. unassigned / no previous owner).
@@ -135,6 +137,7 @@ export default function LeadPool() {
       )}
 
       {rows.length > 0 && (
+        <ProtectedLeadData>
         <TableContainer component={Paper} sx={{ border: '1px solid #eef0f3', boxShadow: 'none' }}>
           <Table size="small" sx={{ minWidth: 900 }}>
             <TableHead>
@@ -165,7 +168,16 @@ export default function LeadPool() {
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{r.name || '—'}</Typography>
                     <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
-                      {r.phone || r.whatsapp_number || r.alternate_contact || 'No number'}
+                      {(r.phone || r.whatsapp_number || r.alternate_contact)
+                        ? (
+                          <MaskedPhone
+                            value={r.phone || r.whatsapp_number || r.alternate_contact}
+                            leadId={r.id}
+                            reveal={leadPoolApi.revealPhone}
+                            field={r.phone ? 'phone' : r.whatsapp_number ? 'whatsapp_number' : 'alternate_contact'}
+                          />
+                        )
+                        : 'No number'}
                     </Typography>
                     {r.email ? (
                       <Typography variant="caption" sx={{ color: '#9ca3af', display: 'block' }}>{r.email}</Typography>
@@ -216,6 +228,7 @@ export default function LeadPool() {
             </TableBody>
           </Table>
         </TableContainer>
+        </ProtectedLeadData>
       )}
 
       {rows.length > 0 && (

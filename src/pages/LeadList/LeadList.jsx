@@ -15,10 +15,12 @@ import FiltersOptions from "../../components/FiltersOptions/FiltersOptions";
 import ReferLeadsDrawer from "../../components/ReferLeadsDrawer/ReferLeadsDrawer";
 import { leadsApi } from "../../lib/endpoints";
 import { onNotification } from "../../lib/socket";
+import { useCopyGuard } from "../../components/DataProtection/useCopyGuard";
 
 const PAGE_SIZE = 20;
 
 const LeadList = () => {
+    const copyGuard = useCopyGuard();
     const [addLeadOpen, setAddLeadOpen] = useState(false);
     const [uploadLeadOpen, setUploadLeadOpen] = useState(false);
 
@@ -331,7 +333,13 @@ const LeadList = () => {
                     </div>
                 )}
                 {!loading && leads.length > 0 && viewMode === 'card' && (
-                    <div className="lead-cards-container">
+                    <div
+                        className="lead-cards-container"
+                        onCopy={copyGuard.onCopy}
+                        onCut={copyGuard.onCopy}
+                        onContextMenu={copyGuard.onContextMenu}
+                        style={copyGuard.style}
+                    >
                         {leads.map((lead) => (
                             <LeadCard
                                 key={lead.id}

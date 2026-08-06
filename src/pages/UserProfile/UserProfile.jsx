@@ -23,6 +23,7 @@ import BadgeIcon from '@mui/icons-material/Badge';
 import DownloadIcon from '@mui/icons-material/Download';
 import { usersApi, analyticsApi } from '../../lib/endpoints';
 import AddNewLead from '../../components/AddNewLead/AddNewLead';
+import LoginActivityMap from '../../components/LoginActivityMap/LoginActivityMap';
 import { downloadXls, downloadCsv } from '../../lib/exportTable';
 
 const fmt = (v) => {
@@ -65,6 +66,7 @@ export default function UserProfile() {
   const [sessions, setSessions] = useState([]);
   const [loginEvents, setLoginEvents] = useState([]);
   const [loginAgg, setLoginAgg] = useState([]); // per-day aggregate
+  const [activitySummary, setActivitySummary] = useState(null); // { active_minutes, genuine_minutes }
   const [loadingTab, setLoadingTab] = useState(false);
 
   // Header
@@ -89,13 +91,15 @@ export default function UserProfile() {
       usersApi.workSessions(id, { days: 30 }).then((r) => r?.data || []).catch(() => []),
       usersApi.loginEvents(id, { days: 30 }).then((r) => r?.data || []).catch(() => []),
       analyticsApi.loginEvents({ user_id: id, days: 30 }).then((r) => r?.data || []).catch(() => []),
-    ]).then(([cur, past, ws, le, agg]) => {
+      usersApi.activitySummary(id, { days: 30 }).then((r) => r?.data || null).catch(() => null),
+    ]).then(([cur, past, ws, le, agg, activity]) => {
       if (!alive) return;
       setCurrentLeads(cur);
       setPastLeads(past);
       setSessions(ws);
       setLoginEvents(le);
       setLoginAgg(agg);
+      setActivitySummary(activity);
     }).finally(() => { if (alive) setLoadingTab(false); });
     return () => { alive = false; };
   }, [id]);
@@ -108,6 +112,16 @@ export default function UserProfile() {
     () => new Set(loginAgg.map((r) => r.day?.slice(0, 10))).size,
     [loginAgg],
   );
+  const autoClosedCount30d = useMemo(
+    () => sessions.filter((s) => s.auto_closed).length,
+    [sessions],
+  );
+  // % of tracked minutes backed by a real mouse/keyboard pattern, not just an
+  // API call happening — see useGenuineActivity / work_activity_minutes.source.
+  const genuinePct = useMemo(() => {
+    if (!activitySummary || !activitySummary.active_minutes) return null;
+    return Math.round((activitySummary.genuine_minutes / activitySummary.active_minutes) * 100);
+  }, [activitySummary]);
 
   // Export the time-sheet to Excel (.xls) or CSV. Format mirrors the on-screen
   // table so users can audit / share without re-formatting.
@@ -191,6 +205,16 @@ export default function UserProfile() {
         <Kpi label="Past leads" value={pastLeads.length} accent="#FB8C00" />
         <Kpi label="Login days (30d)" value={distinctLoginDays} accent="#1E88E5" />
         <Kpi label="Active time (30d)" value={fmtDuration(totalActiveSeconds)} accent="#43A047" />
+        <Kpi
+          label="Genuine activity (30d)"
+          value={genuinePct == null ? '—' : `${genuinePct}%`}
+          accent={genuinePct != null && genuinePct < 50 ? '#dc2626' : '#00897B'}
+        />
+        <Kpi
+          label="Forgot to clock out (30d)"
+          value={autoClosedCount30d}
+          accent={autoClosedCount30d > 0 ? '#dc2626' : '#8E24AA'}
+        />
       </Box>
 
       {/* Tabs */}
@@ -267,6 +291,15 @@ export default function UserProfile() {
                         label={s.status + (s.restart_of_day ? ' · restarted' : '')}
                         sx={{ height: 20, fontSize: 11, background: s.status === 'active' ? '#e8f5e9' : s.status === 'stopped' ? '#fbe9e7' : '#fff8e1' }}
                       />
+                      {s.auto_closed && (
+                        <Tooltip title="Forgot to clock out — the system auto-closed this session at midnight">
+                          <Chip
+                            size="small"
+                            label="Auto-closed"
+                            sx={{ height: 20, fontSize: 11, ml: 0.5, background: '#fdecea', color: '#c62828', fontWeight: 600 }}
+                          />
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -278,6 +311,9 @@ export default function UserProfile() {
 
         {!loadingTab && tab === 3 && (
           <Box sx={{ overflow: 'auto' }}>
+            <Box sx={{ p: 1.5 }}>
+              <LoginActivityMap events={loginEvents} />
+            </Box>
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ background: '#fdf3ed' }}>

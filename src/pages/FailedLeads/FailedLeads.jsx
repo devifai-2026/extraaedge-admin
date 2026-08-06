@@ -16,6 +16,7 @@ import Button from "@mui/material/Button";
 import "./FailedLeads.css";
 import { colors } from "../../theme/colors";
 import { failedLeadsApi } from "../../lib/endpoints";
+import ProtectedLeadData from "../../components/DataProtection/ProtectedLeadData";
 
 const PAGE_SIZE = 50;
 
@@ -355,6 +356,7 @@ function ValidationFailuresTable({ rows, onDelete, selected, onToggleRow, onTogg
     return <EmptyState message="No validation errors. Bulk uploads are clean." />;
   }
   return (
+    <ProtectedLeadData>
     <table className="failed-leads-table">
       <thead>
         <tr>
@@ -409,6 +411,7 @@ function ValidationFailuresTable({ rows, onDelete, selected, onToggleRow, onTogg
         ))}
       </tbody>
     </table>
+    </ProtectedLeadData>
   );
 }
 
@@ -417,6 +420,7 @@ function DuplicatesTable({ rows, onDelete, selected, onToggleRow, onToggleAll, a
     return <EmptyState message="No duplicates from bulk uploads." />;
   }
   return (
+    <ProtectedLeadData>
     <table className="failed-leads-table">
       <thead>
         <tr>
@@ -508,6 +512,7 @@ function DuplicatesTable({ rows, onDelete, selected, onToggleRow, onToggleAll, a
         ))}
       </tbody>
     </table>
+    </ProtectedLeadData>
   );
 }
 
