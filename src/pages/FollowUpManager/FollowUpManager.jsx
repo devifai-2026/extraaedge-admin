@@ -588,6 +588,7 @@ function FollowupRow({ f, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleAt, setRescheduleAt] = useState('');
+  const [rescheduleReason, setRescheduleReason] = useState('');
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [doneOpen, setDoneOpen] = useState(false);
@@ -645,14 +646,16 @@ function FollowupRow({ f, onChanged }) {
     } else {
       setRescheduleAt('');
     }
+    setRescheduleReason('');
     setRescheduleOpen(true);
   };
 
   const confirmReschedule = async () => {
     if (!rescheduleAt) return;
     const iso = new Date(rescheduleAt).toISOString();
-    await wrap(() => followUpsApi.reschedule(f.id, iso));
+    await wrap(() => followUpsApi.reschedule(f.id, iso, rescheduleReason.trim() || undefined));
     setRescheduleOpen(false);
+    setRescheduleReason('');
   };
 
   const confirmCancel = async () => {
@@ -826,7 +829,11 @@ function FollowupRow({ f, onChanged }) {
       </Dialog>
 
       {/* Reschedule modal — datetime-local input seeded with the current
-          scheduled time. Confirms via POST /follow-ups/:id/reschedule. */}
+          scheduled time. Confirms via POST /follow-ups/:id/reschedule.
+          The remark is optional (unlike Mark Done's required one) — stored
+          in lead_followups.reschedule_reason and, per reschedule, in
+          lead_activities so the full reschedule history (not just the
+          latest reason) shows up in the lead timeline. */}
       <Dialog open={rescheduleOpen} onClose={() => setRescheduleOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Reschedule follow-up</DialogTitle>
         <DialogContent>
@@ -843,6 +850,17 @@ function FollowupRow({ f, onChanged }) {
               }}
             />
           </div>
+          <TextField
+            label="Remark (optional)"
+            value={rescheduleReason}
+            onChange={(e) => setRescheduleReason(e.target.value)}
+            fullWidth
+            size="small"
+            multiline
+            minRows={2}
+            sx={{ mt: 2 }}
+            placeholder="e.g. Requested a callback next week"
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRescheduleOpen(false)}>Cancel</Button>

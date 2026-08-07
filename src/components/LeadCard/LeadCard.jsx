@@ -616,6 +616,15 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                     <div className="followup-section">
                                         <div className="followup-label">FOLLOWUP REMARKS</div>
                                         <div className="followup-value followup-remarks">{followUp?.notes || followUp?.remarks || followUp?.comment || '-'}</div>
+                                        {followUp?.reschedule_reason && (
+                                            <div style={{
+                                                marginTop: 4, fontSize: 11, color: '#8a5a00',
+                                                background: '#fff8e1', borderLeft: '3px solid #F9A825',
+                                                padding: '4px 8px', borderRadius: 3,
+                                            }}>
+                                                <strong>Rescheduled:</strong> {followUp.reschedule_reason}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -705,6 +714,15 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                                                         <strong>Closure:</strong> {f.completion_reason}
                                                                     </div>
                                                                 )}
+                                                                {f?.reschedule_reason && (
+                                                                    <div style={{
+                                                                        marginTop: 4, fontSize: 11, color: '#8a5a00',
+                                                                        background: '#fff8e1', borderLeft: '3px solid #F9A825',
+                                                                        padding: '4px 8px', borderRadius: 3,
+                                                                    }}>
+                                                                        <strong>Rescheduled:</strong> {f.reschedule_reason}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     );
@@ -759,7 +777,18 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                                         >
                                             <div style={{ fontSize: 13 }}>{fmt(f.next_action_datetime)}</div>
                                             <div style={{ fontSize: 12, textTransform: 'uppercase', color: '#666' }}>{f.status || ''}</div>
-                                            <div style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>{f.comment || f.notes || '-'}</div>
+                                            <div>
+                                                <div style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>{f.comment || f.notes || '-'}</div>
+                                                {f.reschedule_reason && (
+                                                    <div style={{
+                                                        marginTop: 4, fontSize: 11, color: '#8a5a00',
+                                                        background: '#fff8e1', borderLeft: '3px solid #F9A825',
+                                                        padding: '4px 8px', borderRadius: 3,
+                                                    }}>
+                                                        <strong>Rescheduled:</strong> {f.reschedule_reason}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

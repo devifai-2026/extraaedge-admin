@@ -175,7 +175,8 @@ export const followUpsApi = {
   create: (body) => api.post('/follow-ups', body),
   update: (id, body, ifMatch) => api.put(`/follow-ups/${id}`, body, ifMatch),
   complete: (id, reason) => api.post(`/follow-ups/${id}/complete`, reason ? { completion_reason: reason } : {}),
-  reschedule: (id, next_action_datetime) => api.post(`/follow-ups/${id}/reschedule`, { next_action_datetime }),
+  reschedule: (id, next_action_datetime, reschedule_reason) =>
+    api.post(`/follow-ups/${id}/reschedule`, reschedule_reason ? { next_action_datetime, reschedule_reason } : { next_action_datetime }),
   // Cancel keeps the row (status='cancelled') so reports + timeline see it.
   // Use delete for hard-removal.
   cancel: (id, reason) => api.post(`/follow-ups/${id}/cancel`, reason ? { reason } : {}),
