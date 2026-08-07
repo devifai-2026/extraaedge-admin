@@ -399,9 +399,31 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
         let alive = true;
         setHydrating(true);
         leadsApi.get(leadData.id)
-            .then((r) => {
+            .then(async (r) => {
                 if (!alive) return;
                 const lead = r?.data || {};
+                // The list/get endpoints mask phone-like fields for everyone
+                // except super_admin (see server lib/leadMasking.js). Editing
+                // needs the real value — both so the form isn't blank/garbled,
+                // and so saving without touching the field can't round-trip
+                // the masked placeholder back as if it were the real number
+                // (the server also guards against that, but the form should
+                // never show a fake value as if it were real in the first
+                // place). Only reveals when a field actually looks masked.
+                const masked = ['phone', 'whatsapp_number', 'alternate_contact'].filter(
+                    (f) => typeof lead[f] === 'string' && lead[f].includes('•'),
+                );
+                if (masked.length) {
+                    try {
+                        const real = await leadsApi.revealPhone(lead.id);
+                        Object.assign(lead, real?.data || {});
+                    } catch {
+                        // Reveal is best-effort here — if it fails, the field
+                        // simply stays masked and the save-guard on the
+                        // backend keeps it from being overwritten.
+                    }
+                }
+                if (!alive) return;
                 setFreshLead(lead);
                 const family = lead.family || {};
                 const primarySource = (lead.sources || [])[0] || {};

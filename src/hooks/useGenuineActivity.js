@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 // Real mouse/keyboard/touch/scroll interaction, as a heuristic for "someone
 // is actually at the keyboard" — deliberately NOT satisfied by a single
@@ -38,15 +38,21 @@ export function useGenuineActivity() {
 
   // Call right before each heartbeat. Returns whether the interaction since
   // the last call looks like a real work pattern, then resets the window.
-  const consumeGenuine = () => {
+  // Memoized (stable identity across renders) — WorkTimer's heartbeat effect
+  // lists this in its dependency array, and WorkTimer re-renders every
+  // second (its own activeSeconds tick), so an unmemoized function here
+  // would re-run that effect every second, resetting its internal 60s timer
+  // before it could ever fire. This is why "genuine" activity never
+  // recorded anything before this fix — the heartbeat itself never fired.
+  const consumeGenuine = useCallback(() => {
     const w = windowRef.current;
     const hasSpread = w.firstAt != null && (w.lastAt - w.firstAt) >= MIN_SPREAD_MS;
     const genuine = w.types.size >= 2 && w.count >= MIN_EVENT_COUNT && hasSpread;
     windowRef.current = { types: new Set(), count: 0, firstAt: null, lastAt: null };
     return genuine;
-  };
+  }, []);
 
-  const msSinceLastActivity = () => Date.now() - lastActivityAtRef.current;
+  const msSinceLastActivity = useCallback(() => Date.now() - lastActivityAtRef.current, []);
 
   return { consumeGenuine, msSinceLastActivity };
 }
