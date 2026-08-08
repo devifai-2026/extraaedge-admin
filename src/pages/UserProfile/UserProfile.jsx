@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box, Avatar, Typography, Chip, Tabs, Tab, IconButton, CircularProgress,
-  Table, TableHead, TableRow, TableCell, TableBody, Tooltip, Button, Menu, MenuItem,
+  Table, TableHead, TableRow, TableCell, TableBody, Tooltip, Button, Menu, MenuItem, TextField,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EmailIcon from '@mui/icons-material/Email';
@@ -74,6 +74,16 @@ export default function UserProfile() {
   const [downloadAnchor, setDownloadAnchor] = useState(null);
   const [rangeKey, setRangeKey] = useState('30d');
   const range = RANGES.find((r) => r.key === rangeKey) || RANGES[3];
+  // An explicit calendar range (date pickers) is a separate axis from the
+  // 6h/24h/7d/30d/lifetime presets, not another preset — picking specific
+  // dates means exactly that window, so it overrides rangeKey below rather
+  // than trying to express "1 Jul to 5 Jul" as an hours lookback.
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const customActive = Boolean(customFrom && customTo);
+  // What the KPI labels below show as "(...)" — the preset label normally,
+  // or the actual picked dates once a custom range is in effect.
+  const rangeLabel = customActive ? `${fmtDate(customFrom)}–${fmtDate(customTo)}` : range.label;
 
   // Tab data buckets
   const [currentLeads, setCurrentLeads] = useState([]);
@@ -113,17 +123,28 @@ export default function UserProfile() {
   }, [id]);
 
   // Everything else is time-ranged — re-fetches whenever the 6h/24h/7d/30d/
-  // lifetime filter changes.
+  // lifetime filter changes, OR whenever a custom date range is applied
+  // (which takes precedence — see customActive below).
   useEffect(() => {
     if (!id) return;
     let alive = true;
     setLoadingTab(true);
-    const hours = range.hours;
+    const timeParams = customActive
+      ? { date_from: `${customFrom}T00:00:00`, date_to: `${customTo}T23:59:59` }
+      : { hours: range.hours };
+    // The daily-aggregate chart endpoint only understands a day-count
+    // lookback, not an absolute range — approximate it from the custom
+    // span's width. Only distinctLoginDays (one KPI number) reads this, so
+    // an approximation here doesn't affect the Time Sheet / Login Activity
+    // tabs or the map, which all use timeParams directly.
+    const aggDays = customActive
+      ? Math.max(1, Math.ceil((new Date(customTo) - new Date(customFrom)) / 86_400_000) + 1)
+      : Math.max(1, Math.ceil(range.hours / 24));
     Promise.all([
-      usersApi.workSessions(id, { hours }).then((r) => r?.data || []).catch(() => []),
-      usersApi.loginEvents(id, { hours }).then((r) => r?.data || []).catch(() => []),
-      analyticsApi.loginEvents({ user_id: id, days: Math.max(1, Math.ceil(hours / 24)) }).then((r) => r?.data || []).catch(() => []),
-      usersApi.activitySummary(id, { hours }).then((r) => r?.data || null).catch(() => null),
+      usersApi.workSessions(id, timeParams).then((r) => r?.data || []).catch(() => []),
+      usersApi.loginEvents(id, timeParams).then((r) => r?.data || []).catch(() => []),
+      analyticsApi.loginEvents({ user_id: id, days: aggDays }).then((r) => r?.data || []).catch(() => []),
+      usersApi.activitySummary(id, timeParams).then((r) => r?.data || null).catch(() => null),
     ]).then(([ws, le, agg, activity]) => {
       if (!alive) return;
       setSessions(ws);
@@ -132,7 +153,7 @@ export default function UserProfile() {
       setActivitySummary(activity);
     }).finally(() => { if (alive) setLoadingTab(false); });
     return () => { alive = false; };
-  }, [id, range.hours]);
+  }, [id, range.hours, customActive, customFrom, customTo]);
 
   const totalActiveSeconds = useMemo(
     () => sessions.reduce((sum, s) => sum + (s.active_seconds ?? (s.active_minutes ?? 0) * 60), 0),
@@ -230,39 +251,59 @@ export default function UserProfile() {
       </Box>
 
       {/* Time-range filter — everything below except Current/Past leads
-          (those are present-state, not history) re-fetches on change. */}
-      <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
+          (those are present-state, not history) re-fetches on change.
+          Presets and the custom date range are mutually exclusive: picking
+          a preset clears any custom range, and vice versa, so it's always
+          obvious which one is actually in effect. */}
+      <Box sx={{ display: 'flex', gap: 1, mb: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
         {RANGES.map((r) => (
           <Button
             key={r.key}
             size="small"
-            variant={r.key === rangeKey ? 'contained' : 'outlined'}
-            onClick={() => setRangeKey(r.key)}
+            variant={!customActive && r.key === rangeKey ? 'contained' : 'outlined'}
+            onClick={() => { setRangeKey(r.key); setCustomFrom(''); setCustomTo(''); }}
             sx={{ textTransform: 'none', minWidth: 0, px: 1.5 }}
           >
             {r.label}
           </Button>
         ))}
+        <Typography sx={{ color: '#bbb', fontSize: 13, mx: 0.5 }}>or</Typography>
+        <TextField
+          type="date" size="small" label="From" InputLabelProps={{ shrink: true }}
+          value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
+          sx={{ width: 150 }}
+        />
+        <TextField
+          type="date" size="small" label="To" InputLabelProps={{ shrink: true }}
+          value={customTo} onChange={(e) => setCustomTo(e.target.value)}
+          inputProps={{ min: customFrom || undefined }}
+          sx={{ width: 150 }}
+        />
+        {customActive && (
+          <Button size="small" onClick={() => { setCustomFrom(''); setCustomTo(''); }} sx={{ textTransform: 'none' }}>
+            Clear
+          </Button>
+        )}
       </Box>
 
       {/* KPI strip */}
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
         <Kpi label="Current leads" value={currentLeads.length} accent="#E53935" />
         <Kpi label="Past leads" value={pastLeads.length} accent="#FB8C00" />
-        <Kpi label={`Login days (${range.label})`} value={distinctLoginDays} accent="#1E88E5" />
-        <Kpi label={`Active time (${range.label})`} value={fmtDuration(totalActiveSeconds)} accent="#43A047" />
+        <Kpi label={`Login days (${rangeLabel})`} value={distinctLoginDays} accent="#1E88E5" />
+        <Kpi label={`Active time (${rangeLabel})`} value={fmtDuration(totalActiveSeconds)} accent="#43A047" />
         <Kpi
-          label={`Genuine activity (${range.label})`}
+          label={`Genuine activity (${rangeLabel})`}
           value={genuinePct == null ? '—' : `${genuinePct}%`}
           accent={genuinePct != null && genuinePct < 50 ? '#dc2626' : '#00897B'}
         />
         <Kpi
-          label={`Forgot to clock out (${range.label})`}
+          label={`Forgot to clock out (${rangeLabel})`}
           value={autoClosedCount}
           accent={autoClosedCount > 0 ? '#dc2626' : '#8E24AA'}
         />
         <Kpi
-          label={`Leads created/assigned (${range.label})`}
+          label={`Leads created/assigned (${rangeLabel})`}
           value={(activitySummary?.leads_created_total ?? 0) + (activitySummary?.leads_assigned_by_system ?? 0)}
           accent="#00838F"
           hint={activitySummary
@@ -270,7 +311,7 @@ export default function UserProfile() {
             : ''}
         />
         <Kpi
-          label={`Lead activity (${range.label})`}
+          label={`Lead activity (${rangeLabel})`}
           value={activitySummary?.lead_activity_count ?? 0}
           accent="#6D4C41"
           hint="Stage moves + any other lead activity logged for this user"

@@ -22,6 +22,7 @@ import { leadsApi, usersApi } from "../../lib/endpoints";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import FacebookIcon from '@mui/icons-material/Facebook';
 import StorefrontIcon from '@mui/icons-material/Storefront';
+import LanguageIcon from '@mui/icons-material/Language';
 import WhatsappModal from "../WhatsApp/WhatsApp"
 import SavedList from "../SavedList/SavedList";
 
@@ -51,6 +52,33 @@ const SORT_OPTIONS = [
     { key: 'last_activity_desc', label: 'Last Activity' },
     { key: 'score_desc',         label: 'Lead Score' },
 ];
+
+// One shared shape for every quick origin-filter pill (WhatsApp / Facebook /
+// JustDial / Website / Not-updated) so they read as a single cohesive
+// segmented group instead of five buttons each styled slightly differently.
+// Pill radius + fixed height + the same hover/active treatment everywhere;
+// only the brand color changes per-button.
+const pillFilterSx = (active, brand) => ({
+    textTransform: 'none',
+    fontSize: 12.5,
+    fontWeight: 600,
+    height: 32,
+    borderRadius: '999px',
+    px: 1.5,
+    boxShadow: active ? `0 1px 4px ${brand}55` : 'none',
+    transition: 'background-color .15s, border-color .15s, box-shadow .15s',
+    ...(active
+        ? { background: brand, color: '#fff', border: `1px solid ${brand}`, '&:hover': { background: brand, filter: 'brightness(0.94)' } }
+        : { color: brand, border: `1px solid ${brand}40`, background: `${brand}0d`, '&:hover': { border: `1px solid ${brand}`, background: `${brand}1a` } }),
+});
+
+// Same treatment for the round icon-only actions in the second cluster —
+// a soft tinted circle on hover instead of the bare, ungrouped icons.
+const iconBtnSx = {
+    width: 34, height: 34, borderRadius: '10px',
+    transition: 'background-color .15s',
+    '&:hover': { background: 'rgba(0,0,0,0.045)' },
+};
 
 const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onReassignSelected, onReassignAll, onBulkDelete, sort, onSortChange, advancedFilter, onApplyFilter, onResetFilter, viewMode = 'card', onViewModeChange, unassignedCount = 0, searchQuery = '', onSearchQueryChange, exportFilter }) => {
     // Auto-assign button is for super-admin and sales-manager only —
@@ -165,192 +193,159 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
         onSortChange?.(key);
     };
 
+    // Origin pills share one config-driven list so adding a future channel
+    // (or reordering these) is a one-line change instead of copy-pasting a
+    // whole Tooltip+Button block again.
+    const originFilters = [
+        { key: 'whatsapp', label: 'WhatsApp', icon: <WhatsAppIcon fontSize="small" />, brand: '#25D366' },
+        { key: 'facebook', label: 'Facebook', icon: <FacebookIcon fontSize="small" />, brand: '#1877F2' },
+        { key: 'justdial', label: 'JustDial', icon: <StorefrontIcon fontSize="small" />, brand: '#F26722' },
+        { key: 'website',  label: 'Website',  icon: <LanguageIcon fontSize="small" />,  brand: '#5C6BC0' },
+    ];
+
     return (
         <>
-            <div className="raw-data-manager-bottomcontainer">
+            <div className="raw-data-manager-bottomcontainer filters-toolbar">
                 <div className="raw-data-manager-bottomcontainer-content">
 
-                    <IconButton
-                        size="small"
-                        onClick={(e) => {
-                            setAnchorEl(e.currentTarget);
-                            setOpenSort(true);
-                        }}
-                    >
-                        <SwapVertIcon sx={{ color: colors.primary, cursor: "pointer" }} />
-                    </IconButton>
-
-                    {/* In-table search bar — narrows the current stage
-                        tab + advanced filter by name / email / phone /
-                        WhatsApp. Wires up via onSearchQueryChange so the
-                        parent owns the debouncing + API call. Only shows
-                        when the parent passes a handler so other
-                        consumers of FiltersOptions (RawData, FailedLeads)
-                        keep their current shape. */}
-                    {typeof onSearchQueryChange === 'function' && (
-                        <Box
-                            sx={{
-                                display: 'flex', alignItems: 'center', gap: 0.5,
-                                border: `1px solid ${colors.borderGrey}`,
-                                borderRadius: 1,
-                                px: 1, py: 0.25,
-                                background: '#fff',
-                                minWidth: 220,
-                                ml: 0.5,
-                                '&:focus-within': { borderColor: colors.primary },
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', flex: 1 }}>
+                        <IconButton
+                            size="small"
+                            sx={iconBtnSx}
+                            onClick={(e) => {
+                                setAnchorEl(e.currentTarget);
+                                setOpenSort(true);
                             }}
                         >
-                            <SearchIcon sx={{ fontSize: 18, color: colors.midGrey }} />
-                            <InputBase
-                                value={searchQuery}
-                                onChange={(e) => onSearchQueryChange(e.target.value)}
-                                placeholder="Search by name, email, phone…"
-                                sx={{ fontSize: 13, flex: 1, ml: 0.5 }}
-                                inputProps={{ 'aria-label': 'Search leads in current view' }}
-                            />
-                            {searchQuery && (
-                                <IconButton
+                            <SwapVertIcon sx={{ color: colors.primary, cursor: "pointer" }} fontSize="small" />
+                        </IconButton>
+
+                        {/* In-table search bar — narrows the current stage
+                            tab + advanced filter by name / email / phone /
+                            WhatsApp. Wires up via onSearchQueryChange so the
+                            parent owns the debouncing + API call. Only shows
+                            when the parent passes a handler so other
+                            consumers of FiltersOptions (RawData, FailedLeads)
+                            keep their current shape. */}
+                        {typeof onSearchQueryChange === 'function' && (
+                            <Box
+                                sx={{
+                                    display: 'flex', alignItems: 'center', gap: 0.5,
+                                    border: `1px solid ${colors.borderGrey}`,
+                                    borderRadius: '10px',
+                                    px: 1.25, height: 34,
+                                    background: '#fff',
+                                    minWidth: 220,
+                                    transition: 'border-color .15s, box-shadow .15s',
+                                    '&:focus-within': { borderColor: colors.primary, boxShadow: `0 0 0 3px ${colors.primary}1a` },
+                                }}
+                            >
+                                <SearchIcon sx={{ fontSize: 18, color: colors.midGrey }} />
+                                <InputBase
+                                    value={searchQuery}
+                                    onChange={(e) => onSearchQueryChange(e.target.value)}
+                                    placeholder="Search by name, email, phone…"
+                                    sx={{ fontSize: 13, flex: 1, ml: 0.5 }}
+                                    inputProps={{ 'aria-label': 'Search leads in current view' }}
+                                />
+                                {searchQuery && (
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => onSearchQueryChange('')}
+                                        aria-label="Clear search"
+                                        sx={{ p: 0.25 }}
+                                    >
+                                        <CloseIcon sx={{ fontSize: 16, color: colors.midGrey }} />
+                                    </IconButton>
+                                )}
+                            </Box>
+                        )}
+
+                        {/* Quick origin filters — one-click toggles that write
+                            lead_origin into the advanced filter so they layer
+                            with the stage tab + search. Only shown when the
+                            parent wires onApplyFilter (LeadList does). Styled
+                            as one segmented pill-group (pillFilterSx) instead
+                            of four independently-styled buttons. */}
+                        {typeof onApplyFilter === 'function' && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                                {originFilters.map(({ key, label, icon, brand }) => {
+                                    const active = advancedFilter?.lead_origin === key;
+                                    return (
+                                        <Tooltip
+                                            key={key}
+                                            title={active ? `Showing only ${label} leads — click to clear` : `Show only leads that came in via ${label}`}
+                                        >
+                                            <Button
+                                                size="small"
+                                                startIcon={icon}
+                                                onClick={() => {
+                                                    const next = { ...(advancedFilter || {}) };
+                                                    if (next.lead_origin === key) delete next.lead_origin;
+                                                    else next.lead_origin = key;
+                                                    onApplyFilter(next);
+                                                }}
+                                                sx={pillFilterSx(active, brand)}
+                                            >
+                                                {label}
+                                            </Button>
+                                        </Tooltip>
+                                    );
+                                })}
+                            </Box>
+                        )}
+
+                        {/* "Not updated" (stale) report — super_admin/managers.
+                            Opens a dialog for a date window + counsellor scope and
+                            filters to leads with no activity/follow-up in it. */}
+                        {canStaleReport && typeof onApplyFilter === 'function' && (
+                            <Tooltip title="Find stale leads — not touched (no activity/update) since a chosen date">
+                                <Button
                                     size="small"
-                                    onClick={() => onSearchQueryChange('')}
-                                    aria-label="Clear search"
-                                    sx={{ p: 0.25 }}
+                                    startIcon={<HistoryToggleOffIcon fontSize="small" />}
+                                    onClick={() => {
+                                        // Seed dialog from any active stale filter.
+                                        setStaleSince((advancedFilter?.no_activity_from || '').slice(0, 10));
+                                        setStaleCounsellor(advancedFilter?.assigned_to || '');
+                                        setOpenStale(true);
+                                    }}
+                                    sx={pillFilterSx(Boolean(advancedFilter?.no_activity_from), colors.primary)}
                                 >
-                                    <CloseIcon sx={{ fontSize: 16, color: colors.midGrey }} />
-                                </IconButton>
-                            )}
-                        </Box>
-                    )}
+                                    Not updated
+                                </Button>
+                            </Tooltip>
+                        )}
+                    </Box>
 
-                    {/* Quick origin filter — one-click toggle for WhatsApp leads.
-                        Writes lead_origin into the advanced filter so it layers
-                        with the stage tab + search. Only shown when the parent
-                        wires onApplyFilter (LeadList does). */}
-                    {typeof onApplyFilter === 'function' && (
-                        <Tooltip title={advancedFilter?.lead_origin === 'whatsapp'
-                            ? 'Showing only WhatsApp leads — click to clear'
-                            : 'Show only leads that came in via WhatsApp'}>
-                            <Button
-                                size="small"
-                                variant={advancedFilter?.lead_origin === 'whatsapp' ? 'contained' : 'outlined'}
-                                startIcon={<WhatsAppIcon fontSize="small" />}
-                                onClick={() => {
-                                    const next = { ...(advancedFilter || {}) };
-                                    if (next.lead_origin === 'whatsapp') delete next.lead_origin;
-                                    else next.lead_origin = 'whatsapp';
-                                    onApplyFilter(next);
-                                }}
-                                sx={{
-                                    textTransform: 'none', fontSize: 12, ml: 0.5,
-                                    ...(advancedFilter?.lead_origin === 'whatsapp'
-                                        ? { background: '#25D366', color: '#fff', '&:hover': { background: '#1da851' } }
-                                        : { color: '#25D366', borderColor: '#25D366', '&:hover': { borderColor: '#1da851', background: '#f0fff6' } }),
-                                }}
-                            >
-                                WhatsApp
-                            </Button>
-                        </Tooltip>
-                    )}
-
-                    {/* Quick origin filter — one-click toggle for Facebook leads. */}
-                    {typeof onApplyFilter === 'function' && (
-                        <Tooltip title={advancedFilter?.lead_origin === 'facebook'
-                            ? 'Showing only Facebook leads — click to clear'
-                            : 'Show only leads that came in via Facebook'}>
-                            <Button
-                                size="small"
-                                variant={advancedFilter?.lead_origin === 'facebook' ? 'contained' : 'outlined'}
-                                startIcon={<FacebookIcon fontSize="small" />}
-                                onClick={() => {
-                                    const next = { ...(advancedFilter || {}) };
-                                    if (next.lead_origin === 'facebook') delete next.lead_origin;
-                                    else next.lead_origin = 'facebook';
-                                    onApplyFilter(next);
-                                }}
-                                sx={{
-                                    textTransform: 'none', fontSize: 12, ml: 0.5,
-                                    ...(advancedFilter?.lead_origin === 'facebook'
-                                        ? { background: '#1877F2', color: '#fff', '&:hover': { background: '#145dbf' } }
-                                        : { color: '#1877F2', borderColor: '#1877F2', '&:hover': { borderColor: '#145dbf', background: '#f0f6ff' } }),
-                                }}
-                            >
-                                Facebook
-                            </Button>
-                        </Tooltip>
-                    )}
-
-                    {/* Quick origin filter — one-click toggle for JustDial leads. */}
-                    {typeof onApplyFilter === 'function' && (
-                        <Tooltip title={advancedFilter?.lead_origin === 'justdial'
-                            ? 'Showing only JustDial leads — click to clear'
-                            : 'Show only leads that came in via JustDial'}>
-                            <Button
-                                size="small"
-                                variant={advancedFilter?.lead_origin === 'justdial' ? 'contained' : 'outlined'}
-                                startIcon={<StorefrontIcon fontSize="small" />}
-                                onClick={() => {
-                                    const next = { ...(advancedFilter || {}) };
-                                    if (next.lead_origin === 'justdial') delete next.lead_origin;
-                                    else next.lead_origin = 'justdial';
-                                    onApplyFilter(next);
-                                }}
-                                sx={{
-                                    textTransform: 'none', fontSize: 12, ml: 0.5,
-                                    ...(advancedFilter?.lead_origin === 'justdial'
-                                        ? { background: '#F26722', color: '#fff', '&:hover': { background: '#d4551a' } }
-                                        : { color: '#F26722', borderColor: '#F26722', '&:hover': { borderColor: '#d4551a', background: '#fff5ef' } }),
-                                }}
-                            >
-                                JustDial
-                            </Button>
-                        </Tooltip>
-                    )}
-
-                    {/* "Not updated" (stale) report — super_admin/managers.
-                        Opens a dialog for a date window + counsellor scope and
-                        filters to leads with no activity/follow-up in it. */}
-                    {canStaleReport && typeof onApplyFilter === 'function' && (
-                        <Tooltip title="Find stale leads — not touched (no activity/update) since a chosen date">
-                            <Button
-                                size="small"
-                                variant={advancedFilter?.no_activity_from ? 'contained' : 'outlined'}
-                                startIcon={<HistoryToggleOffIcon fontSize="small" />}
-                                onClick={() => {
-                                    // Seed dialog from any active stale filter.
-                                    setStaleSince((advancedFilter?.no_activity_from || '').slice(0, 10));
-                                    setStaleCounsellor(advancedFilter?.assigned_to || '');
-                                    setOpenStale(true);
-                                }}
-                                sx={{
-                                    textTransform: 'none', fontSize: 12, ml: 0.5,
-                                    ...(advancedFilter?.no_activity_from
-                                        ? { background: colors.primary, color: '#fff' }
-                                        : { color: colors.primary, borderColor: colors.primary }),
-                                }}
-                            >
-                                Not updated
-                            </Button>
-                        </Tooltip>
-                    )}
-
-                    <Box sx={{ display: "flex", gap: 1 }}>
+                    <Box sx={{ display: "flex", alignItems: 'center', gap: 0.5 }}>
 
                         {/* GROUP / bulk-reassign opener — hidden for counsellors
                             who cannot reassign leads. Server enforces the same
                             scope on POST /lead-assignments. */}
                         {!isRole(ROLES.COUNSELLOR) && (
-                            <IconButton size="small" onClick={() => setOpenAssign(true)}>
-                                <GroupIcon sx={{ color: colors.primary }} />
-                            </IconButton>
+                            <Tooltip title="Reassign leads">
+                                <IconButton size="small" sx={iconBtnSx} onClick={() => setOpenAssign(true)}>
+                                    <GroupIcon fontSize="small" sx={{ color: colors.primary }} />
+                                </IconButton>
+                            </Tooltip>
                         )}
 
                         {/* WHATSAPP MODAL */}
-                        <IconButton size="small" onClick={() => setOpenWhatsapp(true)}>
-                            <WhatsAppIcon sx={{ color: colors.primary }} />
-                        </IconButton>
+                        <Tooltip title="Send a WhatsApp message">
+                            <IconButton size="small" sx={iconBtnSx} onClick={() => setOpenWhatsapp(true)}>
+                                <WhatsAppIcon fontSize="small" sx={{ color: colors.primary }} />
+                            </IconButton>
+                        </Tooltip>
 
-                        <IconButton size="small" onClick={handleRefresh}>
-                            <RefreshIcon sx={{ color: colors.primary }} />
-                        </IconButton>
+                        <Tooltip title="Refresh">
+                            <IconButton size="small" sx={iconBtnSx} onClick={handleRefresh}>
+                                <RefreshIcon fontSize="small" sx={{ color: colors.primary }} />
+                            </IconButton>
+                        </Tooltip>
+
+                        {(canAutoAssign || canBulkDelete || canExport) && (
+                            <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.75, borderColor: colors.borderGrey }} />
+                        )}
 
                         {canAutoAssign && (
                             <Tooltip title={
@@ -361,18 +356,12 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                                 <span>
                                     <Button
                                         size="small"
-                                        variant="outlined"
                                         startIcon={autoAssigning
                                             ? <CircularProgress size={14} sx={{ color: colors.primary }} />
                                             : <AutoFixHighIcon fontSize="small" />}
                                         onClick={handleAutoAssign}
                                         disabled={autoAssigning || unassignedCount === 0}
-                                        sx={{
-                                            textTransform: 'none', fontSize: 12,
-                                            color: colors.primary, borderColor: colors.primary,
-                                            ml: 0.5,
-                                            '&:hover': { borderColor: colors.primary, background: '#fff7f7' },
-                                        }}
+                                        sx={pillFilterSx(false, colors.primary)}
                                     >
                                         {autoAssigning ? 'Assigning…' : 'Auto-assign'}
                                         {unassignedCount > 0 && !autoAssigning ? ` (${unassignedCount})` : ''}
@@ -390,15 +379,10 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                                 <span>
                                     <Button
                                         size="small"
-                                        variant="outlined"
-                                        color="error"
                                         startIcon={<DeleteOutlineIcon fontSize="small" />}
                                         onClick={() => setOpenDeleteConfirm(true)}
                                         disabled={selectedCount === 0 || deleting}
-                                        sx={{
-                                            textTransform: 'none', fontSize: 12, ml: 0.5,
-                                            '&:hover': { background: '#fdecea' },
-                                        }}
+                                        sx={pillFilterSx(false, '#d32f2f')}
                                     >
                                         Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
                                     </Button>
@@ -411,17 +395,12 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                                 <span>
                                     <Button
                                         size="small"
-                                        variant="outlined"
                                         startIcon={exporting
                                             ? <CircularProgress size={14} sx={{ color: colors.primary }} />
                                             : <FileDownloadIcon fontSize="small" />}
                                         onClick={handleExport}
                                         disabled={exporting}
-                                        sx={{
-                                            textTransform: 'none', fontSize: 12, ml: 0.5,
-                                            color: colors.primary, borderColor: colors.primary,
-                                            '&:hover': { borderColor: colors.primary, background: '#fff7f7' },
-                                        }}
+                                        sx={pillFilterSx(false, colors.primary)}
                                     >
                                         {exporting ? 'Exporting…' : 'Download CSV'}
                                     </Button>
@@ -429,22 +408,26 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                             </Tooltip>
                         )}
 
+                        <Divider orientation="vertical" flexItem sx={{ mx: 0.5, my: 0.75, borderColor: colors.borderGrey }} />
+
                         <Tooltip title={viewMode === 'table' ? 'Switch to card view' : 'Switch to table view'}>
                             <IconButton
                                 size="small"
                                 onClick={() => onViewModeChange?.(viewMode === 'table' ? 'card' : 'table')}
-                                sx={{ background: viewMode === 'table' ? '#fdecea' : 'transparent' }}
+                                sx={{ ...iconBtnSx, background: viewMode === 'table' ? `${colors.primary}14` : 'transparent' }}
                             >
                                 {viewMode === 'table'
-                                    ? <ViewModuleIcon sx={{ color: colors.primary }} />
-                                    : <ViewListIcon sx={{ color: colors.primary }} />
+                                    ? <ViewModuleIcon fontSize="small" sx={{ color: colors.primary }} />
+                                    : <ViewListIcon fontSize="small" sx={{ color: colors.primary }} />
                                 }
                             </IconButton>
                         </Tooltip>
 
-                        <IconButton size="small" onClick={() => setOpenFilter(true)}>
-                            <FilterAltIcon sx={{ color: colors.primary }} />
-                        </IconButton>
+                        <Tooltip title="More filters">
+                            <IconButton size="small" sx={iconBtnSx} onClick={() => setOpenFilter(true)}>
+                                <FilterAltIcon fontSize="small" sx={{ color: colors.primary }} />
+                            </IconButton>
+                        </Tooltip>
                     </Box>
                 </div>
             </div>

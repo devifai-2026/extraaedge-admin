@@ -191,6 +191,8 @@ export default function QaReviewQueue() {
   const [branches, setBranches] = useState([]);
   const [counsellorId, setCounsellorId] = useState('');
   const [branchId, setBranchId] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [reviewFor, setReviewFor] = useState(null);
 
   useEffect(() => {
@@ -201,7 +203,10 @@ export default function QaReviewQueue() {
         branchesApi.list().catch(() => ({ data: [] })),
       ]);
       setParameters(params?.data || []);
-      setCounsellors(users?.data || []);
+      // usersApi.options() returns EVERY active user regardless of role (it
+      // backs many generic pickers app-wide) — narrow to counsellors here so
+      // this specific filter doesn't also offer super_admin/branch_manager/etc.
+      setCounsellors((users?.data || []).filter((u) => u.role === 'counsellor'));
       setBranches(brs?.data || []);
     })();
   }, []);
@@ -213,6 +218,8 @@ export default function QaReviewQueue() {
         status, page, limit: PAGE_SIZE,
         counsellor_id: counsellorId || undefined,
         branch_id: branchId || undefined,
+        date_from: dateFrom ? `${dateFrom}T00:00:00` : undefined,
+        date_to: dateTo ? `${dateTo}T23:59:59` : undefined,
       });
       setRows(Array.isArray(r?.data) ? r.data : []);
       setTotal(Number(r?.meta?.total) || 0);
@@ -221,7 +228,7 @@ export default function QaReviewQueue() {
     } finally {
       setLoading(false);
     }
-  }, [status, page, counsellorId, branchId]);
+  }, [status, page, counsellorId, branchId, dateFrom, dateTo]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -265,6 +272,23 @@ export default function QaReviewQueue() {
           onChange={(_e, opt) => { setBranchId(opt?.id || ''); setPage(1); }}
           renderInput={(p) => <TextField {...p} label="Branch" placeholder="All branches" />}
         />
+        <TextField
+          label="From" type="date" size="small" sx={{ minWidth: 160 }}
+          InputLabelProps={{ shrink: true }}
+          value={dateFrom}
+          onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+        />
+        <TextField
+          label="To" type="date" size="small" sx={{ minWidth: 160 }}
+          InputLabelProps={{ shrink: true }}
+          value={dateTo}
+          onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+        />
+        {(dateFrom || dateTo) && (
+          <Button size="small" onClick={() => { setDateFrom(''); setDateTo(''); setPage(1); }} sx={{ textTransform: 'none' }}>
+            Clear dates
+          </Button>
+        )}
       </div>
 
       {error && <div style={{ color: '#d32f2f', marginBottom: 12 }}>{error}</div>}
