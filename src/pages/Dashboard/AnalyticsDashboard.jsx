@@ -16,6 +16,7 @@ import {
   PieChart, Pie,
 } from 'recharts';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import CloseIcon from '@mui/icons-material/Close';
@@ -33,6 +34,15 @@ const ROLES = {
 };
 
 const STAGE_PALETTE = ['#E53935', '#FB8C00', '#FDD835', '#43A047', '#1E88E5', '#5E35B1', '#00897B', '#8D6E63', '#3949AB'];
+
+// Gold / silver / bronze for the leaderboard's top 3; rank 4+ stays plain grey.
+const RANK_COLORS = { 1: '#D4AF37', 2: '#9CA3AF', 3: '#B87333' };
+// 'YYYY-MM' -> 'August 2026', for the leaderboard's month tabs.
+const monthLabel = (ym) => {
+  const [y, m] = String(ym).split('-').map(Number);
+  if (!y || !m) return ym;
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+};
 
 const fmtDate = (d) => {
   if (!d) return '';
@@ -165,6 +175,11 @@ export default function AnalyticsDashboard() {
   const [leadOrigin, setLeadOrigin] = useState(null);
   const [programStatus, setProgramStatus] = useState([]);
   const [perfTeam, setPerfTeam] = useState([]);
+  // Counsellor leaderboard: who's moved the most leads into a success stage.
+  // Fixed windows (rolling 30d + calendar months) rather than the page's own
+  // date-range picker — a leaderboard means "this month vs last month", not
+  // whatever ad-hoc range someone else picked for the rest of the page.
+  const [leaderboard, setLeaderboard] = useState({ last_30_days: [], months: [] });
   const [myFollowups, setMyFollowups] = useState([]);
   const [myLeadsToday, setMyLeadsToday] = useState(0);
   // Tenant-wide admission state + dashboard sub-cards for admin/manager.
@@ -183,9 +198,11 @@ export default function AnalyticsDashboard() {
   const [loading, setLoading] = useState({
     summary: true, funnel: true, timeline: true, programWise: true,
     channelSource: true, programStatus: true, perfTeam: true,
-    admissions: true,
+    admissions: true, leaderboard: true,
   });
   const [openSummaryModal, setOpenSummaryModal] = useState(false);
+  // Which leaderboard window is showing: '30d' or a 'YYYY-MM' month key.
+  const [leaderboardTab, setLeaderboardTab] = useState('30d');
   const [lastSynced, setLastSynced] = useState(new Date());
 
   // ---- Counsellor list for the picker (admin = all, manager = team) ----
@@ -299,6 +316,12 @@ export default function AnalyticsDashboard() {
         .then((r) => setPerfTeam(r?.data || []))
         .catch(() => setPerfTeam([]))
         .finally(() => flag('perfTeam', false));
+
+      flag('leaderboard', true);
+      analyticsApi.leaderboard()
+        .then((r) => setLeaderboard(r?.data || { last_30_days: [], months: [] }))
+        .catch(() => setLeaderboard({ last_30_days: [], months: [] }))
+        .finally(() => flag('leaderboard', false));
     }
 
     if (isCounsellor) {
@@ -1054,11 +1077,14 @@ export default function AnalyticsDashboard() {
         </Box>
       )}
 
-      {/* ============ COUNSELLOR LEADERBOARD (manager + admin) ============ */}
+      {/* ============ COUNSELLOR PERFORMANCE TABLE (manager + admin) ============
+          Detailed side-by-side comparison (assigned/converted/calls/messages).
+          The ranked, medal-style Leaderboard lives in its own section below —
+          this table stays for the fuller multi-metric breakdown. */}
       {!isCounsellor && (
         <Box sx={{ mt: 2 }}>
           <ChartCard
-            title={isManager ? 'My team — counsellor performance' : 'Counsellor leaderboard'}
+            title="Counsellor performance"
             loading={loading.perfTeam}
             lastSynced={lastSynced}
             onRefresh={reloadAll}
@@ -1090,6 +1116,96 @@ export default function AnalyticsDashboard() {
                 ))}
               </tbody>
             </table>
+          </ChartCard>
+        </Box>
+      )}
+
+      {/* ============ LEADERBOARD (manager + admin) ============
+          Who's moved the most leads into whatever this tenant flags as its
+          success stage(s) — "Last 30 days" (rolling) plus one tab per
+          calendar month (most recent first, from the backend's 6-month
+          window). Rank 1-3 get a medal color; everyone else a plain number. */}
+      {!isCounsellor && (
+        <Box sx={{ mt: 2 }}>
+          <ChartCard
+            title="Counsellor leaderboard"
+            loading={loading.leaderboard}
+            lastSynced={lastSynced}
+            onRefresh={reloadAll}
+            csvRows={(leaderboardTab === '30d' ? leaderboard.last_30_days : (leaderboard.months.find((m) => m.month === leaderboardTab)?.leaders || []))}
+            fullHeight="auto"
+          >
+            <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5, flexWrap: 'wrap' }}>
+              <Chip
+                label="Last 30 days"
+                size="small"
+                onClick={() => setLeaderboardTab('30d')}
+                color={leaderboardTab === '30d' ? 'primary' : 'default'}
+                variant={leaderboardTab === '30d' ? 'filled' : 'outlined'}
+              />
+              {leaderboard.months.map((m) => (
+                <Chip
+                  key={m.month}
+                  label={monthLabel(m.month)}
+                  size="small"
+                  onClick={() => setLeaderboardTab(m.month)}
+                  color={leaderboardTab === m.month ? 'primary' : 'default'}
+                  variant={leaderboardTab === m.month ? 'filled' : 'outlined'}
+                />
+              ))}
+            </Box>
+            {(() => {
+              const leaders = leaderboardTab === '30d'
+                ? leaderboard.last_30_days
+                : (leaderboard.months.find((m) => m.month === leaderboardTab)?.leaders || []);
+              if (leaders.length === 0) {
+                return (
+                  <Box sx={{ p: 3, color: '#888', fontSize: 13, textAlign: 'center' }}>
+                    No conversions in this window yet.
+                  </Box>
+                );
+              }
+              const top = leaders[0].conversions || 1;
+              return (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                  {leaders.map((u, i) => {
+                    const rank = i + 1;
+                    const medal = RANK_COLORS[rank];
+                    return (
+                      <Box
+                        key={u.user_id}
+                        sx={{
+                          display: 'flex', alignItems: 'center', gap: 1.5,
+                          p: '8px 12px', borderRadius: 1.5,
+                          background: medal ? `${medal}14` : '#fafafa',
+                          border: `1px solid ${medal ? `${medal}40` : '#f0f0f0'}`,
+                        }}
+                      >
+                        <Box sx={{
+                          width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 13, fontWeight: 700,
+                          background: medal || '#e0e0e0', color: medal ? '#fff' : '#666',
+                        }}>
+                          {rank}
+                        </Box>
+                        <Box sx={{ minWidth: 140, fontSize: 13.5, fontWeight: rank <= 3 ? 700 : 500 }}>{u.name}</Box>
+                        <Box sx={{ flex: 1, height: 8, borderRadius: 4, background: '#eee', overflow: 'hidden' }}>
+                          <Box sx={{
+                            height: '100%', borderRadius: 4,
+                            width: `${Math.max(4, Math.round((u.conversions / top) * 100))}%`,
+                            background: medal || '#bbb',
+                          }} />
+                        </Box>
+                        <Box sx={{ minWidth: 28, textAlign: 'right', fontSize: 14, fontWeight: 700, color: medal || '#444' }}>
+                          {u.conversions}
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              );
+            })()}
           </ChartCard>
         </Box>
       )}

@@ -193,6 +193,7 @@ export const analyticsApi = {
   programStatus: (params) => api.get('/analytics/program-status', withBranch(params)),
   coldEnquiries: (params) => api.get('/analytics/cold-enquiries', withBranch(params)),
   counselorPerformance: (params) => api.get('/analytics/counselor-performance', withBranch(params)),
+  leaderboard: (params) => api.get('/analytics/leaderboard', withBranch(params)),
   communications: (params) => api.get('/analytics/communications', withBranch(params)),
   loginEvents: (params) => api.get('/analytics/login-events', params),
   // Concurrent sessions / new devices / login-location anomalies — super_admin only.
