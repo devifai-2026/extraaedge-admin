@@ -8,7 +8,7 @@
 // FE simply chooses which cards to render and which header controls to show.
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Autocomplete, TextField, Box, Divider, Typography, Modal, Button, IconButton,
+  Autocomplete, TextField, Box, Divider, Typography, Modal, Button, IconButton, Chip,
 } from '@mui/material';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, FunnelChart, Funnel,
@@ -16,7 +16,6 @@ import {
   PieChart, Pie,
 } from 'recharts';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import CloseIcon from '@mui/icons-material/Close';
