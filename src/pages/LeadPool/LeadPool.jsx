@@ -16,17 +16,20 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box, TextField, InputAdornment, CircularProgress, Chip, Typography,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-  Divider, Tooltip,
+  Divider, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, Button,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonIcon from '@mui/icons-material/Person';
 import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
 import HistoryIcon from '@mui/icons-material/History';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import { leadPoolApi, leadsApi } from '../../lib/endpoints';
 import { isRole, ROLES } from '../../lib/rbac';
 import { auth } from '../../lib/api';
 import AddNewLead from '../../components/AddNewLead/AddNewLead';
+import ViewTimelineModal from '../../components/ViewTimelineModal/ViewTimelineModal';
 import ProtectedLeadData from '../../components/DataProtection/ProtectedLeadData';
 import MaskedPhone from '../../components/DataProtection/MaskedPhone';
 
@@ -83,6 +86,11 @@ export default function LeadPool() {
   const [openLead, setOpenLead] = useState(null);
   const [openEditable, setOpenEditable] = useState(false);
   const [rowLoadingId, setRowLoadingId] = useState(null);
+  // The row awaiting a "timeline or details?" choice, and the lead whose
+  // timeline is open. Kept separate from `openLead` so the two dialogs can't
+  // fight over one piece of state.
+  const [chooserRow, setChooserRow] = useState(null);
+  const [timelineLead, setTimelineLead] = useState(null);
   // Bumped after a successful save so the search re-runs and the row reflects
   // the new values (the query text itself hasn't changed).
   const [refreshKey, setRefreshKey] = useState(0);
@@ -115,14 +123,24 @@ export default function LeadPool() {
       .finally(() => { if (seq === reqSeq.current) setLoading(false); });
   }, [debouncedQ, refreshKey]);
 
-  // Open a row. Editable rows hydrate from /leads/:id (the full record the
-  // edit form needs — notes, custom values, follow-ups); view-only rows use
-  // the tenant-wide /lead-pool/:id projection, which is the only endpoint a
+  // Row click → ask what to open (timeline or the lead form). We only pick
+  // the row here; nothing is fetched until the user chooses, so opening the
+  // timeline never pays for the heavier /leads/:id hydration.
+  const handleRowClick = (row) => {
+    if (!row?.id || rowLoadingId) return;
+    setChooserRow(row);
+  };
+
+  // "Lead details" → open the AddNewLead form.
+  //
+  // Editable rows hydrate from /leads/:id (the full record the edit form
+  // needs — notes, custom values, follow-ups); view-only rows use the
+  // tenant-wide /lead-pool/:id projection, which is the only endpoint a
   // counsellor can read for a lead they don't own. If the scoped fetch is
   // refused (the row sits outside this manager's branch/team after all) we
   // fall back to the read-only projection rather than showing an error.
-  const handleRowClick = async (row) => {
-    if (!row?.id || rowLoadingId) return;
+  const openLeadForm = async (row) => {
+    if (!row?.id) return;
     const editable = canEditLead(row);
     setRowLoadingId(row.id);
     try {
@@ -135,23 +153,31 @@ export default function LeadPool() {
           data = null; // out of scope after all — degrade to read-only
         }
       }
+      let forcedViewOnly = false;
       if (!data) {
         const r = await leadPoolApi.get(row.id);
         data = r?.data || null;
-        if (data) {
-          setOpenEditable(false);
-          setOpenLead(data);
-          return;
-        }
+        forcedViewOnly = true;
       }
       if (!data) { setError('Could not open that lead.'); return; }
-      setOpenEditable(editable);
+      setChooserRow(null);
+      setOpenEditable(editable && !forcedViewOnly);
       setOpenLead(data);
     } catch (e) {
       setError(e?.message || 'Could not open that lead.');
     } finally {
       setRowLoadingId(null);
     }
+  };
+
+  // "Timeline" → open the shared ViewTimelineModal. /leads/:id/timeline is
+  // tenant-scoped (no owner check), so this works for any pool row without
+  // needing the full record — the modal only reads lead.id and lead.name.
+  const openTimeline = (row) => {
+    if (!row?.id) return;
+    setChooserRow(null);
+    // The modal header reads name → phone → 'Lead', so pass both.
+    setTimelineLead({ id: row.id, name: row.name, phone: row.phone });
   };
 
   const helper = useMemo(() => {
@@ -317,11 +343,76 @@ export default function LeadPool() {
         <>
           <Divider sx={{ mt: 3, mb: 1 }} />
           <Typography variant="caption" sx={{ color: '#9ca3af' }}>
-            Click a row to open the lead. You can edit the leads you own — for anyone
-            else's lead the form opens read-only; ask the current owner or a manager to reassign it.
+            Click a row to open its timeline or the full lead details. You can edit the
+            leads you own — for anyone else's lead the form opens read-only; ask the
+            current owner or a manager to reassign it.
           </Typography>
         </>
       )}
+
+      {/* Row click → pick a view. Two large targets rather than a menu, since
+          this is a deliberate choice and both options are equally likely. */}
+      <Dialog
+        open={!!chooserRow}
+        onClose={() => { if (!rowLoadingId) setChooserRow(null); }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ pb: 0.5 }}>
+          <Typography component="div" sx={{ fontWeight: 700, fontSize: 17 }}>
+            {chooserRow?.name || 'Lead'}
+          </Typography>
+          <Typography variant="caption" sx={{ color: '#6b7280' }}>
+            What would you like to open?
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, mt: 1 }}>
+            <Button
+              variant="outlined"
+              size="large"
+              startIcon={<TimelineIcon />}
+              disabled={!!rowLoadingId}
+              onClick={() => openTimeline(chooserRow)}
+              sx={{ justifyContent: 'flex-start', textTransform: 'none', py: 1.25 }}
+            >
+              <Box sx={{ textAlign: 'left' }}>
+                <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }}>Lead timeline</Typography>
+                <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                  Activities, notes, calls and stage changes
+                </Typography>
+              </Box>
+            </Button>
+            <Button
+              variant="outlined"
+              size="large"
+              startIcon={rowLoadingId ? <CircularProgress size={18} /> : <DescriptionOutlinedIcon />}
+              disabled={!!rowLoadingId}
+              onClick={() => openLeadForm(chooserRow)}
+              sx={{ justifyContent: 'flex-start', textTransform: 'none', py: 1.25 }}
+            >
+              <Box sx={{ textAlign: 'left' }}>
+                <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }}>Lead details</Typography>
+                <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                  {chooserRow && canEditLead(chooserRow)
+                    ? 'Open the full lead form — editable'
+                    : 'Open the full lead form — read-only'}
+                </Typography>
+              </Box>
+            </Button>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setChooserRow(null)} disabled={!!rowLoadingId}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Lead timeline. Read-only by nature, so no permission branch here. */}
+      <ViewTimelineModal
+        open={!!timelineLead}
+        lead={timelineLead}
+        onClose={() => setTimelineLead(null)}
+      />
 
       {/* Row-click lead dialog. Same component the Lead Manager uses, so the
           layout/validation stay identical; `viewOnly` locks every input and
