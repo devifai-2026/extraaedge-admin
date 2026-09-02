@@ -29,12 +29,23 @@ import EventIcon from '@mui/icons-material/Event';
 import PersonIcon from '@mui/icons-material/Person';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
-import { followUpsApi, usersApi } from '../../lib/endpoints';
-import { useNavigate } from 'react-router-dom';
+import { followUpsApi, usersApi, leadsApi } from '../../lib/endpoints';
+import AddNewLead from '../../components/AddNewLead/AddNewLead';
 import { auth } from '../../lib/endpoints';
+import { isRole, ROLES } from '../../lib/rbac';
 import { useDropdown } from '../../lib/useDropdowns';
 import { colors } from '../../theme/colors';
 import './FollowUpManager.css';
+
+// Mirrors LeadPool's rule: super_admin / branch_manager / sales_manager may
+// edit any lead they can open; everyone else only the leads they own. The
+// server re-checks this on save (modules/leads/service.js#updateLead).
+const canEditLead = (lead) => {
+  if (!lead) return false;
+  if (isRole(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER, ROLES.SALES_MANAGER)) return true;
+  const me = auth.getUser()?.id;
+  return Boolean(me && lead.assigned_to && lead.assigned_to === me);
+};
 
 const STATUS_TABS = [
   { key: 'all',     label: 'All' },
@@ -184,7 +195,25 @@ function KpiTile({ label, value, color }) {
 }
 
 export default function FollowUpManager() {
-  const navigate = useNavigate();
+  // Lead dialog opened from a follow-up / by-lead row. Previously these rows
+  // deep-linked to /leadlist?focus=<id>, which yanked the user out of the
+  // follow-up view (losing the selected date, filters and scroll position).
+  // We now open the same AddNewLead dialog inline on this page instead.
+  const [openLead, setOpenLead] = useState(null);
+  const [openingLeadId, setOpeningLeadId] = useState(null);
+
+  const openLeadDialog = async (leadId) => {
+    if (!leadId || openingLeadId) return;
+    setOpeningLeadId(leadId);
+    try {
+      const r = await leadsApi.get(leadId);
+      if (r?.data) setOpenLead(r.data);
+    } catch {
+      /* lead may be out of scope or deleted — leave the page as-is */
+    } finally {
+      setOpeningLeadId(null);
+    }
+  };
   const sessionUser = auth.getUser() || {};
   // branch_manager is admin-like (sees their whole branch, scoped server-side),
   // so it gets the admin/all view here rather than the counsellor view.
@@ -428,7 +457,7 @@ export default function FollowUpManager() {
                       key={r.lead_id}
                       hover
                       sx={{ cursor: 'pointer' }}
-                      onClick={() => navigate(`/leadlist?focus=${r.lead_id}`)}
+                      onClick={() => openLeadDialog(r.lead_id)}
                     >
                       <TableCell>{r.lead_name || '—'}</TableCell>
                       <TableCell>{r.lead_phone || ''}</TableCell>
@@ -561,6 +590,7 @@ export default function FollowUpManager() {
               key={f.id}
               f={f}
               onChanged={() => { reloadList(); reloadCalendar(); }}
+              onOpenLead={openLeadDialog}
             />
           ))}
         </div>
@@ -574,6 +604,23 @@ export default function FollowUpManager() {
           loading={calLoading}
         />
       </div>
+
+      {/* Lead dialog, opened inline from a follow-up row or the by-lead table.
+          Same editability rule as the Lead Pool: managers/admins edit any
+          lead, everyone else only the leads they own. */}
+      <AddNewLead
+        open={!!openLead}
+        leadData={openLead}
+        viewOnly={!canEditLead(openLead)}
+        onClose={() => setOpenLead(null)}
+        onSaved={() => {
+          setOpenLead(null);
+          // A stage/follow-up change from the dialog can move rows in/out of
+          // the current day + status filter, so refresh both list and calendar.
+          reloadList();
+          reloadCalendar();
+        }}
+      />
     </div>
   );
 }
@@ -584,7 +631,7 @@ export default function FollowUpManager() {
 //   • missed  (red)     → reschedule, mark done, cancel
 //   • done    (green)   → locked, no actions
 //   • cancelled (grey)  → locked, no actions
-function FollowupRow({ f, onChanged }) {
+function FollowupRow({ f, onChanged, onOpenLead }) {
   const [busy, setBusy] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleAt, setRescheduleAt] = useState('');
@@ -593,7 +640,7 @@ function FollowupRow({ f, onChanged }) {
   const [cancelReason, setCancelReason] = useState('');
   const [doneOpen, setDoneOpen] = useState(false);
   const [doneReason, setDoneReason] = useState('');
-  const navigate = useNavigate();
+
 
   const STATUS_META = {
     planned:   { color: '#FB8C00', label: 'Planned'   },
@@ -664,9 +711,10 @@ function FollowupRow({ f, onChanged }) {
     setCancelReason('');
   };
 
-  // Open the lead's edit dialog by deep-linking to LeadList with ?focus=<id>.
+  // Open the lead's edit dialog inline on this page (the parent owns the
+  // dialog). Previously this deep-linked to /leadlist?focus=<id>.
   const openLead = () => {
-    if (f.lead_id) navigate(`/leadlist?focus=${f.lead_id}`);
+    if (f.lead_id) onOpenLead?.(f.lead_id);
   };
 
   return (

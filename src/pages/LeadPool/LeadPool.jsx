@@ -1,10 +1,17 @@
-// Lead Pool — tenant-wide, READ-ONLY lead lookup.
+// Lead Pool — tenant-wide lead lookup.
 //
 // Available to every counsellor (and up). Unlike Lead Manager, this searches
 // EVERY lead in the tenant by name or phone number (with or without a 91
 // prefix) — but the view is strictly read-only. For each hit we show the lead
 // details plus who currently owns it, that owner's manager, and the previous
-// owner (if the lead was ever reassigned). No edit / reassign / call actions.
+// owner (if the lead was ever reassigned).
+//
+// Clicking a row opens the same AddNewLead dialog the Lead Manager uses. The
+// list itself stays a read-only projection; whether that dialog is editable is
+// decided per-row by canEditLead() below — a counsellor may edit only the
+// leads they currently own, managers/admins may edit any of them. This mirrors
+// the server-side scope in modules/leads/service.js#updateLead, which is the
+// real gate: the dialog opening editable is a UI affordance, not permission.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box, TextField, InputAdornment, CircularProgress, Chip, Typography,
@@ -16,7 +23,10 @@ import PersonIcon from '@mui/icons-material/Person';
 import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount';
 import HistoryIcon from '@mui/icons-material/History';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import { leadPoolApi } from '../../lib/endpoints';
+import { leadPoolApi, leadsApi } from '../../lib/endpoints';
+import { isRole, ROLES } from '../../lib/rbac';
+import { auth } from '../../lib/api';
+import AddNewLead from '../../components/AddNewLead/AddNewLead';
 import ProtectedLeadData from '../../components/DataProtection/ProtectedLeadData';
 import MaskedPhone from '../../components/DataProtection/MaskedPhone';
 
@@ -43,6 +53,20 @@ const fmtDate = (v) => {
   return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
+// Who may EDIT a lead opened from the pool.
+//
+//   • super_admin / branch_manager / sales_manager → every lead they can see.
+//   • everyone else (counsellor, account_manager…)  → only leads they own.
+//
+// `assigned_to` is the owner's user id, returned by the /lead-pool search
+// projection. Managers are trusted here because the pool is tenant-wide but
+// their save is still scope-checked server-side.
+const canEditLead = (row) => {
+  if (isRole(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER, ROLES.SALES_MANAGER)) return true;
+  const me = auth.getUser()?.id;
+  return Boolean(me && row?.assigned_to && row.assigned_to === me);
+};
+
 export default function LeadPool() {
   const [q, setQ] = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
@@ -51,6 +75,17 @@ export default function LeadPool() {
   const [error, setError] = useState('');
   const [touched, setTouched] = useState(false);
   const reqSeq = useRef(0);
+
+  // Row-click detail dialog. `openLead` holds the FULL lead fetched from the
+  // API (the search projection is too thin to hydrate the edit form), and
+  // `openEditable` is frozen at open time from the row we clicked so the
+  // dialog can't flip modes underneath the user mid-edit.
+  const [openLead, setOpenLead] = useState(null);
+  const [openEditable, setOpenEditable] = useState(false);
+  const [rowLoadingId, setRowLoadingId] = useState(null);
+  // Bumped after a successful save so the search re-runs and the row reflects
+  // the new values (the query text itself hasn't changed).
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Debounce the query so we don't fire on every keystroke.
   useEffect(() => {
@@ -78,7 +113,46 @@ export default function LeadPool() {
         setRows([]);
       })
       .finally(() => { if (seq === reqSeq.current) setLoading(false); });
-  }, [debouncedQ]);
+  }, [debouncedQ, refreshKey]);
+
+  // Open a row. Editable rows hydrate from /leads/:id (the full record the
+  // edit form needs — notes, custom values, follow-ups); view-only rows use
+  // the tenant-wide /lead-pool/:id projection, which is the only endpoint a
+  // counsellor can read for a lead they don't own. If the scoped fetch is
+  // refused (the row sits outside this manager's branch/team after all) we
+  // fall back to the read-only projection rather than showing an error.
+  const handleRowClick = async (row) => {
+    if (!row?.id || rowLoadingId) return;
+    const editable = canEditLead(row);
+    setRowLoadingId(row.id);
+    try {
+      let data = null;
+      if (editable) {
+        try {
+          const r = await leadsApi.get(row.id);
+          data = r?.data || null;
+        } catch {
+          data = null; // out of scope after all — degrade to read-only
+        }
+      }
+      if (!data) {
+        const r = await leadPoolApi.get(row.id);
+        data = r?.data || null;
+        if (data) {
+          setOpenEditable(false);
+          setOpenLead(data);
+          return;
+        }
+      }
+      if (!data) { setError('Could not open that lead.'); return; }
+      setOpenEditable(editable);
+      setOpenLead(data);
+    } catch (e) {
+      setError(e?.message || 'Could not open that lead.');
+    } finally {
+      setRowLoadingId(null);
+    }
+  };
 
   const helper = useMemo(() => {
     const n = (debouncedQ || '').trim();
@@ -164,7 +238,15 @@ export default function LeadPool() {
             </TableHead>
             <TableBody>
               {rows.map((r) => (
-                <TableRow key={r.id} hover>
+                <TableRow
+                  key={r.id}
+                  hover
+                  onClick={() => handleRowClick(r)}
+                  sx={{
+                    cursor: rowLoadingId ? 'progress' : 'pointer',
+                    opacity: rowLoadingId && rowLoadingId !== r.id ? 0.6 : 1,
+                  }}
+                >
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{r.name || '—'}</Typography>
                     <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>
@@ -235,10 +317,27 @@ export default function LeadPool() {
         <>
           <Divider sx={{ mt: 3, mb: 1 }} />
           <Typography variant="caption" sx={{ color: '#9ca3af' }}>
-            Read-only view. To take ownership of a lead, ask the current owner or a manager to reassign it.
+            Click a row to open the lead. You can edit the leads you own — for anyone
+            else's lead the form opens read-only; ask the current owner or a manager to reassign it.
           </Typography>
         </>
       )}
+
+      {/* Row-click lead dialog. Same component the Lead Manager uses, so the
+          layout/validation stay identical; `viewOnly` locks every input and
+          hides the Update button for leads this user may not edit. */}
+      <AddNewLead
+        open={!!openLead}
+        leadData={openLead}
+        viewOnly={!openEditable}
+        onClose={() => { setOpenLead(null); setOpenEditable(false); }}
+        onSaved={() => {
+          setOpenLead(null);
+          setOpenEditable(false);
+          // Re-run the current search so the row shows the saved values.
+          setRefreshKey((k) => k + 1);
+        }}
+      />
     </Box>
   );
 }

@@ -29,7 +29,7 @@ import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import "./AddNewLead.css";
-import { leadsApi, usersApi, uploadsApi, admissionsApi } from "../../lib/endpoints";
+import { leadsApi, usersApi, uploadsApi, admissionsApi, leadPoolApi } from "../../lib/endpoints";
 import { auth } from "../../lib/api";
 import { useDropdown } from "../../lib/useDropdowns";
 import QuickCreateDialog from "../QuickCreateDialog/QuickCreateDialog";
@@ -398,7 +398,13 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
         }
         let alive = true;
         setHydrating(true);
-        leadsApi.get(leadData.id)
+        // In viewOnly mode the opener may be looking at a lead OUTSIDE their
+        // own scope (Lead Pool is tenant-wide), so /leads/:id would 403 and
+        // leave an empty form behind a "Failed to load lead" error. Read the
+        // unscoped read-only projection instead — it is the endpoint that
+        // exists precisely for this case. Editable opens keep using the
+        // scoped endpoint, which returns the richer record the form needs.
+        (viewOnly ? leadPoolApi.get(leadData.id) : leadsApi.get(leadData.id))
             .then(async (r) => {
                 if (!alive) return;
                 const lead = r?.data || {};
@@ -494,7 +500,7 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
             .catch((e) => { if (alive) setSubmitError(e.message || 'Failed to load lead'); })
             .finally(() => { if (alive) setHydrating(false); });
         return () => { alive = false; };
-    }, [open, isEditMode, leadData?.id]);
+    }, [open, isEditMode, leadData?.id, viewOnly]);
 
     // Fields that must contain digits only (phone numbers, pincode, etc.).
     const NUMERIC_FIELDS = new Set(['phone', 'whatsapp_number', 'alternate_contact', 'pincode']);
