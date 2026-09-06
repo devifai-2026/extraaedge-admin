@@ -19,7 +19,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
-import { leadRoutingApi, usersApi } from '../../lib/endpoints';
+import { leadRoutingApi, usersApi, dropdownsApi } from '../../lib/endpoints';
 import { isRole, ROLES, LEAD_OWNER_ROLES_PARAM } from '../../lib/rbac';
 
 // Keep in sync with LEAD_ORIGINS in extraaedge-server/src/lib/leadOrigin.js.
@@ -44,6 +44,7 @@ const STRATEGY_LABEL = {
 const blankPool = () => ({
   name: '',
   origins: [],
+  source_names: [],
   member_ids: [],
   strategy: 'load_balanced',
   priority: 100,
@@ -57,6 +58,9 @@ export default function LeadDistribution() {
   const [pools, setPools] = useState([]);
   const [owners, setOwners] = useState([]);
   const [origins, setOrigins] = useState(FALLBACK_ORIGINS);
+  // The tenant's own source + channel names, for pools that route by the
+  // marketing vocabulary rather than a built-in channel (e.g. "Social Media").
+  const [sourceNames, setSourceNames] = useState([]);
   const [editing, setEditing] = useState(null); // pool object or blankPool()
   const [deleting, setDeleting] = useState(null);
 
@@ -68,15 +72,22 @@ export default function LeadDistribution() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [p, u, o] = await Promise.allSettled([
+      const [p, u, o, src, ch] = await Promise.allSettled([
         leadRoutingApi.list(),
         usersApi.list({ role: LEAD_OWNER_ROLES_PARAM, limit: 200 }),
         leadRoutingApi.origins(),
+        dropdownsApi.sources(),
+        dropdownsApi.channels(),
       ]);
       if (cancelled) return;
       setPools(p.value?.data || []);
       setOwners((u.value?.data || []).filter((x) => x.is_active !== false));
       if (Array.isArray(o.value?.data) && o.value.data.length) setOrigins(o.value.data);
+      // Sources and channels are matched the same way server-side, so offer
+      // both in one list and de-duplicate.
+      const names = [...(src.value?.data || []), ...(ch.value?.data || [])]
+        .map((r) => r?.name).filter(Boolean);
+      setSourceNames([...new Set(names)].sort((a, b) => a.localeCompare(b)));
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -92,6 +103,7 @@ export default function LeadDistribution() {
     const body = {
       name: form.name.trim(),
       origins: form.origins,
+      source_names: form.source_names,
       member_ids: form.member_ids,
       strategy: form.strategy,
       priority: Number(form.priority) || 100,
@@ -183,6 +195,9 @@ export default function LeadDistribution() {
                       sx={{ background: `${originColor(o)}18`, color: originColor(o), fontWeight: 600 }}
                     />
                   ))}
+                  {(p.source_names || []).map((n) => (
+                    <Chip key={`s-${n}`} size="small" label={n} sx={{ background: '#f1f5f9', color: '#334155', fontWeight: 600 }} />
+                  ))}
                   <Box sx={{ alignSelf: 'center', color: '#94a3b8', px: 0.5 }}>→</Box>
                   {members.map((m) => (
                     <Chip key={m.id} size="small" label={m.name || m.email} sx={{ background: '#ede9fe', color: '#5b21b6' }} />
@@ -223,6 +238,7 @@ export default function LeadDistribution() {
         pool={editing}
         owners={owners}
         origins={origins}
+        sourceNames={sourceNames}
         onClose={() => setEditing(null)}
         onSave={save}
       />
@@ -231,7 +247,7 @@ export default function LeadDistribution() {
         <DialogTitle sx={{ color: '#dc2626', fontWeight: 700 }}>Remove “{deleting?.name}”?</DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: 13, color: '#555' }}>
-            New leads from {(deleting?.origins || []).map(originLabel).join(', ') || 'these channels'} will
+            New leads from {[...(deleting?.origins || []).map(originLabel), ...(deleting?.source_names || [])].join(', ') || 'these channels'} will
             fall through to your Assignment Rule instead. Leads already assigned keep their owner.
           </Typography>
         </DialogContent>
@@ -244,7 +260,7 @@ export default function LeadDistribution() {
   );
 }
 
-function PoolEditor({ pool, owners, origins, onClose, onSave }) {
+function PoolEditor({ pool, owners, origins, sourceNames, onClose, onSave }) {
   const [form, setForm] = useState(blankPool());
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -261,7 +277,10 @@ function PoolEditor({ pool, owners, origins, onClose, onSave }) {
 
   const submit = async () => {
     if (!form.name.trim()) { setErr('Give the rule a name'); return; }
-    if (!form.origins.length) { setErr('Pick at least one channel — a rule with none can never match'); return; }
+    if (!form.origins.length && !form.source_names.length) {
+      setErr('Pick at least one channel or source — a rule with none can never match a lead');
+      return;
+    }
     setBusy(true); setErr('');
     try {
       await onSave(form);
@@ -293,8 +312,21 @@ function PoolEditor({ pool, owners, origins, onClose, onSave }) {
           onChange={(_e, picked) => setForm({ ...form, origins: picked })}
           renderInput={(params) => (
             <TextField
-              {...params} margin="dense" label="Channels *"
+              {...params} margin="dense" label="Channels"
               helperText="Leads arriving through any of these go to the people below."
+            />
+          )}
+        />
+
+        <Autocomplete
+          multiple freeSolo size="small"
+          options={sourceNames || []}
+          value={form.source_names || []}
+          onChange={(_e, picked) => setForm({ ...form, source_names: picked })}
+          renderInput={(params) => (
+            <TextField
+              {...params} margin="dense" label="…or your own sources"
+              helperText={'Matches the lead\'s Source or Channel text exactly (case-insensitive). Use this for values the channels above don\'t cover — e.g. "Social Media".'}
             />
           )}
         />
