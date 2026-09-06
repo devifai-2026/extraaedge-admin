@@ -19,6 +19,17 @@ export const isFacebookLead = (lead) => {
     || norm(lead.first_touch_channel).includes('facebook');
 };
 
+// Meta delivers Instagram lead ads on the SAME leadgen webhook as Facebook, so
+// an Instagram lead can carry a facebook-ish source alongside
+// first_touch_channel='Instagram'. originBadge() therefore tests Instagram
+// BEFORE Facebook — the more specific origin has to win. Mirrors
+// classifyOrigin() in extraaedge-server/src/lib/leadOrigin.js.
+export const isInstagramLead = (lead) => {
+  if (!lead) return false;
+  return norm(lead.first_touch_source).includes('instagram')
+    || norm(lead.first_touch_channel).includes('instagram');
+};
+
 export const isJustDialLead = (lead) => {
   if (!lead) return false;
   return norm(lead.first_touch_source).includes('justdial')
@@ -37,6 +48,8 @@ export const isWebsiteLead = (lead) => {
 // no notable origin (plain manual / bulk-import lead).
 export const originBadge = (lead) => {
   if (isWhatsAppLead(lead)) return { key: 'whatsapp', label: 'WhatsApp', color: '#25D366' };
+  // Instagram before Facebook — see isInstagramLead.
+  if (isInstagramLead(lead)) return { key: 'instagram', label: 'Instagram', color: '#E1306C' };
   if (isFacebookLead(lead)) return { key: 'facebook', label: 'Facebook', color: '#1877F2' };
   if (isJustDialLead(lead)) return { key: 'justdial', label: 'JustDial', color: '#F26722' };
   if (isWebsiteLead(lead)) return { key: 'website', label: 'Website', color: '#5C6BC0' };

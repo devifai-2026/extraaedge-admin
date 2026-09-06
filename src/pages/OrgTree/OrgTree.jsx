@@ -13,13 +13,20 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { useNavigate } from 'react-router-dom';
 import { usersApi } from '../../lib/endpoints';
 
-// Full-institute tiers: owner → branch → department leads → front-line staff.
-// Sales, Accounts, Training, HR and Placement all sit under the branch tier.
+// Full-institute tiers: owner → branch → department leads → team leads →
+// front-line staff. Sales, Accounts, Training, HR and Placement all sit under
+// the branch tier.
+//
+// The front line splits three ways under a sales manager: counsellors report
+// to the sales manager directly, while telecallers report to a telecaller
+// lead, who sits one tier below the sales manager. Hence tier 4 — telecallers
+// are the only role that hangs off a tier-3 node.
 const ROLE_TIER = {
   super_admin: 0,
   branch_manager: 1,
   sales_manager: 2, account_manager: 2, head_trainer: 2, hr: 2, placement: 2,
-  counsellor: 3, trainer: 3,
+  counsellor: 3, trainer: 3, telecaller_lead: 3, qa: 3,
+  telecaller: 4,
 };
 const ROLE_COLOR = {
   super_admin: '#E53935',
@@ -31,6 +38,11 @@ const ROLE_COLOR = {
   placement: '#7c3aed',
   counsellor: '#2e7d32',
   trainer: '#ea580c',
+  // Telecalling pair — teal family, so it reads as its own branch of the org
+  // next to the green counsellor line.
+  telecaller_lead: '#0369a1',
+  telecaller: '#0ea5e9',
+  qa: '#64748b',
 };
 const ROLE_LABEL = {
   super_admin: 'Super Admin',
@@ -42,16 +54,26 @@ const ROLE_LABEL = {
   placement: 'Placement',
   counsellor: 'Counsellor',
   trainer: 'Trainer',
+  telecaller_lead: 'Telecaller Lead',
+  telecaller: 'Telecaller',
+  qa: 'QA',
 };
 
 // Tier-based layout: place each role tier on its own horizontal row,
 // spread members evenly along the X axis. Good enough for normal team
 // sizes; for >50 nodes per tier we'd switch to dagre, but simpler is fine
 // for the Stage 3 release.
+// Deepest tier any role maps to, so the bucket set grows with ROLE_TIER
+// instead of being hardcoded — a role added at a new depth used to land in an
+// undefined bucket and throw.
+const MAX_TIER = Math.max(...Object.values(ROLE_TIER));
+
 const layout = (rawNodes, rawEdges) => {
-  const buckets = { 0: [], 1: [], 2: [], 3: [] };
+  const buckets = {};
+  for (let t = 0; t <= MAX_TIER; t += 1) buckets[t] = [];
   for (const n of rawNodes) {
-    const tier = ROLE_TIER[n.role] ?? 3;
+    // Unknown role (a genuine custom role) → drop it on the front-line row.
+    const tier = ROLE_TIER[n.role] ?? MAX_TIER;
     buckets[tier].push(n);
   }
   const ROW_GAP = 180;
@@ -165,7 +187,7 @@ export default function OrgTree() {
   // ordered by tier then label.
   const summary = useMemo(() => Object.entries(tierCounts)
     .filter(([, n]) => n > 0)
-    .sort((a, b) => (ROLE_TIER[a[0]] ?? 9) - (ROLE_TIER[b[0]] ?? 9))
+    .sort((a, b) => (ROLE_TIER[a[0]] ?? MAX_TIER) - (ROLE_TIER[b[0]] ?? MAX_TIER))
     .map(([role, n]) => `${n} ${ROLE_LABEL[role] || role}`)
     .join(' · '), [tierCounts]);
 
@@ -183,6 +205,8 @@ export default function OrgTree() {
           <Chip label="Branch mgr" size="small" sx={{ background: '#f3e5f5', color: '#8e24aa', fontWeight: 600 }} />
           <Chip label="Manager" size="small" sx={{ background: '#dbeafe', color: '#1976d2', fontWeight: 600 }} />
           <Chip label="Counsellor" size="small" sx={{ background: '#dcfce7', color: '#2e7d32', fontWeight: 600 }} />
+          <Chip label="Telecaller lead" size="small" sx={{ background: '#e0f2fe', color: '#0369a1', fontWeight: 600 }} />
+          <Chip label="Telecaller" size="small" sx={{ background: '#f0f9ff', color: '#0ea5e9', fontWeight: 600 }} />
           <IconButton size="small" onClick={reload} title="Refresh"><RefreshIcon /></IconButton>
         </Box>
       </Box>

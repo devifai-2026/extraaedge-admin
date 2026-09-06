@@ -216,6 +216,13 @@ export const usersApi = {
   // own session is gone in that browser tab from that point on.
   sudoLogin: (id) => api.post(`/users/${id}/sudo-login`),
   setPermissions: (id, permissions_json) => api.put(`/users/${id}/permissions`, { permissions_json }),
+  // Move a person between roles (counsellor / telecaller lead / telecaller).
+  // Body: { role_id, manager_ids?, reassign_leads_to? }.
+  // 409 CONFLICT with details.open_lead_count when the new role can't own
+  // leads and the user still has an open queue — resend with
+  // reassign_leads_to to hand it over. Nothing is ever deleted; sessions are
+  // revoked so the new role takes effect immediately.
+  switchRole: (id, body) => api.post(`/users/${id}/switch-role`, body),
   // Per-user views used by the user-profile page.
   leads: (id, params) => api.get(`/users/${id}/leads`, params),
   workSessions: (id, params) => api.get(`/users/${id}/work-sessions`, params),
@@ -554,6 +561,18 @@ export const campaignsDripApi = {
   deleteRule: (id, rid) => api.delete(`/campaigns/drip/${id}/rules/${rid}`),
   runs: (id) => api.get(`/campaigns/drip/${id}/runs`),
   stats: (id) => api.get(`/campaigns/drip/${id}/stats`),
+};
+
+// Source-based lead distribution: route WhatsApp / Facebook / Instagram /
+// Website / JustDial leads to a named person or a named group. Runs BEFORE the
+// assignment-rules engine; falls through to it when no pool matches.
+export const leadRoutingApi = {
+  list: () => api.get('/lead-routing-pools'),
+  origins: () => api.get('/lead-routing-pools/origins'),
+  get: (id) => api.get(`/lead-routing-pools/${id}`),
+  create: (body) => api.post('/lead-routing-pools', body),
+  update: (id, body) => api.put(`/lead-routing-pools/${id}`, body),
+  delete: (id) => api.delete(`/lead-routing-pools/${id}`),
 };
 
 export const assignmentRulesApi = {

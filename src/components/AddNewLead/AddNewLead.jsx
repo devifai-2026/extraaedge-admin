@@ -34,7 +34,7 @@ import { auth } from "../../lib/api";
 import { useDropdown } from "../../lib/useDropdowns";
 import QuickCreateDialog from "../QuickCreateDialog/QuickCreateDialog";
 import SubStageReviewModal from "./SubStageReviewModal";
-import { isRole, ROLES } from "../../lib/rbac";
+import { isRole, ROLES, isLeadOwnerRole } from "../../lib/rbac";
 import { isEmail } from "../../lib/validators";
 
 
@@ -248,7 +248,7 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
     // After reassign, the new owner automatically sees the full lead + all its
     // data (recordings/timeline/notes are gated by lead ownership server-side).
     const ownsThisLead = isEditMode && leadData?.assigned_to === (auth.getUser()?.id);
-    const canReassign = isEditMode && (!isRole(ROLES.COUNSELLOR) || ownsThisLead);
+    const canReassign = isEditMode && (!isLeadOwnerRole() || ownsThisLead);
     const [reassignList, setReassignList] = useState([]);     // [{id,name,email,manager_id}]
     const [reassignTo, setReassignTo] = useState('');         // chosen user id
     const [reassignReason, setReassignReason] = useState(''); // free-text

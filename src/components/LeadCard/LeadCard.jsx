@@ -38,7 +38,7 @@ import MaskedPhone from "../DataProtection/MaskedPhone";
 import { useDropdown } from "../../lib/useDropdowns";
 import { flagForLead, TONE_BG, formatLeadAge, formatTimestamp } from "../../lib/leadFlags";
 import { originBadge } from "../../lib/leadOrigin";
-import { isRole, ROLES } from "../../lib/rbac";
+import { isLeadOwnerRole } from "../../lib/rbac";
 
 import "./LeadCard.css";
 
@@ -373,7 +373,7 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                         {/* Refer / reassign action — hidden for counsellors who
                             cannot reassign leads they own. Server enforces the
                             same restriction on POST /lead-assignments. */}
-                        {!isRole(ROLES.COUNSELLOR) && (
+                        {!isLeadOwnerRole() && (
                             <Tooltip title="Reassign">
                                 <IconButton size="small" className="action-btn" onClick={onReassign}><SwapHorizIcon /></IconButton>
                             </Tooltip>
@@ -842,7 +842,7 @@ const LeadCard = ({ lead, selected, onToggleSelect, onReassign, onChanged }) => 
                     it from the More menu, not just from the "View all"
                     link buried under the comm-stats. */}
                 <MenuItem onClick={() => { handleMenuClose(); setOpenTimeline(true); }}>View Timeline</MenuItem>
-                {!isRole(ROLES.COUNSELLOR) && (
+                {!isLeadOwnerRole() && (
                     <MenuItem onClick={() => { handleMenuClose(); onReassign?.(); }}>Reassign</MenuItem>
                 )}
                 <MenuItem onClick={() => { handleMenuClose(); setOpenFollowUp(true); }}>Add Follow Up</MenuItem>

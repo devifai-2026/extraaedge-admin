@@ -17,7 +17,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
 import HistoryToggleOffIcon from "@mui/icons-material/HistoryToggleOff";
 import { Tooltip, CircularProgress, InputBase, TextField, MenuItem as MuiMenuItem } from "@mui/material";
-import { isRole, ROLES } from "../../lib/rbac";
+import { isRole, ROLES, LEAD_OWNER_ROLES_PARAM, isLeadOwnerRole, LEAD_OWNER_ROLES } from '../../lib/rbac';
 import { leadsApi, usersApi } from "../../lib/endpoints";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import FacebookIcon from '@mui/icons-material/Facebook';
@@ -155,9 +155,9 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
     // backend already scopes results by role (a counsellor only sees their own
     // leads), so counsellors get a personal stale list; managers/admins can also
     // scope by a specific counsellor via the picker below.
-    const canStaleReport = isRole(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER, ROLES.SALES_MANAGER, ROLES.COUNSELLOR);
+    const canStaleReport = isRole(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER, ROLES.SALES_MANAGER, ROLES.TELECALLER_LEAD, ...LEAD_OWNER_ROLES);
     // Only managers/admins can scope the stale report to a specific counsellor.
-    const canPickCounsellor = !isRole(ROLES.COUNSELLOR);
+    const canPickCounsellor = !isLeadOwnerRole();
     const [openStale, setOpenStale] = useState(false);
     // "Not touched since" cutoff — leads whose last activity/update is OLDER than
     // this date (gone quiet). Sent to the backend as no_activity_from.
@@ -166,7 +166,7 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
     const [counsellors, setCounsellors] = useState([]);
     React.useEffect(() => {
         if (!openStale || counsellors.length || !canPickCounsellor) return;
-        usersApi.list({ role: 'counsellor', limit: 200 })
+        usersApi.list({ role: LEAD_OWNER_ROLES_PARAM, limit: 200 })
             .then((r) => setCounsellors((r?.data || []).filter((u) => u.is_active !== false)))
             .catch(() => setCounsellors([]));
     }, [openStale, counsellors.length, canPickCounsellor]);
@@ -322,7 +322,7 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                         {/* GROUP / bulk-reassign opener — hidden for counsellors
                             who cannot reassign leads. Server enforces the same
                             scope on POST /lead-assignments. */}
-                        {!isRole(ROLES.COUNSELLOR) && (
+                        {!isLeadOwnerRole() && (
                             <Tooltip title="Reassign leads">
                                 <IconButton size="small" sx={iconBtnSx} onClick={() => setOpenAssign(true)}>
                                     <GroupIcon fontSize="small" sx={{ color: colors.primary }} />

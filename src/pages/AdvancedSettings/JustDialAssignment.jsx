@@ -9,7 +9,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import { integrationsApi, usersApi } from '../../lib/endpoints';
-import { isRole, ROLES } from '../../lib/rbac';
+import { isRole, ROLES, LEAD_OWNER_ROLES_PARAM } from '../../lib/rbac';
 
 export default function JustDialAssignment() {
   const canManage = isRole(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER);
@@ -23,7 +23,7 @@ export default function JustDialAssignment() {
   useEffect(() => {
     if (!canManage) { setLoading(false); return; }
     Promise.allSettled([
-      usersApi.list({ role: 'counsellor', limit: 200 }),
+      usersApi.list({ role: LEAD_OWNER_ROLES_PARAM, limit: 200 }),
       integrationsApi.getJustDialPool(),
     ]).then(([u, p]) => {
       const list = (u.value?.data || []).filter((x) => x.is_active !== false);

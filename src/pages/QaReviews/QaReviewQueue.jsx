@@ -21,6 +21,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Alert from '@mui/material/Alert';
 import { qaReviewsApi, deviceRecordingsApi, usersApi, branchesApi } from '../../lib/endpoints';
+import { LEAD_OWNER_ROLES } from '../../lib/rbac';
 
 const PAGE_SIZE = 50;
 
@@ -206,7 +207,7 @@ export default function QaReviewQueue() {
       // usersApi.options() returns EVERY active user regardless of role (it
       // backs many generic pickers app-wide) — narrow to counsellors here so
       // this specific filter doesn't also offer super_admin/branch_manager/etc.
-      setCounsellors((users?.data || []).filter((u) => u.role === 'counsellor'));
+      setCounsellors((users?.data || []).filter((u) => LEAD_OWNER_ROLES.includes(u.role)));
       setBranches(brs?.data || []);
     })();
   }, []);

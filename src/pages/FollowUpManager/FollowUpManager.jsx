@@ -32,7 +32,7 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { followUpsApi, usersApi, leadsApi } from '../../lib/endpoints';
 import AddNewLead from '../../components/AddNewLead/AddNewLead';
 import { auth } from '../../lib/endpoints';
-import { isRole, ROLES } from '../../lib/rbac';
+import { isRole, ROLES, LEAD_OWNER_ROLES, LEAD_OWNER_ROLES_PARAM } from '../../lib/rbac';
 import { useDropdown } from '../../lib/useDropdowns';
 import { colors } from '../../theme/colors';
 import './FollowUpManager.css';
@@ -263,9 +263,9 @@ export default function FollowUpManager() {
   // Load counsellors for the manager / admin filter
   useEffect(() => {
     if (!isAdmin && !isManager) return;
-    const loader = isManager ? usersApi.myTeam() : usersApi.list({ role: 'counsellor', limit: 200 });
+    const loader = isManager ? usersApi.myTeam() : usersApi.list({ role: LEAD_OWNER_ROLES_PARAM, limit: 200 });
     loader
-      .then((r) => setCounsellors((r?.data || []).filter((u) => u.role === 'counsellor' && u.is_active !== false)))
+      .then((r) => setCounsellors((r?.data || []).filter((u) => LEAD_OWNER_ROLES.includes(u.role) && u.is_active !== false)))
       .catch(() => setCounsellors([]));
   }, [isAdmin, isManager]);
 

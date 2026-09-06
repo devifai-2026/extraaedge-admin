@@ -17,6 +17,13 @@ export const ROLES = {
   BRANCH_MANAGER: 'branch_manager',
   SALES_MANAGER: 'sales_manager',
   COUNSELLOR: 'counsellor',
+  // ---- Telecalling side of the front line ----
+  // Runs a team of telecallers under a sales manager. Same surfaces and same
+  // team-subtree scoping as a sales_manager, one tier down.
+  TELECALLER_LEAD: 'telecaller_lead',
+  // Works a personal queue of assigned leads, exactly like a counsellor — and
+  // like a counsellor, a valid lead owner.
+  TELECALLER: 'telecaller',
   // Tenant-level role for post-conversion account management. No team —
   // reports to their branch manager (or the tenant super_admin). Visibility
   // scope: every converted lead in the tenant (enforced server-side).
@@ -90,6 +97,18 @@ const ROLE_QA_TABS = ['qa.reviews'];
 const ROLE_HR_TABS = ['hr.dashboard', 'hr.interviews', 'hr.certificates'];
 const ROLE_PLACEMENT_TABS = ['placement.dashboard', 'placement.companies', 'placement.openings', 'placement.applications'];
 
+// Front-line roles that carry a personal queue of leads. Mirrors the server's
+// LEAD_OWNER_ROLES — these are the buckets a lead can be assigned to, and the
+// ones whose views are scoped to "mine only".
+export const LEAD_OWNER_ROLES = [ROLES.COUNSELLOR, ROLES.TELECALLER];
+// Query value for the very common "list everyone who can own a lead" fetch:
+// GET /users?role=counsellor,telecaller.
+export const LEAD_OWNER_ROLES_PARAM = LEAD_OWNER_ROLES.join(',');
+// Manager tiers whose visibility is their own downstream subtree.
+export const TEAM_SCOPED_MANAGER_ROLES = [
+  ROLES.SALES_MANAGER, ROLES.BRANCH_MANAGER, ROLES.TELECALLER_LEAD,
+];
+
 const FALLBACK_TABS = {
   [ROLES.SUPER_ADMIN]: ROLE_ALL_TABS,
   // branch_manager is admin-like for tabs (backend sends ['*']); mirror that
@@ -97,6 +116,9 @@ const FALLBACK_TABS = {
   [ROLES.BRANCH_MANAGER]: ROLE_ALL_TABS,
   [ROLES.SALES_MANAGER]: ROLE_MANAGER_TABS,
   [ROLES.COUNSELLOR]: ROLE_COUNSELLOR_TABS,
+  // The telecalling pair mirrors its sales-side counterpart exactly.
+  [ROLES.TELECALLER_LEAD]: ROLE_MANAGER_TABS,
+  [ROLES.TELECALLER]: ROLE_COUNSELLOR_TABS,
   [ROLES.ACCOUNT_MANAGER]: ROLE_ACCOUNT_MANAGER_TABS,
   [ROLES.HEAD_TRAINER]: ROLE_HEAD_TRAINER_TABS,
   [ROLES.TRAINER]: ROLE_TRAINER_TABS,
@@ -110,6 +132,12 @@ const FALLBACK_TABS = {
 export const currentRole = () => auth.getUser()?.role || null;
 
 export const isRole = (...roles) => roles.includes(currentRole());
+
+// True when the logged-in user is front line — a counsellor OR a telecaller.
+// Use this instead of isRole(ROLES.COUNSELLOR) for any "does this user carry a
+// personal queue" check: a telecaller works leads exactly as a counsellor
+// does, so a bare COUNSELLOR test would show them manager-only UI.
+export const isLeadOwnerRole = () => LEAD_OWNER_ROLES.includes(currentRole());
 
 // Check if the logged-in user has access to a tab key (matches DEFAULT_TAB_KEYS on backend).
 //

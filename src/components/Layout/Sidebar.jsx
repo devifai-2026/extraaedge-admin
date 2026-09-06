@@ -38,7 +38,7 @@ import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
-import { hasTab, currentRole, ROLES } from '../../lib/rbac';
+import { hasTab, currentRole, ROLES, LEAD_OWNER_ROLES } from '../../lib/rbac';
 import { admissionsApi, leadDiscountsApi, whatsappApi } from '../../lib/endpoints';
 import { onNotification } from '../../lib/socket';
 
@@ -72,7 +72,7 @@ const pinnedItems = [
   { id: 23, label: 'Lead Pool', icon: TravelExploreIcon, path: '/lead-pool', tab: 'lead_pool' },
   // Counsellor-facing admissions: their own converted students. Gated on
   // 'admissions.my_students' (seeded to counsellor), so only they see it.
-  { id: 24, label: 'My Students', icon: SchoolIcon, path: '/my-students', tab: 'admissions.my_students', roles: [ROLES.COUNSELLOR] },
+  { id: 24, label: 'My Students', icon: SchoolIcon, path: '/my-students', tab: 'admissions.my_students', roles: LEAD_OWNER_ROLES },
   // In-depth payments ledger. `tab: 'payments'` resolves true only for
   // super_admin (allowed_tabs:['*']); all other roles never see this row.
   { id: 19, label: 'Payments Ledger', icon: AccountBalanceWalletIcon, path: '/payments', tab: 'payments' },

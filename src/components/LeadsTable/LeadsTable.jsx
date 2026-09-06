@@ -19,7 +19,7 @@ import AddNewLead from '../AddNewLead/AddNewLead';
 import { flagForLead, TONE_BG, formatLeadAge, formatTimestamp } from '../../lib/leadFlags';
 import { originBadge } from '../../lib/leadOrigin';
 import { leadsApi } from '../../lib/endpoints';
-import { isRole, ROLES } from '../../lib/rbac';
+import { isRole, ROLES, isLeadOwnerRole } from '../../lib/rbac';
 import ProtectedLeadData from '../DataProtection/ProtectedLeadData';
 import MaskedPhone from '../DataProtection/MaskedPhone';
 
@@ -423,7 +423,7 @@ const LeadsTable = ({
                   <Tooltip title="Call"><IconButton size="small"><CallIcon fontSize="small" /></IconButton></Tooltip>
                   <Tooltip title="WhatsApp"><IconButton size="small"><WhatsAppIcon fontSize="small" /></IconButton></Tooltip>
                   <Tooltip title="Email"><IconButton size="small"><EmailIcon fontSize="small" /></IconButton></Tooltip>
-                  {!isRole(ROLES.COUNSELLOR) && (
+                  {!isLeadOwnerRole() && (
                     <Tooltip title="Reassign"><IconButton size="small" onClick={() => onReassign?.(lead)}><SwapHorizIcon fontSize="small" /></IconButton></Tooltip>
                   )}
                   {canDelete && (
@@ -449,7 +449,7 @@ const LeadsTable = ({
       >
         <MenuItem onClick={() => { setEditLead(menu.lead); setMenu({ anchor: null, lead: null }); }}>Edit Lead</MenuItem>
         <MenuItem onClick={() => { setTimelineLead(menu.lead); setMenu({ anchor: null, lead: null }); }}>View Timeline</MenuItem>
-        {!isRole(ROLES.COUNSELLOR) && (
+        {!isLeadOwnerRole() && (
           <MenuItem onClick={() => { onReassign?.(menu.lead); setMenu({ anchor: null, lead: null }); }}>Reassign</MenuItem>
         )}
         {canDelete && (

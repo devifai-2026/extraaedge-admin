@@ -12,12 +12,13 @@ import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import SwapVertIcon from '@mui/icons-material/SwapVert';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import LoginIcon from '@mui/icons-material/Login';
 import { usersApi, customRolesApi, programsApi, authApi, branchesApi, coursesApi } from '../../lib/endpoints';
 import { auth } from '../../lib/api';
-import { isRole, ROLES } from '../../lib/rbac';
+import { isRole, ROLES, LEAD_OWNER_ROLES } from '../../lib/rbac';
 import { isEmail, sanitizeDigits, emailError } from '../../lib/validators';
 import Breadcrumb from './Breadcrumb';
 import TrainerStudents from '../Trainer/TrainerStudents';
@@ -79,9 +80,29 @@ const ACCESS_LEVEL_OPTIONS = [
   { value: 'branch_manager', label: 'Branch Manager' },
   { value: 'sales_manager', label: 'Sales Manager (Operations)' },
   { value: 'counsellor', label: 'Counsellor (End User)' },
+  // The telecalling half of the front line, both under a sales manager.
+  { value: 'telecaller_lead', label: 'Telecaller Lead (Team Lead)' },
+  { value: 'telecaller', label: 'Telecaller (End User)' },
   { value: 'account_manager', label: 'Account Manager (Post-Conversion)' },
   { value: 'qa', label: 'QA (Call Quality Reviewer)' },
 ];
+
+// Short label per role bucket, for chips and confirmation copy. Falls back to
+// the raw scope for genuine custom roles.
+const ROLE_LABEL = {
+  super_admin: 'Admin',
+  branch_manager: 'Branch Manager',
+  sales_manager: 'Manager',
+  counsellor: 'Counsellor',
+  telecaller_lead: 'Telecaller Lead',
+  telecaller: 'Telecaller',
+  account_manager: 'Account Mgr',
+  head_trainer: 'Head Trainer',
+  trainer: 'Trainer',
+  qa: 'QA',
+  hr: 'HR',
+  placement: 'Placement',
+};
 
 const initialsColor = (name = '') => {
   const palette = ['#26a69a', '#5c6bc0', '#ef5350', '#ab47bc', '#fb8c00', '#42a5f5', '#66bb6a', '#ec407a'];
@@ -153,6 +174,10 @@ function UsersTab() {
   // DB so foreign-key history (lead_assignments etc.) survives.
   const [deleteUser, setDeleteUser] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  // Switch Role — move someone between counsellor / telecaller lead /
+  // telecaller (or any other bucket). Separate from the edit dialog because
+  // the server may demand a lead handover first.
+  const [switchUser, setSwitchUser] = useState(null);
   // Branch managers CAN manage users — the backend scopes them to their branch
   // subtree and blocks admin/branch-manager targets (assertBranchManagerScope).
   // Sudo-login ("Login as user") stays super_admin-only.
@@ -281,16 +306,7 @@ function UsersTab() {
                 <td style={{ padding: '14px 16px', color: '#555' }}>{u.email}</td>
                 <td style={{ padding: '14px 16px', color: '#555' }}>{u.phone || '—'}</td>
                 <td style={{ padding: '14px 16px' }}>
-                  <Chip size="small" label={
-                    u.role === 'super_admin' ? 'Admin'
-                      : u.role === 'branch_manager' ? 'Branch Manager'
-                      : u.role === 'sales_manager' ? 'Manager'
-                      : u.role === 'account_manager' ? 'Account Mgr'
-                      : u.role === 'head_trainer' ? 'Head Trainer'
-                      : u.role === 'trainer' ? 'Trainer'
-                      : u.role === 'counsellor' ? 'Counsellor'
-                      : (u.role_name || u.role || 'User')
-                  } />
+                  <Chip size="small" label={ROLE_LABEL[u.role] || u.role_name || u.role || 'User'} />
                 </td>
                 <td style={{ padding: '14px 16px', color: '#555' }}>{u.role_name || '—'}</td>
                 <td style={{ padding: '14px 16px', color: '#555' }}>{reportingTo?.name || '—'}</td>
@@ -317,6 +333,18 @@ function UsersTab() {
                         sx={{ color: '#1565C0' }}
                       >
                         <EditIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="Switch role (e.g. Counsellor → Telecaller)">
+                    <span>
+                      <IconButton
+                        size="small"
+                        disabled={!canManage}
+                        onClick={() => setSwitchUser(u)}
+                        sx={{ color: '#7c3aed' }}
+                      >
+                        <SwapHorizIcon fontSize="small" />
                       </IconButton>
                     </span>
                   </Tooltip>
@@ -398,6 +426,14 @@ function UsersTab() {
         onClose={() => { setResetOpen(false); setActiveUser(null); }}
       />
 
+      <SwitchRoleDialog
+        open={Boolean(switchUser)}
+        user={switchUser}
+        users={allUsers}
+        onClose={() => setSwitchUser(null)}
+        onSwitched={() => { setSwitchUser(null); reload(); }}
+      />
+
       {/* Delete confirmation — DELETE /users/:id soft-deletes the row.
           Self-delete is blocked by both the button (disabled if u.id ===
           current user) and the dialog (extra confirm gate). */}
@@ -436,6 +472,156 @@ function UsersTab() {
         </DialogActions>
       </Dialog>
     </div>
+  );
+}
+
+// ----------------------------- Switch role dialog -----------------------------
+// Moves a person between roles — the counsellor / telecaller lead / telecaller
+// split this was built for, though it works for any bucket.
+//
+// Kept separate from the edit dialog because a role change is not a plain
+// field edit: the server revokes the user's sessions (their JWT still carries
+// the old role), writes an audit_log row, and — when the new role can't own
+// leads — refuses with 409 until the caller says who takes over the queue.
+// Nothing is deleted: the user row is updated in place and lead handovers
+// append to the assignment ledger.
+function SwitchRoleDialog({ open, user, users, onClose, onSwitched }) {
+  const [roles, setRoles] = useState([]);
+  const [roleId, setRoleId] = useState('');
+  const [managerIds, setManagerIds] = useState([]);
+  const [reassignTo, setReassignTo] = useState(null);
+  // Set when the server reports an open queue that has to move first.
+  const [pendingLeads, setPendingLeads] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const isBM = isRole(ROLES.BRANCH_MANAGER);
+
+  useEffect(() => {
+    if (!open) return;
+    setErr(''); setPendingLeads(0); setReassignTo(null); setSaving(false);
+    setRoleId('');
+    setManagerIds(user?.manager_ids?.length ? user.manager_ids : (user?.manager_id ? [user.manager_id] : []));
+    customRolesApi.list()
+      .then((r) => setRoles(pickableRolesFor(r?.data || [], isBM)))
+      .catch((e) => setErr(e?.message || 'Could not load roles'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, user?.id]);
+
+  const targetRole = roles.find((r) => r.id === roleId);
+  // Whether the role they're moving TO can hold leads. Drives the handover UI.
+  const targetOwns = targetRole ? LEAD_OWNER_ROLES.includes(targetRole.scope) : true;
+  const currentlyOwns = LEAD_OWNER_ROLES.includes(user?.role);
+  const needsHandover = currentlyOwns && !targetOwns;
+
+  // Candidate new owners for the queue: active users who can actually hold a
+  // lead, excluding the person being switched.
+  const handoverCandidates = useMemo(
+    () => (users || []).filter((u) => u.id !== user?.id && u.is_active !== false && LEAD_OWNER_ROLES.includes(u.role)),
+    [users, user?.id],
+  );
+  const managerCandidates = useMemo(
+    () => (users || []).filter((u) => u.id !== user?.id && u.is_active !== false),
+    [users, user?.id],
+  );
+
+  const submit = async () => {
+    if (!roleId) { setErr('Pick the new role'); return; }
+    setSaving(true); setErr('');
+    try {
+      const body = { role_id: roleId, manager_ids: managerIds };
+      if (reassignTo) body.reassign_leads_to = reassignTo;
+      await usersApi.switchRole(user.id, body);
+      onSwitched();
+    } catch (e) {
+      // 409 + details.open_lead_count => the queue must be handed over. Show
+      // the picker and let them resubmit rather than failing outright.
+      const count = e?.details?.open_lead_count;
+      if (count) setPendingLeads(count);
+      setErr(e?.message || 'Switch failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const showHandover = needsHandover || pendingLeads > 0;
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ fontWeight: 700 }}>
+        Switch role — {user?.name || user?.email}
+      </DialogTitle>
+      <DialogContent>
+        <p style={{ fontSize: 13, color: '#555', marginTop: 0 }}>
+          Currently <b>{ROLE_LABEL[user?.role] || user?.role}</b>
+          {user?.role_name ? ` (${user.role_name})` : ''}. Nothing is deleted —
+          their leads, history and login records all stay.
+        </p>
+
+        <TextField
+          select fullWidth size="small" margin="dense"
+          label="New role *"
+          value={roleId}
+          onChange={(e) => { setRoleId(e.target.value); setErr(''); }}
+        >
+          {roles.filter((r) => r.id !== user?.role_id).map((r) => (
+            <MenuItem key={r.id} value={r.id}>
+              {r.name}{r.scope && r.scope !== r.name ? ` — ${ROLE_LABEL[r.scope] || r.scope}` : ''}
+            </MenuItem>
+          ))}
+        </TextField>
+
+        <Autocomplete
+          multiple size="small"
+          options={managerCandidates}
+          getOptionLabel={(o) => o.name || o.email || ''}
+          isOptionEqualToValue={(o, v) => o.id === (v?.id ?? v)}
+          value={managerCandidates.filter((u) => managerIds.includes(u.id))}
+          onChange={(_e, picked) => setManagerIds(picked.map((u) => u.id))}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              margin="dense"
+              label="Reporting To"
+              helperText="Leave as-is to keep their current manager. A telecaller normally reports to a telecaller lead."
+            />
+          )}
+        />
+
+        {showHandover && (
+          <Box sx={{ mt: 2, p: 1.5, background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#9a3412', marginBottom: 8 }}>
+              {pendingLeads > 0
+                ? `${pendingLeads} open lead(s) need a new owner`
+                : 'This role cannot own leads'}
+            </div>
+            <div style={{ fontSize: 12, color: '#7c2d12', marginBottom: 8 }}>
+              {ROLE_LABEL[targetRole?.scope] || 'This role'} manages a team rather than
+              carrying a personal queue, so their open leads have to move to
+              someone who can hold them.
+            </div>
+            <Autocomplete
+              size="small"
+              options={handoverCandidates}
+              getOptionLabel={(o) => `${o.name || o.email} (${ROLE_LABEL[o.role] || o.role})`}
+              value={handoverCandidates.find((u) => u.id === reassignTo) || null}
+              onChange={(_e, picked) => setReassignTo(picked?.id || null)}
+              renderInput={(params) => (
+                <TextField {...params} label="Move their open leads to *" />
+              )}
+            />
+          </Box>
+        )}
+
+        {err && <div style={{ color: '#dc2626', fontSize: 12, marginTop: 12 }}>{err}</div>}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button variant="contained" onClick={submit} disabled={saving || !roleId}>
+          {saving ? 'Switching…' : 'Switch role'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 

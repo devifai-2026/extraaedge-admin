@@ -25,6 +25,7 @@ import { useNavigate } from 'react-router-dom';
 import DateRangePicker from '../../components/DatePicker/DatePicker';
 import ChartCard from '../../components/ChartCard/ChartCard';
 import './AnalyticsDashboard.css';
+import { LEAD_OWNER_ROLES, LEAD_OWNER_ROLES_PARAM } from '../../lib/rbac';
 
 const ROLES = {
   SUPER_ADMIN: 'super_admin',
@@ -156,7 +157,7 @@ export default function AnalyticsDashboard() {
   // server-side), so it gets the admin variant rather than the counsellor one.
   const isAdmin = role === ROLES.SUPER_ADMIN || role === ROLES.BRANCH_MANAGER;
   const isManager = role === ROLES.SALES_MANAGER;
-  const isCounsellor = role === ROLES.COUNSELLOR;
+  const isCounsellor = LEAD_OWNER_ROLES.includes(role);
 
   // Header filters
   const [dateRange, setDateRange] = useState({ from: null, to: null, rangeType: null });
@@ -207,9 +208,9 @@ export default function AnalyticsDashboard() {
   // ---- Counsellor list for the picker (admin = all, manager = team) ----
   useEffect(() => {
     if (isCounsellor) return;
-    const loader = isManager ? usersApi.myTeam() : usersApi.list({ role: 'counsellor', limit: 200 });
+    const loader = isManager ? usersApi.myTeam() : usersApi.list({ role: LEAD_OWNER_ROLES_PARAM, limit: 200 });
     loader
-      .then((r) => setCounsellors((r?.data || []).filter((u) => u.role === 'counsellor' && u.is_active !== false)))
+      .then((r) => setCounsellors((r?.data || []).filter((u) => LEAD_OWNER_ROLES.includes(u.role) && u.is_active !== false)))
       .catch(() => setCounsellors([]));
   }, [isCounsellor, isManager]);
 

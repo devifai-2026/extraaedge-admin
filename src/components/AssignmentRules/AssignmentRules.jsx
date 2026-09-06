@@ -21,6 +21,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { assignmentRulesApi, usersApi } from '../../lib/endpoints';
+import { LEAD_OWNER_ROLES_PARAM } from '../../lib/rbac';
 
 // One canonical place describing each strategy. The dialog reads label +
 // description + example; the row card uses label + chip color.
@@ -203,7 +204,7 @@ export default function AssignmentRules() {
 
   useEffect(() => {
     reload();
-    usersApi.list({ role: 'counsellor', limit: 200 })
+    usersApi.list({ role: LEAD_OWNER_ROLES_PARAM, limit: 200 })
       .then((r) => setUsers((r?.data || []).filter((u) => u.is_active !== false)))
       .catch(() => setUsers([]));
   }, []);

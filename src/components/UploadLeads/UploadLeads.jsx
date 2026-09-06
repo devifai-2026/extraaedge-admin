@@ -18,7 +18,8 @@ import CheckIcon from "@mui/icons-material/Check";
 import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import "./UploadLeads.css";
 import { colors } from "../../theme/colors";
-import { bulkApi, uploadsApi } from "../../lib/endpoints";
+import { bulkApi, uploadsApi, usersApi } from "../../lib/endpoints";
+import { LEAD_OWNER_ROLES_PARAM } from "../../lib/rbac";
 import { onNotification } from "../../lib/socket";
 import { useDropdown } from "../../lib/useDropdowns";
 
@@ -59,6 +60,11 @@ const waitForPreview = async (previewId, { timeoutMs = 30000, onTick } = {}) => 
 
 const UploadLeads = ({ open, onClose, onUploaded }) => {
     const [activeStep, setActiveStep] = useState(0);
+    // Job-level assignee pool: rows with no owner column are shared out among
+    // these people instead of falling to the tenant-wide round robin. A
+    // per-row assigned_to_email still wins over this.
+    const [assigneePool, setAssigneePool] = useState([]);
+    const [owners, setOwners] = useState([]);
     const [channel, setChannel] = useState("");
     const [source, setSource] = useState("");
 
@@ -104,6 +110,24 @@ const UploadLeads = ({ open, onClose, onUploaded }) => {
         return unsubscribe;
     }, [open]);
 
+    // Everyone who can hold a lead (counsellors + telecallers), for the
+    // "Assign to" picker below. Best-effort: if the fetch fails the picker is
+    // simply empty and assignment falls back to the rules, as before.
+    useEffect(() => {
+        if (!open) return undefined;
+        let cancelled = false;
+        (async () => {
+            try {
+                const r = await usersApi.list({ role: LEAD_OWNER_ROLES_PARAM, limit: 200 });
+                if (cancelled) return;
+                setOwners((r?.data || []).filter((u) => u.is_active !== false));
+            } catch {
+                if (!cancelled) setOwners([]);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [open]);
+
     const handleClose = () => {
         // Don't let the user close mid-upload by clicking outside the dialog —
         // the import job is already in flight server-side, so closing here
@@ -122,6 +146,9 @@ const UploadLeads = ({ open, onClose, onUploaded }) => {
         setResult(null);
         setError(null);
         setProgress(null);
+        // Clear the job-level pool too — it applies to one upload, not the
+        // next one the user opens.
+        setAssigneePool([]);
         trackedImportIdRef.current = null;
         onClose();
         if (hadSuccessfulImport) {
@@ -265,6 +292,10 @@ const UploadLeads = ({ open, onClose, onUploaded }) => {
                 send_welcome_sms: sendWelcomeSMS,
                 file_name: uploadedFile.name,
                 file_size: uploadedFile.size,
+                // Rows with no owner column are shared out among these people.
+                // Omitted entirely when nobody was picked, so the existing
+                // round-robin behaviour is unchanged.
+                ...(assigneePool.length ? { assignee_pool: assigneePool.map((u) => u.id) } : {}),
             });
             const importRow = commitResp?.data;
             trackedImportIdRef.current = importRow?.id || null;
@@ -407,10 +438,12 @@ const UploadLeads = ({ open, onClose, onUploaded }) => {
                     <li>Upload an <b>.xlsx</b> file (max 30,000 rows). CSV is not supported — please convert to .xlsx.</li>
                     <li>
                         Owner columns: <code>current_lead_owner_email</code> and <code>assigned_to_email</code> behave the same way and accept ANY active user email —
-                        counsellor email assigns the lead directly, sales-manager email round-robins across their team,
-                        super-admin email round-robins across the tenant. If both columns are set they must point to the
-                        SAME user (else <code>OWNER_MISMATCH</code>). Leave both blank to let the auto-assignment rule pick.
-                        Use <code>previous_lead_owner_email</code> (optional) to record a prior owner in the lead's history.
+                        a <b>counsellor or telecaller</b> email assigns the lead directly to them, a <b>sales-manager or
+                        telecaller-lead</b> email round-robins across their own team, and a super-admin email round-robins
+                        across the tenant. Manager roles never become the owner themselves. If both columns are set they
+                        must point to the SAME user (else <code>OWNER_MISMATCH</code>). Leave both blank to use the
+                        <b>Assign to</b> picker below, or the auto-assignment rule if that&apos;s empty too.
+                        Use <code>previous_lead_owner_email</code> (optional) to record a prior owner in the lead&apos;s history.
                     </li>
                     <li>
                         New <code>primary_source</code> column is auto-created (case-insensitive match) on first use,
@@ -472,6 +505,35 @@ const UploadLeads = ({ open, onClose, onUploaded }) => {
                         />
                     </div>
 
+                </div>
+
+                <div className="upload-leads-field" style={{ marginTop: 12 }}>
+                    <label className="upload-leads-field-label">Assign to</label>
+                    <Autocomplete
+                        multiple
+                        size="small"
+                        fullWidth
+                        options={owners}
+                        value={assigneePool}
+                        getOptionLabel={(o) => o.name || o.email || ""}
+                        isOptionEqualToValue={(o, v) => o.id === v.id}
+                        onChange={(_, val) => setAssigneePool(val)}
+                        noOptionsText="No counsellors or telecallers found"
+                        renderInput={(params) => (
+                            <TextField
+                                {...params}
+                                placeholder={assigneePool.length ? "" : "Leave empty to use your assignment rule"}
+                            />
+                        )}
+                    />
+                    <p style={{ fontSize: 12, color: "#64748b", margin: "6px 0 0" }}>
+                        {assigneePool.length === 1
+                            ? "Every row without an owner column goes to this person."
+                            : assigneePool.length > 1
+                                ? `Rows without an owner column are shared evenly among these ${assigneePool.length} people.`
+                                : "Rows without an owner column go to whoever your assignment rule picks."}
+                        {" "}A <code>assigned_to_email</code> value in the file always wins.
+                    </p>
                 </div>
 
                 <div className="upload-leads-checkboxes">

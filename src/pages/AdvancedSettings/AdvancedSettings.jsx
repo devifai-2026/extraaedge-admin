@@ -100,6 +100,11 @@ const sections = [
     title: "Lead Routing",
     items: [
       {
+        label: "Lead Distribution",
+        description: "Send WhatsApp, Instagram, Facebook or Website leads to a chosen person — or a group who share them. Checked before the assignment rule.",
+        path: "/advancedsettings/lead-distribution",
+      },
+      {
         label: "Assignment Rules",
         description: "Round-robin, load-balanced, and program-based auto-assignment.",
         path: "/advancedsettings/assignment-rules",
