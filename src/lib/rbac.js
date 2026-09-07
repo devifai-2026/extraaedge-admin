@@ -117,7 +117,10 @@ const FALLBACK_TABS = {
   [ROLES.SALES_MANAGER]: ROLE_MANAGER_TABS,
   [ROLES.COUNSELLOR]: ROLE_COUNSELLOR_TABS,
   // The telecalling pair mirrors its sales-side counterpart exactly.
-  [ROLES.TELECALLER_LEAD]: ROLE_MANAGER_TABS,
+  // Same surfaces as a sales manager, plus the QA scoring queue — a telecaller
+  // lead reviews their own telecallers' calls (server: qa-reviews
+  // REVIEWER_ROLES + applyReviewScope).
+  [ROLES.TELECALLER_LEAD]: [...ROLE_MANAGER_TABS, 'qa.reviews', 'qa.feedback'],
   [ROLES.TELECALLER]: ROLE_COUNSELLOR_TABS,
   [ROLES.ACCOUNT_MANAGER]: ROLE_ACCOUNT_MANAGER_TABS,
   [ROLES.HEAD_TRAINER]: ROLE_HEAD_TRAINER_TABS,
