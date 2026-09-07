@@ -9,6 +9,7 @@ import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import Tooltip from '@mui/material/Tooltip';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Rating from '@mui/material/Rating';
@@ -333,13 +334,23 @@ export default function QaReviewQueue() {
                   ) : <span style={{ color: '#94a3b8' }}>—</span>}
                 </td>
                 <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>
-                  <Button
-                    variant={r.review_id ? 'text' : 'outlined'} size="small"
-                    startIcon={<RateReviewIcon fontSize="small" />}
-                    onClick={() => setReviewFor(r)}
-                  >
-                    {r.review_id ? 'Re-rate' : 'Rate'}
-                  </Button>
+                  {/* can_review === false means this call belongs to another
+                      team: listen-only for this actor. The server rejects the
+                      submit either way; hiding the button keeps the UI honest
+                      instead of surfacing it as an error. */}
+                  {r.can_review === false ? (
+                    <Tooltip title="Another team's call — you can listen, but only their own team lead can rate it">
+                      <Chip size="small" label="Listen only" sx={{ height: 22, fontSize: 11, background: '#f1f5f9', color: '#64748b' }} />
+                    </Tooltip>
+                  ) : (
+                    <Button
+                      variant={r.review_id ? 'text' : 'outlined'} size="small"
+                      startIcon={<RateReviewIcon fontSize="small" />}
+                      onClick={() => setReviewFor(r)}
+                    >
+                      {r.review_id ? 'Re-rate' : 'Rate'}
+                    </Button>
+                  )}
                 </td>
               </tr>
             ))}
