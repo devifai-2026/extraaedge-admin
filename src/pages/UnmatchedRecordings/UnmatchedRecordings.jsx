@@ -26,6 +26,38 @@ const PAGE_SIZE = 50;
 // real enforcer, this just hides the button from counsellors.
 const DELETE_ROLES = [ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER, ROLES.SALES_MANAGER];
 
+// Review status for a matched call. Scored calls show the percentage, colour-
+// banded so a weak call stands out in a long list; unscored ones read as
+// "Not reviewed" so the gap is obvious at a glance.
+//
+// Reviewing happens on the Call Reviews page (QA queue) — this column only
+// reports state, it doesn't score. The percentage's tooltip names the reviewer
+// and when they did it.
+const scoreColor = (pct) => {
+  if (pct == null) return { bg: "#f1f5f9", fg: "#475569" };
+  if (pct >= 80) return { bg: "#dcfce7", fg: "#15803d" };
+  if (pct >= 60) return { bg: "#fef9c3", fg: "#a16207" };
+  return { bg: "#fee2e2", fg: "#b91c1c" };
+};
+
+function ReviewStatus({ row }) {
+  if (!row.review_id) {
+    return <Chip label="Not reviewed" size="small" sx={{ height: 22, fontSize: 11, background: "#f1f5f9", color: "#64748b" }} />;
+  }
+  const pct = row.overall_percent == null ? null : Number(row.overall_percent);
+  const c = scoreColor(pct);
+  const who = row.reviewed_by_name ? `by ${row.reviewed_by_name}` : "";
+  return (
+    <Tooltip title={`Reviewed ${who} ${row.reviewed_at ? fmt(row.reviewed_at) : ""}`.replace(/\s+/g, " ").trim()}>
+      <Chip
+        label={pct == null ? "Reviewed" : `${pct}%`}
+        size="small"
+        sx={{ height: 22, fontSize: 11, fontWeight: 700, background: c.bg, color: c.fg }}
+      />
+    </Tooltip>
+  );
+}
+
 const fmt = (v) => {
   if (!v) return "-";
   const d = new Date(v);
@@ -132,7 +164,9 @@ export default function UnmatchedRecordings() {
   };
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const columns = isMatched ? 6 : 5;
+  // +1 on the matched tab for the Review-status column (unmatched calls are
+  // not reviewable — no lead, often no identified caller).
+  const columns = isMatched ? 7 : 5;
 
   return (
     <div style={{ padding: 20 }}>
@@ -161,6 +195,7 @@ export default function UnmatchedRecordings() {
               <th style={{ padding: "10px 8px" }}>Uploaded by</th>
               <th style={{ padding: "10px 8px" }}>Uploaded</th>
               <th style={{ padding: "10px 8px" }}>Recording</th>
+              {isMatched && <th style={{ padding: "10px 8px" }}>Review</th>}
               <th style={{ padding: "10px 8px" }}>Action</th>
             </tr>
           </thead>
@@ -191,6 +226,11 @@ export default function UnmatchedRecordings() {
                 <td style={{ padding: "10px 8px", color: "#666" }}>{r.uploaded_by_name || "-"}</td>
                 <td style={{ padding: "10px 8px", color: "#666" }}>{fmt(r.uploaded_at)}</td>
                 <td style={{ padding: "10px 8px" }}><RecordingPlayer recordingId={r.id} /></td>
+                {isMatched && (
+                  <td style={{ padding: "10px 8px", whiteSpace: "nowrap" }}>
+                    <ReviewStatus row={r} />
+                  </td>
+                )}
                 <td style={{ padding: "10px 8px", whiteSpace: "nowrap" }}>
                   {!isMatched && (
                     <Tooltip title="Create a lead from this number">
