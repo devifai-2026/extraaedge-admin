@@ -7,7 +7,7 @@ import {
   ReactFlow, ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Box, Chip, Drawer, IconButton, Typography } from '@mui/material';
+import { Alert, AlertTitle, Box, Chip, Drawer, IconButton, Snackbar, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useNavigate } from 'react-router-dom';
@@ -247,21 +247,23 @@ export default function OrgTree() {
   }, [raw]);
   // A compact "N Label · M Label" summary across every role actually present,
   // ordered by tier then label.
-  // Structural gaps worth telling an admin about. A telecaller_lead is an
-  // OPTIONAL tier — nothing in the schema or the API requires one — so a
-  // tenant can end up running telecallers with no lead above them without any
-  // warning. That matters beyond the chart: the stale-lead rule hands a lead
-  // to someone in the SAME role class, and a thin front line is exactly what
-  // leaves leads stuck with an inactive owner.
-  const orgGaps = useMemo(() => {
-    const gaps = [];
-    const count = (role) => raw.nodes.filter((n) => n.role === role).length;
-    const telecallers = count('telecaller');
-    if (telecallers > 0 && count('telecaller_lead') === 0) {
-      gaps.push(`${telecallers} telecaller${telecallers === 1 ? '' : 's'} with no telecaller lead — promote someone via Users & Roles so the telecalling line has a manager.`);
-    }
-    return gaps;
-  }, [raw]);
+  // Structural gaps come from the API (/users/org-tree -> gaps), computed from
+  // EXPECTED_SUPERVISOR against the real reporting edges. Deliberately NOT
+  // re-derived here: the server already knows the visible scope and the role
+  // hierarchy, and duplicating the rule in the client is how the two drift.
+  const orgGaps = useMemo(() => raw.gaps || [], [raw]);
+
+  // Surface the gaps as a toast as well as inline text: the inline line is
+  // easy to scroll past, and the people who can act on this (branch manager /
+  // admin) are exactly the ones who open this page.
+  //
+  // Derived rather than set from an effect: we remember which gap set the user
+  // dismissed, and the toast is open whenever the CURRENT set differs from it.
+  // So a refresh that still has gaps re-opens it, a re-render does not, and
+  // there is no setState-in-effect cascade.
+  const gapKey = orgGaps.map((g) => `${g.code}:${g.role}:${g.count}`).join('|');
+  const [dismissedGapKey, setDismissedGapKey] = useState(null);
+  const gapToastOpen = !!gapKey && gapKey !== dismissedGapKey;
 
   const summary = useMemo(() => Object.entries(tierCounts)
     .filter(([, n]) => n > 0)
@@ -278,8 +280,9 @@ export default function OrgTree() {
             {summary || 'No staff yet'}
           </Typography>
           {orgGaps.map((g) => (
-            <Typography key={g} variant="body2" sx={{ color: '#b45309', mt: 0.5, fontSize: 13 }}>
-              ⚠ {g}
+            <Typography key={`${g.code}-${g.role}`} variant="body2" sx={{ color: '#b45309', mt: 0.5, fontSize: 13 }}>
+              ⚠ {g.message}
+              {g.members?.length ? ` — ${g.members.slice(0, 3).join(', ')}${g.count > 3 ? ` +${g.count - 3} more` : ''}` : ''}
             </Typography>
           ))}
         </Box>
@@ -370,6 +373,34 @@ export default function OrgTree() {
           </Box>
         )}
       </Drawer>
+
+      {/* Org structure warning. Stays until dismissed rather than auto-hiding:
+          this is a "go fix your org" message, not a confirmation, and the
+          affected names are worth reading. */}
+      <Snackbar
+        open={gapToastOpen && orgGaps.length > 0}
+        onClose={(_e, reason) => { if (reason !== 'clickaway') setDismissedGapKey(gapKey); }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert severity="warning" variant="filled" onClose={() => setDismissedGapKey(gapKey)} sx={{ maxWidth: 460 }}>
+          <AlertTitle sx={{ fontWeight: 700 }}>
+            {orgGaps.length === 1 ? 'Org structure gap' : `${orgGaps.length} org structure gaps`}
+          </AlertTitle>
+          {orgGaps.map((g) => (
+            <div key={`${g.code}-${g.role}`} style={{ fontSize: 13, marginTop: 2 }}>
+              • {g.message}
+              {g.members?.length ? (
+                <div style={{ fontSize: 12, opacity: 0.9, paddingLeft: 10 }}>
+                  {g.members.slice(0, 3).join(', ')}{g.count > 3 ? ` +${g.count - 3} more` : ''}
+                </div>
+              ) : null}
+            </div>
+          ))}
+          <div style={{ fontSize: 12, marginTop: 6, opacity: 0.95 }}>
+            Fix in Advanced Settings → Users &amp; Roles (Switch Role / Reporting To).
+          </div>
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
