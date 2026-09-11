@@ -26,6 +26,8 @@ import HowToRegIcon from '@mui/icons-material/HowToReg';
 import PauseCircleIcon from '@mui/icons-material/PauseCircle';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
 import HistoryEduIcon from '@mui/icons-material/HistoryEduOutlined';
 import EventBusyIcon from '@mui/icons-material/EventBusyOutlined';
 import PaymentsIcon from '@mui/icons-material/Payments';
@@ -94,6 +96,13 @@ const menuSections = [
       { id: 6, label: 'Upload Failed Leads', icon: UploadFileIcon, path: '/failedleads', tab: 'failed_leads' },
       { id: 7, label: 'Bulk Action Stage', icon: SettingsIcon, path: '/bulkuploadlist', tab: 'bulk_upload' },
       { id: 20, label: 'Lead Report', icon: AssessmentIcon, path: '/reports/lead-transfers', tab: 'lead_transfer_report' },
+      // Audit of manual lead moves — super_admin only (own tab key), so the
+      // people being audited can't see it. Sits next to Lead Report because
+      // both read the lead_assignments ledger.
+      { id: 25, label: 'Reassign Logs', icon: SwapHorizIcon, path: '/reports/reassign-logs', tab: 'reassign_logs' },
+      // The 6-day/7-day stale-lead auto-handover, made visible. Managers see
+      // it too (they're the ones notified on day 6), each within their scope.
+      { id: 26, label: 'Stale Leads', icon: HourglassBottomIcon, path: '/reports/stale-leads', tab: 'stale_handovers' },
       { id: 21, label: 'Discount Approvals', icon: ChecklistIcon, path: '/discount-approvals', tab: 'lead_transfer_report', badgeKey: 'discount_approvals' },
       { id: 22, label: 'Call Recordings', icon: GraphicEqIcon, path: '/unmatched-recordings', tab: 'unmatched_recordings' },
       // QA: the review queue is the reviewer's surface, the feedback report is

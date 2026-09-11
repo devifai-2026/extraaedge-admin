@@ -54,6 +54,13 @@ export const auth = {
     if (tenant) localStorage.setItem(STORAGE.TENANT, JSON.stringify(tenant));
     if (allowed_tabs) localStorage.setItem(STORAGE.ALLOWED_TABS, JSON.stringify(allowed_tabs));
     if (tenant_setup) localStorage.setItem(STORAGE.TENANT_SETUP, JSON.stringify(tenant_setup));
+    // Re-pin date rendering to the tenant's zone as soon as we know it, so the
+    // post-login screens don't have to wait for a reload to show IST. Imported
+    // lazily to keep lib/api dependency-free (appTimezone imports nothing, but
+    // this keeps the module graph acyclic for any future change there).
+    if (tenant) {
+      import('./appTimezone').then((m) => m.setAppTimezone(tenant)).catch(() => {});
+    }
   },
   clear: () => {
     Object.values(STORAGE).forEach((k) => localStorage.removeItem(k));

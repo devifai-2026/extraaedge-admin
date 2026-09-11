@@ -29,7 +29,7 @@ import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import "./AddNewLead.css";
-import { leadsApi, usersApi, uploadsApi, admissionsApi, leadPoolApi } from "../../lib/endpoints";
+import { leadsApi, usersApi, uploadsApi, admissionsApi, leadPoolApi, deviceRecordingsApi } from "../../lib/endpoints";
 import { auth } from "../../lib/api";
 import { useDropdown } from "../../lib/useDropdowns";
 import QuickCreateDialog from "../QuickCreateDialog/QuickCreateDialog";
@@ -1750,11 +1750,40 @@ function CallRecordingsTab({ leadId }) {
     const me = auth.getUser() || {};
     const isAdmin = me.role === 'super_admin';
 
+    // Two independent stores feed this tab and BOTH must be shown:
+    //   - lead_call_recordings : files uploaded here, on the lead (manual).
+    //   - device_recordings    : files the mobile recorder app uploaded and
+    //                            matched to this lead by phone number.
+    // Only the first was listed before, so a lead whose calls all came from the
+    // app read "No call recordings yet" here while the Call Recordings page
+    // showed them — the two screens disagreed about the same lead. We merge
+    // them and tag each row with `source` so play/delete hit the right API.
     const reload = async () => {
         setLoading(true); setLoadError('');
         try {
-            const r = await leadsApi.recordings.list(leadId);
-            setItems(r?.data ?? []);
+            const [manual, device] = await Promise.allSettled([
+                leadsApi.recordings.list(leadId),
+                deviceRecordingsApi.list({ lead_id: leadId, limit: 200 }),
+            ]);
+            const manualRows = manual.status === 'fulfilled' ? (manual.value?.data ?? []) : [];
+            const deviceRows = device.status === 'fulfilled' ? (device.value?.data ?? []) : [];
+            // A counsellor may legitimately lack access to the device-recordings
+            // endpoint; that must not blank out their manual uploads, so we only
+            // surface an error when BOTH sides failed.
+            if (manual.status === 'rejected' && device.status === 'rejected') {
+                throw manual.reason || device.reason || new Error('Failed to load recordings');
+            }
+            setItems([
+                ...manualRows.map((r) => ({ ...r, source: 'manual' })),
+                // device rows use `uploaded_at` and carry no stage snapshot;
+                // normalise the few fields this tab renders.
+                ...deviceRows.map((r) => ({
+                    ...r,
+                    source: 'device',
+                    uploaded_at: r.uploaded_at,
+                    uploaded_by_name: r.uploaded_by_name ?? r.uploader_name ?? null,
+                })),
+            ].sort((a, b) => new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0)));
         } catch (e) { setLoadError(e?.message || 'Failed to load recordings'); }
         finally { setLoading(false); }
     };
@@ -1839,7 +1868,9 @@ function CallRecordingsTab({ leadId }) {
         if (playUrls[rec.id]) return;
         setPlayLoadingId(rec.id);
         try {
-            const r = await leadsApi.recordings.playUrl(leadId, rec.id);
+            const r = rec.source === 'device'
+                ? await deviceRecordingsApi.playUrl(rec.id)
+                : await leadsApi.recordings.playUrl(leadId, rec.id);
             const url = r?.data?.url;
             if (!url) throw new Error('No playback URL');
             setPlayUrls((prev) => ({ ...prev, [rec.id]: url }));
@@ -1853,7 +1884,8 @@ function CallRecordingsTab({ leadId }) {
     const handleDelete = async (rec) => {
         if (!confirm(`Delete recording "${rec.file_name || 'this file'}"? This can't be undone.`)) return;
         try {
-            await leadsApi.recordings.delete(leadId, rec.id);
+            if (rec.source === 'device') await deviceRecordingsApi.delete(rec.id);
+            else await leadsApi.recordings.delete(leadId, rec.id);
             setPlayUrls((prev) => { const next = { ...prev }; delete next[rec.id]; return next; });
             await reload();
         } catch (e) {
@@ -1866,10 +1898,15 @@ function CallRecordingsTab({ leadId }) {
     const grouped = useMemo(() => {
         const map = new Map();
         for (const r of items) {
-            const key = r.stage_id || 'untagged';
-            const label = r.stage_name
-                ? (r.sub_stage_name ? `${r.stage_name} · ${r.sub_stage_name}` : r.stage_name)
-                : 'Untagged';
+            // Device uploads carry no stage snapshot — give them their own
+            // bucket instead of burying them under "Untagged" next to manual
+            // uploads that genuinely lost their stage.
+            const key = r.source === 'device' ? 'device' : (r.stage_id || 'untagged');
+            const label = r.source === 'device'
+                ? 'From mobile recorder app'
+                : (r.stage_name
+                    ? (r.sub_stage_name ? `${r.stage_name} · ${r.sub_stage_name}` : r.stage_name)
+                    : 'Untagged');
             if (!map.has(key)) map.set(key, { label, rows: [] });
             map.get(key).rows.push(r);
         }

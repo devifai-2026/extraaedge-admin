@@ -822,6 +822,12 @@ export const reportsApi = {
   jobStatus: (job_id) => api.get(`/reports/${job_id}`),
   // Lead Transfer Report (admin + sales_manager). JSON for the on-screen table.
   leadTransfers: (params) => api.get('/reports/lead-transfers', params),
+  // Reassign Logs (super_admin only) — actor-first audit of manual lead moves.
+  // Rows are BATCHES: one bulk reassign = one row with its lead_count.
+  reassignLogs: (params) => api.get('/reports/reassign-logs', params),
+  // Stale-lead handovers (admin + manager tiers) — the 6-day/7-day rule's
+  // output: what was flagged, what moved to whom, what was held.
+  staleHandovers: (params) => api.get('/sla-policies/handovers', params),
   // Streams the same report as an Excel file and triggers a browser download.
   downloadLeadTransfers: async (params = {}) => {
     const { auth, API_BASE } = await import('./api');

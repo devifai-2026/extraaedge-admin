@@ -15,7 +15,7 @@ import { quickAddApi } from '../../lib/endpoints';
 import { auth } from '../../lib/api';
 import { useDropdown } from '../../lib/useDropdowns';
 import './QuickAdd.css';
-import { LEAD_OWNER_ROLES } from '../../lib/rbac';
+import { LEAD_OWNER_ROLES, TEAM_SCOPED_MANAGER_ROLES } from '../../lib/rbac';
 
 const initialFormData = {
     applicantName: '',
@@ -107,7 +107,11 @@ const QuickAdd = ({ open, onClose, onCreated }) => {
 
     // A counsellor's quick-add self-assigns to them; managers/admins leave it
     // Unassigned for auto-assign. Word the toast accordingly.
-    const savedText = LEAD_OWNER_ROLES.includes(auth.getUser()?.role)
+    // telecaller_lead can own leads but quick-adds like a manager (server:
+    // modules/quick-add/routes.js), so it must NOT get the self-assign copy.
+    const quickAddRole = auth.getUser()?.role;
+    const savedText = LEAD_OWNER_ROLES.includes(quickAddRole)
+        && !TEAM_SCOPED_MANAGER_ROLES.includes(quickAddRole)
         ? 'Lead saved to your leads.'
         : 'Lead saved to the Unassigned bucket.';
 

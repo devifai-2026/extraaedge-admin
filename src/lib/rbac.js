@@ -56,6 +56,7 @@ const ROLE_MANAGER_TABS = [
   'settings.email_templates', 'settings.sms_templates', 'settings.whatsapp_templates',
   'settings.assignment_rules',
   'lead_transfer_report',
+  'stale_handovers',
 ];
 const ROLE_COUNSELLOR_TABS = [
   'dashboard', 'leads', 'lead_pool', 'raw_data', 'failed_leads', 'followups', 'whatsapp',
@@ -100,7 +101,11 @@ const ROLE_PLACEMENT_TABS = ['placement.dashboard', 'placement.companies', 'plac
 // Front-line roles that carry a personal queue of leads. Mirrors the server's
 // LEAD_OWNER_ROLES — these are the buckets a lead can be assigned to, and the
 // ones whose views are scoped to "mine only".
-export const LEAD_OWNER_ROLES = [ROLES.COUNSELLOR, ROLES.TELECALLER];
+// Mirrors the backend's LEAD_OWNER_ROLES. telecaller_lead is deliberately in
+// BOTH this list and TEAM_SCOPED_MANAGER_ROLES: it runs a team of telecallers
+// and carries its own queue of leads. Anywhere the UI branches "owner vs
+// manager" (isLeadOwnerRole) check the manager tiers first.
+export const LEAD_OWNER_ROLES = [ROLES.COUNSELLOR, ROLES.TELECALLER, ROLES.TELECALLER_LEAD];
 // Query value for the very common "list everyone who can own a lead" fetch:
 // GET /users?role=counsellor,telecaller.
 export const LEAD_OWNER_ROLES_PARAM = LEAD_OWNER_ROLES.join(',');
@@ -137,11 +142,21 @@ export const currentRole = () => auth.getUser()?.role || null;
 
 export const isRole = (...roles) => roles.includes(currentRole());
 
-// True when the logged-in user is front line — a counsellor OR a telecaller.
-// Use this instead of isRole(ROLES.COUNSELLOR) for any "does this user carry a
-// personal queue" check: a telecaller works leads exactly as a counsellor
-// does, so a bare COUNSELLOR test would show them manager-only UI.
-export const isLeadOwnerRole = () => LEAD_OWNER_ROLES.includes(currentRole());
+// True when the logged-in user is PURE front line — a counsellor or a
+// telecaller. Use this instead of isRole(ROLES.COUNSELLOR) for any "does this
+// user carry a personal queue and nothing more" check: a telecaller works
+// leads exactly as a counsellor does, so a bare COUNSELLOR test would show
+// them manager-only UI.
+//
+// telecaller_lead owns leads too, but it also runs a team, so it is
+// deliberately EXCLUDED here — every call site uses `!isLeadOwnerRole()` to
+// decide whether to show manager affordances (bulk reassign, the counsellor
+// picker), and a team lead must keep those. Use
+// LEAD_OWNER_ROLES.includes(role) directly for a plain "can hold a lead" test.
+export const isLeadOwnerRole = () => {
+  const r = currentRole();
+  return LEAD_OWNER_ROLES.includes(r) && !TEAM_SCOPED_MANAGER_ROLES.includes(r);
+};
 
 // Check if the logged-in user has access to a tab key (matches DEFAULT_TAB_KEYS on backend).
 //
@@ -194,6 +209,9 @@ const TAB_TO_ROUTE = {
   third_party_integration: '/connectedaccounts',
   reports: '/dashboard',
   lead_transfer_report: '/reports/lead-transfers',
+  // super_admin-only audit of manual lead moves.
+  reassign_logs: '/reports/reassign-logs',
+  stale_handovers: '/reports/stale-leads',
   // Accounts module — account_manager only
   'accounts.dashboard':              '/accounts/dashboard',
   'accounts.pending_admissions':     '/accounts/pending-admissions',
