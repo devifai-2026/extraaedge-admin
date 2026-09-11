@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Tab, Tabs, Button, TextField, CircularProgress, Chip, Avatar, IconButton,
   Dialog, DialogTitle, DialogContent, DialogActions, Switch, MenuItem,
-  InputAdornment, Tooltip, Checkbox, FormControlLabel, Autocomplete, Box,
+  InputAdornment, Tooltip, Checkbox, FormControlLabel, Autocomplete, Box, Alert,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
@@ -613,7 +613,15 @@ function SwitchRoleDialog({ open, user, users, onClose, onSwitched }) {
           </Box>
         )}
 
-        {err && <div style={{ color: '#dc2626', fontSize: 12, marginTop: 12 }}>{err}</div>}
+        {/* A structural refusal ("no telecaller lead exists", "must report to
+            a sales manager") is not a field typo — it needs an admin to change
+            the org, so it gets an alert at the top of the actions area rather
+            than 12px red text at the bottom of a long form. */}
+        {err && (
+          <Alert severity="warning" sx={{ mt: 2 }} onClose={() => setErr('')}>
+            {err}
+          </Alert>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={saving}>Cancel</Button>
