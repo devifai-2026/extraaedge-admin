@@ -1,7 +1,7 @@
 // Org Tree canvas — super_admin sees the full tenant tree; sales_manager
 // sees the chain they're part of (managers above + counsellors below).
 // Counsellors are blocked at the route layer.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background, Controls, Handle, MarkerType, MiniMap, Position,
   ReactFlow, ReactFlowProvider,
@@ -58,6 +58,22 @@ const ROLE_LABEL = {
   telecaller: 'Telecaller',
   qa: 'QA',
 };
+
+// The legend chips across the top. Each maps to the set of roles it stands
+// for, so clicking one can flash exactly those cards. "Manager" is the tier-2
+// bucket (sales manager + the sibling department heads) rather than a single
+// role, which is why this is an explicit list and not derived from ROLE_LABEL.
+const LEGEND = [
+  { key: 'super_admin', label: 'Super admin', bg: '#fee2e2', fg: '#E53935', roles: ['super_admin'] },
+  { key: 'branch_manager', label: 'Branch mgr', bg: '#f3e5f5', fg: '#8e24aa', roles: ['branch_manager'] },
+  { key: 'manager', label: 'Manager', bg: '#dbeafe', fg: '#1976d2', roles: ['sales_manager'] },
+  { key: 'counsellor', label: 'Counsellor', bg: '#dcfce7', fg: '#2e7d32', roles: ['counsellor'] },
+  { key: 'telecaller_lead', label: 'Telecaller lead', bg: '#e0f2fe', fg: '#0369a1', roles: ['telecaller_lead'] },
+  { key: 'telecaller', label: 'Telecaller', bg: '#f0f9ff', fg: '#0ea5e9', roles: ['telecaller'] },
+];
+
+// How long a legend click keeps the matching cards lit.
+const HIGHLIGHT_MS = 3000;
 
 // Tier-based layout: place each role tier on its own horizontal row,
 // spread members evenly along the X axis. Good enough for normal team
@@ -120,19 +136,30 @@ const handleStyle = { width: 1, height: 1, background: 'transparent', border: 'n
 
 const OrgNode = ({ data, selected }) => {
   const color = ROLE_COLOR[data.role] || '#666';
+  // `highlighted` is set for ~3s when the matching legend chip is clicked.
+  // It borrows the selected styling and adds a ring + lift so a whole role
+  // reads as one group at a glance, then fades back on its own.
+  const lit = data.highlighted;
+  const active = selected || lit;
   return (
     <div
       style={{
-        background: '#fff',
-        border: `2px solid ${selected ? color : '#e2e8f0'}`,
+        background: lit ? `${color}0c` : '#fff',
+        border: `2px solid ${active ? color : '#e2e8f0'}`,
         borderRadius: 12,
         padding: '12px 16px',
         minWidth: 200,
-        boxShadow: selected
-          ? `0 8px 24px ${color}33, 0 2px 6px rgba(15,23,42,0.06)`
-          : '0 4px 12px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04)',
+        boxShadow: lit
+          ? `0 0 0 4px ${color}33, 0 10px 28px ${color}40`
+          : selected
+            ? `0 8px 24px ${color}33, 0 2px 6px rgba(15,23,42,0.06)`
+            : '0 4px 12px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04)',
         cursor: 'pointer',
-        transition: 'all 0.15s',
+        // Dim everything that is NOT part of the highlighted set, so the group
+        // stands out instead of merely being brighter.
+        opacity: data.dimmed ? 0.35 : 1,
+        transform: lit ? 'scale(1.04)' : 'scale(1)',
+        transition: 'box-shadow 0.25s, transform 0.25s, opacity 0.25s, border-color 0.25s, background 0.25s',
       }}
     >
       <Handle type="target" position={Position.Top} style={handleStyle} isConnectable={false} />
@@ -165,6 +192,26 @@ export default function OrgTree() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [selectedNode, setSelectedNode] = useState(null);
+  // Which legend chip is currently flashing its group (null = none).
+  const [litKey, setLitKey] = useState(null);
+  const litTimer = useRef(null);
+
+  // Flash every card of a role group for HIGHLIGHT_MS, then clear. Clicking
+  // the same chip again toggles it off; clicking another switches immediately
+  // (the previous timer is cancelled so it can't clear the new highlight).
+  const flashRole = (key) => {
+    if (litTimer.current) clearTimeout(litTimer.current);
+    setLitKey((prev) => {
+      const next = prev === key ? null : key;
+      if (next) {
+        litTimer.current = setTimeout(() => setLitKey(null), HIGHLIGHT_MS);
+      }
+      return next;
+    });
+  };
+
+  // Don't leave a timer running against an unmounted component.
+  useEffect(() => () => { if (litTimer.current) clearTimeout(litTimer.current); }, []);
 
   const reload = () => {
     setLoading(true); setErr('');
@@ -176,7 +223,22 @@ export default function OrgTree() {
 
   useEffect(() => { reload(); }, []);
 
-  const { nodes, edges } = useMemo(() => layout(raw.nodes, raw.edges), [raw]);
+  const base = useMemo(() => layout(raw.nodes, raw.edges), [raw]);
+
+  // Re-stamp the laid-out nodes with the highlight flags. Kept separate from
+  // `layout` so flashing a group never recomputes positions (which would make
+  // the whole tree jump).
+  const { nodes, edges } = useMemo(() => {
+    if (!litKey) return base;
+    const roles = new Set(LEGEND.find((l) => l.key === litKey)?.roles || []);
+    return {
+      edges: base.edges,
+      nodes: base.nodes.map((n) => {
+        const hit = roles.has(n.data?.role);
+        return { ...n, data: { ...n.data, highlighted: hit, dimmed: !hit } };
+      }),
+    };
+  }, [base, litKey]);
 
   const tierCounts = useMemo(() => {
     const c = {};
@@ -201,12 +263,30 @@ export default function OrgTree() {
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          <Chip label="Super admin" size="small" sx={{ background: '#fee2e2', color: '#E53935', fontWeight: 600 }} />
-          <Chip label="Branch mgr" size="small" sx={{ background: '#f3e5f5', color: '#8e24aa', fontWeight: 600 }} />
-          <Chip label="Manager" size="small" sx={{ background: '#dbeafe', color: '#1976d2', fontWeight: 600 }} />
-          <Chip label="Counsellor" size="small" sx={{ background: '#dcfce7', color: '#2e7d32', fontWeight: 600 }} />
-          <Chip label="Telecaller lead" size="small" sx={{ background: '#e0f2fe', color: '#0369a1', fontWeight: 600 }} />
-          <Chip label="Telecaller" size="small" sx={{ background: '#f0f9ff', color: '#0ea5e9', fontWeight: 600 }} />
+          {LEGEND.map((l) => {
+            const count = raw.nodes.filter((n) => l.roles.includes(n.role)).length;
+            const on = litKey === l.key;
+            return (
+              <Chip
+                key={l.key}
+                label={l.label}
+                size="small"
+                onClick={() => flashRole(l.key)}
+                disabled={count === 0}
+                title={count ? `Highlight ${count} ${l.label.toLowerCase()}${count === 1 ? '' : 's'}` : `No ${l.label.toLowerCase()} in this tree`}
+                sx={{
+                  background: l.bg,
+                  color: l.fg,
+                  fontWeight: 600,
+                  cursor: count ? 'pointer' : 'default',
+                  // Ring the active chip so it's obvious which group is lit.
+                  boxShadow: on ? `0 0 0 2px ${l.fg}` : 'none',
+                  transition: 'box-shadow 0.2s, opacity 0.2s',
+                  '&:hover': { background: l.bg, opacity: count ? 0.85 : 1 },
+                }}
+              />
+            );
+          })}
           <IconButton size="small" onClick={reload} title="Refresh"><RefreshIcon /></IconButton>
         </Box>
       </Box>

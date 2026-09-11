@@ -29,6 +29,18 @@ const OUTCOMES = [
   { v: 'resolved', label: 'Resolved in time' },
 ];
 
+// Why a handover didn't happen. Codes come from HOLD_REASONS in the server's
+// modules/sla/reassign.js. 'unknown_legacy' is the pre-existing backlog that
+// escalated before the reason was recorded — we say so rather than inventing
+// a cause.
+const HOLD_REASON_TEXT = {
+  no_peers: 'Nobody else in this role class is active',
+  owner_role: 'Current owner can no longer hold leads',
+  no_owner: 'Owner account no longer exists',
+  policy_no_reassign: 'Policy notifies only — it does not reassign',
+  unknown_legacy: 'Escalated before reasons were recorded — will retry',
+};
+
 const OUTCOME_STYLE = {
   moved: { bg: '#e8f5e9', fg: '#1b5e20', label: 'Moved' },
   held: { bg: '#fff3e0', fg: '#e65100', label: 'Held' },
@@ -49,10 +61,13 @@ const roleLabel = (r) => (r ? String(r).replaceAll('_', ' ') : '');
 export default function StaleHandovers() {
   const [rows, setRows] = useState([]);
   const [totals, setTotals] = useState({ pending: 0, moved: 0, held: 0 });
+  const [upcoming, setUpcoming] = useState({ in_rotation: 0, due_within_24h: 0 });
+  const [policy, setPolicy] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const [view, setView] = useState('history');
   const [filters, setFilters] = useState({
     date_from: '', date_to: '', from_user_id: '', to_user_id: '', outcome: '',
   });
@@ -71,17 +86,27 @@ export default function StaleHandovers() {
   }, []);
 
   const params = useMemo(() => {
-    const p = { limit: 200 };
-    for (const [k, v] of Object.entries(debounced)) { if (v !== '' && v != null) p[k] = v; }
+    const p = { limit: 200, view };
+    for (const [k, v] of Object.entries(debounced)) {
+      if (v === '' || v == null) continue;
+      // The upcoming pipeline has no outcome, no recipient and no handover
+      // date yet — only the current owner filter applies.
+      if (view === 'upcoming' && k !== 'from_user_id') continue;
+      p[k] = v;
+    }
     return p;
-  }, [debounced]);
+  }, [debounced, view]);
 
   const reload = useCallback(async () => {
     setLoading(true); setError('');
     try {
       const res = await reportsApi.staleHandovers(params);
       setRows(res?.data || []);
-      if (res?.meta?.totals) setTotals(res.meta.totals);
+      if (res?.meta?.policy) setPolicy(res.meta.policy);
+      if (res?.meta?.totals) {
+        if (params.view === 'upcoming') setUpcoming(res.meta.totals);
+        else setTotals(res.meta.totals);
+      }
     } catch (e) {
       setError(e?.message || 'Could not load stale-lead handovers'); setRows([]);
     } finally { setLoading(false); }
@@ -104,36 +129,76 @@ export default function StaleHandovers() {
         <HourglassBottomIcon /> Stale Leads
       </h2>
       <p style={{ margin: '0 0 16px', color: '#666', fontSize: 14, maxWidth: 860 }}>
-        Leads with no activity for 6 days. On day 6 the owner and their managers are
-        notified; on day 7 the lead moves to someone else in the same role — counsellors
-        to counsellors, telecallers to telecallers. Touch a lead on day 6 and it stays put.
+        Leads with no activity for {policy ? Math.round(policy.no_activity_hours / 24) : 6} days.
+        The owner and their managers are notified first; {policy?.escalate_after_hours
+          ? `${Math.round(policy.escalate_after_hours / 24) || 1} day later`
+          : 'a day later'} the lead
+        moves to someone else in the same role — counsellors to counsellors, telecallers to
+        telecallers. Touch a lead before then and it stays put.
       </p>
 
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid #eee' }}>
+        {[
+          { v: 'history', label: 'What moved' },
+          { v: 'upcoming', label: 'Coming up' },
+        ].map((tb) => (
+          <button
+            key={tb.v}
+            type="button"
+            onClick={() => setView(tb.v)}
+            style={{
+              padding: '8px 18px', border: 'none', cursor: 'pointer', fontSize: 14,
+              background: 'transparent',
+              fontWeight: view === tb.v ? 700 : 500,
+              color: view === tb.v ? '#c62828' : '#666',
+              borderBottom: view === tb.v ? '2px solid #c62828' : '2px solid transparent',
+            }}
+          >{tb.label}</button>
+        ))}
+      </div>
+
       <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
-        <Stat label="Moved (day 7)" value={totals.moved ?? 0} color="#1b5e20" />
-        <Stat label="Held — nobody free" value={totals.held ?? 0} color="#e65100" />
-        <Stat label="Pending (day 6)" value={totals.pending ?? 0} color="#0d47a1" />
+        {view === 'history' ? (
+          <>
+            <Stat label="Moved (day 7)" value={totals.moved ?? 0} color="#1b5e20" />
+            <Stat label="Held — no handover" value={totals.held ?? 0} color="#e65100" />
+            <Stat label="Pending (day 6)" value={totals.pending ?? 0} color="#0d47a1" />
+          </>
+        ) : (
+          <>
+            <Stat label="In the rotation" value={upcoming.in_rotation ?? 0} color="#0d47a1" />
+            <Stat label="Go stale within 24h" value={upcoming.due_within_24h ?? 0} color="#e65100" />
+          </>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-        <TextField size="small" type="date" label="From" InputLabelProps={{ shrink: true }}
-          value={filters.date_from} onChange={set('date_from')} />
-        <TextField size="small" type="date" label="To" InputLabelProps={{ shrink: true }}
-          value={filters.date_to} onChange={set('date_to')} />
-        <TextField size="small" select label="Lost by" sx={{ minWidth: 180 }}
+        {view === 'history' && (
+          <>
+            <TextField size="small" type="date" label="From" InputLabelProps={{ shrink: true }}
+              value={filters.date_from} onChange={set('date_from')} />
+            <TextField size="small" type="date" label="To" InputLabelProps={{ shrink: true }}
+              value={filters.date_to} onChange={set('date_to')} />
+          </>
+        )}
+        <TextField size="small" select label={view === 'upcoming' ? 'Current owner' : 'Lost by'} sx={{ minWidth: 180 }}
           value={filters.from_user_id} onChange={set('from_user_id')}>
           <MenuItem value="">Anyone</MenuItem>
           {users.map((u) => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
         </TextField>
-        <TextField size="small" select label="Received by" sx={{ minWidth: 180 }}
-          value={filters.to_user_id} onChange={set('to_user_id')}>
-          <MenuItem value="">Anyone</MenuItem>
-          {users.map((u) => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
-        </TextField>
-        <TextField size="small" select label="Outcome" sx={{ minWidth: 180 }}
-          value={filters.outcome} onChange={set('outcome')}>
-          {OUTCOMES.map((o) => <MenuItem key={o.v} value={o.v}>{o.label}</MenuItem>)}
-        </TextField>
+        {view === 'history' && (
+          <>
+            <TextField size="small" select label="Received by" sx={{ minWidth: 180 }}
+              value={filters.to_user_id} onChange={set('to_user_id')}>
+              <MenuItem value="">Anyone</MenuItem>
+              {users.map((u) => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
+            </TextField>
+            <TextField size="small" select label="Outcome" sx={{ minWidth: 180 }}
+              value={filters.outcome} onChange={set('outcome')}>
+              {OUTCOMES.map((o) => <MenuItem key={o.v} value={o.v}>{o.label}</MenuItem>)}
+            </TextField>
+          </>
+        )}
       </div>
 
       {error && <div style={{ color: '#c62828', marginBottom: 12 }}>{error}</div>}
@@ -142,7 +207,60 @@ export default function StaleHandovers() {
         <div style={{ padding: 40, textAlign: 'center' }}><CircularProgress size={28} /></div>
       ) : rows.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>
-          No stale-lead activity matches these filters.
+          {view === 'upcoming'
+            ? 'No leads are currently heading toward a handover.'
+            : 'No stale-lead activity matches these filters.'}
+        </div>
+      ) : view === 'upcoming' ? (
+        <div style={{ overflowX: 'auto', border: '1px solid #eee', borderRadius: 8 }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 14 }}>
+            <thead>
+              <tr style={{ background: '#fafafa', textAlign: 'left' }}>
+                <th style={{ padding: '10px 12px' }}>Time left</th>
+                <th style={{ padding: '10px 12px' }}>Lead</th>
+                <th style={{ padding: '10px 12px' }}>Current owner</th>
+                <th style={{ padding: '10px 12px' }}>New owner</th>
+                <th style={{ padding: '10px 12px' }}>Last activity</th>
+                <th style={{ padding: '10px 12px' }}>Goes stale (day 6)</th>
+                <th style={{ padding: '10px 12px' }}>Moves (day 7)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                // < 48h to the day-6 flag is the window where the owner can
+                // still save the lead by touching it — worth calling out.
+                const soon = (r.hours_left ?? 999) <= 48;
+                return (
+                  <tr key={r.lead_id} style={{ borderTop: '1px solid #f0f0f0', background: soon ? '#fff8e1' : undefined }}>
+                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', fontWeight: soon ? 700 : 500 }}>
+                      {r.hours_left >= 24
+                        ? `${Math.floor(r.hours_left / 24)}d ${r.hours_left % 24}h`
+                        : `${r.hours_left}h`}
+                    </td>
+                    <td style={{ padding: '10px 12px' }}>
+                      {r.lead_name || '—'}
+                      <div style={{ fontSize: 12, color: '#888' }}>{r.lead_phone || ''}</div>
+                    </td>
+                    <td style={{ padding: '10px 12px' }}>
+                      {r.from_name || '—'}
+                      <div style={{ fontSize: 12, color: '#888' }}>{roleLabel(r.from_role)}</div>
+                    </td>
+                    <td style={{ padding: '10px 12px' }}>
+                      <Tooltip title="Chosen when the move happens, from whoever is least loaded then — so it can't be named in advance.">
+                        <span style={{ color: '#999', fontStyle: 'italic' }}>TBD</span>
+                      </Tooltip>
+                      <div style={{ fontSize: 12, color: '#888' }}>
+                        another {roleLabel(r.from_role) || 'owner'}
+                      </div>
+                    </td>
+                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{fmt(r.last_activity_at)}</td>
+                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{fmt(r.due_at)}</td>
+                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{fmt(r.move_at)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div style={{ overflowX: 'auto', border: '1px solid #eee', borderRadius: 8 }}>
@@ -155,6 +273,7 @@ export default function StaleHandovers() {
                 <th style={{ padding: '10px 12px' }}>Moved to</th>
                 <th style={{ padding: '10px 12px' }}>Flagged (day 6)</th>
                 <th style={{ padding: '10px 12px' }}>Moved (day 7)</th>
+                <th style={{ padding: '10px 12px' }}>Why not moved</th>
               </tr>
             </thead>
             <tbody>
@@ -191,6 +310,18 @@ export default function StaleHandovers() {
                     </td>
                     <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{fmt(r.flagged_at)}</td>
                     <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{fmt(r.moved_at)}</td>
+                    <td style={{ padding: '10px 12px', color: '#666', maxWidth: 260 }}>
+                      {r.outcome === 'held' ? (
+                        <>
+                          {HOLD_REASON_TEXT[r.hold_reason] || r.hold_reason || 'Reason not recorded'}
+                          {r.handover_attempts > 1 && (
+                            <div style={{ fontSize: 12, color: '#999' }}>
+                              {r.handover_attempts} attempts
+                            </div>
+                          )}
+                        </>
+                      ) : '—'}
+                    </td>
                   </tr>
                 );
               })}
