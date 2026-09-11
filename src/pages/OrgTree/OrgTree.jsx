@@ -247,6 +247,22 @@ export default function OrgTree() {
   }, [raw]);
   // A compact "N Label · M Label" summary across every role actually present,
   // ordered by tier then label.
+  // Structural gaps worth telling an admin about. A telecaller_lead is an
+  // OPTIONAL tier — nothing in the schema or the API requires one — so a
+  // tenant can end up running telecallers with no lead above them without any
+  // warning. That matters beyond the chart: the stale-lead rule hands a lead
+  // to someone in the SAME role class, and a thin front line is exactly what
+  // leaves leads stuck with an inactive owner.
+  const orgGaps = useMemo(() => {
+    const gaps = [];
+    const count = (role) => raw.nodes.filter((n) => n.role === role).length;
+    const telecallers = count('telecaller');
+    if (telecallers > 0 && count('telecaller_lead') === 0) {
+      gaps.push(`${telecallers} telecaller${telecallers === 1 ? '' : 's'} with no telecaller lead — promote someone via Users & Roles so the telecalling line has a manager.`);
+    }
+    return gaps;
+  }, [raw]);
+
   const summary = useMemo(() => Object.entries(tierCounts)
     .filter(([, n]) => n > 0)
     .sort((a, b) => (ROLE_TIER[a[0]] ?? MAX_TIER) - (ROLE_TIER[b[0]] ?? MAX_TIER))
@@ -261,6 +277,11 @@ export default function OrgTree() {
           <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
             {summary || 'No staff yet'}
           </Typography>
+          {orgGaps.map((g) => (
+            <Typography key={g} variant="body2" sx={{ color: '#b45309', mt: 0.5, fontSize: 13 }}>
+              ⚠ {g}
+            </Typography>
+          ))}
         </Box>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
           {LEGEND.map((l) => {
