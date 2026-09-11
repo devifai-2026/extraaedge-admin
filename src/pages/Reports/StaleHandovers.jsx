@@ -33,6 +33,28 @@ const OUTCOMES = [
 // modules/sla/reassign.js. 'unknown_legacy' is the pre-existing backlog that
 // escalated before the reason was recorded — we say so rather than inventing
 // a cause.
+// Why the lead ended up where it did — filled for EVERY outcome, not just
+// held. A blank cell used to leave "Resolved" rows unexplained, which read as
+// missing data when in fact nothing was supposed to move.
+const outcomeExplanation = (r) => {
+  if (r.outcome === 'moved') {
+    // The recipient is whoever had the fewest open leads in the same role
+    // class at that moment (preferring the same manager, then branch) — see
+    // pickSameRoleReplacement. Say so, since "why her?" is the first question
+    // a run of identical recipients provokes.
+    return r.to_name
+      ? `Fewest open leads among ${roleLabel(r.from_role) || 'peer'}s at that moment`
+      : 'Reassigned by the stale-lead rule';
+  }
+  if (r.outcome === 'resolved') {
+    return r.resolution_reason === 'activity_logged'
+      ? 'Owner logged activity in time — kept the lead'
+      : 'Alert resolved before the handover was due';
+  }
+  if (r.outcome === 'pending') return 'Still inside the grace period — owner can keep it';
+  return HOLD_REASON_TEXT[r.hold_reason] || r.hold_reason || 'Reason not recorded';
+};
+
 const HOLD_REASON_TEXT = {
   no_peers: 'Nobody else in this role class is active',
   owner_role: 'Current owner can no longer hold leads',
@@ -269,11 +291,11 @@ export default function StaleHandovers() {
               <tr style={{ background: '#fafafa', textAlign: 'left' }}>
                 <th style={{ padding: '10px 12px' }}>Outcome</th>
                 <th style={{ padding: '10px 12px' }}>Lead</th>
-                <th style={{ padding: '10px 12px' }}>Lost by</th>
-                <th style={{ padding: '10px 12px' }}>Moved to</th>
+                <th style={{ padding: '10px 12px' }}>Owner when flagged</th>
+                <th style={{ padding: '10px 12px' }}>Owner now</th>
                 <th style={{ padding: '10px 12px' }}>Flagged (day 6)</th>
                 <th style={{ padding: '10px 12px' }}>Moved (day 7)</th>
-                <th style={{ padding: '10px 12px' }}>Why not moved</th>
+                <th style={{ padding: '10px 12px' }}>What happened</th>
               </tr>
             </thead>
             <tbody>
@@ -297,9 +319,25 @@ export default function StaleHandovers() {
                       <div style={{ fontSize: 12, color: '#888' }}>{roleLabel(r.from_role)}</div>
                     </td>
                     <td style={{ padding: '10px 12px' }}>
-                      {r.to_name || <span style={{ color: '#aaa' }}>—</span>}
+                      {/* Always the LIVE owner, so a row never leaves "who has
+                          this lead?" unanswered. On a moved row that is the
+                          recipient; otherwise the lead stayed put. */}
+                      {r.current_name || r.to_name || <span style={{ color: '#aaa' }}>unassigned</span>}
                       <div style={{ fontSize: 12, color: '#888' }}>
-                        {roleLabel(r.to_role)}
+                        {roleLabel(r.current_role || r.to_role)}
+                        {/* Only claim "unchanged" when the owner really is the
+                            one we flagged. A resolved/held lead can still have
+                            moved later by a manual reassign, and saying
+                            otherwise would be a lie the data contradicts. */}
+                        {r.current_user_id && r.current_user_id === r.from_user_id && (
+                          <span style={{ color: '#aaa' }}> · unchanged</span>
+                        )}
+                        {r.outcome !== 'moved' && r.current_user_id
+                          && r.current_user_id !== r.from_user_id && (
+                          <Tooltip title="This lead changed hands outside the stale-lead rule — see Reassign Logs">
+                            <span style={{ color: '#b45309' }}> · moved elsewhere</span>
+                          </Tooltip>
+                        )}
                         {crossed && (
                           <Tooltip title="This handover crossed role classes — it predates the same-role fix">
                             <Chip size="small" label="crossed" color="warning"
@@ -310,17 +348,13 @@ export default function StaleHandovers() {
                     </td>
                     <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{fmt(r.flagged_at)}</td>
                     <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>{fmt(r.moved_at)}</td>
-                    <td style={{ padding: '10px 12px', color: '#666', maxWidth: 260 }}>
-                      {r.outcome === 'held' ? (
-                        <>
-                          {HOLD_REASON_TEXT[r.hold_reason] || r.hold_reason || 'Reason not recorded'}
-                          {r.handover_attempts > 1 && (
-                            <div style={{ fontSize: 12, color: '#999' }}>
-                              {r.handover_attempts} attempts
-                            </div>
-                          )}
-                        </>
-                      ) : '—'}
+                    <td style={{ padding: '10px 12px', color: '#666', maxWidth: 280 }}>
+                      {outcomeExplanation(r)}
+                      {r.outcome === 'held' && r.handover_attempts > 1 && (
+                        <div style={{ fontSize: 12, color: '#999' }}>
+                          {r.handover_attempts} attempts
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
