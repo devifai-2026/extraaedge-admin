@@ -107,7 +107,7 @@ const ROLE_HR_TABS = ['hr.dashboard', 'hr.interviews', 'hr.certificates'];
 // backing routes resolve the caller's own id with no role gate, so the tab is
 // navigation rather than authority. Students are excluded: they are not
 // employees and their attendance is a course record, not a staff register.
-const ROLE_SELF_SERVICE_TABS = ['hr.my_leave', 'hr.leave_calendar'];
+const ROLE_SELF_SERVICE_TABS = ['hr.my_leave', 'hr.leave_calendar', 'payroll.my_payslips'];
 // Roles that can actually decide on someone else's leave.
 const ROLE_LEAVE_APPROVER_TABS = ['hr.leave_approvals'];
 // Quotas, approval chains and the holiday calendar.
@@ -170,11 +170,18 @@ for (const role of [ROLES.SALES_MANAGER, ROLES.TELECALLER_LEAD, ROLES.HEAD_TRAIN
   ROLES.HR, ROLES.HR_TEAM_LEAD]) {
   FALLBACK_TABS[role] = [...new Set([...(FALLBACK_TABS[role] || []), ...ROLE_LEAVE_APPROVER_TABS])];
 }
+// Payroll administration mirrors the server's PAYROLL_ADMIN_ROLES
+// (ADMIN_TIER_ROLES + hr_team_lead). Salary itself is gated per ROW server-side,
+// never by these tabs — branch_manager holds '*', so a tab-only rule would
+// expose the whole org's salaries.
+const ROLE_PAYROLL_ADMIN_TABS = ['payroll.runs', 'payroll.structures'];
+
 // Policy/quota/holiday administration mirrors the server's LEAVE_ADMIN set
 // (ADMIN_TIER_ROLES + hr_team_lead). The flat `hr` role is deliberately absent:
 // granting it here would render a Leave Settings link that 403s on open.
 for (const role of [ROLES.HR_TEAM_LEAD]) {
-  FALLBACK_TABS[role] = [...new Set([...(FALLBACK_TABS[role] || []), ...ROLE_LEAVE_ADMIN_TABS])];
+  FALLBACK_TABS[role] = [...new Set([...(FALLBACK_TABS[role] || []),
+    ...ROLE_LEAVE_ADMIN_TABS, ...ROLE_PAYROLL_ADMIN_TABS])];
 }
 
 // ---------- Public helpers ----------
@@ -290,6 +297,9 @@ const TAB_TO_ROUTE = {
   'hr.leave_calendar':     '/hr/leave-calendar',
   'hr.leave_approvals':    '/hr/leave-approvals',
   'hr.leave_admin':        '/hr/leave-admin',
+  'payroll.my_payslips':   '/payroll/my-payslips',
+  'payroll.runs':          '/payroll/runs',
+  'payroll.structures':    '/payroll/structures',
   // ---- Placement department ----
   'placement.dashboard':   '/placement/dashboard',
   'placement.companies':   '/placement/companies',

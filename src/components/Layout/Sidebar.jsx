@@ -82,6 +82,7 @@ const pinnedItems = [
   // Self-service leave. Pinned rather than buried under HR because every staff
   // role has it — a telecaller applies for leave as often as a manager does.
   { id: 27, label: 'My Leave', icon: EventBusyIcon, path: '/hr/my-leave', tab: 'hr.my_leave' },
+  { id: 28, label: 'My Payslips', icon: ReceiptLongIcon, path: '/payroll/my-payslips', tab: 'payroll.my_payslips' },
 ];
 
 // Collapsible, role-named sections. Order here is the display order. New
@@ -192,7 +193,10 @@ const menuSections = [
       { id: 206, label: 'Mock Tests',    icon: ChecklistIcon,       path: '/trainer/tests',         tab: 'trainer.tests' },
       { id: 207, label: 'Projects',      icon: AssessmentIcon,      path: '/trainer/projects',      tab: 'trainer.projects' },
       { id: 213, label: 'Homework',      icon: HistoryEduIcon,      path: '/trainer/homework',      tab: 'trainer.projects' },
-      { id: 214, label: 'My Leave',      icon: EventBusyIcon,       path: '/trainer/leave',         tab: 'trainer.classes' },
+      // Removed: a second 'My Leave' pointing at the legacy /courses/leaves
+      // page. It duplicated the pinned entry for trainers AND bypassed the
+      // approval chain — that page marked leave approved on submit. Trainers
+      // now use the same self-service panel as everyone else.
       { id: 208, label: 'Mock Interviews', icon: HowToRegIcon,      path: '/trainer/interviews',    tab: 'trainer.interviews' },
       { id: 209, label: 'Leaderboard',   icon: AssessmentIcon,      path: '/trainer/leaderboard',   tab: 'trainer.leaderboard' },
       { id: 211, label: 'Materials',     icon: FolderIcon,          path: '/trainer/materials',     tab: 'trainer.materials' },
@@ -215,6 +219,16 @@ const menuSections = [
       { id: 225, label: 'Leave Settings',   icon: SettingsSuggestIcon, path: '/hr/leave-admin',      tab: 'hr.leave_admin' },
       { id: 221, label: 'Interviews',       icon: ChecklistIcon,       path: '/hr/interviews',       tab: 'hr.interviews' },
       { id: 222, label: 'Certificates',     icon: SchoolIcon,          path: '/hr/certificates',     tab: 'hr.certificates' },
+    ],
+  },
+  {
+    id: 'payroll',
+    label: 'Payroll',
+    icon: PaymentsIcon,
+    section: true,
+    children: [
+      { id: 230, label: 'Payroll Runs',       icon: PaymentsIcon,               path: '/payroll/runs',       tab: 'payroll.runs' },
+      { id: 231, label: 'Salary Structures',  icon: AccountBalanceWalletIcon,   path: '/payroll/structures', tab: 'payroll.structures' },
     ],
   },
   {

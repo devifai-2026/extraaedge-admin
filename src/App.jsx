@@ -121,6 +121,9 @@ import HrDashboard from './pages/Hr/HrDashboard'
 import HrInterviews from './pages/Hr/HrInterviews'
 import HrCertificates from './pages/Hr/HrCertificates'
 import MyLeave from './pages/Leave/MyLeave'
+import MyPayslips from './pages/Payroll/MyPayslips'
+import PayrollRuns from './pages/Payroll/PayrollRuns'
+import SalaryStructures from './pages/Payroll/SalaryStructures'
 import LeaveCalendar from './pages/Leave/LeaveCalendar'
 import LeaveApprovals from './pages/Leave/LeaveApprovals'
 import LeaveAdmin from './pages/Leave/LeaveAdmin'
@@ -244,6 +247,12 @@ function App() {
         <Route path="/hr/leave-calendar" element={<ProtectedRoute tab="hr.leave_calendar"><Layout><LeaveCalendar /></Layout></ProtectedRoute>} />
         <Route path="/hr/leave-approvals" element={<ProtectedRoute tab="hr.leave_approvals"><Layout><LeaveApprovals /></Layout></ProtectedRoute>} />
         <Route path="/hr/leave-admin" element={<ProtectedRoute tab="hr.leave_admin"><Layout><LeaveAdmin /></Layout></ProtectedRoute>} />
+        {/* Payroll. my-payslips is self-service for every staff role; the runs
+            and structures pages are additionally gated per row server-side,
+            because branch_manager holds the '*' tab wildcard. */}
+        <Route path="/payroll/my-payslips" element={<ProtectedRoute tab="payroll.my_payslips"><Layout><MyPayslips /></Layout></ProtectedRoute>} />
+        <Route path="/payroll/runs" element={<ProtectedRoute tab="payroll.runs"><Layout><PayrollRuns /></Layout></ProtectedRoute>} />
+        <Route path="/payroll/structures" element={<ProtectedRoute tab="payroll.structures"><Layout><SalaryStructures /></Layout></ProtectedRoute>} />
         <Route path="/placement/dashboard" element={<ProtectedRoute tab="placement.dashboard"><Layout><PlacementDashboard /></Layout></ProtectedRoute>} />
         <Route path="/placement/companies" element={<ProtectedRoute tab="placement.companies"><Layout><PlacementCompanies /></Layout></ProtectedRoute>} />
         <Route path="/placement/openings" element={<ProtectedRoute tab="placement.openings"><Layout><PlacementOpenings /></Layout></ProtectedRoute>} />
@@ -261,7 +270,11 @@ function App() {
         <Route path="/trainer/tests" element={<ProtectedRoute tab="trainer.tests"><Layout><TrainerTests /></Layout></ProtectedRoute>} />
         <Route path="/trainer/projects" element={<ProtectedRoute tab="trainer.projects"><Layout><TrainerProjects /></Layout></ProtectedRoute>} />
         <Route path="/trainer/homework" element={<ProtectedRoute tab="trainer.projects"><Layout><TrainerHomework /></Layout></ProtectedRoute>} />
-        <Route path="/trainer/leave" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerLeave /></Layout></ProtectedRoute>} />
+        {/* Legacy trainer-only leave page. Redirected rather than kept: it wrote
+            through /courses/leaves, which marked leave APPROVED on submit and so
+            skipped the approval chain entirely. Old bookmarks land on the real
+            self-service panel. */}
+        <Route path="/trainer/leave" element={<Navigate to="/hr/my-leave" replace />} />
         <Route path="/trainer/interviews" element={<ProtectedRoute tab="trainer.interviews"><Layout><TrainerInterviews /></Layout></ProtectedRoute>} />
         <Route path="/trainer/leaderboard" element={<ProtectedRoute tab="trainer.leaderboard"><Layout><TrainerLeaderboard /></Layout></ProtectedRoute>} />
         <Route path="/trainer/materials" element={<ProtectedRoute tab="trainer.materials"><Layout><TrainerMaterials /></Layout></ProtectedRoute>} />

@@ -1084,4 +1084,35 @@ export const leaveApi = {
   addHoliday: (body) => api.post('/staff-leave/holidays', body),
 };
 
+// ---- Payroll ---------------------------------------------------------------
+// `my/payslips` carries no role gate server-side (own rows only). Everything
+// else is gated per row by service.assertMaySeeSalary — NOT by a tab, because
+// branch_manager holds the '*' wildcard.
+export const payrollApi = {
+  myPayslips: () => api.get('/payroll/my/payslips'),
+  payslip: (id) => api.get(`/payroll/payslips/${id}`),
+
+  components: () => api.get('/payroll/components'),
+  updateComponent: (id, body) => api.patch(`/payroll/components/${id}`, body),
+
+  slabs: () => api.get('/payroll/slabs'),
+  saveSlab: (body) => api.post('/payroll/slabs', body),
+  deleteSlab: (id) => api.delete(`/payroll/slabs/${id}`),
+
+  structures: (params) => api.get('/payroll/structures', params),
+  structure: (userId, params) => api.get(`/payroll/structures/${userId}`, params),
+  saveStructure: (body) => api.post('/payroll/structures', body),
+
+  settings: () => api.get('/payroll/settings'),
+  saveSettings: (body) => api.put('/payroll/settings', body),
+
+  runs: () => api.get('/payroll/runs'),
+  createRun: (body) => api.post('/payroll/runs', body),
+  compute: (id) => api.post(`/payroll/runs/${id}/compute`),
+  runPayslips: (id) => api.get(`/payroll/runs/${id}/payslips`),
+  approve: (id) => api.post(`/payroll/runs/${id}/approve`),
+  disbursements: (id) => api.get(`/payroll/runs/${id}/disbursements`),
+  markPaid: (id, body) => api.post(`/payroll/disbursements/${id}/mark-paid`, body),
+};
+
 export { auth };
