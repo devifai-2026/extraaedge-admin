@@ -45,6 +45,13 @@ export const ROLES = {
   HR: 'hr',
   // Placement: companies, job openings, applications, criteria firing.
   PLACEMENT: 'placement',
+  // ---- MoM HR/placement tiers ----
+  // hr_team_lead runs HR *and* placement and reports to the branch manager;
+  // the other two report to it. Deliberately absent from LEAD_OWNER_ROLES and
+  // TEAM_SCOPED_MANAGER_ROLES — they carry no leads and manage no lead team.
+  HR_TEAM_LEAD: 'hr_team_lead',
+  HR_RECRUITER: 'hr_recruiter',
+  PLACEMENT_OFFICER: 'placement_officer',
 };
 
 // Role → set of tabs the bucket can access (used for safety; final source is backend's allowed_tabs).
@@ -135,6 +142,12 @@ const FALLBACK_TABS = {
   [ROLES.QA]: ROLE_QA_TABS,
   [ROLES.HR]: ROLE_HR_TABS,
   [ROLES.PLACEMENT]: ROLE_PLACEMENT_TABS,
+  // HR team lead oversees both HR and placement, plus the LMS analytics the
+  // MoM's student/drop reports need.
+  [ROLES.HR_TEAM_LEAD]: [...ROLE_HR_TABS, ...ROLE_PLACEMENT_TABS, 'lms.analytics'],
+  [ROLES.HR_RECRUITER]: ROLE_HR_TABS,
+  // The placement officer assigns mock interviews, which lives on the HR side.
+  [ROLES.PLACEMENT_OFFICER]: [...ROLE_PLACEMENT_TABS, 'hr.interviews'],
 };
 
 // ---------- Public helpers ----------

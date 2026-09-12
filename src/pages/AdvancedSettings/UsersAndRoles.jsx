@@ -66,13 +66,29 @@ const blankTabPerms = () => Object.fromEntries(TAB_KEYS.map((k) => [k, 'hidden']
 // → every tab EXCEPT accounts.* is applicable; the Accounts module is
 // a dedicated bucket and granting it to a counsellor would land them on
 // a page that expects role=account_manager scoping.
+// Which tab prefixes a scope may hold. Mirrors PREFIX_SCOPES in the server's
+// custom-roles/service.js sanitizeTabPermissions — the two are a matched pair,
+// and drifting them means the editor offers a tab the server then discards.
+const SCOPE_PREFIXES = {
+  account_manager: ['accounts.'],
+  qa: ['qa.'],
+  hr: ['hr.'],
+  hr_recruiter: ['hr.'],
+  hr_team_lead: ['hr.', 'placement.', 'lms.'],
+  placement: ['placement.'],
+  placement_officer: ['placement.', 'hr.interviews'],
+  trainer: ['trainer.', 'courses.'],
+  head_trainer: ['trainer.', 'courses.', 'lms.'],
+  student: ['student.'],
+};
+
 const isTabApplicable = (tabKey, scope) => {
-  const isAccounts = tabKey.startsWith('accounts.');
-  if (scope === 'account_manager') return isAccounts;
-  // A QA reviewer only ever works the review queue — granting them a CRM tab
-  // would land them on a page their role can't load server-side.
-  if (scope === 'qa') return tabKey.startsWith('qa.');
-  return !isAccounts;
+  const prefixes = SCOPE_PREFIXES[scope];
+  // A prefix-scoped role keeps only its own keys; everyone else keeps anything
+  // that is not an Accounts key. Granting outside the set would render a tab
+  // whose routes then 403, which reads as a broken product.
+  if (prefixes) return prefixes.some((pre) => tabKey.startsWith(pre));
+  return !tabKey.startsWith('accounts.');
 };
 
 const ACCESS_LEVEL_OPTIONS = [
@@ -85,6 +101,14 @@ const ACCESS_LEVEL_OPTIONS = [
   { value: 'telecaller', label: 'Telecaller (End User)' },
   { value: 'account_manager', label: 'Account Manager (Post-Conversion)' },
   { value: 'qa', label: 'QA (Call Quality Reviewer)' },
+  // Non-sales departments, all reporting to the branch manager.
+  { value: 'hr_team_lead', label: 'HR Team Lead (HR + Placement)' },
+  { value: 'hr_recruiter', label: 'HR Recruiter (Hiring)' },
+  { value: 'placement_officer', label: 'Placement Officer' },
+  { value: 'hr', label: 'HR (Interviews + Certificates)' },
+  { value: 'placement', label: 'Placement' },
+  { value: 'head_trainer', label: 'Trainer Team Lead' },
+  { value: 'trainer', label: 'Trainer' },
 ];
 
 // Short label per role bucket, for chips and confirmation copy. Falls back to
@@ -97,11 +121,14 @@ const ROLE_LABEL = {
   telecaller_lead: 'Telecaller Lead',
   telecaller: 'Telecaller',
   account_manager: 'Account Mgr',
-  head_trainer: 'Head Trainer',
+  head_trainer: 'Trainer Team Lead',
   trainer: 'Trainer',
   qa: 'QA',
   hr: 'HR',
   placement: 'Placement',
+  hr_team_lead: 'HR Team Lead',
+  hr_recruiter: 'HR Recruiter',
+  placement_officer: 'Placement Officer',
 };
 
 const initialsColor = (name = '') => {

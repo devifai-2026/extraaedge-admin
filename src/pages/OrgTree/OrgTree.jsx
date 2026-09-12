@@ -25,7 +25,11 @@ const ROLE_TIER = {
   super_admin: 0,
   branch_manager: 1,
   sales_manager: 2, account_manager: 2, head_trainer: 2, hr: 2, placement: 2,
+  // HR team lead is a department head alongside the others, and its two reports
+  // sit on the team-lead row with counsellors/telecaller leads.
+  hr_team_lead: 2,
   counsellor: 3, trainer: 3, telecaller_lead: 3, qa: 3,
+  hr_recruiter: 3, placement_officer: 3,
   telecaller: 4,
 };
 const ROLE_COLOR = {
@@ -43,13 +47,17 @@ const ROLE_COLOR = {
   telecaller_lead: '#0369a1',
   telecaller: '#0ea5e9',
   qa: '#64748b',
+  // HR/placement family — violet, distinct from the sales green/teal lines.
+  hr_team_lead: '#7c3aed',
+  hr_recruiter: '#a78bfa',
+  placement_officer: '#8b5cf6',
 };
 const ROLE_LABEL = {
   super_admin: 'Super Admin',
   branch_manager: 'Branch Manager',
   sales_manager: 'Sales Manager',
   account_manager: 'Accounts',
-  head_trainer: 'Head Trainer',
+  head_trainer: 'Trainer Team Lead',
   hr: 'HR',
   placement: 'Placement',
   counsellor: 'Counsellor',
@@ -57,6 +65,9 @@ const ROLE_LABEL = {
   telecaller_lead: 'Telecaller Lead',
   telecaller: 'Telecaller',
   qa: 'QA',
+  hr_team_lead: 'HR Team Lead',
+  hr_recruiter: 'HR Recruiter',
+  placement_officer: 'Placement Officer',
 };
 
 // The legend chips across the top. Each maps to the set of roles it stands
@@ -70,6 +81,13 @@ const LEGEND = [
   { key: 'counsellor', label: 'Counsellor', bg: '#dcfce7', fg: '#2e7d32', roles: ['counsellor'] },
   { key: 'telecaller_lead', label: 'Telecaller lead', bg: '#e0f2fe', fg: '#0369a1', roles: ['telecaller_lead'] },
   { key: 'telecaller', label: 'Telecaller', bg: '#f0f9ff', fg: '#0ea5e9', roles: ['telecaller'] },
+  // Non-sales departments. Chips with no members grey out (disabled at count 0),
+  // so listing them all is harmless and makes the tree fully explorable.
+  { key: 'hr', label: 'HR', bg: '#f3e8ff', fg: '#7c3aed', roles: ['hr_team_lead', 'hr', 'hr_recruiter'] },
+  { key: 'placement', label: 'Placement', bg: '#ede9fe', fg: '#8b5cf6', roles: ['placement', 'placement_officer'] },
+  { key: 'training', label: 'Training', bg: '#ffedd5', fg: '#c2410c', roles: ['head_trainer', 'trainer'] },
+  { key: 'accounts', label: 'Accounts', bg: '#cffafe', fg: '#0891b2', roles: ['account_manager'] },
+  { key: 'qa', label: 'QA', bg: '#f1f5f9', fg: '#64748b', roles: ['qa'] },
 ];
 
 // How long a legend click keeps the matching cards lit.
