@@ -39,6 +39,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonthOutlined';
 import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import { hasTab, currentRole, ROLES, LEAD_OWNER_ROLES } from '../../lib/rbac';
 import { admissionsApi, leadDiscountsApi, whatsappApi } from '../../lib/endpoints';
@@ -78,6 +79,9 @@ const pinnedItems = [
   // In-depth payments ledger. `tab: 'payments'` resolves true only for
   // super_admin (allowed_tabs:['*']); all other roles never see this row.
   { id: 19, label: 'Payments Ledger', icon: AccountBalanceWalletIcon, path: '/payments', tab: 'payments' },
+  // Self-service leave. Pinned rather than buried under HR because every staff
+  // role has it — a telecaller applies for leave as often as a manager does.
+  { id: 27, label: 'My Leave', icon: EventBusyIcon, path: '/hr/my-leave', tab: 'hr.my_leave' },
 ];
 
 // Collapsible, role-named sections. Order here is the display order. New
@@ -202,9 +206,15 @@ const menuSections = [
     icon: PeopleAltIcon,
     section: true,
     children: [
-      { id: 220, label: 'Dashboard',    icon: AssessmentIcon,  path: '/hr/dashboard',    tab: 'hr.dashboard' },
-      { id: 221, label: 'Interviews',   icon: ChecklistIcon,   path: '/hr/interviews',   tab: 'hr.interviews' },
-      { id: 222, label: 'Certificates', icon: SchoolIcon,      path: '/hr/certificates', tab: 'hr.certificates' },
+      { id: 220, label: 'Dashboard',        icon: AssessmentIcon,      path: '/hr/dashboard',        tab: 'hr.dashboard' },
+      // Leave management. The calendar is granted to every staff role (knowing
+      // who is away is ordinary team information); approvals and administration
+      // carry their own tabs so a counsellor never sees an approvals inbox.
+      { id: 223, label: 'Leave Calendar',   icon: CalendarMonthIcon,   path: '/hr/leave-calendar',   tab: 'hr.leave_calendar' },
+      { id: 224, label: 'Leave Approvals',  icon: FactCheckIcon,       path: '/hr/leave-approvals',  tab: 'hr.leave_approvals' },
+      { id: 225, label: 'Leave Settings',   icon: SettingsSuggestIcon, path: '/hr/leave-admin',      tab: 'hr.leave_admin' },
+      { id: 221, label: 'Interviews',       icon: ChecklistIcon,       path: '/hr/interviews',       tab: 'hr.interviews' },
+      { id: 222, label: 'Certificates',     icon: SchoolIcon,          path: '/hr/certificates',     tab: 'hr.certificates' },
     ],
   },
   {

@@ -283,18 +283,32 @@ export default function OrgTree() {
   const [dismissedGapKey, setDismissedGapKey] = useState(null);
   const gapToastOpen = !!gapKey && gapKey !== dismissedGapKey;
 
-  const summary = useMemo(() => Object.entries(tierCounts)
+  // Fifteen roles spelled out wrapped to three lines and read as noise. Show a
+  // headcount plus the four largest groups; the full breakdown is the title
+  // attribute, and the legend chips below already name every role.
+  const summaryParts = useMemo(() => Object.entries(tierCounts)
     .filter(([, n]) => n > 0)
     .sort((a, b) => (ROLE_TIER[a[0]] ?? MAX_TIER) - (ROLE_TIER[b[0]] ?? MAX_TIER))
-    .map(([role, n]) => `${n} ${ROLE_LABEL[role] || role}`)
-    .join(' · '), [tierCounts]);
+    .map(([role, n]) => `${n} ${ROLE_LABEL[role] || role}`), [tierCounts]);
+  const summaryFull = summaryParts.join(' · ');
+  const headcount = useMemo(
+    () => Object.values(tierCounts).reduce((a, n) => a + n, 0), [tierCounts],
+  );
+  const summary = summaryParts.length
+    ? `${headcount} people · ${summaryParts.slice(0, 4).join(' · ')}${summaryParts.length > 4 ? ` · +${summaryParts.length - 4} more roles` : ''}`
+    : '';
 
   return (
     <Box sx={{ height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2, borderBottom: '1px solid #e5e7eb' }}>
-        <Box>
+      {/* flexWrap + a shrinkable left column: with 15 roles the summary string
+          is long enough to push the legend on top of itself otherwise. */}
+      <Box sx={{
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+        gap: 2, flexWrap: 'wrap', px: 3, py: 2, borderBottom: '1px solid #e5e7eb',
+      }}>
+        <Box sx={{ minWidth: 240, flex: '1 1 auto' }}>
           <Typography variant="h5" sx={{ fontWeight: 600 }}>Org Tree</Typography>
-          <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+          <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }} title={summaryFull}>
             {summary || 'No staff yet'}
           </Typography>
           {orgGaps.map((g) => (
@@ -304,7 +318,7 @@ export default function OrgTree() {
             </Typography>
           ))}
         </Box>
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', flex: '0 1 auto', justifyContent: 'flex-end' }}>
           {LEGEND.map((l) => {
             const count = raw.nodes.filter((n) => l.roles.includes(n.role)).length;
             const on = litKey === l.key;

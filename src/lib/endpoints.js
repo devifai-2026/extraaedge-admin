@@ -1050,4 +1050,38 @@ export const learningApi = {
   hrAutoIssue: (body) => api.post('/learning/hr/certificates/auto-issue', body),
 };
 
+// ---- Staff leave — the KEKA-style self-service + approval surface ----------
+// The /mine* calls carry no role gate on the server: they resolve the caller's
+// own id, so every employee from telecaller to branch manager uses the same
+// endpoints. Approver and admin calls below are role-gated server-side.
+export const leaveApi = {
+  // self-service
+  types: () => api.get('/staff-leave/types'),
+  mine: (params) => api.get('/staff-leave/mine', params),
+  myBalances: (year) => api.get('/staff-leave/mine/balances', year ? { year } : undefined),
+  // What chain WILL apply, so the form can show it before anyone submits.
+  myChain: () => api.get('/staff-leave/mine/approval-chain'),
+  apply: (body) => api.post('/staff-leave', body),
+  cancel: (id) => api.post(`/staff-leave/${id}/cancel`),
+  get: (id) => api.get(`/staff-leave/${id}`),
+
+  // approver
+  pendingQueue: () => api.get('/staff-leave/queue/pending'),
+  // `mark_lop` / `lop_days` let the approver approve the absence but dock the
+  // pay for some or all of it.
+  decide: (id, body) => api.post(`/staff-leave/${id}/decide`, body),
+
+  // Shared month calendar: every staff role may read it. Name/date/status only —
+  // never the reason — which is why it is not the approver-gated register below.
+  calendar: (params) => api.get('/staff-leave/calendar', params),
+  // Full register, approver/admin only: carries reasons, notes and LOP.
+  list: (params) => api.get('/staff-leave', params),
+
+  // admin: policies + holidays
+  policies: () => api.get('/staff-leave/policies'),
+  setPolicy: (scope, approval_mode) => api.put(`/staff-leave/policies/${scope}`, { approval_mode }),
+  holidays: (params) => api.get('/staff-leave/holidays/list', params),
+  addHoliday: (body) => api.post('/staff-leave/holidays', body),
+};
+
 export { auth };

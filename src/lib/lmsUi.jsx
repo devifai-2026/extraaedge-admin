@@ -60,11 +60,14 @@ export const StatGrid = ({ children, min = 190 }) => (
   <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(${min}px, 1fr))`, gap: 14, marginBottom: 20 }}>{children}</div>
 );
 
+// The header row uses flexWrap + a non-shrinking title: a long `right` (a
+// summary line plus a button, say) would otherwise squeeze the heading into an
+// ellipsis or overlap it at narrow widths.
 export const Section = ({ title, right, children }) => (
   <div style={{ marginBottom: 20 }}>
     {(title || right) && (
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: 0.5 }}>{title}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: 0.5, flex: '0 0 auto' }}>{title}</div>
         {right}
       </div>
     )}

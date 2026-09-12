@@ -120,6 +120,10 @@ import TrainerStudents from './pages/Trainer/TrainerStudents'
 import HrDashboard from './pages/Hr/HrDashboard'
 import HrInterviews from './pages/Hr/HrInterviews'
 import HrCertificates from './pages/Hr/HrCertificates'
+import MyLeave from './pages/Leave/MyLeave'
+import LeaveCalendar from './pages/Leave/LeaveCalendar'
+import LeaveApprovals from './pages/Leave/LeaveApprovals'
+import LeaveAdmin from './pages/Leave/LeaveAdmin'
 import PlacementDashboard from './pages/Placement/PlacementDashboard'
 import PlacementCompanies from './pages/Placement/PlacementCompanies'
 import PlacementOpenings from './pages/Placement/PlacementOpenings'
@@ -234,6 +238,12 @@ function App() {
         <Route path="/hr/dashboard" element={<ProtectedRoute tab="hr.dashboard"><Layout><HrDashboard /></Layout></ProtectedRoute>} />
         <Route path="/hr/interviews" element={<ProtectedRoute tab="hr.interviews"><Layout><HrInterviews /></Layout></ProtectedRoute>} />
         <Route path="/hr/certificates" element={<ProtectedRoute tab="hr.certificates"><Layout><HrCertificates /></Layout></ProtectedRoute>} />
+        {/* Staff leave. /hr/my-leave is self-service and granted to every staff
+            role; approvals and administration are gated on their own tabs. */}
+        <Route path="/hr/my-leave" element={<ProtectedRoute tab="hr.my_leave"><Layout><MyLeave /></Layout></ProtectedRoute>} />
+        <Route path="/hr/leave-calendar" element={<ProtectedRoute tab="hr.leave_calendar"><Layout><LeaveCalendar /></Layout></ProtectedRoute>} />
+        <Route path="/hr/leave-approvals" element={<ProtectedRoute tab="hr.leave_approvals"><Layout><LeaveApprovals /></Layout></ProtectedRoute>} />
+        <Route path="/hr/leave-admin" element={<ProtectedRoute tab="hr.leave_admin"><Layout><LeaveAdmin /></Layout></ProtectedRoute>} />
         <Route path="/placement/dashboard" element={<ProtectedRoute tab="placement.dashboard"><Layout><PlacementDashboard /></Layout></ProtectedRoute>} />
         <Route path="/placement/companies" element={<ProtectedRoute tab="placement.companies"><Layout><PlacementCompanies /></Layout></ProtectedRoute>} />
         <Route path="/placement/openings" element={<ProtectedRoute tab="placement.openings"><Layout><PlacementOpenings /></Layout></ProtectedRoute>} />

@@ -103,6 +103,15 @@ const ROLE_STUDENT_TABS = [
 ];
 const ROLE_QA_TABS = ['qa.reviews'];
 const ROLE_HR_TABS = ['hr.dashboard', 'hr.interviews', 'hr.certificates'];
+// Self-service HR. Every STAFF role gets these — leave is personal, and the
+// backing routes resolve the caller's own id with no role gate, so the tab is
+// navigation rather than authority. Students are excluded: they are not
+// employees and their attendance is a course record, not a staff register.
+const ROLE_SELF_SERVICE_TABS = ['hr.my_leave', 'hr.leave_calendar'];
+// Roles that can actually decide on someone else's leave.
+const ROLE_LEAVE_APPROVER_TABS = ['hr.leave_approvals'];
+// Quotas, approval chains and the holiday calendar.
+const ROLE_LEAVE_ADMIN_TABS = ['hr.leave_admin'];
 const ROLE_PLACEMENT_TABS = ['placement.dashboard', 'placement.companies', 'placement.openings', 'placement.applications'];
 
 // Front-line roles that carry a personal queue of leads. Mirrors the server's
@@ -149,6 +158,24 @@ const FALLBACK_TABS = {
   // The placement officer assigns mock interviews, which lives on the HR side.
   [ROLES.PLACEMENT_OFFICER]: [...ROLE_PLACEMENT_TABS, 'hr.interviews'],
 };
+
+// Fold the self-service tabs into every staff bundle rather than repeating them
+// on sixteen lines. ROLE_ALL_TABS already covers the admin tiers; student is
+// skipped because a student is not an employee.
+for (const [role, tabs] of Object.entries(FALLBACK_TABS)) {
+  if (role === ROLES.STUDENT || tabs === ROLE_ALL_TABS) continue;
+  FALLBACK_TABS[role] = [...new Set([...tabs, ...ROLE_SELF_SERVICE_TABS])];
+}
+for (const role of [ROLES.SALES_MANAGER, ROLES.TELECALLER_LEAD, ROLES.HEAD_TRAINER,
+  ROLES.HR, ROLES.HR_TEAM_LEAD]) {
+  FALLBACK_TABS[role] = [...new Set([...(FALLBACK_TABS[role] || []), ...ROLE_LEAVE_APPROVER_TABS])];
+}
+// Policy/quota/holiday administration mirrors the server's LEAVE_ADMIN set
+// (ADMIN_TIER_ROLES + hr_team_lead). The flat `hr` role is deliberately absent:
+// granting it here would render a Leave Settings link that 403s on open.
+for (const role of [ROLES.HR_TEAM_LEAD]) {
+  FALLBACK_TABS[role] = [...new Set([...(FALLBACK_TABS[role] || []), ...ROLE_LEAVE_ADMIN_TABS])];
+}
 
 // ---------- Public helpers ----------
 export const currentRole = () => auth.getUser()?.role || null;
@@ -259,6 +286,10 @@ const TAB_TO_ROUTE = {
   'hr.dashboard':          '/hr/dashboard',
   'hr.interviews':         '/hr/interviews',
   'hr.certificates':       '/hr/certificates',
+  'hr.my_leave':           '/hr/my-leave',
+  'hr.leave_calendar':     '/hr/leave-calendar',
+  'hr.leave_approvals':    '/hr/leave-approvals',
+  'hr.leave_admin':        '/hr/leave-admin',
   // ---- Placement department ----
   'placement.dashboard':   '/placement/dashboard',
   'placement.companies':   '/placement/companies',
