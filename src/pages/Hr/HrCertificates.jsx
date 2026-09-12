@@ -16,7 +16,19 @@ export default function HrCertificates() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
 
-  useEffect(() => { programsApi.list().then((r) => setPrograms(r?.data || [])).catch(() => {}); }, []);
+  // Auto-select the first course so the page opens WITH data instead of a blank
+  // table the user has to go hunting for. A picker that starts empty reads as
+  // "there is nothing here" rather than "choose something", which is the
+  // complaint this addresses. The user can still switch courses freely.
+  useEffect(() => {
+    programsApi.list()
+      .then((r) => {
+        const list = r?.data || [];
+        setPrograms(list);
+        setProgramId((cur) => cur || list[0]?.id || '');
+      })
+      .catch(() => {});
+  }, []);
   const load = () => { if (!programId) { setRows([]); return; } setLoading(true); learningApi.hrCertificates(programId).then((r) => setRows(r?.data || [])).catch((e) => setToast({ severity: 'error', text: e.message })).finally(() => setLoading(false)); };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [programId]);
 

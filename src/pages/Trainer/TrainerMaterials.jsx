@@ -37,7 +37,18 @@ export default function TrainerMaterials() {
   const [toast, setToast] = useState(null);
   const fileRef = useRef(null);
 
-  useEffect(() => { coursesApi.list().then((r) => setCourses(r?.data || [])).catch(() => {}); }, []);
+  // Auto-select the first course so the page opens WITH data rather than a
+  // blank "pick a course" panel — a trainer almost always wants the course
+  // they teach, and an empty screen reads as "nothing here".
+  useEffect(() => {
+    coursesApi.list()
+      .then((r) => {
+        const list = r?.data || [];
+        setCourses(list);
+        setProgramId((cur) => cur || list[0]?.id || '');
+      })
+      .catch(() => {});
+  }, []);
   const load = useCallback(() => {
     if (!programId) return;
     coursesApi.listModules(programId).then((r) => setModules(r?.data || [])).catch(() => {});
