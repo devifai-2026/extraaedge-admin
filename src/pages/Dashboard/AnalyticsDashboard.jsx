@@ -555,6 +555,15 @@ export default function AnalyticsDashboard() {
               value={summary?.followups_due_today ?? '—'}
               accent="#43A047"
             />
+            {/* Overdue is the number people act on — amber, and only shown when
+                there ARE some, so a clean queue doesn't display a red zero. */}
+            {(summary?.followups_overdue ?? 0) > 0 && (
+              <Kpi
+                label="Follow-ups overdue"
+                value={summary.followups_overdue}
+                accent="#E53935"
+              />
+            )}
             <Kpi
               label="Enrolled · this month"
               value={summary?.enrolled_this_month ?? '—'}
@@ -1284,6 +1293,12 @@ export default function AnalyticsDashboard() {
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>Follow-ups due today</span><b>{summary.followups_due_today ?? 0}</b>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Follow-ups overdue</span>
+                      <b style={{ color: (summary.followups_overdue ?? 0) > 0 ? '#E53935' : undefined }}>
+                        {summary.followups_overdue ?? 0}
+                      </b>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>Enrolled · this month</span><b>{summary.enrolled_this_month ?? 0}</b>

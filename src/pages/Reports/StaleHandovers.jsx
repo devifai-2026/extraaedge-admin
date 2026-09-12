@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CircularProgress, MenuItem, TextField, Chip, Tooltip } from '@mui/material';
 import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
 import { reportsApi, usersApi } from '../../lib/endpoints';
+import { isLeadOwnerRole } from '../../lib/rbac';
 
 const OUTCOMES = [
   { v: '', label: 'All outcomes' },
@@ -89,7 +90,9 @@ export default function StaleHandovers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [view, setView] = useState('history');
+  // A front-line owner opens on "Coming up" — the leads they can still save.
+  // Managers open on history, which is the audit view they actually want.
+  const [view, setView] = useState(() => (isLeadOwnerRole() ? 'upcoming' : 'history'));
   const [filters, setFilters] = useState({
     date_from: '', date_to: '', from_user_id: '', to_user_id: '', outcome: '',
   });

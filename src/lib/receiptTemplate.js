@@ -169,12 +169,14 @@ export function buildReceiptHtml(data, opts = {}) {
       </tr>
     </table>`;
 
-  // Payment proof (optional; shown on-screen/PDF when accounts attached one).
-  const proof = receipt.payment_screenshot_url ? `
-    <div style="margin-top:16px"></div>
-    ${heading('Payment Proof')}
-    <img src="${esc(receipt.payment_screenshot_url)}" alt="Payment proof" crossorigin="anonymous"
-         style="max-width:260px;max-height:200px;object-fit:contain;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc" />` : '';
+  // Payment proof is deliberately NOT rendered here.
+  //
+  // The receipt is a one-page A4 document, and the proof image was the only
+  // thing that could push it onto a second page — htmlToPdf slices a raster
+  // snapshot across pages, so the break lands mid-content rather than between
+  // sections. The proof is still stored on the admission and viewable in the
+  // Accounts UI (AdmissionDetail "View payment proof" opens it via a signed
+  // URL); it just isn't part of the customer-facing receipt.
 
   return `
     <div style="box-sizing:border-box;width:100%;max-width:760px;margin:0 auto;background:#fff;color:#0f172a;
@@ -184,7 +186,6 @@ export function buildReceiptHtml(data, opts = {}) {
       <div style="margin-top:6px"></div>
       ${paymentSummary}
       ${installments}
-      ${proof}
       ${footer}
     </div>`;
 }
