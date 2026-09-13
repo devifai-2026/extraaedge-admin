@@ -278,7 +278,7 @@ function ModulesTab({ programId, notify, canManage }) {
           })}
         </div>
       )}
-      {scheduleFor && <ScheduleClassDialog programId={programId} moduleId={scheduleFor.id} moduleName={scheduleFor.name} batches={batches}
+      {scheduleFor && <ScheduleClassDialog programId={programId} moduleId={scheduleFor.id} moduleName={scheduleFor.name} batches={batches} trainers={trainers}
         onClose={() => setScheduleFor(null)} onDone={() => { setScheduleFor(null); load(); notify('success', 'Class scheduled'); }} onError={(m) => notify('error', m)} />}
       {completionFor && <ModuleCompletionDialog programId={programId} moduleId={completionFor.id} moduleName={completionFor.name}
         onClose={() => setCompletionFor(null)} onSaved={() => { load(); }} onError={(m) => notify('error', m)} notify={notify} />}
@@ -704,8 +704,21 @@ function CreateTrainerDialog({ programId, modules, onClose, onDone, onError }) {
 }
 
 // Schedule a class directly inside a module (picks a batch + time).
-function ScheduleClassDialog({ programId, moduleId, moduleName, batches, onClose, onDone, onError }) {
-  const [f, setF] = useState({ batch_id: '', title: '', mode: 'online', meeting_url: '', starts_at: '', duration: 60 });
+function ScheduleClassDialog({ programId, moduleId, moduleName, batches, trainers = [], onClose, onDone, onError }) {
+  // The trainer bound to THIS module on the roster, else the course head. The
+  // dialog is opened from inside a module, so the answer is already known —
+  // and a class created with no trainer_id pays nobody, since per-class payroll
+  // counts off that column.
+  const defaultTrainer = (() => {
+    const bound = trainers.find((t) => t.module_id === moduleId);
+    if (bound) return bound.user_id;
+    const head = trainers.find((t) => t.role === 'head');
+    return head ? head.user_id : '';
+  })();
+  const [f, setF] = useState({
+    batch_id: '', title: '', mode: 'online', meeting_url: '', starts_at: '', duration: 60,
+    trainer_id: defaultTrainer,
+  });
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
   const submit = async () => {
@@ -714,7 +727,7 @@ function ScheduleClassDialog({ programId, moduleId, moduleName, batches, onClose
     try {
       const start = new Date(f.starts_at);
       const end = new Date(start.getTime() + (Number(f.duration) || 60) * 60000);
-      await classesApi.create({ program_id: programId, module_id: moduleId, batch_id: f.batch_id, title: f.title.trim(), kind: 'lecture', mode: f.mode, meeting_url: f.meeting_url || null, starts_at: start.toISOString(), ends_at: end.toISOString() });
+      await classesApi.create({ program_id: programId, module_id: moduleId, batch_id: f.batch_id, trainer_id: f.trainer_id || null, title: f.title.trim(), kind: 'lecture', mode: f.mode, meeting_url: f.meeting_url || null, starts_at: start.toISOString(), ends_at: end.toISOString() });
       onDone();
     } catch (e) { onError(e.message); } finally { setBusy(false); }
   };
@@ -723,6 +736,19 @@ function ScheduleClassDialog({ programId, moduleId, moduleName, batches, onClose
       <DialogTitle>Schedule class · {moduleName}</DialogTitle>
       <DialogContent sx={{ display: 'grid', gap: 2, pt: 1 }}>
         {batches.length === 0 && <Alert severity="warning">Create a batch first (Batches tab) — classes are scheduled into a batch.</Alert>}
+        {trainers.length > 0 && (
+          <TextField
+            select size="small" label="Teacher" value={f.trainer_id} onChange={set('trainer_id')}
+            helperText={f.trainer_id ? "Taken from this module — change it if somebody else covers the session" : 'Unassigned classes are not counted for pay'}
+          >
+            <MenuItem value="">— unassigned</MenuItem>
+            {trainers.map((t) => (
+              <MenuItem key={t.id} value={t.user_id}>
+                {t.user_name}{t.role === 'head' ? ' (head)' : ''}{t.module_name ? ` · ${t.module_name}` : ''}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
         <TextField size="small" select label="Batch" value={f.batch_id} onChange={set('batch_id')}>
           {batches.map((b) => <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>)}
         </TextField>

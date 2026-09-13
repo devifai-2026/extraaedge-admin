@@ -132,7 +132,36 @@ export default function TrainerClasses() {
 function CreateClassDialog({ programId, batches, modules, trainers = [], onClose, onDone, onError }) {
   const [f, setF] = useState({ title: '', batch_id: '', module_id: '', trainer_id: '', kind: 'lecture', mode: 'online', meeting_url: '', starts_at: '', ends_at: '' });
   const [busy, setBusy] = useState(false);
+  // Tracks whether the teacher was chosen by hand. Once it is, changing the
+  // module must not silently overwrite that choice.
+  const [trainerTouched, setTrainerTouched] = useState(false);
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
+
+  // The trainer bound to a module on the course roster (course_trainers row
+  // with that module_id), falling back to the course head.
+  const trainerForModule = (moduleId) => {
+    if (!moduleId) return '';
+    const bound = trainers.find((t) => t.module_id === moduleId);
+    if (bound) return bound.user_id;
+    const head = trainers.find((t) => t.role === 'head');
+    return head ? head.user_id : '';
+  };
+
+  // Picking a module prefills the teacher, because the module already knows who
+  // teaches it — asking again from scratch was pure re-entry. Still editable:
+  // one session of a module is often covered by somebody else.
+  const setModule = (e) => {
+    const moduleId = e.target.value;
+    setF((s) => ({
+      ...s,
+      module_id: moduleId,
+      trainer_id: trainerTouched ? s.trainer_id : trainerForModule(moduleId),
+    }));
+  };
+  const setTrainer = (e) => {
+    setTrainerTouched(true);
+    setF((s) => ({ ...s, trainer_id: e.target.value }));
+  };
   const submit = async () => {
     if (!f.title || !f.batch_id || !f.starts_at || !f.ends_at) { onError('Title, batch, start and end are required'); return; }
     setBusy(true);
@@ -153,11 +182,17 @@ function CreateClassDialog({ programId, batches, modules, trainers = [], onClose
         <TextField select size="small" label="Batch" value={f.batch_id} onChange={set('batch_id')}>
           {batches.map((b) => <MenuItem key={b.id} value={b.id}>{b.name}</MenuItem>)}
         </TextField>
-        <TextField select size="small" label="Module" value={f.module_id} onChange={set('module_id')}>
+        <TextField select size="small" label="Module" value={f.module_id} onChange={setModule}>
           <MenuItem value="">—</MenuItem>
           {modules.map((m) => <MenuItem key={m.id} value={m.id}>{m.name}</MenuItem>)}
         </TextField>
-        <TextField select size="small" label="Teacher" value={f.trainer_id} onChange={set('trainer_id')} sx={{ gridColumn: '1 / -1' }} helperText="Who teaches this class">
+        <TextField
+          select size="small" label="Teacher" value={f.trainer_id} onChange={setTrainer}
+          sx={{ gridColumn: '1 / -1' }}
+          helperText={f.trainer_id && !trainerTouched && f.module_id
+            ? 'Filled in from the module — change it if somebody else takes this session'
+            : 'Who teaches this class'}
+        >
           <MenuItem value="">— unassigned</MenuItem>
           {trainers.map((t) => <MenuItem key={t.id} value={t.user_id}>{t.user_name}{t.role === 'head' ? ' (head)' : ''}{t.module_name ? ` · ${t.module_name}` : ''}</MenuItem>)}
         </TextField>
