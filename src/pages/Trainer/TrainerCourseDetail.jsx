@@ -82,7 +82,9 @@ function ModulesTab({ programId, notify, canManage }) {
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [open, setOpen] = useState({}); // moduleId → expanded
-  const [topicInput, setTopicInput] = useState({}); // moduleId → draft topic
+  const [topicInput, setTopicInput] = useState({});
+  // Which topic title is being edited inline: { moduleId, idx, value }.
+  const [editTopic, setEditTopic] = useState(null); // moduleId → draft topic
   const [scheduleFor, setScheduleFor] = useState(null); // module to schedule a class in
   const [completionFor, setCompletionFor] = useState(null); // module to certify completion
 
@@ -121,6 +123,19 @@ function ModulesTab({ programId, notify, canManage }) {
   const trainerName = (uid) => trainerOptions.find((t) => t.id === uid)?.name;
   const removeTopic = (m, idx) => {
     const syllabus = (Array.isArray(m.syllabus) ? m.syllabus : []).filter((_, j) => j !== idx);
+    saveTopics(m, syllabus);
+  };
+  // Rename a topic in place. Keeps trainer_user_id — renaming "HTML Basics" to
+  // "HTML Fundamentals" must not silently unassign whoever teaches it.
+  const renameTopic = (m, idx, title) => {
+    const clean = (title || '').trim();
+    const current = normalizeTopic((m.syllabus || [])[idx]);
+    // Empty is a no-op, not a delete: deleting is the × and should be deliberate.
+    if (!clean || clean === current.title) { setEditTopic(null); return; }
+    const syllabus = (Array.isArray(m.syllabus) ? m.syllabus : [])
+      .map(normalizeTopic)
+      .map((t, j) => (j === idx ? { ...t, title: clean } : t));
+    setEditTopic(null);
     saveTopics(m, syllabus);
   };
 
@@ -179,7 +194,27 @@ function ModulesTab({ programId, notify, canManage }) {
                           const topic = normalizeTopic(s);
                           return (
                             <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #eef0f5', borderRadius: 10, padding: '6px 10px', fontSize: 13, color: '#334155', flexWrap: 'wrap' }}>
-                              <span style={{ flex: 1, minWidth: 120 }}>{topic.title}</span>
+                              {canManage && editTopic?.moduleId === m.id && editTopic?.idx === j ? (
+                                <TextField
+                                  size="small" variant="standard" autoFocus
+                                  value={editTopic.value}
+                                  onChange={(e) => setEditTopic((s2) => ({ ...s2, value: e.target.value }))}
+                                  onBlur={() => renameTopic(m, j, editTopic.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') renameTopic(m, j, editTopic.value);
+                                    if (e.key === 'Escape') setEditTopic(null);
+                                  }}
+                                  sx={{ flex: 1, minWidth: 120 }}
+                                />
+                              ) : (
+                                <span
+                                  onClick={() => canManage && setEditTopic({ moduleId: m.id, idx: j, value: topic.title })}
+                                  title={canManage ? 'Click to rename' : undefined}
+                                  style={{ flex: 1, minWidth: 120, cursor: canManage ? 'text' : 'default' }}
+                                >
+                                  {topic.title}
+                                </span>
+                              )}
                               {canManage && trainerOptions.length > 0 ? (
                                 <TextField select size="small" variant="standard" value={topic.trainer_user_id || ''} onChange={(e) => setTopicTrainer(m, j, e.target.value)} sx={{ minWidth: 150 }} SelectProps={{ displayEmpty: true }}>
                                   <MenuItem value=""><em style={{ color: '#94a3b8' }}>Unassigned</em></MenuItem>
