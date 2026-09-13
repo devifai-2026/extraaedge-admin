@@ -883,6 +883,10 @@ export const coursesApi = {
   programLeaves: (programId) => api.get('/courses/leaves', { programId }),
   createTrainer: (programId, body) => api.post(`/courses/${programId}/create-trainer`, body),
   completeBatch: (programId, batchId) => api.post(`/courses/${programId}/batches/${batchId}/complete`),
+  // Counts of everything attached to a batch, so the UI can offer deletion only
+  // when it will actually succeed.
+  batchUsage: (programId, batchId) => api.get(`/courses/${programId}/batches/${batchId}/usage`),
+  deleteBatch: (programId, batchId) => api.delete(`/courses/${programId}/batches/${batchId}`),
   students: () => api.get('/courses/students', withBranch()),
   resetStudentPassword: (studentId) => api.post(`/courses/students/${studentId}/reset-password`),
   sudoStudent: (studentId) => api.post(`/courses/students/${studentId}/sudo-login`),

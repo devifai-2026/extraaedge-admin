@@ -10,7 +10,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box, Tabs, Tab, Button, TextField, Alert, Snackbar, Chip,
   CircularProgress, IconButton, Dialog, DialogTitle, DialogContent,
-  DialogActions, MenuItem, FormControlLabel, Checkbox, Table, TableHead, TableRow, TableCell, TableBody,
+  DialogActions, MenuItem, FormControlLabel, Checkbox, Table, TableHead, TableRow, TableCell, TableBody, Tooltip,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
@@ -436,6 +436,14 @@ function BatchesTab({ programId, notify, canManage }) {
     try { await coursesApi.completeBatch(programId, b.id); load(); notify('success', 'Batch marked completed'); }
     catch (e) { notify('error', e.message); }
   };
+  // Delete is offered only for an empty batch. The server checks again and
+  // refuses with the blocking counts, so a batch that gained a student since
+  // this list loaded still cannot be removed by accident.
+  const remove = async (b) => {
+    if (!window.confirm(`Delete batch "${b.name}"? This cannot be undone from the UI.`)) return;
+    try { await coursesApi.deleteBatch(programId, b.id); load(); notify('success', `Batch "${b.name}" deleted`); }
+    catch (e) { notify('error', e.message); }
+  };
 
   if (loading) return <CircularProgress />;
   const nonMerged = batches.filter((b) => b.status !== 'merged');
@@ -460,7 +468,18 @@ function BatchesTab({ programId, notify, canManage }) {
                 <TableCell align="center">{b.student_count}</TableCell>
                 <TableCell sx={{ color: '#64748b' }}>{b.start_date ? fmtDate(b.start_date) : '—'}</TableCell>
                 <TableCell align="center">{b.status === 'completed' ? <Badge tone="neutral">Completed</Badge> : <Badge tone="success">Active</Badge>}</TableCell>
-                <TableCell align="right">{canManage && b.status !== 'completed' && <Button size="small" onClick={() => complete(b)} sx={{ textTransform: 'none' }}>Mark complete</Button>}</TableCell>
+                <TableCell align="right">
+                  {canManage && b.status !== 'completed' && <Button size="small" onClick={() => complete(b)} sx={{ textTransform: 'none' }}>Mark complete</Button>}
+                  {/* Empty batches only — one with students, classes or capstones
+                      holds attendance and payroll history worth keeping. */}
+                  {canManage && Number(b.student_count) === 0 && (
+                    <Tooltip title="Delete this empty batch">
+                      <IconButton size="small" onClick={() => remove(b)} sx={{ ml: 0.5 }}>
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </TableCell>
               </TableRow>
             ))}</TableBody>
           </Table>
