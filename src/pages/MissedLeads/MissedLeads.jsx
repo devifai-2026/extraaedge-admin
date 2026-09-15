@@ -17,7 +17,7 @@
 // Rows are grouped per LEAD, not per follow-up: one lead with four missed
 // follow-ups is one problem to solve, not four. missed_count carries the
 // repetition, which is the part worth acting on.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CircularProgress, MenuItem, TextField, Chip } from '@mui/material';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
@@ -82,16 +82,26 @@ export default function MissedLeads() {
     return p;
   }, [debounced, ownerScoped]);
 
+  // Same guard as Stale Leads: typing in the search box fires overlapping
+  // requests, and without a sequence number whichever RESOLVES last wins
+  // rather than whichever was REQUESTED last — so an older, broader result can
+  // land after the narrower one the user is actually waiting for.
+  const reqSeq = useRef(0);
+
   const reload = useCallback(async () => {
+    const seq = reqSeq.current + 1;
+    reqSeq.current = seq;
     setLoading(true); setError('');
     try {
       const res = await followUpsApi.missed(params);
+      if (reqSeq.current !== seq) return;   // superseded — drop this response
       setRows(res?.data || []);
       if (res?.meta?.totals) setTotals(res.meta.totals);
     } catch (e) {
+      if (reqSeq.current !== seq) return;
       setError(e?.message || 'Could not load missed leads');
     } finally {
-      setLoading(false);
+      if (reqSeq.current === seq) setLoading(false);
     }
   }, [params]);
   useEffect(() => { reload(); }, [reload]);

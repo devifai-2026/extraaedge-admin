@@ -16,7 +16,7 @@
 //              the lead deliberately stayed put (we never cross the class, and
 //              never unassign).
 //   resolved — the owner acted in time. No handover.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CircularProgress, MenuItem, TextField, Chip, Tooltip } from '@mui/material';
 import HourglassBottomIcon from '@mui/icons-material/HourglassBottom';
 import { reportsApi, usersApi } from '../../lib/endpoints';
@@ -152,26 +152,59 @@ export default function StaleHandovers() {
     return p;
   }, [debounced, view]);
 
+  // Which view the rows currently in state actually belong to. The three views
+  // return different shapes, so rendering one view's rows under another's
+  // columns produces garbage like "undefinedh" (a history row has no
+  // hours_left). Tracking this lets the table refuse to draw rows that don't
+  // match the selected tab, instead of trusting that `rows` is always current.
+  const [loadedView, setLoadedView] = useState(null);
+
+  // Guards against a slow earlier request overwriting a newer one. Toggling
+  // tabs quickly fires several requests; without this, whichever RESOLVES last
+  // wins rather than whichever was REQUESTED last, so the previous tab's data
+  // could land in the current tab. Each run claims a sequence number and only
+  // commits if it is still the newest when it returns.
+  const reqSeq = useRef(0);
+
   const reload = useCallback(async () => {
+    const seq = reqSeq.current + 1;
+    reqSeq.current = seq;
+    const requestedView = params.view;
     setLoading(true); setError('');
     try {
       const res = await reportsApi.staleHandovers(params);
-      if (params.view === 'criteria') {
+      if (reqSeq.current !== seq) return;   // superseded — drop this response
+      if (requestedView === 'criteria') {
         setCriteria(res?.data || []);
         setCriteriaMeta(res?.meta || null);
         setRows([]);
       } else {
         setRows(res?.data || []);
       }
+      setLoadedView(requestedView);
       if (res?.meta?.policy) setPolicy(res.meta.policy);
       if (res?.meta?.totals) {
-        if (params.view === 'upcoming') setUpcoming(res.meta.totals);
-        else if (params.view !== 'criteria') setTotals(res.meta.totals);
+        if (requestedView === 'upcoming') setUpcoming(res.meta.totals);
+        else if (requestedView !== 'criteria') setTotals(res.meta.totals);
       }
     } catch (e) {
+      if (reqSeq.current !== seq) return;
       setError(e?.message || 'Could not load stale-lead handovers'); setRows([]);
-    } finally { setLoading(false); }
+    } finally {
+      // Only the newest request may clear the loader. An older one finishing
+      // late must not reveal a half-loaded table.
+      if (reqSeq.current === seq) setLoading(false);
+    }
   }, [params]);
+
+  // Switching tabs drops the old view's rows immediately and shows the loader,
+  // so there is never a frame where one view's data sits under another's
+  // headers — the state the screenshot caught.
+  useEffect(() => {
+    setRows([]);
+    setLoadedView(null);
+    setLoading(true);
+  }, [view]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -286,7 +319,10 @@ export default function StaleHandovers() {
 
       {error && <div style={{ color: '#c62828', marginBottom: 12 }}>{error}</div>}
 
-      {loading ? (
+      {/* `loadedView !== view` means the rows in state belong to a different
+          tab (a request is still in flight, or one was just superseded). Show
+          the loader rather than drawing them under the wrong headers. */}
+      {loading || (view !== 'criteria' && loadedView !== view) ? (
         <div style={{ padding: 40, textAlign: 'center' }}><CircularProgress size={28} /></div>
       ) : view === 'criteria' ? (
         <div>
@@ -384,9 +420,13 @@ export default function StaleHandovers() {
                 return (
                   <tr key={r.lead_id} style={{ borderTop: '1px solid #f0f0f0', background: soon ? '#fff8e1' : undefined }}>
                     <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', fontWeight: soon ? 700 : 500 }}>
-                      {r.hours_left >= 24
-                        ? `${Math.floor(r.hours_left / 24)}d ${r.hours_left % 24}h`
-                        : `${r.hours_left}h`}
+                      {/* Never interpolate a missing value: a row without
+                          hours_left used to render the literal "undefinedh". */}
+                      {r.hours_left == null
+                        ? '—'
+                        : r.hours_left >= 24
+                          ? `${Math.floor(r.hours_left / 24)}d ${r.hours_left % 24}h`
+                          : `${r.hours_left}h`}
                     </td>
                     <td style={{ padding: '10px 12px' }}>
                       {r.lead_name || '—'}
