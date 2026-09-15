@@ -106,12 +106,26 @@ export default function MissedLeads() {
   }, [params]);
   useEffect(() => { reload(); }, [reload]);
 
-  // Clicking a row opens that lead's card, which lands on the tab carrying the
-  // follow-up schedule. `?focus=<id>` is the existing deep-link LeadList
-  // already honours (it also powers notification clicks), and `highlight`
-  // drives the 3-second ring on the row it came from.
-  const openLead = (leadId) => {
-    navigate(`/leadlist?focus=${leadId}&highlight=${leadId}`);
+  // Clicking a row goes to the Follow-ups Manager calendar, landing on the DAY
+  // the follow-up was due with the Missed tab active and that lead's dialog
+  // open. The calendar is date-driven, so dropping the user on today would show
+  // an empty list for a promise broken last week — the date is what makes the
+  // missed follow-up actually visible.
+  //
+  // Deliberately NOT /leadlist?focus=: that opens the lead edit dialog on the
+  // lead list, which is a different surface. The Follow-ups Manager is where a
+  // follow-up gets rescheduled or completed, which is the whole point of
+  // clicking a missed lead.
+  const openLead = (leadId, lastMissedAt) => {
+    const params = new URLSearchParams({ lead: leadId, status: 'missed' });
+    // Local calendar day, not UTC — toISOString() would shift the date across
+    // midnight for IST and land the user on the wrong day.
+    const d = lastMissedAt ? new Date(lastMissedAt) : null;
+    if (d && !Number.isNaN(d.getTime())) {
+      const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      params.set('date', local);
+    }
+    navigate(`/followupmanager?${params.toString()}`);
   };
 
   const set = (k) => (e) => setFilters((f) => ({ ...f, [k]: e.target.value }));
@@ -182,11 +196,11 @@ export default function MissedLeads() {
               {rows.map((r) => (
                 <tr
                   key={r.lead_id}
-                  onClick={() => openLead(r.lead_id)}
+                  onClick={() => openLead(r.lead_id, r.last_missed_at)}
                   style={{ borderTop: '1px solid #f0f0f0', cursor: 'pointer' }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = '#fffdf5'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                  title="Open this lead's follow-up schedule"
+                  title="Open this lead in the Follow-ups Manager, on the day it was due"
                 >
                   <td style={{ padding: '10px 12px' }}>
                     <div style={{ fontWeight: 600 }}>{r.lead_name || 'Unknown'}</div>

@@ -7,7 +7,8 @@
 //
 // Calendar shows up to 3 dots under each day: planned (amber), done (green),
 // missed (red). Clicking a date filters the right-pane list.
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   IconButton, Box, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText,
   TextField, InputAdornment, Chip, CircularProgress, Autocomplete,
@@ -201,6 +202,7 @@ export default function FollowUpManager() {
   // We now open the same AddNewLead dialog inline on this page instead.
   const [openLead, setOpenLead] = useState(null);
   const [openingLeadId, setOpeningLeadId] = useState(null);
+  const [highlightLeadId, setHighlightLeadId] = useState(null);
 
   const openLeadDialog = async (leadId) => {
     if (!leadId || openingLeadId) return;
@@ -214,14 +216,53 @@ export default function FollowUpManager() {
       setOpeningLeadId(null);
     }
   };
+  // Pop the deep-linked lead's dialog once, then strip the params so a
+  // refresh or a later navigation doesn't re-open it. openLeadDialog is the
+  // same path the calendar's own rows use, so the user lands exactly where a
+  // click inside this page would have put them.
+  useEffect(() => {
+    const { leadId } = deepLink.current;
+    if (!leadId) return;
+    deepLink.current = { leadId: null, date: null, status: null };
+    openLeadDialog(leadId);
+    // Ring the matching row for 3 seconds so the lead you came for is obvious
+    // behind the dialog, and still obvious once it is dismissed.
+    setHighlightLeadId(leadId);
+    setTimeout(() => setHighlightLeadId(null), 3000);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('lead'); next.delete('date'); next.delete('status');
+      return next;
+    }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const sessionUser = auth.getUser() || {};
   // branch_manager is admin-like (sees their whole branch, scoped server-side),
   // so it gets the admin/all view here rather than the counsellor view.
   const isAdmin = sessionUser.role === 'super_admin' || sessionUser.role === 'branch_manager';
   const isManager = sessionUser.role === 'sales_manager';
 
-  const [activeTab, setActiveTab] = useState('all');
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // Deep-link from Missed Leads: ?lead=<id>&date=<yyyy-mm-dd>&status=<tab>.
+  // The calendar is date-driven, so landing on the right DAY is what makes the
+  // lead's follow-up visible — dropping the user on today would show an empty
+  // list for a promise that was broken last week. The params are read once on
+  // mount and then stripped, so a refresh doesn't keep re-applying them.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLink = useRef({
+    leadId: searchParams.get('lead'),
+    date: searchParams.get('date'),
+    status: searchParams.get('status'),
+  });
+
+  const [activeTab, setActiveTab] = useState(() => {
+    const s = deepLink.current.status;
+    return ['planned', 'done', 'missed', 'cancelled'].includes(s) ? s : 'all';
+  });
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = deepLink.current.date ? new Date(`${deepLink.current.date}T00:00:00`) : null;
+    return d && !Number.isNaN(d.getTime()) ? d : new Date();
+  });
   const [calendarMonth, setCalendarMonth] = useState({ month: selectedDate.getMonth(), year: selectedDate.getFullYear() });
 
   // Filters
@@ -591,6 +632,7 @@ export default function FollowUpManager() {
               f={f}
               onChanged={() => { reloadList(); reloadCalendar(); }}
               onOpenLead={openLeadDialog}
+              highlighted={!!highlightLeadId && f.lead_id === highlightLeadId}
             />
           ))}
         </div>
@@ -631,7 +673,7 @@ export default function FollowUpManager() {
 //   • missed  (red)     → reschedule, mark done, cancel
 //   • done    (green)   → locked, no actions
 //   • cancelled (grey)  → locked, no actions
-function FollowupRow({ f, onChanged, onOpenLead }) {
+function FollowupRow({ f, onChanged, onOpenLead, highlighted }) {
   const [busy, setBusy] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleAt, setRescheduleAt] = useState('');
@@ -720,7 +762,7 @@ function FollowupRow({ f, onChanged, onOpenLead }) {
   return (
     <>
       <div
-        className="followup-row"
+        className={`followup-row${highlighted ? ' lead-highlight-flash' : ''}`}
         onClick={openLead}
         role="button"
         tabIndex={0}
