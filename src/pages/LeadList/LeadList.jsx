@@ -32,6 +32,24 @@ const LeadList = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const [focusedLead, setFocusedLead] = useState(null);
     const focusId = searchParams.get('focus');
+
+    // ?highlight=<lead_id> — ring the lead for 3 seconds after arriving from
+    // another page (Missed Leads), so the row you came for is obvious in a
+    // list of many. Purely visual and self-clearing; the param is stripped on
+    // arrival so a refresh doesn't replay it.
+    const highlightParam = searchParams.get('highlight');
+    const [highlightId, setHighlightId] = useState(null);
+    useEffect(() => {
+        if (!highlightParam) return undefined;
+        setHighlightId(highlightParam);
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('highlight');
+            return next;
+        }, { replace: true });
+        const t = setTimeout(() => setHighlightId(null), 3000);
+        return () => clearTimeout(t);
+    }, [highlightParam, setSearchParams]);
     useEffect(() => {
         if (!focusId) return;
         let alive = true;
@@ -341,14 +359,18 @@ const LeadList = () => {
                         style={copyGuard.style}
                     >
                         {leads.map((lead) => (
-                            <LeadCard
+                            <div
                                 key={lead.id}
-                                lead={lead}
-                                selected={selectedIds.has(lead.id)}
-                                onToggleSelect={() => toggleSelect(lead.id)}
-                                onReassign={() => handleSingleReassign(lead)}
-                                onChanged={() => setReloadKey((k) => k + 1)}
-                            />
+                                className={highlightId === lead.id ? 'lead-highlight-flash' : undefined}
+                            >
+                                <LeadCard
+                                    lead={lead}
+                                    selected={selectedIds.has(lead.id)}
+                                    onToggleSelect={() => toggleSelect(lead.id)}
+                                    onReassign={() => handleSingleReassign(lead)}
+                                    onChanged={() => setReloadKey((k) => k + 1)}
+                                />
+                            </div>
                         ))}
                     </div>
                 )}
@@ -356,6 +378,7 @@ const LeadList = () => {
                 {!loading && leads.length > 0 && viewMode === 'table' && (
                     <LeadsTable
                         leads={leads}
+                        highlightId={highlightId}
                         selectedIds={selectedIds}
                         onToggleSelect={(id) => toggleSelect(id)}
                         onToggleSelectAll={(checked) => {

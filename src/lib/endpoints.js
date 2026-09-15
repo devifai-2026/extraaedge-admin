@@ -172,6 +172,9 @@ export const followUpsApi = {
   analytics: (params) => api.get('/follow-ups/analytics', params),
   myUpcoming: () => api.get('/follow-ups/my'),
   overdue: () => api.get('/follow-ups/overdue'),
+  // Missed Leads tab — leads whose follow-up was promised and not kept,
+  // grouped per lead and scoped server-side to the caller's role.
+  missed: (params) => api.get('/follow-ups/missed', params),
   create: (body) => api.post('/follow-ups', body),
   update: (id, body, ifMatch) => api.put(`/follow-ups/${id}`, body, ifMatch),
   complete: (id, reason) => api.post(`/follow-ups/${id}/complete`, reason ? { completion_reason: reason } : {}),

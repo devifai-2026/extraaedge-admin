@@ -38,3 +38,23 @@
   gap: 12px;
   z-index: 1000;
 }
+
+/* 3-second ring on a lead arrived at from Missed Leads (?highlight=<id>).
+   Purely an attention cue: it fades out on its own and leaves no layout
+   shift, so the row settles into the list exactly where it already was.
+   outline (not border) keeps it from resizing the card or table row. */
+@keyframes lead-highlight-flash {
+  0%   { outline-color: rgba(198, 40, 40, 0.95); background-color: rgba(198, 40, 40, 0.10); }
+  70%  { outline-color: rgba(198, 40, 40, 0.85); background-color: rgba(198, 40, 40, 0.06); }
+  100% { outline-color: rgba(198, 40, 40, 0);    background-color: transparent; }
+}
+.lead-highlight-flash {
+  outline: 2px solid rgba(198, 40, 40, 0.95);
+  outline-offset: -2px;
+  border-radius: 8px;
+  animation: lead-highlight-flash 3s ease-out forwards;
+}
+/* Respect users who ask for less motion: keep the ring, drop the pulse. */
+@media (prefers-reduced-motion: reduce) {
+  .lead-highlight-flash { animation-duration: 3s; animation-timing-function: step-end; }
+}

@@ -10,6 +10,7 @@ import PaymentsTracker from './pages/Payments/PaymentsTracker'
 import LeadTransferReport from './pages/Reports/LeadTransferReport'
 import ReassignLogs from './pages/Reports/ReassignLogs'
 import StaleHandovers from './pages/Reports/StaleHandovers'
+import MissedLeads from './pages/MissedLeads/MissedLeads'
 import RawDataManager from './pages/RawDataManager/RawDataManager'
 import FailedLeads from './pages/FailedLeads/FailedLeads'
 import UnmatchedRecordings from './pages/UnmatchedRecordings/UnmatchedRecordings'
@@ -192,6 +193,7 @@ function App() {
         <Route path="/reports/lead-transfers" element={<ProtectedRoute tab="lead_transfer_report"><Layout><LeadTransferReport /></Layout></ProtectedRoute>} />
         <Route path="/reports/reassign-logs" element={<ProtectedRoute tab="reassign_logs"><Layout><ReassignLogs /></Layout></ProtectedRoute>} />
         <Route path="/reports/stale-leads" element={<ProtectedRoute tab="stale_handovers"><Layout><StaleHandovers /></Layout></ProtectedRoute>} />
+        <Route path="/missed-leads" element={<ProtectedRoute tab="missed_leads"><Layout><MissedLeads /></Layout></ProtectedRoute>} />
         <Route path="/search"               element={<ProtectedRoute tab="leads"><Layout><SearchResults /></Layout></ProtectedRoute>} />
         <Route path="/users/:id"            element={<ProtectedRoute tab="advanced.users_roles"><Layout><UserProfile /></Layout></ProtectedRoute>} />
         {/* /profile is open to every authenticated tenant role — each user

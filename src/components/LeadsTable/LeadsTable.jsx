@@ -109,7 +109,7 @@ const cellStyle = {
 };
 
 const LeadsTable = ({
-  leads, selectedIds, onToggleSelect, onToggleSelectAll, onReassign, onChanged,
+  leads, selectedIds, onToggleSelect, onToggleSelectAll, onReassign, onChanged, highlightId,
   // Server-driven sort + per-column search (whole tenant DB, not just the
   // loaded page). `sort` is the server sort key string (e.g. 'name_asc').
   // `columnFilters` is keyed by SERVER param name (see PARAM_KEY below).
@@ -297,6 +297,7 @@ const LeadsTable = ({
             return (
               <tr
                 key={lead.id}
+                className={highlightId === lead.id ? 'lead-highlight-flash' : undefined}
                 style={{ background: isSelected ? '#fdf3ed' : 'transparent' }}
                 onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = '#fafafa'; }}
                 onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}

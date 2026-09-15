@@ -64,10 +64,19 @@ const ROLE_MANAGER_TABS = [
   'settings.assignment_rules',
   'lead_transfer_report',
   'stale_handovers',
+  'missed_leads',
 ];
 const ROLE_COUNSELLOR_TABS = [
   'dashboard', 'leads', 'lead_pool', 'raw_data', 'failed_leads', 'followups', 'whatsapp',
   'admissions.my_students',
+  // Their own broken follow-up promises — the surface is scoped server-side,
+  // so a lead owner only ever sees their own.
+  'missed_leads',
+  // The 6-day/7-day rule takes leads AWAY from front-line owners, so they need
+  // to see it: what they lost, what landed on them, and what is about to go.
+  // Server-side scoping (selfOnly in modules/sla/routes.js) forces a lead owner
+  // to their own rows regardless of what the client asks for.
+  'stale_handovers',
 ];
 // Account managers get a dedicated Accounts module — separate sidebar
 // entirely from counsellors / managers. They never see /leadlist or
@@ -259,6 +268,7 @@ const TAB_TO_ROUTE = {
   // super_admin-only audit of manual lead moves.
   reassign_logs: '/reports/reassign-logs',
   stale_handovers: '/reports/stale-leads',
+  missed_leads: '/missed-leads',
   // Accounts module — account_manager only
   'accounts.dashboard':              '/accounts/dashboard',
   'accounts.pending_admissions':     '/accounts/pending-admissions',

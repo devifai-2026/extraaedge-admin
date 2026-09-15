@@ -98,6 +98,10 @@ const menuSections = [
       { id: 3, label: 'Raw Data Manager', icon: FolderIcon, path: '/rawdata', tab: 'raw_data' },
       { id: 4, label: 'WhatsApp Chat', icon: WhatsAppIcon, path: '/whatsapplist', tab: 'whatsapp', badgeKey: 'whatsapp' },
       { id: 5, label: 'Follow-ups Manager', icon: CalendarTodayIcon, path: '/followupmanager', tab: 'followups' },
+      // Broken follow-up promises. Sits beside the Follow-ups Manager because
+      // it is the same commitment seen from the other end. Front-line roles see
+      // their own; manager tiers see their team's (scoped server-side).
+      { id: 29, label: 'Missed Leads', icon: EventBusyIcon, path: '/missed-leads', tab: 'missed_leads' },
       { id: 6, label: 'Upload Failed Leads', icon: UploadFileIcon, path: '/failedleads', tab: 'failed_leads' },
       { id: 7, label: 'Bulk Action Stage', icon: SettingsIcon, path: '/bulkuploadlist', tab: 'bulk_upload' },
       { id: 20, label: 'Lead Report', icon: AssessmentIcon, path: '/reports/lead-transfers', tab: 'lead_transfer_report' },

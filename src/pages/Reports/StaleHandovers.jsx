@@ -27,6 +27,7 @@ const OUTCOMES = [
   { v: 'moved', label: 'Moved' },
   { v: 'held', label: 'Held (nobody free)' },
   { v: 'pending', label: 'Pending (day 6)' },
+  { v: 'saved', label: 'Saved by a touch' },
   { v: 'resolved', label: 'Resolved in time' },
 ];
 
@@ -47,13 +48,31 @@ const outcomeExplanation = (r) => {
       ? `Fewest open leads among ${roleLabel(r.from_role) || 'peer'}s at that moment`
       : 'Reassigned by the stale-lead rule';
   }
-  if (r.outcome === 'resolved') {
-    return r.resolution_reason === 'activity_logged'
-      ? 'Owner logged activity in time — kept the lead'
-      : 'Alert resolved before the handover was due';
+  // Was ABOUT to move on day 7, then a person touched it. Name the actual
+  // action (completed a follow-up, added a comment, logged a call) and who did
+  // it — "saved by activity" alone doesn't answer why this lead stayed put.
+  if (r.outcome === 'saved') {
+    const what = SAVED_BY_TEXT[r.saved_by_type];
+    const who = r.saved_by_name ? ` by ${r.saved_by_name}` : '';
+    if (what) return `${what}${who} before day 7 — lead stayed put`;
+    return r.saved_by_summary || 'Owner touched the lead before day 7 — it stayed put';
   }
+  if (r.outcome === 'resolved') return 'Alert resolved before the handover was due';
   if (r.outcome === 'pending') return 'Still inside the grace period — owner can keep it';
   return HOLD_REASON_TEXT[r.hold_reason] || r.hold_reason || 'Reason not recorded';
+};
+
+// lead_activities.type -> what a person actually did. These are the touches
+// that keep a lead out of the rotation.
+const SAVED_BY_TEXT = {
+  follow_up_completed: 'Follow-up completed',
+  follow_up_rescheduled: 'Follow-up rescheduled',
+  follow_up_cancelled: 'Follow-up cancelled',
+  follow_up_scheduled: 'Follow-up scheduled',
+  note_added: 'Comment added',
+  call_logged: 'Call logged',
+  stage_changed: 'Stage changed',
+  lead_updated: 'Lead updated',
 };
 
 const HOLD_REASON_TEXT = {
@@ -69,6 +88,7 @@ const OUTCOME_STYLE = {
   held: { bg: '#fff3e0', fg: '#e65100', label: 'Held' },
   pending: { bg: '#e3f2fd', fg: '#0d47a1', label: 'Pending' },
   resolved: { bg: '#f5f5f5', fg: '#555', label: 'Resolved' },
+  saved: { bg: '#f3e5f5', fg: '#6a1b9a', label: 'Saved' },
 };
 
 const fmt = (v) => {
@@ -83,18 +103,26 @@ const roleLabel = (r) => (r ? String(r).replaceAll('_', ' ') : '');
 
 export default function StaleHandovers() {
   const [rows, setRows] = useState([]);
-  const [totals, setTotals] = useState({ pending: 0, moved: 0, held: 0 });
+  const [totals, setTotals] = useState({ pending: 0, moved: 0, held: 0, saved: 0 });
   const [upcoming, setUpcoming] = useState({ in_rotation: 0, due_within_24h: 0 });
   const [policy, setPolicy] = useState(null);
+  const [criteria, setCriteria] = useState([]);
+  const [criteriaMeta, setCriteriaMeta] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   // A front-line owner opens on "Coming up" — the leads they can still save.
   // Managers open on history, which is the audit view they actually want.
+  // A front-line owner is forced to their own rows by the server, so the
+  // owner pickers would be noise — and the roster fetch behind them is a
+  // manager-only call.
+  // isLeadOwnerRole() already excludes telecaller_lead (it runs a team), which
+  // is exactly the server's selfOnly test in modules/sla/routes.js.
+  const selfScoped = isLeadOwnerRole();
   const [view, setView] = useState(() => (isLeadOwnerRole() ? 'upcoming' : 'history'));
   const [filters, setFilters] = useState({
-    date_from: '', date_to: '', from_user_id: '', to_user_id: '', outcome: '',
+    date_from: '', date_to: '', from_user_id: '', to_user_id: '', outcome: '', search: '',
   });
   const [debounced, setDebounced] = useState(filters);
   const fkey = JSON.stringify(filters);
@@ -104,11 +132,12 @@ export default function StaleHandovers() {
   }, [fkey]);
 
   useEffect(() => {
+    if (selfScoped) return;
     (async () => {
       try { const r = await usersApi.list({ limit: 200, is_active: 'true' }); setUsers(r?.data || []); }
       catch { /* dropdowns degrade to "Anyone" */ }
     })();
-  }, []);
+  }, [selfScoped]);
 
   const params = useMemo(() => {
     const p = { limit: 200, view };
@@ -116,7 +145,8 @@ export default function StaleHandovers() {
       if (v === '' || v == null) continue;
       // The upcoming pipeline has no outcome, no recipient and no handover
       // date yet — only the current owner filter applies.
-      if (view === 'upcoming' && k !== 'from_user_id') continue;
+      if (view === 'criteria') continue;
+      if (view === 'upcoming' && k !== 'from_user_id' && k !== 'search') continue;
       p[k] = v;
     }
     return p;
@@ -126,11 +156,17 @@ export default function StaleHandovers() {
     setLoading(true); setError('');
     try {
       const res = await reportsApi.staleHandovers(params);
-      setRows(res?.data || []);
+      if (params.view === 'criteria') {
+        setCriteria(res?.data || []);
+        setCriteriaMeta(res?.meta || null);
+        setRows([]);
+      } else {
+        setRows(res?.data || []);
+      }
       if (res?.meta?.policy) setPolicy(res.meta.policy);
       if (res?.meta?.totals) {
         if (params.view === 'upcoming') setUpcoming(res.meta.totals);
-        else setTotals(res.meta.totals);
+        else if (params.view !== 'criteria') setTotals(res.meta.totals);
       }
     } catch (e) {
       setError(e?.message || 'Could not load stale-lead handovers'); setRows([]);
@@ -166,6 +202,7 @@ export default function StaleHandovers() {
         {[
           { v: 'history', label: 'What moved' },
           { v: 'upcoming', label: 'Coming up' },
+          { v: 'criteria', label: 'Which leads move' },
         ].map((tb) => (
           <button
             key={tb.v}
@@ -183,11 +220,18 @@ export default function StaleHandovers() {
       </div>
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
-        {view === 'history' ? (
+        {view === 'criteria' ? (
+          <>
+            <Stat label="Leads in the tenant" value={criteriaMeta?.totals?.total ?? 0} color="#555" />
+            <Stat label="Past the window now" value={criteriaMeta?.totals?.due_now ?? 0} color="#e65100" />
+            <Stat label="Inside the window" value={criteriaMeta?.totals?.in_window ?? 0} color="#0d47a1" />
+          </>
+        ) : view === 'history' ? (
           <>
             <Stat label="Moved (day 7)" value={totals.moved ?? 0} color="#1b5e20" />
             <Stat label="Held — no handover" value={totals.held ?? 0} color="#e65100" />
             <Stat label="Pending (day 6)" value={totals.pending ?? 0} color="#0d47a1" />
+            <Stat label="Saved by a touch" value={totals.saved ?? 0} color="#6a1b9a" />
           </>
         ) : (
           <>
@@ -198,6 +242,16 @@ export default function StaleHandovers() {
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+        {view !== 'criteria' && (
+        <TextField
+          size="small"
+          label="Search lead"
+          placeholder="Name or phone"
+          sx={{ minWidth: 220 }}
+          value={filters.search}
+          onChange={set('search')}
+        />
+        )}
         {view === 'history' && (
           <>
             <TextField size="small" type="date" label="From" InputLabelProps={{ shrink: true }}
@@ -206,23 +260,27 @@ export default function StaleHandovers() {
               value={filters.date_to} onChange={set('date_to')} />
           </>
         )}
+        {view !== 'criteria' && !selfScoped && (
         <TextField size="small" select label={view === 'upcoming' ? 'Current owner' : 'Lost by'} sx={{ minWidth: 180 }}
           value={filters.from_user_id} onChange={set('from_user_id')}>
           <MenuItem value="">Anyone</MenuItem>
           {users.map((u) => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
         </TextField>
-        {view === 'history' && (
+        )}
+        {view === 'history' && !selfScoped && (
           <>
             <TextField size="small" select label="Received by" sx={{ minWidth: 180 }}
               value={filters.to_user_id} onChange={set('to_user_id')}>
               <MenuItem value="">Anyone</MenuItem>
               {users.map((u) => <MenuItem key={u.id} value={u.id}>{u.name}</MenuItem>)}
             </TextField>
+          </>
+        )}
+        {view === 'history' && (
             <TextField size="small" select label="Outcome" sx={{ minWidth: 180 }}
               value={filters.outcome} onChange={set('outcome')}>
               {OUTCOMES.map((o) => <MenuItem key={o.v} value={o.v}>{o.label}</MenuItem>)}
             </TextField>
-          </>
         )}
       </div>
 
@@ -230,6 +288,74 @@ export default function StaleHandovers() {
 
       {loading ? (
         <div style={{ padding: 40, textAlign: 'center' }}><CircularProgress size={28} /></div>
+      ) : view === 'criteria' ? (
+        <div>
+          {criteriaMeta && criteriaMeta.active === false ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>
+              No active stale-lead policy — nothing is being auto-reassigned.
+            </div>
+          ) : (
+            <>
+              <div style={{
+                border: '1px solid #eee', borderRadius: 8, padding: '14px 16px',
+                marginBottom: 16, background: '#fafafa', fontSize: 14, lineHeight: 1.6,
+              }}>
+                <strong>A lead moves only if it meets every condition below.</strong> It is
+                flagged on day {criteriaMeta?.policy?.flag_days ?? 6} and handed to someone else
+                in the same role on day {criteriaMeta?.policy?.move_days ?? 7}. The counts are
+                live, so this is the rule as it is actually running — not a description of it.
+              </div>
+
+              {/* The fix, stated where the question gets asked. Anyone looking at
+                  a lead that moved despite being worked needs to know the clock
+                  now counts their follow-ups and comments. */}
+              <div style={{
+                border: '1px solid #c8e6c9', background: '#f1f8e9', borderRadius: 8,
+                padding: '14px 16px', marginBottom: 16, fontSize: 14, lineHeight: 1.6,
+              }}>
+                <strong>Fixed:</strong> completing or rescheduling a follow-up, adding a comment,
+                logging a call or changing a stage now resets the clock. Until this fix these
+                actions were recorded on the timeline but did not count as activity, so leads
+                that were genuinely being worked could still be reassigned. From the next cycle
+                they will not be.
+              </div>
+
+              <div style={{ overflowX: 'auto', border: '1px solid #eee', borderRadius: 8 }}>
+                <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 14 }}>
+                  <thead>
+                    <tr style={{ background: '#fafafa', textAlign: 'left' }}>
+                      <th style={{ padding: '10px 12px', width: 90 }}>Effect</th>
+                      <th style={{ padding: '10px 12px', width: 260 }}>Condition</th>
+                      <th style={{ padding: '10px 12px' }}>What it means</th>
+                      <th style={{ padding: '10px 12px', width: 190 }}>Right now</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {criteria.map((c) => (
+                      <tr key={c.key} style={{ borderTop: '1px solid #f0f0f0' }}>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span style={{
+                            padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 600,
+                            background: c.include ? '#e8f5e9' : '#f5f5f5',
+                            color: c.include ? '#1b5e20' : '#555',
+                          }}>{c.include ? 'Required' : 'Exempt'}</span>
+                        </td>
+                        <td style={{ padding: '10px 12px', fontWeight: 600 }}>{c.rule}</td>
+                        <td style={{ padding: '10px 12px', color: '#555', lineHeight: 1.5 }}>{c.detail}</td>
+                        <td style={{ padding: '10px 12px', color: '#555' }}>
+                          {c.count == null ? '—' : (
+                            <><strong>{c.count.toLocaleString()}</strong>
+                              <div style={{ fontSize: 12, color: '#888' }}>{c.count_label}</div></>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
       ) : rows.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>
           {view === 'upcoming'
