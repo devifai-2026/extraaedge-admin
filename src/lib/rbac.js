@@ -121,6 +121,14 @@ const ROLE_SELF_SERVICE_TABS = ['hr.my_leave', 'hr.leave_calendar', 'payroll.my_
 const ROLE_LEAVE_APPROVER_TABS = ['hr.leave_approvals'];
 // Quotas, approval chains and the holiday calendar.
 const ROLE_LEAVE_ADMIN_TABS = ['hr.leave_admin'];
+// Payroll administration mirrors the server's PAYROLL_ADMIN_ROLES
+// (super_admin + hr_team_lead + hr_recruiter). branch_manager is deliberately
+// absent: salary is money and that role sees none beyond registration amounts.
+// Salary is additionally gated per ROW server-side, so these tabs are
+// navigation rather than authority.
+// Declared HERE, not further down: FALLBACK_TABS consumes it, and a const
+// defined after that object throws on module load (temporal dead zone).
+const ROLE_PAYROLL_ADMIN_TABS = ['payroll.runs', 'payroll.structures'];
 const ROLE_PLACEMENT_TABS = ['placement.dashboard', 'placement.companies', 'placement.openings', 'placement.applications'];
 
 // Front-line roles that carry a personal queue of leads. Mirrors the server's
@@ -191,7 +199,14 @@ const FALLBACK_TABS = {
   // HR team lead oversees both HR and placement, plus the LMS analytics the
   // MoM's student/drop reports need.
   [ROLES.HR_TEAM_LEAD]: [...ROLE_HR_TABS, ...ROLE_PLACEMENT_TABS, 'lms.analytics'],
-  [ROLES.HR_RECRUITER]: ROLE_HR_TABS,
+  // Recruitment & staffing: hiring pipeline, onboarding, then the leave and
+  // payroll admin for the people they hire. Mirrors the server's
+  // HR_RECRUITER_TAB_KEYS — keep the two in step.
+  [ROLES.HR_RECRUITER]: [
+    ...ROLE_HR_TABS,
+    ...ROLE_LEAVE_APPROVER_TABS, ...ROLE_LEAVE_ADMIN_TABS,
+    ...ROLE_PAYROLL_ADMIN_TABS,
+  ],
   // The placement officer assigns mock interviews, which lives on the HR side.
   [ROLES.PLACEMENT_OFFICER]: [...ROLE_PLACEMENT_TABS, 'hr.interviews'],
 };
@@ -211,13 +226,6 @@ for (const role of [ROLES.SALES_MANAGER, ROLES.TELECALLER_LEAD, ROLES.HEAD_TRAIN
   ROLES.HR, ROLES.HR_TEAM_LEAD]) {
   FALLBACK_TABS[role] = [...new Set([...(FALLBACK_TABS[role] || []), ...ROLE_LEAVE_APPROVER_TABS])];
 }
-// Payroll administration mirrors the server's PAYROLL_ADMIN_ROLES, which is
-// now super_admin + hr_team_lead. branch_manager was dropped from it: salary
-// is money, and this role sees none beyond registration amounts. Salary is
-// additionally gated per ROW server-side, so these tabs are navigation rather
-// than authority.
-const ROLE_PAYROLL_ADMIN_TABS = ['payroll.runs', 'payroll.structures'];
-
 // Policy/quota/holiday administration mirrors the server's LEAVE_ADMIN set
 // (ADMIN_TIER_ROLES + hr_team_lead). The flat `hr` role is deliberately absent:
 // granting it here would render a Leave Settings link that 403s on open.
