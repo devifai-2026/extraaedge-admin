@@ -183,6 +183,17 @@ const doFetch = async (path, init = {}, retried = false) => {
     if (data?.error?.code === 'CLOCK_IN_REQUIRED' && typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('ee:clock-in-required'));
     }
+    // Same reasoning for permission denials. A 403 means the server refused an
+    // action the UI should not have offered in the first place, and most call
+    // sites either swallow the error in a bare catch or surface it as inline
+    // text the user never looks at — so the click just appeared to do nothing.
+    // Broadcasting lets GlobalErrorToast (mounted once in Layout) always say
+    // why, no matter which of the ~200 call sites made the request.
+    if (res.status === 403 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ee:forbidden', {
+        detail: { message: msg, code: data?.error?.code || null },
+      }));
+    }
     throw new ApiError(msg, res.status, data);
   }
   return data;
