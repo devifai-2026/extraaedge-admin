@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { isReadOnlyRole } from "../../lib/rbac";
 import { Fab, Pagination, CircularProgress, Snackbar, Alert, Checkbox, Button } from "@mui/material";
 import './LeadList.css';
 import AddIcon from '@mui/icons-material/Add';
@@ -409,6 +410,10 @@ const LeadList = () => {
 
             {/* Floating Action Buttons */}
             <div className="fab-container">
+                {/* Creating a lead is a write the server refuses for a branch
+                    manager. Bulk upload below stays: it is one of the few
+                    writes the role is explicitly allowed. */}
+                {!isReadOnlyRole() && (
                 <Fab
                     size="medium"
                     onClick={() => setAddLeadOpen(true)}
@@ -416,6 +421,7 @@ const LeadList = () => {
                 >
                     <AddIcon />
                 </Fab>
+                )}
                 <Fab
                     size="medium"
                     onClick={() => setUploadLeadOpen(true)}

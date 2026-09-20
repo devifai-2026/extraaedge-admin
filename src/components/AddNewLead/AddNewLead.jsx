@@ -34,7 +34,7 @@ import { auth } from "../../lib/api";
 import { useDropdown } from "../../lib/useDropdowns";
 import QuickCreateDialog from "../QuickCreateDialog/QuickCreateDialog";
 import SubStageReviewModal from "./SubStageReviewModal";
-import { isRole, ROLES, isLeadOwnerRole } from "../../lib/rbac";
+import { isRole, ROLES, isLeadOwnerRole, isReadOnlyRole } from "../../lib/rbac";
 import { isEmail } from "../../lib/validators";
 
 
@@ -210,7 +210,11 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
     // prop. Every read of this flag inside the JSX below already gates the
     // right things (input disable, Update button hide, reassign panel hide)
     // so we get a full read-only modal for free.
-    const lockedConverted = viewOnly || (isConverted && !isRole(ROLES.SUPER_ADMIN));
+    // Branch managers get the same fully-locked modal: the server rejects
+    // every write on this form (PUT /leads/:id, the stage change, the reassign
+    // and the follow-up), so reusing this flag turns the whole dialog into a
+    // read-only view rather than leaving buttons that 403 on click.
+    const lockedConverted = viewOnly || isReadOnlyRole() || (isConverted && !isRole(ROLES.SUPER_ADMIN));
 
     // Inline "Add new …" mini-dialog state. `quickCreate.type` controls which
     // dropdown we're creating into (degrees / specializations / universities /
@@ -248,7 +252,10 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
     // After reassign, the new owner automatically sees the full lead + all its
     // data (recordings/timeline/notes are gated by lead ownership server-side).
     const ownsThisLead = isEditMode && leadData?.assigned_to === (auth.getUser()?.id);
-    const canReassign = isEditMode && (!isLeadOwnerRole() || ownsThisLead);
+    // Branch managers are read-only: the server rejects the reassign call, so
+    // offering the control would only produce a 403 after the user has picked
+    // a counsellor.
+    const canReassign = isEditMode && !isReadOnlyRole() && (!isLeadOwnerRole() || ownsThisLead);
     const [reassignList, setReassignList] = useState([]);     // [{id,name,email,manager_id}]
     const [reassignTo, setReassignTo] = useState('');         // chosen user id
     const [reassignReason, setReassignReason] = useState(''); // free-text

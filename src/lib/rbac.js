@@ -209,6 +209,16 @@ export const isRole = (...roles) => roles.includes(currentRole());
 // decide whether to show manager affordances (bulk reassign, the counsellor
 // picker), and a team lead must keep those. Use
 // LEAD_OWNER_ROLES.includes(role) directly for a plain "can hold a lead" test.
+// Branch managers are READ-ONLY across the CRM (server: middleware/
+// branchManagerReadOnly.js). They oversee a branch; they do not operate it.
+// The server is the real enforcer — this exists so the UI doesn't offer
+// buttons that are guaranteed to 403, which is how the restriction was first
+// reported as "not working": every write control was still on screen.
+//
+// The narrow exceptions (approving a discount, admission approve/reject, bulk
+// import) are opted back in at their own call sites, not here.
+export const isReadOnlyRole = () => currentRole() === ROLES.BRANCH_MANAGER;
+
 export const isLeadOwnerRole = () => {
   const r = currentRole();
   return LEAD_OWNER_ROLES.includes(r) && !TEAM_SCOPED_MANAGER_ROLES.includes(r);

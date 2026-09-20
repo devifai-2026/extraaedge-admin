@@ -17,7 +17,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
 import HistoryToggleOffIcon from "@mui/icons-material/HistoryToggleOff";
 import { Tooltip, CircularProgress, InputBase, TextField, MenuItem as MuiMenuItem } from "@mui/material";
-import { isRole, ROLES, LEAD_OWNER_ROLES_PARAM, isLeadOwnerRole, LEAD_OWNER_ROLES } from '../../lib/rbac';
+import { isRole, ROLES, LEAD_OWNER_ROLES_PARAM, isLeadOwnerRole, LEAD_OWNER_ROLES, isReadOnlyRole } from '../../lib/rbac';
 import { leadsApi, usersApi } from "../../lib/endpoints";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import FacebookIcon from '@mui/icons-material/Facebook';
@@ -322,7 +322,7 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                         {/* GROUP / bulk-reassign opener — hidden for counsellors
                             who cannot reassign leads. Server enforces the same
                             scope on POST /lead-assignments. */}
-                        {!isLeadOwnerRole() && (
+                        {!isLeadOwnerRole() && !isReadOnlyRole() && (
                             <Tooltip title="Reassign leads">
                                 <IconButton size="small" sx={iconBtnSx} onClick={() => setOpenAssign(true)}>
                                     <GroupIcon fontSize="small" sx={{ color: colors.primary }} />
