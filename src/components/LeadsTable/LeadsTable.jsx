@@ -110,6 +110,9 @@ const cellStyle = {
 
 const LeadsTable = ({
   leads, selectedIds, onToggleSelect, onToggleSelectAll, onReassign, onChanged, highlightId,
+  // True while a refetch is in flight. The table stays mounted (so the header
+  // filter row keeps its inputs + focus) and we just dim the rows.
+  loading = false,
   // Server-driven sort + per-column search (whole tenant DB, not just the
   // loaded page). `sort` is the server sort key string (e.g. 'name_asc').
   // `columnFilters` is keyed by SERVER param name (see PARAM_KEY below).
@@ -253,6 +256,12 @@ const LeadsTable = ({
 
   const colByKey = Object.fromEntries(COLUMNS.map((c) => [c.key, c]));
 
+  // Any non-empty header search box / date picker. Drives the wording of the
+  // empty state so "no matches" reads differently from "this view is empty".
+  const hasActiveFilter = Object.values(columnFilters).some(
+    (v) => (typeof v === 'string' ? v.trim() : v),
+  );
+
   return (
     <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 6, overflow: 'auto' }}>
       <ProtectedLeadData>
@@ -283,11 +292,15 @@ const LeadsTable = ({
             <th style={{ ...headerCellStyle, textAlign: 'right' }}>Actions</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody style={loading ? { opacity: 0.5, transition: 'opacity 120ms' } : undefined}>
           {displayLeads.length === 0 && (
             <tr>
               <td colSpan={15} style={{ padding: 32, textAlign: 'center', color: '#888' }}>
-                {leads.length === 0 ? 'No leads in this view.' : 'No leads match the column filters.'}
+                {loading
+                  ? 'Searching…'
+                  : (hasActiveFilter
+                    ? 'No leads match the current filters.'
+                    : 'No leads in this view.')}
               </td>
             </tr>
           )}

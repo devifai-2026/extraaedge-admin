@@ -115,6 +115,12 @@ const LeadList = () => {
     const [leads, setLeads] = useState([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
+    // True once the first fetch has resolved. Subsequent refetches (typing in a
+    // column filter, paging, sorting) must NOT tear the table down and show a
+    // full-page spinner — that made the header filter row disappear mid-typing
+    // and stole input focus. After the first load we keep the table mounted and
+    // only dim it while the new rows are in flight.
+    const [hasLoaded, setHasLoaded] = useState(false);
     const [error, setError] = useState('');
     // Unassigned count (used to badge the Auto-assign button + show context).
     // Honors the active advanced filter so the badge reflects what the user
@@ -192,6 +198,7 @@ const LeadList = () => {
             setError(e.message || 'Failed to load leads');
         } finally {
             setLoading(false);
+            setHasLoaded(true);
         }
     }, [filterParams]);
 
@@ -338,7 +345,7 @@ const LeadList = () => {
             )}
 
             <div className="lead-card-scroll-area">
-                {loading && (
+                {loading && !hasLoaded && (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
                         <CircularProgress />
                     </div>
@@ -346,7 +353,10 @@ const LeadList = () => {
                 {!loading && error && (
                     <div style={{ color: '#d32f2f', padding: 16 }}>{error}</div>
                 )}
-                {!loading && !error && leads.length === 0 && (
+                {/* Table view renders its own empty state INSIDE the table so the
+                    header filter row survives a no-match search. Card view has no
+                    such header, so it keeps the standalone message. */}
+                {hasLoaded && !error && leads.length === 0 && viewMode === 'card' && (
                     <div style={{ color: '#888', textAlign: 'center', padding: 40 }}>
                         No leads in this view.
                     </div>
@@ -376,9 +386,10 @@ const LeadList = () => {
                     </div>
                 )}
 
-                {!loading && leads.length > 0 && viewMode === 'table' && (
+                {hasLoaded && !error && viewMode === 'table' && (
                     <LeadsTable
                         leads={leads}
+                        loading={loading}
                         highlightId={highlightId}
                         selectedIds={selectedIds}
                         onToggleSelect={(id) => toggleSelect(id)}
@@ -395,7 +406,7 @@ const LeadList = () => {
                     />
                 )}
 
-                {!loading && total > PAGE_SIZE && (
+                {hasLoaded && total > PAGE_SIZE && (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0 24px' }}>
                         <Pagination
                             count={totalPages}
