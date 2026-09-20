@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { publicReceiptsApi } from '../../lib/endpoints';
-import { buildReceiptHtml } from '../../lib/receiptTemplate';
+import { buildReceiptHtml, receiptFileName } from '../../lib/receiptTemplate';
 
 export default function PublicReceipt() {
   const { token } = useParams();
@@ -24,6 +24,19 @@ export default function PublicReceipt() {
       .then((r) => setData(r?.data || null))
       .catch((e) => setErr(e?.message || 'Receipt not found'));
   }, [token]);
+
+  // This page saves via the browser's own print dialog (window.print), which
+  // takes the suggested filename from document.title — NOT from anything we
+  // pass it. So the student's name has to go on the title, or "Save as PDF"
+  // here proposes the page/URL name while the admin and student-portal
+  // downloads (which name the file directly) get it right. Same helper, minus
+  // the .pdf the browser appends itself.
+  useEffect(() => {
+    if (!data) return undefined;
+    const previous = document.title;
+    document.title = receiptFileName(data).replace(/\.pdf$/i, '');
+    return () => { document.title = previous; };
+  }, [data]);
 
   if (err) {
     return (
