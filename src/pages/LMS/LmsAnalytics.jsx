@@ -14,6 +14,7 @@ import SchoolIcon from '@mui/icons-material/SchoolOutlined';
 import { lmsAnalyticsApi } from '../../lib/endpoints';
 import { studentAuth } from '../../lib/studentApi';
 import { PageHeader, Card, StatTile, StatGrid, EmptyState } from '../../lib/lmsUi';
+import { isRole, ROLES } from '../../lib/rbac';
 
 export default function LmsAnalytics() {
   const [data, setData] = useState(null);
@@ -24,7 +25,12 @@ export default function LmsAnalytics() {
 
   useEffect(() => {
     lmsAnalyticsApi.dashboard().then((r) => setData(r?.data || null)).catch((e) => setErr(e.message));
-    lmsAnalyticsApi.students().then((r) => setStudents(r?.data || [])).catch(() => {});
+    // Only fetched to populate the sudo-login picker, which is super_admin
+    // only — no reason to pull a list of student names and emails for a role
+    // that cannot use it.
+    if (isRole(ROLES.SUPER_ADMIN)) {
+      lmsAnalyticsApi.students().then((r) => setStudents(r?.data || [])).catch(() => {});
+    }
   }, []);
 
   // Sudo-login as a student: mint a student token, stash it in the student
@@ -113,7 +119,12 @@ export default function LmsAnalytics() {
         </Table>
       </Card>
 
-      {/* Sudo-login as a student */}
+      {/* Sudo-login as a student — super_admin only. The endpoint already
+          rejects everyone else (lms-analytics/routes.js gates it to
+          SUPER_ADMIN), so rendering the card for a branch manager only
+          offered a button guaranteed to 403. Opening the student portal as
+          someone else is an impersonation tool, not branch oversight. */}
+      {isRole(ROLES.SUPER_ADMIN) && (
       <Card title="Sudo-login as a student">
         <div style={{ fontSize: 12.5, color: '#64748b', marginBottom: 12 }}>Open the student portal as any student (troubleshooting). Opens in a new tab; every session is logged.</div>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -123,6 +134,7 @@ export default function LmsAnalytics() {
           <Button variant="contained" onClick={sudo} disabled={!sudoId} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>Open as student</Button>
         </Box>
       </Card>
+      )}
 
       <Snackbar open={!!toast} autoHideDuration={4000} onClose={() => setToast('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         {toast ? <Alert severity="info" onClose={() => setToast('')}>{toast}</Alert> : undefined}
