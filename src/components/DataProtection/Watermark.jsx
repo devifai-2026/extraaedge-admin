@@ -25,32 +25,32 @@ import { auth } from '../../lib/endpoints';
 
 const REFRESH_MS = 30_000;
 
-// Tunable in one place. 0.16 reads clearly in a screenshot or a phone photo
-// while still letting dense table text through underneath; raise toward 0.25
-// for more deterrence, drop toward 0.08 if staff find it noisy.
-const OPACITY = 0.16;
-const FONT_SIZE = 13;
+// Tunable in one place. This has to stay traceable without making the app
+// tiring to work in all day: 0.055 is legible when you look for it (and in a
+// screenshot enlarged to read the data) but recedes while reading the page.
+const OPACITY = 0.055;
+const FONT_SIZE = 12;
 // Tile geometry is derived from the ROTATED bounding box, not guessed: at
-// -20deg a ~300px label spans ~280x102px, so two rows need ~230px of height.
-// Sizing the tile any shorter clips the top line and leaves a dead band at
-// the bottom of every repeat — both of which showed up when this was eyeballed.
-const TILE_W = 320;
-const TILE_H = 230;
-const ROW1_Y = 112;
-const ROW2_Y = 227;
+// -20deg a ~280px label spans ~260x95px. The tile is then made deliberately
+// LARGER than the text so the marks are spaced out — the first version packed
+// two rows into every 320x230 tile, which stamped text over every card, KPI
+// number and sidebar item at once and read as visual noise. One mark per
+// tile, on a wide pitch, is just as traceable and far calmer.
+const TILE_W = 620;
+const TILE_H = 320;
+const ROW1_Y = 150;
 
 const escapeXml = (s) => String(s).replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]
 ));
 
-// One tile, drawn twice on a diagonal so the repeat reads as a dense mesh
-// rather than widely-spaced stripes.
+// One mark per tile. The tile is much larger than the mark, so the repeat
+// gives a sparse diagonal grid instead of a dense mesh.
 const tileDataUri = (label) => {
   const t = escapeXml(label);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${TILE_W}" height="${TILE_H}">`
     + `<g fill="#111" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-size="${FONT_SIZE}" font-weight="600">`
-    + `<text x="12" y="${ROW1_Y}" transform="rotate(-20 12 ${ROW1_Y})">${t}</text>`
-    + `<text x="12" y="${ROW2_Y}" transform="rotate(-20 12 ${ROW2_Y})">${t}</text>`
+    + `<text x="24" y="${ROW1_Y}" transform="rotate(-20 24 ${ROW1_Y})">${t}</text>`
     + `</g></svg>`;
   return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
 };
