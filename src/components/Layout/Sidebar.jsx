@@ -169,6 +169,10 @@ const menuSections = [
     label: 'Configuration',
     icon: SettingsSuggestIcon,
     section: true,
+    // Branch managers are read-only (server: middleware/
+    // branchManagerReadOnly.js) — every screen in here exists to CHANGE
+    // tenant configuration, so the whole section is noise they cannot act on.
+    hideForRoles: [ROLES.BRANCH_MANAGER],
     children: [
       { id: 12, label: 'Connected Accounts', icon: AccountTreeIcon, path: '/connectedaccounts', tab: 'connected_accounts' },
       { id: 13, label: 'Basic Settings', icon: SettingsIcon, path: '/settings', tab: 'settings.email_templates' },
@@ -346,7 +350,16 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
   // and drop the group entirely if nothing's left under it.
   // An item may also carry `roles: [...]` to restrict it to specific roles
   // even when the tab is technically visible (e.g. super_admin's '*' wildcard).
-  const roleOk = (item) => !item.roles || item.roles.includes(currentRole());
+  // `roles: [...]`      — allowlist: only these roles see the item.
+  // `hideForRoles: [...]` — denylist: these roles never see it, even when the
+  //                       tab check passes. Needed for branch_manager, whose
+  //                       tab grant is the '*' wildcard, so hasTab() can never
+  //                       hide anything from it.
+  const roleOk = (item) => {
+    const role = currentRole();
+    if (item.hideForRoles?.includes(role)) return false;
+    return !item.roles || item.roles.includes(role);
+  };
   const tabOk = (item) => !item.tab || hasTab(item.tab);
   const visibleItems = (items) =>
     items
