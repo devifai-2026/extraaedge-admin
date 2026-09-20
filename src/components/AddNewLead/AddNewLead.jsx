@@ -214,7 +214,12 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
     // every write on this form (PUT /leads/:id, the stage change, the reassign
     // and the follow-up), so reusing this flag turns the whole dialog into a
     // read-only view rather than leaving buttons that 403 on click.
-    const lockedConverted = viewOnly || isReadOnlyRole() || (isConverted && !isRole(ROLES.SUPER_ADMIN));
+    // Two different reasons the form can be locked, and they need different
+    // wording: a converted lead (admin-only) vs a role that cannot write at
+    // all. Keeping them separate stops a branch manager being told a brand-new
+    // lead "has been converted".
+    const readOnlyRole = isReadOnlyRole();
+    const lockedConverted = viewOnly || readOnlyRole || (isConverted && !isRole(ROLES.SUPER_ADMIN));
 
     // Inline "Add new …" mini-dialog state. `quickCreate.type` controls which
     // dropdown we're creating into (degrees / specializations / universities /
@@ -1664,7 +1669,9 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
                     not trying to edit. */}
                 {!submitError && lockedConverted && !viewOnly && (
                     <Alert severity="info" sx={{ mr: 'auto', flex: 1, fontSize: 13, py: 0 }}>
-                        This lead has been converted. Only an administrator can edit it.
+                        {readOnlyRole
+                            ? 'Your role has view-only access to leads.'
+                            : 'This lead has been converted. Only an administrator can edit it.'}
                     </Alert>
                 )}
                 <Button variant="outlined" onClick={handleCancel} disabled={submitting} className="add-lead-cancel-btn">
@@ -1673,7 +1680,7 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
                 {/* Hide the Update/Add button entirely in viewOnly mode —
                     showing it greyed out is confusing because the user
                     didn't open the modal to edit. */}
-                {!viewOnly && (
+                {!viewOnly && !readOnlyRole && (
                     <Tooltip
                         title={lockedConverted ? 'Converted leads can only be edited by an administrator' : ''}
                         disableHoverListener={!lockedConverted}
