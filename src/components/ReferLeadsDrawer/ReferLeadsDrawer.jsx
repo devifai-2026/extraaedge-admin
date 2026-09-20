@@ -15,6 +15,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import { leadsApi, usersApi } from "../../lib/endpoints";
+import { LEAD_OWNER_ROLES_PARAM } from "../../lib/rbac";
 
 // mode: 'single' | 'selected' | 'filter'
 //   - single   → reassign one lead (`lead` prop)
@@ -32,7 +33,10 @@ const ReferLeadsDrawer = ({ open, onClose, mode = 'single', lead, selectedIds = 
     if (!open) return;
     setLoadingUsers(true);
     setErr("");
-    usersApi.list({ limit: 200 })
+    // Only LEAD OWNERS are valid targets — the server rejects anything else
+    // ("Leads can only be assigned to an active counsellor or telecaller"),
+    // so an unfiltered list offered managers the reassign then refused.
+    usersApi.list({ role: LEAD_OWNER_ROLES_PARAM, limit: 200 })
       .then((r) => setUsers(r?.data || []))
       .catch((e) => setErr(e.message || 'Failed to load users'))
       .finally(() => setLoadingUsers(false));
@@ -75,6 +79,10 @@ const ReferLeadsDrawer = ({ open, onClose, mode = 'single', lead, selectedIds = 
         if (filterParams.assigned_to) filter.assigned_to = filterParams.assigned_to;
         if (filterParams.team_id) filter.team_id = filterParams.team_id;
         if (filterParams.q) filter.q = filterParams.q;
+        // Tab-driven flags (Cold / Junk, Unassigned, Fresh, Untouched). Without
+        // this the flag was dropped and "reassign all in this view" matched far
+        // more leads than the view showed.
+        if (filterParams.flag) filter.flag = filterParams.flag;
         await leadsApi.bulkAssign({ filter, assigned_to: referTo, reason: remarks || undefined });
       }
       reset();

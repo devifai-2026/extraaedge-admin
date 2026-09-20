@@ -44,6 +44,7 @@ import { Popover, MenuItem, ListItemIcon, ListItemText, } from "@mui/material";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import { Menu } from "@mui/material";
 import FilterLeadsModal from "../Filter/Filter";
+import GroupsIcon from "@mui/icons-material/GroupsOutlined";
 
 const SORT_OPTIONS = [
     { key: 'created_desc',       label: 'Added On (newest first)' },
@@ -80,7 +81,7 @@ const iconBtnSx = {
     '&:hover': { background: 'rgba(0,0,0,0.045)' },
 };
 
-const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onReassignSelected, onReassignAll, onBulkDelete, sort, onSortChange, advancedFilter, onApplyFilter, onResetFilter, viewMode = 'card', onViewModeChange, unassignedCount = 0, searchQuery = '', onSearchQueryChange, exportFilter }) => {
+const FiltersOptions = ({ onRefresh, onDistributeSelected, selectedCount = 0, totalInFilter = 0, onReassignSelected, onReassignAll, onBulkDelete, sort, onSortChange, advancedFilter, onApplyFilter, onResetFilter, viewMode = 'card', onViewModeChange, unassignedCount = 0, searchQuery = '', onSearchQueryChange, exportFilter }) => {
     // Auto-assign button is for super-admin and sales-manager only —
     // counsellors don't manage assignments themselves.
     const canAutoAssign = isRole(ROLES.SUPER_ADMIN, ROLES.SALES_MANAGER);
@@ -365,6 +366,30 @@ const FiltersOptions = ({ onRefresh, selectedCount = 0, totalInFilter = 0, onRea
                                     >
                                         {autoAssigning ? 'Assigning…' : 'Auto-assign'}
                                         {unassignedCount > 0 && !autoAssigning ? ` (${unassignedCount})` : ''}
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                        )}
+
+                        {/* Spread a selection over many people at once —
+                            round-robin across a branch's counsellors, or an
+                            even split over hand-picked counsellors/telecallers.
+                            Distinct from the single-target reassign above. */}
+                        {canBulkDelete && (
+                            <Tooltip title={
+                                selectedCount > 0
+                                    ? `Split ${selectedCount} selected lead${selectedCount === 1 ? '' : 's'} across several counsellors or telecallers`
+                                    : 'Select one or more leads to enable bulk reassign'
+                            }>
+                                <span>
+                                    <Button
+                                        size="small"
+                                        startIcon={<GroupsIcon fontSize="small" />}
+                                        onClick={() => onDistributeSelected?.()}
+                                        disabled={selectedCount === 0}
+                                        sx={pillFilterSx(false, colors.primary)}
+                                    >
+                                        Reassign{selectedCount > 0 ? ` (${selectedCount})` : ''}
                                     </Button>
                                 </span>
                             </Tooltip>

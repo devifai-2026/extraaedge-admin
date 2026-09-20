@@ -63,6 +63,12 @@ export const leadsApi = {
   delete: (id) => api.delete(`/leads/${id}`),
   changeStage: (id, body) => api.post(`/leads/${id}/stage`, body),
   bulkAssign: (body) => api.post('/leads/bulk-assign', body),
+  // Bulk reassign spread over MANY people.
+  // Body: { lead_ids, mode: 'round_robin'|'manual', branch_id?, assignee_ids?, reason? }
+  // round_robin spreads evenly over every active counsellor in branch_id;
+  // manual spreads evenly over the picked counsellors/telecallers.
+  // Returns { affected, per_assignee: { <user_id>: count } }.
+  distribute: (body) => api.post('/leads/distribute', body),
   // Bulk hard-delete. Body: { ids: [uuid,...] }. Returns { deleted, deleted_ids }.
   // Super-admin only at the API layer — non-super-admin callers get 403.
   // The server CASCADEs every dependent row (followups, notes, activities,

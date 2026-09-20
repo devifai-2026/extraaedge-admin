@@ -14,11 +14,17 @@ import { colors } from "../../theme/colors";
 import TabsSection from "../../components/TabsSection/TabsSection";
 import FiltersOptions from "../../components/FiltersOptions/FiltersOptions";
 import ReferLeadsDrawer from "../../components/ReferLeadsDrawer/ReferLeadsDrawer";
+import DistributeLeadsDialog from "../../components/DistributeLeadsDialog/DistributeLeadsDialog";
 import { leadsApi } from "../../lib/endpoints";
 import { onNotification } from "../../lib/socket";
 import { useCopyGuard } from "../../components/DataProtection/useCopyGuard";
 
 const PAGE_SIZE = 20;
+
+// Tab values that are server-side FLAGS rather than a stage uuid. Keep in step
+// with the `flag` enum in the server's leads listQuery schema.
+//   dormant = parked in a terminal, non-success stage (Cold / Junk / Lost).
+const FLAG_TABS = ['fresh', 'untouched', 'unassigned', 'dormant'];
 
 const LeadList = () => {
     const copyGuard = useCopyGuard();
@@ -135,6 +141,8 @@ const LeadList = () => {
     // Selection (for bulk reassign)
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [referOpen, setReferOpen] = useState(false);
+    // Bulk reassign spread over many people (round-robin / multi-pick).
+    const [distributeOpen, setDistributeOpen] = useState(false);
     const [referMode, setReferMode] = useState('selected'); // 'selected' | 'filter' | 'single'
     const [referLead, setReferLead] = useState(null);
 
@@ -147,7 +155,7 @@ const LeadList = () => {
         // otherwise the advanced filter's flag (e.g. set via the Filter modal's
         // "Assignment: Unassigned" option) would be silently dropped.
         const params = { ...advancedFilter, page, limit: PAGE_SIZE, sort };
-        if (activeStageId === 'fresh' || activeStageId === 'untouched' || activeStageId === 'unassigned') {
+        if (FLAG_TABS.includes(activeStageId)) {
             params.flag = activeStageId;
             delete params.stage_id;
         } else if (activeStageId) {
@@ -311,6 +319,7 @@ const LeadList = () => {
                 selectedCount={selectedIds.size}
                 totalInFilter={total}
                 onReassignSelected={() => openBulkRefer('selected')}
+                onDistributeSelected={() => setDistributeOpen(true)}
                 onReassignAll={() => openBulkRefer('filter')}
                 onBulkDelete={handleBulkDelete}
                 sort={sort}
@@ -480,6 +489,18 @@ const LeadList = () => {
                 filterParams={filterParams}
                 totalInFilter={total}
                 onDone={onReferDone}
+            />
+
+            <DistributeLeadsDialog
+                open={distributeOpen}
+                leadIds={Array.from(selectedIds)}
+                onClose={() => setDistributeOpen(false)}
+                onDone={(msg) => {
+                    setDistributeOpen(false);
+                    setSelectedIds(new Set());
+                    setReloadKey((k) => k + 1);
+                    setToast({ severity: 'success', text: msg });
+                }}
             />
 
             {/* Anchor the toast at the top-right so it never overlaps with the

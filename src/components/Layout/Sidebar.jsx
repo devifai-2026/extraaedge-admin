@@ -79,10 +79,17 @@ const pinnedItems = [
   // In-depth payments ledger. `tab: 'payments'` resolves true only for
   // super_admin (allowed_tabs:['*']); all other roles never see this row.
   { id: 19, label: 'Payments Ledger', icon: AccountBalanceWalletIcon, path: '/payments', tab: 'payments' },
-  // Self-service leave. Pinned rather than buried under HR because every staff
-  // role has it — a telecaller applies for leave as often as a manager does.
-  { id: 27, label: 'My Leave', icon: EventBusyIcon, path: '/hr/my-leave', tab: 'hr.my_leave' },
-  { id: 28, label: 'My Payslips', icon: ReceiptLongIcon, path: '/payroll/my-payslips', tab: 'payroll.my_payslips' },
+  // Self-service leave + payslip. Pinned rather than buried under HR because
+  // every staff role has it — a telecaller applies for leave as often as a
+  // manager does.
+  //
+  // Hidden from super_admin: they are the institute OWNER, not an employee.
+  // They do not request leave from anyone and do not draw a payslip, so both
+  // rows are dead weight on their sidebar. hideForRoles (not the tab check)
+  // because super_admin holds the '*' wildcard, which hasTab() can never
+  // filter.
+  { id: 27, label: 'My Leave', icon: EventBusyIcon, path: '/hr/my-leave', tab: 'hr.my_leave', hideForRoles: [ROLES.SUPER_ADMIN] },
+  { id: 28, label: 'My Payslips', icon: ReceiptLongIcon, path: '/payroll/my-payslips', tab: 'payroll.my_payslips', hideForRoles: [ROLES.SUPER_ADMIN] },
 ];
 
 // Collapsible, role-named sections. Order here is the display order. New

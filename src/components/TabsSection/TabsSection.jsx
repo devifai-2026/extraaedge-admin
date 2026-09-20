@@ -44,7 +44,7 @@ const TabsSection = ({ activeStageId, onChange, reloadKey, advancedFilter }) => 
 
   const countFor = (id) => counts.stages.find((s) => s.stage_id === id)?.count ?? 0;
 
-  // Tab values: 'all' | 'fresh' | 'untouched' | <stage_uuid>
+  // Tab values: 'all' | 'fresh' | 'untouched' | 'unassigned' | 'dormant' | <stage_uuid>
   const value = activeStageId ?? 'all';
   const handleChange = (_e, val) => {
     if (val === 'all') onChange?.(null);
@@ -64,6 +64,11 @@ const TabsSection = ({ activeStageId, onChange, reloadKey, advancedFilter }) => 
         <Tab value="unassigned" label={`Unassigned (${counts.unassigned ?? 0})`} className={`custom-tab ${value === 'unassigned' ? "active" : ""}`} />
         <Tab value="fresh" label={`Fresh (${counts.fresh})`} className={`custom-tab ${value === 'fresh' ? "active" : ""}`} />
         <Tab value="untouched" label={`Untouched (${counts.untouched})`} className={`custom-tab ${value === 'untouched' ? "active" : ""}`} />
+        {/* Cold / Junk pile. Server-side flag keyed off the stage being
+            terminal-and-not-success, so it follows whatever the tenant named
+            those stages. Sits after the working tabs and before the per-stage
+            ones — it is a bucket, not a stage. */}
+        <Tab value="dormant" label={`Cold / Junk (${counts.dormant ?? 0})`} className={`custom-tab ${value === 'dormant' ? "active" : ""}`} />
         {stages.map((s) => (
           <Tab
             key={s.id}
