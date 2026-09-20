@@ -19,7 +19,13 @@ import GroupsIcon from '@mui/icons-material/GroupsOutlined';
 import { leadsApi, usersApi, branchesApi } from '../../lib/endpoints';
 import { LEAD_OWNER_ROLES_PARAM, ROLES } from '../../lib/rbac';
 
-const DistributeLeadsDialog = ({ open, leadIds = [], onClose, onDone }) => {
+const DistributeLeadsDialog = ({
+  open, leadIds = [], filter = null, totalMatching = 0, onClose, onDone,
+}) => {
+  // Either an explicit selection, or "everything matching the current view".
+  // The latter sends the filter and lets the server resolve it, because a
+  // 2,337-lead result set across 117 pages cannot be ticked by hand.
+  const targetCount = filter ? totalMatching : leadIds.length;
   const [mode, setMode] = useState('round_robin');
   const [branchId, setBranchId] = useState('');
   const [picked, setPicked] = useState([]);
@@ -59,8 +65,8 @@ const DistributeLeadsDialog = ({ open, leadIds = [], onClose, onDone }) => {
 
   const poolSize = isRoundRobin ? rrPool.length : picked.length;
   // Even split, remainder dealt one-per-person from the top.
-  const per = poolSize ? Math.floor(leadIds.length / poolSize) : 0;
-  const remainder = poolSize ? leadIds.length % poolSize : 0;
+  const per = poolSize ? Math.floor(targetCount / poolSize) : 0;
+  const remainder = poolSize ? targetCount % poolSize : 0;
 
   const reset = () => {
     setMode('round_robin'); setBranchId(''); setPicked([]); setReason(''); setErr('');
@@ -75,7 +81,7 @@ const DistributeLeadsDialog = ({ open, leadIds = [], onClose, onDone }) => {
     setBusy(true);
     try {
       const r = await leadsApi.distribute({
-        lead_ids: leadIds,
+        ...(filter ? { filter } : { lead_ids: leadIds }),
         mode,
         ...(isRoundRobin ? { branch_id: branchId } : { assignee_ids: picked.map((u) => u.id) }),
         reason: reason || undefined,
@@ -94,7 +100,7 @@ const DistributeLeadsDialog = ({ open, leadIds = [], onClose, onDone }) => {
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 17, fontWeight: 700 }}>
         <GroupsIcon sx={{ color: '#E87B2F' }} />
-        Reassign {leadIds.length} lead{leadIds.length === 1 ? '' : 's'}
+        Reassign {targetCount.toLocaleString('en-IN')} lead{targetCount === 1 ? '' : 's'}
       </DialogTitle>
 
       <DialogContent dividers>
@@ -201,7 +207,7 @@ const DistributeLeadsDialog = ({ open, leadIds = [], onClose, onDone }) => {
 
             {poolSize > 0 && (
               <Alert severity="info" sx={{ mt: 2, fontSize: 13 }}>
-                {leadIds.length} lead{leadIds.length === 1 ? '' : 's'} across {poolSize}{' '}
+                {targetCount.toLocaleString('en-IN')} lead{targetCount === 1 ? '' : 's'} across {poolSize}{' '}
                 {poolSize === 1 ? 'person' : 'people'} — about {per}
                 {remainder ? `–${per + 1}` : ''} each.
               </Alert>
@@ -218,7 +224,7 @@ const DistributeLeadsDialog = ({ open, leadIds = [], onClose, onDone }) => {
           disabled={busy || loading || !poolSize}
           sx={{ textTransform: 'none', bgcolor: '#E87B2F' }}
         >
-          {busy ? 'Reassigning…' : `Reassign ${leadIds.length}`}
+          {busy ? 'Reassigning…' : `Reassign ${targetCount.toLocaleString('en-IN')}`}
         </Button>
       </DialogActions>
     </Dialog>

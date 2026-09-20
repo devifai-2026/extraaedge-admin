@@ -143,6 +143,11 @@ const LeadList = () => {
     const [referOpen, setReferOpen] = useState(false);
     // Bulk reassign spread over many people (round-robin / multi-pick).
     const [distributeOpen, setDistributeOpen] = useState(false);
+    // "Select all N matching" — checkbox selection can only ever cover the
+    // rows on screen, which is 20 of (say) 2,337 across 117 pages. When this
+    // is on we send the FILTER to the server instead of a list of ids, so the
+    // action applies to every matching lead rather than the current page.
+    const [selectAllMatching, setSelectAllMatching] = useState(false);
     const [referMode, setReferMode] = useState('selected'); // 'selected' | 'filter' | 'single'
     const [referLead, setReferLead] = useState(null);
 
@@ -212,7 +217,10 @@ const LeadList = () => {
 
     useEffect(() => { reload(); }, [reload, reloadKey]);
 
-    useEffect(() => { setPage(1); setSelectedIds(new Set()); }, [activeStageId]);
+    useEffect(() => { setPage(1); setSelectedIds(new Set()); setSelectAllMatching(false); }, [activeStageId]);
+    // Any change to what the view MATCHES invalidates "all matching" — leaving
+    // it on would silently retarget the action at a different set of leads.
+    useEffect(() => { setSelectAllMatching(false); }, [debouncedTableSearchQ, debouncedColumnFiltersKey, advancedFilter]);
 
     // Auto-refresh on bulk-import lifecycle events. Two signals matter:
     //   • bulk_import.progress with phase='completed' — worker finished the
@@ -316,7 +324,7 @@ const LeadList = () => {
             />
             <FiltersOptions
                 onRefresh={() => setReloadKey((k) => k + 1)}
-                selectedCount={selectedIds.size}
+                selectedCount={selectAllMatching ? total : selectedIds.size}
                 totalInFilter={total}
                 onReassignSelected={() => openBulkRefer('selected')}
                 onDistributeSelected={() => setDistributeOpen(true)}
@@ -392,6 +400,40 @@ const LeadList = () => {
                                 />
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {/* Selection only ever covers the rows on screen. Once the
+                    whole page is ticked and there is more behind it, offer to
+                    extend the action to every matching lead — sent as the
+                    FILTER, not 2,337 ids. */}
+                {hasLoaded && !error && leads.length > 0
+                    && selectedIds.size === leads.length && total > leads.length && (
+                    <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                        padding: '10px 14px', marginBottom: 10, borderRadius: 8,
+                        background: '#fff7ed', border: '1px solid #fed7aa', fontSize: 13.5,
+                    }}
+                    >
+                        {selectAllMatching ? (
+                            <>
+                                <span>
+                                    All <strong>{total.toLocaleString('en-IN')}</strong> leads matching this view are selected.
+                                </span>
+                                <Button size="small" onClick={() => setSelectAllMatching(false)} sx={{ textTransform: 'none' }}>
+                                    Clear
+                                </Button>
+                            </>
+                        ) : (
+                            <>
+                                <span>
+                                    All <strong>{leads.length}</strong> on this page are selected.
+                                </span>
+                                <Button size="small" onClick={() => setSelectAllMatching(true)} sx={{ textTransform: 'none', fontWeight: 600 }}>
+                                    Select all {total.toLocaleString('en-IN')} matching this view
+                                </Button>
+                            </>
+                        )}
                     </div>
                 )}
 
@@ -493,11 +535,24 @@ const LeadList = () => {
 
             <DistributeLeadsDialog
                 open={distributeOpen}
-                leadIds={Array.from(selectedIds)}
+                // In "all matching" mode we hand over the filter instead of the
+                // ids — the server resolves it, so the action covers every page.
+                leadIds={selectAllMatching ? [] : Array.from(selectedIds)}
+                filter={selectAllMatching ? {
+                    ...(filterParams.stage_id ? { stage_id: filterParams.stage_id } : {}),
+                    ...(filterParams.sub_stage_id ? { sub_stage_id: filterParams.sub_stage_id } : {}),
+                    ...(filterParams.program_id ? { program_id: filterParams.program_id } : {}),
+                    ...(filterParams.assigned_to ? { assigned_to: filterParams.assigned_to } : {}),
+                    ...(filterParams.team_id ? { team_id: filterParams.team_id } : {}),
+                    ...(filterParams.q ? { q: filterParams.q } : {}),
+                    ...(filterParams.flag ? { flag: filterParams.flag } : {}),
+                } : null}
+                totalMatching={total}
                 onClose={() => setDistributeOpen(false)}
                 onDone={(msg) => {
                     setDistributeOpen(false);
                     setSelectedIds(new Set());
+                    setSelectAllMatching(false);
                     setReloadKey((k) => k + 1);
                     setToast({ severity: 'success', text: msg });
                 }}
