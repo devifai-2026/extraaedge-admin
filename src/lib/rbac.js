@@ -129,6 +129,13 @@ const ROLE_LEAVE_ADMIN_TABS = ['hr.leave_admin'];
 // Declared HERE, not further down: FALLBACK_TABS consumes it, and a const
 // defined after that object throws on module load (temporal dead zone).
 const ROLE_PAYROLL_ADMIN_TABS = ['payroll.runs', 'payroll.structures'];
+// Speedup Hiring — internal staff recruitment. hr_recruiter + hr_team_lead
+// only: candidate rows carry salary expectations and personal contact details
+// for people who do not work here.
+const ROLE_HIRING_TABS = [
+  'hiring.dashboard', 'hiring.positions', 'hiring.candidates',
+  'hiring.interviews', 'hiring.statuses',
+];
 const ROLE_PLACEMENT_TABS = ['placement.dashboard', 'placement.companies', 'placement.openings', 'placement.applications'];
 
 // Front-line roles that carry a personal queue of leads. Mirrors the server's
@@ -198,12 +205,13 @@ const FALLBACK_TABS = {
   [ROLES.PLACEMENT]: ROLE_PLACEMENT_TABS,
   // HR team lead oversees both HR and placement, plus the LMS analytics the
   // MoM's student/drop reports need.
-  [ROLES.HR_TEAM_LEAD]: [...ROLE_HR_TABS, ...ROLE_PLACEMENT_TABS, 'lms.analytics'],
+  [ROLES.HR_TEAM_LEAD]: [...ROLE_HR_TABS, ...ROLE_PLACEMENT_TABS, ...ROLE_HIRING_TABS, 'lms.analytics'],
   // Recruitment & staffing: hiring pipeline, onboarding, then the leave and
   // payroll admin for the people they hire. Mirrors the server's
   // HR_RECRUITER_TAB_KEYS — keep the two in step.
   [ROLES.HR_RECRUITER]: [
     ...ROLE_HR_TABS,
+    ...ROLE_HIRING_TABS,
     ...ROLE_LEAVE_APPROVER_TABS, ...ROLE_LEAVE_ADMIN_TABS,
     ...ROLE_PAYROLL_ADMIN_TABS,
   ],

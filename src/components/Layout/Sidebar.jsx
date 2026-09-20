@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
+import WorkOutlineIcon from '@mui/icons-material/WorkOutlineOutlined';
+import EventAvailableIcon from '@mui/icons-material/EventAvailableOutlined';
+import TuneIcon from '@mui/icons-material/TuneOutlined';
 import FolderIcon from '@mui/icons-material/Folder';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -234,6 +237,22 @@ const menuSections = [
       { id: 225, label: 'Leave Settings',   icon: SettingsSuggestIcon, path: '/hr/leave-admin',      tab: 'hr.leave_admin' },
       { id: 221, label: 'Interviews',       icon: ChecklistIcon,       path: '/hr/interviews',       tab: 'hr.interviews' },
       { id: 222, label: 'Certificates',     icon: SchoolIcon,          path: '/hr/certificates',     tab: 'hr.certificates' },
+    ],
+  },
+  {
+    // Speedup Hiring — recruiting OUR OWN staff. Separate from Placement
+    // (our students into other companies) and from HR → Interviews (student
+    // mock-interview scoring), which are different populations entirely.
+    id: 'hiring',
+    label: 'Hiring',
+    icon: WorkOutlineIcon,
+    section: true,
+    children: [
+      { id: 240, label: 'Overview',   icon: WorkOutlineIcon,   path: '/hiring',            tab: 'hiring.dashboard' },
+      { id: 241, label: 'Positions',  icon: WorkOutlineIcon,   path: '/hiring/positions',  tab: 'hiring.positions' },
+      { id: 242, label: 'Candidates', icon: PeopleAltIcon,     path: '/hiring/candidates', tab: 'hiring.candidates' },
+      { id: 243, label: 'Interviews', icon: EventAvailableIcon, path: '/hiring/interviews', tab: 'hiring.interviews' },
+      { id: 244, label: 'Statuses',   icon: TuneIcon,          path: '/hiring/statuses',   tab: 'hiring.statuses' },
     ],
   },
   {

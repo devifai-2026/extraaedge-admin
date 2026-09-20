@@ -1129,3 +1129,43 @@ export const payrollApi = {
 };
 
 export { auth };
+
+// ---- Speedup Hiring: internal staff recruitment (hr_recruiter / hr_team_lead) ----
+// Distinct from `placement*` (students into other companies' jobs) and from
+// `interviewsApi` (student mock interviews). These are OUR vacancies and
+// external candidates applying to them.
+export const hiringApi = {
+  dashboard: () => api.get('/hiring/dashboard'),
+
+  statuses: (all = false) => api.get('/hiring/statuses', all ? { all: 'true' } : {}),
+  createStatus: (body) => api.post('/hiring/statuses', body),
+  updateStatus: (id, body) => api.put(`/hiring/statuses/${id}`, body),
+
+  positions: (params) => api.get('/hiring/positions', params),
+  createPosition: (body) => api.post('/hiring/positions', body),
+  updatePosition: (id, body) => api.put(`/hiring/positions/${id}`, body),
+  deletePosition: (id) => api.delete(`/hiring/positions/${id}`),
+
+  postings: (positionId) => api.get(`/hiring/positions/${positionId}/postings`),
+  createPosting: (positionId, body) => api.post(`/hiring/positions/${positionId}/postings`, body),
+  deletePosting: (id) => api.delete(`/hiring/postings/${id}`),
+
+  candidates: (params) => api.get('/hiring/candidates', params),
+  candidate: (id) => api.get(`/hiring/candidates/${id}`),
+  createCandidate: (body) => api.post('/hiring/candidates', body),
+  updateCandidate: (id, body) => api.put(`/hiring/candidates/${id}`, body),
+  deleteCandidate: (id) => api.delete(`/hiring/candidates/${id}`),
+  setCandidateStatus: (id, body) => api.post(`/hiring/candidates/${id}/status`, body),
+
+  interviews: (params) => api.get('/hiring/interviews', params),
+  createInterview: (body) => api.post('/hiring/interviews', body),
+  updateInterview: (id, body) => api.put(`/hiring/interviews/${id}`, body),
+  deleteInterview: (id) => api.delete(`/hiring/interviews/${id}`),
+
+  // Preview first, commit second — the recruiter sees the per-row verdict and
+  // the new-vs-update split before anything is written.
+  previewCandidateImport: (body) => api.post('/hiring/candidates/import/preview', body),
+  commitCandidateImport: (body) => api.post('/hiring/candidates/import/commit', body),
+  previewInterviewImport: (body) => api.post('/hiring/interviews/import/preview', body),
+  commitInterviewImport: (body) => api.post('/hiring/interviews/import/commit', body),
+};
