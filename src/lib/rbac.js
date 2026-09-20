@@ -139,11 +139,35 @@ export const TEAM_SCOPED_MANAGER_ROLES = [
   ROLES.SALES_MANAGER, ROLES.BRANCH_MANAGER, ROLES.TELECALLER_LEAD,
 ];
 
+// Branch manager: lead/CRM oversight, no money. Mirrors the server's
+// BRANCH_MANAGER_TAB_KEYS — keep the two in step. Deliberately omits every
+// accounts.* key, 'payments', 'admissions.pipeline' and the payroll group.
+const ROLE_BRANCH_MANAGER_TABS = [
+  'dashboard', 'leads', 'lead_pool', 'raw_data', 'failed_leads', 'bulk_upload',
+  'followups', 'whatsapp', 'bulk_marketing', 'drip_marketing', 'remarketing',
+  'automation', 'connected_accounts', 'third_party_integration',
+  'settings.email_templates', 'settings.sms_templates',
+  'settings.whatsapp_templates', 'settings.lead_score',
+  'settings.assignment_rules',
+  'advanced.dropdowns', 'advanced.users_roles', 'advanced.communications',
+  'reports', 'analytics', 'lead_transfer_report', 'stale_handovers',
+  'missed_leads', 'unmatched_recordings', 'qa.feedback', 'lms.analytics',
+  'hr.dashboard', 'hr.interviews', 'hr.certificates',
+  'hr.my_leave', 'hr.leave_calendar', 'hr.leave_approvals',
+  'placement.dashboard', 'placement.companies', 'placement.openings',
+  'placement.applications',
+];
+
 const FALLBACK_TABS = {
   [ROLES.SUPER_ADMIN]: ROLE_ALL_TABS,
-  // branch_manager is admin-like for tabs (backend sends ['*']); mirror that
-  // in the fallback so the sidebar isn't starved if allowed_tabs is missing.
-  [ROLES.BRANCH_MANAGER]: ROLE_ALL_TABS,
+  // branch_manager is NOT a wildcard role. The wildcard used to be here "so
+  // the sidebar isn't starved", and it quietly granted every money surface:
+  // the Accounts module, the Payments Ledger and payroll. A branch manager
+  // approves registration amounts and nothing else — real money is for
+  // super_admin and the accounts team. The server sends the same explicit list
+  // (BRANCH_MANAGER_TAB_KEYS in config/constants.js); this mirrors it so a
+  // missing allowed_tabs cannot fail open onto a money tab.
+  [ROLES.BRANCH_MANAGER]: ROLE_BRANCH_MANAGER_TABS,
   [ROLES.SALES_MANAGER]: ROLE_MANAGER_TABS,
   [ROLES.COUNSELLOR]: ROLE_COUNSELLOR_TABS,
   // The telecalling pair mirrors its sales-side counterpart exactly.
@@ -170,19 +194,24 @@ const FALLBACK_TABS = {
 
 // Fold the self-service tabs into every staff bundle rather than repeating them
 // on sixteen lines. ROLE_ALL_TABS already covers the admin tiers; student is
-// skipped because a student is not an employee.
+// skipped because a student is not an employee. branch_manager is skipped too:
+// its list is explicit and deliberately payroll-free, and ROLE_SELF_SERVICE_TABS
+// carries payroll.my_payslips, which would put the Payroll item back on its
+// sidebar — the exact thing the explicit list exists to prevent. It keeps its
+// own leave tabs, which are already named in ROLE_BRANCH_MANAGER_TABS.
 for (const [role, tabs] of Object.entries(FALLBACK_TABS)) {
-  if (role === ROLES.STUDENT || tabs === ROLE_ALL_TABS) continue;
+  if (role === ROLES.STUDENT || role === ROLES.BRANCH_MANAGER || tabs === ROLE_ALL_TABS) continue;
   FALLBACK_TABS[role] = [...new Set([...tabs, ...ROLE_SELF_SERVICE_TABS])];
 }
 for (const role of [ROLES.SALES_MANAGER, ROLES.TELECALLER_LEAD, ROLES.HEAD_TRAINER,
   ROLES.HR, ROLES.HR_TEAM_LEAD]) {
   FALLBACK_TABS[role] = [...new Set([...(FALLBACK_TABS[role] || []), ...ROLE_LEAVE_APPROVER_TABS])];
 }
-// Payroll administration mirrors the server's PAYROLL_ADMIN_ROLES
-// (ADMIN_TIER_ROLES + hr_team_lead). Salary itself is gated per ROW server-side,
-// never by these tabs — branch_manager holds '*', so a tab-only rule would
-// expose the whole org's salaries.
+// Payroll administration mirrors the server's PAYROLL_ADMIN_ROLES, which is
+// now super_admin + hr_team_lead. branch_manager was dropped from it: salary
+// is money, and this role sees none beyond registration amounts. Salary is
+// additionally gated per ROW server-side, so these tabs are navigation rather
+// than authority.
 const ROLE_PAYROLL_ADMIN_TABS = ['payroll.runs', 'payroll.structures'];
 
 // Policy/quota/holiday administration mirrors the server's LEAVE_ADMIN set

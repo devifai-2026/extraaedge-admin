@@ -153,11 +153,16 @@ export default function AnalyticsDashboard() {
   const navigate = useNavigate();
   const sessionUser = auth.getUser() || {};
   const role = sessionUser.role || ROLES.COUNSELLOR;
-  // branch_manager is admin-like for the dashboard (whole-branch view, scoped
-  // server-side), so it gets the admin variant rather than the counsellor one.
-  const isAdmin = role === ROLES.SUPER_ADMIN || role === ROLES.BRANCH_MANAGER;
   const isManager = role === ROLES.SALES_MANAGER;
   const isCounsellor = LEAD_OWNER_ROLES.includes(role);
+  // Separate from isAdmin ON PURPOSE. isAdmin controls the whole-branch LAYOUT
+  // (which tiles, whose numbers) and a branch manager legitimately gets that
+  // variant. Revenue is a different question: a branch manager approves
+  // registration amounts and sees no other money, so the collection tiles and
+  // the rupee charts below are keyed off this instead. The endpoints behind
+  // them refuse the role too (admissions/routes.js), so this is about not
+  // rendering an empty widget, not about enforcement.
+  const canSeeMoney = role === ROLES.SUPER_ADMIN || role === ROLES.ACCOUNT_MANAGER;
 
   // Header filters
   const [dateRange, setDateRange] = useState({ from: null, to: null, rangeType: null });
@@ -449,8 +454,8 @@ export default function AnalyticsDashboard() {
       {/* ============ PAYMENTS CTA (admin only) ============
           Prominent, top-of-dashboard so it's never missed. Shows the real
           total collected + payment count and links into the Payment Details
-          ledger. Admin-only. */}
-      {isAdmin && (
+          ledger. Real-money surface — super_admin + accounts team only. */}
+      {canSeeMoney && (
         <Box
           sx={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2,
@@ -1028,8 +1033,10 @@ export default function AnalyticsDashboard() {
         </ChartCard>
       </Box>
 
-      {/* ============ PAYMENT COLLECTION TREND + BY MODE (admin + manager) ============ */}
-      {!isCounsellor && (
+      {/* ============ PAYMENT COLLECTION TREND + BY MODE ============ */}
+      {/* Rupee figures — excluded from branch_manager along with the rest of
+          the money surfaces; the endpoint refuses the role anyway. */}
+      {canSeeMoney && (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' }, gap: 2, mt: 2 }}>
           <ChartCard
             title="Payment Collection · 30d"
@@ -1219,9 +1226,9 @@ export default function AnalyticsDashboard() {
         </Box>
       )}
 
-      {/* ============ COLLECTION BY RECEIPT KIND (admin only) ============ */}
+      {/* ============ COLLECTION BY RECEIPT KIND ============ */}
       {/* Registration vs installment vs misc — total ₹ collected per kind. */}
-      {isAdmin && (
+      {canSeeMoney && (
         <Box sx={{ mt: 2 }}>
           <ChartCard
             title="Collection by Type · 30d"
