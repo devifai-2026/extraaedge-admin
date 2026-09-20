@@ -1,81 +1,107 @@
 // Bulk import for the hiring sheets — candidates or interviews.
 //
-// Preview then commit, never one step: the recruiter sees which rows are bad
-// and why, and how many are updates rather than new people, BEFORE anything is
-// written. Mirrors the lead importer's flow, which they already know, but maps
-// entirely different columns onto entirely different tables.
+// Upload → (pick a sheet, if the workbook has several) → queue → close.
+// The import runs in the BACKGROUND: a real recruitment workbook is hundreds
+// of rows, and the recruiter should not be held on a spinner. Progress and the
+// failed/duplicate breakdown live on the Imports tab, which this links to.
+//
+// .xlsx and .csv both work. For .xlsx the tabs are listed first, because the
+// sheets people actually keep have one tab per month rather than one sheet.
 import { useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Typography,
-  Alert, CircularProgress, TextField, MenuItem, Chip, Table, TableHead,
-  TableRow, TableCell, TableBody,
+  Alert, CircularProgress, TextField, MenuItem, Chip,
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFileOutlined';
-import { hiringApi } from '../../lib/endpoints';
-import { parseCsv, mapRows, unmappedHeaders } from './csv';
+import { hiringApi, uploadsApi } from '../../lib/endpoints';
+
+const MAX_BYTES = 15 * 1024 * 1024;
 
 const HiringImportDialog = ({ open, kind = 'candidate', positions = [], onClose, onDone }) => {
-  const [rows, setRows] = useState([]);
-  const [unmapped, setUnmapped] = useState([]);
+  const [file, setFile] = useState(null);
+  const [fileKey, setFileKey] = useState('');
+  const [sheets, setSheets] = useState([]);
+  const [sheet, setSheet] = useState('');
   const [positionId, setPositionId] = useState('');
-  const [preview, setPreview] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
 
   const isInterview = kind === 'interview';
   const label = isInterview ? 'interviews' : 'candidates';
 
   const reset = () => {
-    setRows([]); setUnmapped([]); setPositionId(''); setPreview(null); setErr('');
+    setFile(null); setFileKey(''); setSheets([]); setSheet('');
+    setPositionId(''); setBusy(''); setErr('');
   };
   const close = () => { reset(); onClose?.(); };
 
+  // Upload first, then ask the server what tabs the workbook has. The file
+  // never travels through the API itself — the JSON body limit is 200kb.
   const onFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setErr(''); setPreview(null);
-    try {
-      const text = await file.text();
-      const parsed = parseCsv(text);
-      const mapped = mapRows(parsed.rows, kind);
-      if (!mapped.length) { setErr('No data rows found in that file.'); return; }
-      setRows(mapped);
-      setUnmapped(unmappedHeaders(parsed.headers, kind));
-    } catch {
-      setErr('Could not read that file. Save the sheet as CSV and try again.');
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setErr(''); setSheets([]); setSheet(''); setFileKey('');
+    if (!/\.(xlsx|csv)$/i.test(f.name)) {
+      setErr('Upload a .xlsx or .csv file.');
+      return;
     }
+    if (f.size > MAX_BYTES) {
+      setErr(`That file is ${(f.size / (1024 * 1024)).toFixed(1)} MB; the limit is 15 MB.`);
+      return;
+    }
+    setFile(f);
+    setBusy('Uploading…');
+    try {
+      const pres = (await uploadsApi.presign({
+        purpose: 'csv_import',
+        content_type: f.type || 'application/octet-stream',
+        size_bytes: f.size,
+        filename: f.name,
+      }))?.data;
+      if (!pres?.upload_url || !pres?.r2_key) throw new Error('Could not start the upload.');
+      // The signed URL bakes in the content type, so the PUT must send the
+      // same header or storage rejects it as a signature mismatch.
+      const put = await fetch(pres.upload_url, {
+        method: 'PUT', headers: pres.headers || {}, body: f,
+      });
+      if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+      setFileKey(pres.r2_key);
+
+      if (/\.xlsx$/i.test(f.name)) {
+        setBusy('Reading sheets…');
+        const s = (await hiringApi.workbookSheets({ file_key: pres.r2_key }))?.data?.sheets || [];
+        setSheets(s);
+        if (s.length === 1) setSheet(s[0].name);
+      }
+    } catch (e2) {
+      setErr(e2?.message || 'Upload failed');
+      setFile(null);
+    } finally { setBusy(''); }
   };
 
-  const runPreview = async () => {
-    setBusy(true); setErr('');
+  const start = async () => {
+    setErr(''); setBusy('Starting…');
     try {
-      const body = { rows, ...(positionId ? { position_id: positionId } : {}) };
-      const r = isInterview
-        ? await hiringApi.previewInterviewImport(body)
-        : await hiringApi.previewCandidateImport(body);
-      setPreview(r?.data || null);
-    } catch (e) { setErr(e?.message || 'Preview failed'); } finally { setBusy(false); }
-  };
-
-  const commit = async () => {
-    setBusy(true); setErr('');
-    try {
-      const body = { rows, ...(positionId ? { position_id: positionId } : {}) };
-      const r = isInterview
-        ? await hiringApi.commitInterviewImport(body)
-        : await hiringApi.commitCandidateImport(body);
-      const d = r?.data || {};
-      const msg = isInterview
-        ? `Imported ${d.created} interview${d.created === 1 ? '' : 's'}`
-          + (d.candidates_created ? ` (${d.candidates_created} new candidate${d.candidates_created === 1 ? '' : 's'})` : '')
-        : `Imported ${d.created} new, updated ${d.updated}`;
+      await hiringApi.queueImport({
+        kind,
+        file_key: fileKey,
+        file_name: file?.name,
+        ...(sheet ? { sheet_name: sheet } : {}),
+        ...(positionId ? { position_id: positionId } : {}),
+      });
       reset();
-      onDone?.(msg);
-    } catch (e) { setErr(e?.message || 'Import failed'); } finally { setBusy(false); }
+      onDone?.(`Import started — track it on the Imports tab.`);
+    } catch (e) {
+      setErr(e?.message || 'Could not start the import');
+    } finally { setBusy(''); }
   };
+
+  // An .xlsx with several tabs must have one chosen before we can start.
+  const needsSheet = sheets.length > 1 && !sheet;
+  const canStart = Boolean(fileKey) && !needsSheet && !busy;
 
   return (
-    <Dialog open={open} onClose={close} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={close} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700, fontSize: 17 }}>
         <UploadFileIcon sx={{ color: '#E87B2F' }} />
         Bulk upload {label}
@@ -83,77 +109,59 @@ const HiringImportDialog = ({ open, kind = 'candidate', positions = [], onClose,
 
       <DialogContent dividers>
         <Typography sx={{ fontSize: 13.5, color: '#64748b', mb: 2 }}>
-          Save the sheet as CSV and upload it. Column names are matched loosely, so
-          the existing headers work as they are.
+          Upload the sheet as it is — .xlsx or .csv. Column names are matched
+          loosely, so the existing headers work without renaming anything.
         </Typography>
 
-        <Button component="label" variant="outlined" sx={{ textTransform: 'none' }}>
-          Choose CSV file
-          <input type="file" accept=".csv,text/csv" hidden onChange={onFile} />
+        <Button component="label" variant="outlined" disabled={!!busy} sx={{ textTransform: 'none' }}>
+          {file ? 'Choose a different file' : 'Choose file'}
+          <input type="file" accept=".csv,.xlsx" hidden onChange={onFile} />
         </Button>
 
-        {rows.length > 0 && (
-          <Box sx={{ mt: 2 }}>
-            <Chip size="small" label={`${rows.length} rows read`} sx={{ mr: 1 }} />
-            {unmapped.length > 0 && (
-              <Alert severity="warning" sx={{ mt: 1.5, fontSize: 13 }}>
-                These columns were not recognised and will be ignored:{' '}
-                <strong>{unmapped.join(', ')}</strong>
-              </Alert>
-            )}
-
-            {/* A sheet that names its position per row does not need this;
-                it is the fallback for a sheet that assumes one vacancy. */}
-            <TextField
-              select size="small" fullWidth sx={{ mt: 2 }}
-              label="Position (used when a row does not name one)"
-              value={positionId} onChange={(e) => setPositionId(e.target.value)}
-            >
-              <MenuItem value="">— use each row&apos;s own Position column —</MenuItem>
-              {positions.map((p) => <MenuItem key={p.id} value={p.id}>{p.title}</MenuItem>)}
-            </TextField>
+        {busy && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
+            <CircularProgress size={16} />
+            <Typography sx={{ fontSize: 13, color: '#64748b' }}>{busy}</Typography>
           </Box>
         )}
 
-        {preview && (
-          <Box sx={{ mt: 2.5 }}>
-            <Alert severity={preview.valid ? 'info' : 'error'} sx={{ fontSize: 13 }}>
-              <strong>{preview.valid}</strong> row{preview.valid === 1 ? '' : 's'} ready
-              {!isInterview && preview.valid > 0 && (
-                <> — {preview.new_rows} new, {preview.updates} will update an existing candidate</>
-              )}
-              {preview.failed?.length > 0 && <> · <strong>{preview.failed.length}</strong> cannot be imported</>}
-            </Alert>
-
-            {preview.unknown_statuses?.length > 0 && (
-              <Alert severity="warning" sx={{ mt: 1.5, fontSize: 13 }}>
-                These statuses are not configured and will be left blank:{' '}
-                <strong>{preview.unknown_statuses.join(', ')}</strong>.
-                Add them under Configuration → Hiring statuses first if you need them.
-              </Alert>
-            )}
-
-            {preview.failed?.length > 0 && (
-              <Box sx={{ mt: 1.5, maxHeight: 220, overflow: 'auto', border: '1px solid #eee', borderRadius: 1 }}>
-                <Table size="small" stickyHeader>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>Row</TableCell>
-                      <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>Why it was skipped</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {preview.failed.map((f) => (
-                      <TableRow key={f.row}>
-                        <TableCell sx={{ fontSize: 12.5 }}>{f.row}</TableCell>
-                        <TableCell sx={{ fontSize: 12.5, color: '#b91c1c' }}>{f.reason}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Box>
-            )}
+        {file && fileKey && !busy && (
+          <Box sx={{ mt: 2 }}>
+            <Chip size="small" label={file.name} />
           </Box>
+        )}
+
+        {sheets.length > 1 && (
+          <TextField
+            select size="small" fullWidth sx={{ mt: 2 }}
+            label="Which sheet?"
+            value={sheet} onChange={(e) => setSheet(e.target.value)}
+            helperText="This workbook has several tabs — pick the one to import."
+          >
+            {sheets.map((s) => (
+              <MenuItem key={s.name} value={s.name}>
+                {s.name} {s.approx_rows ? `· ~${s.approx_rows} rows` : ''}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
+
+        {fileKey && (
+          <TextField
+            select size="small" fullWidth sx={{ mt: 2 }}
+            label="Position (used when a row does not name one)"
+            value={positionId} onChange={(e) => setPositionId(e.target.value)}
+          >
+            <MenuItem value="">— use each row&apos;s own Position column —</MenuItem>
+            {positions.map((p) => <MenuItem key={p.id} value={p.id}>{p.title}</MenuItem>)}
+          </TextField>
+        )}
+
+        {fileKey && !busy && (
+          <Alert severity="info" sx={{ mt: 2, fontSize: 13 }}>
+            The import runs in the background, so you can carry on working.
+            Rejected and duplicate rows are listed on the Imports tab when it finishes.
+          </Alert>
         )}
 
         {err && <Alert severity="error" sx={{ mt: 2 }}>{err}</Alert>}
@@ -162,16 +170,10 @@ const HiringImportDialog = ({ open, kind = 'candidate', positions = [], onClose,
       <DialogActions sx={{ px: 3, py: 2 }}>
         <Button onClick={close} sx={{ textTransform: 'none' }}>Cancel</Button>
         <Button
-          onClick={runPreview} disabled={!rows.length || busy}
-          variant="outlined" sx={{ textTransform: 'none' }}
-        >
-          {busy && !preview ? <CircularProgress size={18} /> : 'Check file'}
-        </Button>
-        <Button
-          onClick={commit} disabled={!preview || !preview.valid || busy}
+          onClick={start} disabled={!canStart}
           variant="contained" sx={{ textTransform: 'none', bgcolor: '#E87B2F' }}
         >
-          {busy && preview ? 'Importing…' : `Import ${preview?.valid ?? 0}`}
+          Start import
         </Button>
       </DialogActions>
     </Dialog>

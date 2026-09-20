@@ -253,6 +253,7 @@ const menuSections = [
       { id: 242, label: 'Candidates', icon: PeopleAltIcon,     path: '/hiring/candidates', tab: 'hiring.candidates' },
       { id: 243, label: 'Interviews', icon: EventAvailableIcon, path: '/hiring/interviews', tab: 'hiring.interviews' },
       { id: 244, label: 'Statuses',   icon: TuneIcon,          path: '/hiring/statuses',   tab: 'hiring.statuses' },
+      { id: 245, label: 'Imports',    icon: UploadFileIcon,    path: '/hiring/imports',    tab: 'hiring.imports' },
     ],
   },
   {

@@ -134,7 +134,7 @@ const ROLE_PAYROLL_ADMIN_TABS = ['payroll.runs', 'payroll.structures'];
 // for people who do not work here.
 const ROLE_HIRING_TABS = [
   'hiring.dashboard', 'hiring.positions', 'hiring.candidates',
-  'hiring.interviews', 'hiring.statuses',
+  'hiring.interviews', 'hiring.statuses', 'hiring.imports',
 ];
 const ROLE_PLACEMENT_TABS = ['placement.dashboard', 'placement.companies', 'placement.openings', 'placement.applications'];
 

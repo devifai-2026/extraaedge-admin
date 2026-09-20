@@ -63,6 +63,28 @@ export default function HiringCandidates() {
   const [importKind, setImportKind] = useState(null);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  // Creating the first position from inside the candidate form. Without this
+  // the page is a dead end on a fresh tenant: you cannot file a candidate
+  // without a position, and creating one means abandoning what you typed.
+  const [newPosition, setNewPosition] = useState('');
+  const [addingPosition, setAddingPosition] = useState(false);
+
+  const createPositionInline = async () => {
+    const title = newPosition.trim();
+    if (!title) return;
+    setAddingPosition(true);
+    try {
+      const r = await hiringApi.createPosition({ title });
+      const created = r?.data;
+      const next = await hiringApi.positions();
+      setPositions(next?.data || []);
+      setForm((f) => ({ ...f, position_id: created?.id || '' }));
+      setNewPosition('');
+      setToast({ severity: 'success', text: `Added position "${title}"` });
+    } catch (e) {
+      setToast({ severity: 'error', text: e?.message || 'Could not add position' });
+    } finally { setAddingPosition(false); }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -287,10 +309,32 @@ export default function HiringCandidates() {
             <TextField size="small" label="Name *" value={form?.name ?? ''} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <TextField size="small" label="Contact number" value={form?.phone ?? ''} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             <TextField size="small" label="Email" value={form?.email ?? ''} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            <TextField select size="small" label="Position" value={form?.position_id ?? ''} onChange={(e) => setForm({ ...form, position_id: e.target.value })}>
-              <MenuItem value="">—</MenuItem>
-              {positions.map((p) => <MenuItem key={p.id} value={p.id}>{p.title}</MenuItem>)}
-            </TextField>
+            <Box>
+              <TextField
+                select size="small" fullWidth label="Position"
+                value={form?.position_id ?? ''}
+                onChange={(e) => setForm({ ...form, position_id: e.target.value })}
+                helperText={positions.length ? undefined : 'No positions yet — add the vacancy below.'}
+              >
+                <MenuItem value="">—</MenuItem>
+                {positions.map((p) => <MenuItem key={p.id} value={p.id}>{p.title}</MenuItem>)}
+              </TextField>
+              <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                <TextField
+                  size="small" fullWidth placeholder="Or type a new position, e.g. Telecaller"
+                  value={newPosition}
+                  onChange={(e) => setNewPosition(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); createPositionInline(); } }}
+                />
+                <Button
+                  onClick={createPositionInline}
+                  disabled={!newPosition.trim() || addingPosition}
+                  variant="outlined" sx={{ textTransform: 'none', flexShrink: 0 }}
+                >
+                  {addingPosition ? '…' : 'Add'}
+                </Button>
+              </Box>
+            </Box>
             <TextField size="small" type="date" label="Date of contact" InputLabelProps={{ shrink: true }}
               value={(form?.contacted_on ?? '').slice(0, 10)} onChange={(e) => setForm({ ...form, contacted_on: e.target.value })} />
             <TextField select size="small" label="Status" value={form?.status_id ?? ''} onChange={(e) => setForm({ ...form, status_id: e.target.value })}>

@@ -1,7 +1,7 @@
 // User Profiles management — matches the screenshots provided.
 // Two tabs: User Profiles (table + filter + add dialog) | Roles & Tabs (custom role editor).
-import React, { useEffect, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Tab, Tabs, Button, TextField, CircularProgress, Chip, Avatar, IconButton,
   Dialog, DialogTitle, DialogContent, DialogActions, Switch, MenuItem,
@@ -193,6 +193,32 @@ function UsersTab() {
   const [filter, setFilter] = useState({}); // { role, is_active, manager_id, ... }
   const [filterOpen, setFilterOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  // Onboarding hand-off from Speedup Hiring. A hired candidate deep-links here
+  // as ?add=1&name=…&phone=…&email=…&candidate_id=…, which opens the Add User
+  // dialog pre-filled from their record — so the recruiter does not retype
+  // details they already captured during hiring.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const prefill = useMemo(() => {
+    if (searchParams.get('add') !== '1') return null;
+    const full = (searchParams.get('name') || '').trim();
+    const sp = full.indexOf(' ');
+    return {
+      first_name: sp > 0 ? full.slice(0, sp) : full,
+      last_name: sp > 0 ? full.slice(sp + 1) : '',
+      email: searchParams.get('email') || '',
+      phone: searchParams.get('phone') || '',
+      candidate_id: searchParams.get('candidate_id') || '',
+    };
+  }, [searchParams]);
+  // Strip the params once consumed so a refresh does not re-open the dialog.
+  const clearPrefill = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      ['add', 'name', 'email', 'phone', 'candidate_id'].forEach((k) => next.delete(k));
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+  useEffect(() => { if (prefill) setAddOpen(true); }, [prefill]);
   const [resetOpen, setResetOpen] = useState(false);
   const [activeUser, setActiveUser] = useState(null);
   const [editUser, setEditUser] = useState(null);
@@ -432,10 +458,11 @@ function UsersTab() {
       />
 
       <AddUserDialog
+        prefill={prefill}
         open={addOpen}
         users={allUsers}
-        onClose={() => setAddOpen(false)}
-        onCreated={() => { setAddOpen(false); reload(); }}
+        onClose={() => { setAddOpen(false); clearPrefill(); }}
+        onCreated={() => { setAddOpen(false); clearPrefill(); reload(); }}
       />
 
       <UserProfileDialog
@@ -1010,13 +1037,26 @@ function FilterDialog({ open, value, users, onClose, onApply, onReset }) {
 
 // ----------------------------- Add user dialog -----------------------------
 
-function AddUserDialog({ open, users, onClose, onCreated }) {
+function AddUserDialog({ open, users, onClose, onCreated, prefill = null }) {
   const { data: programsData } = useFetch(() => programsApi.list(), [open]);
   const { data: rolesData } = useFetch(() => customRolesApi.list(), [open]);
   const { data: branchesData } = useFetch(() => branchesApi.list(), [open]);
   const [form, setForm] = useState(() => initialAddForm());
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  // Seed from a hiring hand-off when the dialog opens. Only the identity
+  // fields carry over — role, branch and manager are decisions the recruiter
+  // still has to make, and guessing them would be worse than leaving blank.
+  useEffect(() => {
+    if (!open || !prefill) return;
+    setForm((f) => ({
+      ...f,
+      first_name: prefill.first_name || f.first_name,
+      last_name: prefill.last_name || f.last_name,
+      email: prefill.email || f.email,
+      phone: prefill.phone || f.phone,
+    }));
+  }, [open, prefill]);
   // LMS trainer bindings: rows of { program_id, module_id }. A head_trainer
   // binds course(s) only (module_id stays null); a trainer binds course+module.
   // Multiple rows = multiple courses/modules per trainer.

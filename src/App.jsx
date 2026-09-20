@@ -125,6 +125,7 @@ import HiringPositions from './pages/Hiring/HiringPositions'
 import HiringCandidates from './pages/Hiring/HiringCandidates'
 import HiringInterviews from './pages/Hiring/HiringInterviews'
 import HiringStatuses from './pages/Hiring/HiringStatuses'
+import HiringImports from './pages/Hiring/HiringImports'
 import HrCertificates from './pages/Hr/HrCertificates'
 import MyLeave from './pages/Leave/MyLeave'
 import MyPayslips from './pages/Payroll/MyPayslips'
@@ -255,6 +256,7 @@ function App() {
         <Route path="/hiring/candidates" element={<ProtectedRoute tab="hiring.candidates"><Layout><HiringCandidates /></Layout></ProtectedRoute>} />
         <Route path="/hiring/interviews" element={<ProtectedRoute tab="hiring.interviews"><Layout><HiringInterviews /></Layout></ProtectedRoute>} />
         <Route path="/hiring/statuses" element={<ProtectedRoute tab="hiring.statuses"><Layout><HiringStatuses /></Layout></ProtectedRoute>} />
+        <Route path="/hiring/imports" element={<ProtectedRoute tab="hiring.imports"><Layout><HiringImports /></Layout></ProtectedRoute>} />
         <Route path="/hr/certificates" element={<ProtectedRoute tab="hr.certificates"><Layout><HrCertificates /></Layout></ProtectedRoute>} />
         {/* Staff leave. /hr/my-leave is self-service and granted to every staff
             role; approvals and administration are gated on their own tabs. */}

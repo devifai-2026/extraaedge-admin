@@ -1162,10 +1162,13 @@ export const hiringApi = {
   updateInterview: (id, body) => api.put(`/hiring/interviews/${id}`, body),
   deleteInterview: (id) => api.delete(`/hiring/interviews/${id}`),
 
-  // Preview first, commit second — the recruiter sees the per-row verdict and
-  // the new-vs-update split before anything is written.
-  previewCandidateImport: (body) => api.post('/hiring/candidates/import/preview', body),
-  commitCandidateImport: (body) => api.post('/hiring/candidates/import/commit', body),
-  previewInterviewImport: (body) => api.post('/hiring/interviews/import/preview', body),
-  commitInterviewImport: (body) => api.post('/hiring/interviews/import/commit', body),
+  // Which tabs does this uploaded workbook have?
+  workbookSheets: (body) => api.post('/hiring/workbook/sheets', body),
+  // Queue a background import of an already-uploaded file. Returns 202 with
+  // the job row; poll `imports` for progress.
+  queueImport: (body) => api.post('/hiring/imports', body),
+  imports: () => api.get('/hiring/imports'),
+  importJob: (id) => api.get(`/hiring/imports/${id}`),
+  // outcome: 'failed' | 'duplicate'
+  importRows: (id, outcome) => api.get(`/hiring/imports/${id}/rows`, outcome ? { outcome } : {}),
 };
