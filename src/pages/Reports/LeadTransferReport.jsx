@@ -17,6 +17,7 @@ import {
 import DownloadIcon from '@mui/icons-material/Download';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { reportsApi, usersApi } from '../../lib/endpoints';
+import { isReadOnlyRole } from '../../lib/rbac';
 
 const TYPES = [
   { v: 'assign', label: 'Assign' },
@@ -111,6 +112,9 @@ export default function LeadTransferReport() {
             transfer, and qualification. One row per transfer; never-transferred leads still appear.
           </div>
         </div>
+        {/* Branch managers are read-only and cannot extract data in bulk —
+            the server refuses format=xlsx for them, so don't offer it. */}
+        {!isReadOnlyRole() && (
         <Button
           variant="contained"
           startIcon={exporting ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
@@ -120,6 +124,7 @@ export default function LeadTransferReport() {
         >
           {exporting ? 'Exporting…' : 'Export Excel'}
         </Button>
+        )}
       </div>
 
       {/* Filter bar */}
