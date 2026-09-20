@@ -1,10 +1,11 @@
 // Bulk reassign a selection of leads across MANY people at once.
 //
-// Two modes, both ending in an even spread (server: leads/service.distributeLeads):
-//   • Round-robin — every ACTIVE COUNSELLOR in the chosen branch. Counsellors
-//     only, by product decision: telecallers never receive leads from an
-//     automatic spread, only from an explicit pick.
+// Three modes, all ending in an even spread (server: leads/service.distributeLeads):
+//   • Round-robin — counsellors — every ACTIVE COUNSELLOR in the chosen branch.
+//   • Round-robin — telecallers — every ACTIVE TELECALLER in that branch.
 //   • Pick people — whoever is ticked, counsellors and telecallers together.
+// The two round-robin pools stay single-role on purpose: a mixed pool would
+// route by whichever team happens to be larger.
 //
 // The server re-validates every target (active, not deleted, a lead-owner
 // role), so this dialog is convenience, not a security boundary.
@@ -34,21 +35,29 @@ const DistributeLeadsDialog = ({ open, leadIds = [], onClose, onDone }) => {
     setErr('');
     setLoading(true);
     Promise.all([
-      usersApi.list({ role: LEAD_OWNER_ROLES_PARAM, limit: 500 }).then((r) => r?.data || []).catch(() => []),
+      // limit caps at 200 server-side (users listUsersQuery); asking for more
+      // fails validation and returns nothing, which read as "No options".
+      usersApi.list({ role: LEAD_OWNER_ROLES_PARAM, limit: 200 })
+        .then((r) => r?.data || [])
+        .catch((e) => { setErr(e?.message || 'Could not load people'); return []; }),
       branchesApi.list().then((r) => r?.data || []).catch(() => []),
     ])
       .then(([u, b]) => { setUsers(u); setBranches(b); })
       .finally(() => setLoading(false));
   }, [open]);
 
-  // Counsellors in the chosen branch — the exact pool the server will build
-  // for round-robin, so the preview cannot disagree with what happens.
+  const isRoundRobin = mode === 'round_robin' || mode === 'round_robin_telecaller';
+  const rrRole = mode === 'round_robin_telecaller' ? ROLES.TELECALLER : ROLES.COUNSELLOR;
+  const rrLabel = mode === 'round_robin_telecaller' ? 'telecaller' : 'counsellor';
+
+  // The exact pool the server will build for this mode + branch, so the
+  // preview can never disagree with what actually happens.
   const rrPool = useMemo(
-    () => users.filter((u) => u.role === ROLES.COUNSELLOR && u.branch_id === branchId && u.is_active !== false),
-    [users, branchId],
+    () => users.filter((u) => u.role === rrRole && u.branch_id === branchId && u.is_active !== false),
+    [users, branchId, rrRole],
   );
 
-  const poolSize = mode === 'round_robin' ? rrPool.length : picked.length;
+  const poolSize = isRoundRobin ? rrPool.length : picked.length;
   // Even split, remainder dealt one-per-person from the top.
   const per = poolSize ? Math.floor(leadIds.length / poolSize) : 0;
   const remainder = poolSize ? leadIds.length % poolSize : 0;
@@ -60,15 +69,15 @@ const DistributeLeadsDialog = ({ open, leadIds = [], onClose, onDone }) => {
 
   const submit = async () => {
     setErr('');
-    if (mode === 'round_robin' && !branchId) { setErr('Pick a branch to round-robin within'); return; }
-    if (mode === 'round_robin' && !rrPool.length) { setErr('That branch has no active counsellors'); return; }
+    if (isRoundRobin && !branchId) { setErr('Pick a branch to round-robin within'); return; }
+    if (isRoundRobin && !rrPool.length) { setErr(`That branch has no active ${rrLabel}s`); return; }
     if (mode === 'manual' && !picked.length) { setErr('Pick at least one person'); return; }
     setBusy(true);
     try {
       const r = await leadsApi.distribute({
         lead_ids: leadIds,
         mode,
-        ...(mode === 'round_robin' ? { branch_id: branchId } : { assignee_ids: picked.map((u) => u.id) }),
+        ...(isRoundRobin ? { branch_id: branchId } : { assignee_ids: picked.map((u) => u.id) }),
         reason: reason || undefined,
       });
       const n = r?.data?.affected ?? 0;
@@ -99,14 +108,28 @@ const DistributeLeadsDialog = ({ open, leadIds = [], onClose, onDone }) => {
                 control={<Radio size="small" />}
                 label={(
                   <Box>
-                    <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Round-robin across a branch</Typography>
+                    <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Round-robin — counsellors</Typography>
                     <Typography sx={{ fontSize: 12.5, color: '#64748b' }}>
-                      Split evenly between every active counsellor in that branch. Telecallers are not included.
+                      Split evenly between every active counsellor in a branch.
                     </Typography>
                   </Box>
                 )}
               />
-              {mode === 'round_robin' && (
+              <FormControlLabel
+                value="round_robin_telecaller"
+                control={<Radio size="small" />}
+                label={(
+                  <Box>
+                    <Typography sx={{ fontSize: 14, fontWeight: 600 }}>Round-robin — telecallers</Typography>
+                    <Typography sx={{ fontSize: 12.5, color: '#64748b' }}>
+                      Split evenly between every active telecaller in a branch.
+                    </Typography>
+                  </Box>
+                )}
+              />
+              {/* One branch picker shared by both round-robin modes — the pool
+                  below re-resolves from whichever role is selected. */}
+              {isRoundRobin && (
                 <Box sx={{ pl: 4, pb: 1.5 }}>
                   <TextField
                     select size="small" fullWidth label="Branch"
@@ -119,8 +142,8 @@ const DistributeLeadsDialog = ({ open, leadIds = [], onClose, onDone }) => {
                   {branchId && (
                     <Typography sx={{ fontSize: 12.5, color: rrPool.length ? '#64748b' : '#dc2626', mt: 0.75 }}>
                       {rrPool.length
-                        ? `${rrPool.length} counsellor${rrPool.length === 1 ? '' : 's'}: ${rrPool.map((u) => u.name || u.email).join(', ')}`
-                        : 'No active counsellors in this branch.'}
+                        ? `${rrPool.length} ${rrLabel}${rrPool.length === 1 ? '' : 's'}: ${rrPool.map((u) => u.name || u.email).join(', ')}`
+                        : `No active ${rrLabel}s in this branch.`}
                     </Typography>
                   )}
                 </Box>
