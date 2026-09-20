@@ -190,4 +190,39 @@ export function buildReceiptHtml(data, opts = {}) {
     </div>`;
 }
 
+/**
+ * Filename for a downloaded receipt: the STUDENT'S NAME first, then the
+ * receipt number.
+ *
+ * Why the name leads: a student (or an accounts user handling many of them)
+ * ends up with a folder of files called Receipt_SI2026-05239.pdf, which says
+ * nothing about whose receipt it is without opening each one. Sorting by name
+ * groups a student's receipts together; the number still disambiguates two
+ * receipts for the same person.
+ *
+ * Both download paths — the admin "Download PDF" and the student portal — call
+ * this, so the two can never drift the way the hand-rolled names did.
+ *
+ * Takes the same payload buildReceiptHtml receives, so the name always matches
+ * what is printed on the receipt body. Falls back to the plain number when a
+ * name is missing (the server already coalesces to email, then '—').
+ *
+ * @param {object} data - the /public/receipts/:token payload
+ * @returns {string} e.g. "Receipt_Pratiksha-Mahadev-Jadhav_SI2026-05239.pdf"
+ */
+export function receiptFileName(data) {
+  const { receipt = {}, admission = {} } = data || {};
+  // Collapse anything that isn't a letter, digit or dash into a single dash so
+  // the result is safe on every OS. The em-dash placeholder the server uses for
+  // an unknown name normalises away to nothing here, which is what we want.
+  const slug = (v) => String(v ?? '')
+    .normalize('NFKD')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+  const name = slug(admission.student_name);
+  const no = slug(receipt.receipt_no) || 'receipt';
+  return name ? `Receipt_${name}_${no}.pdf` : `Receipt_${no}.pdf`;
+}
+
 export default buildReceiptHtml;

@@ -30,7 +30,7 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 import DownloadIcon from '@mui/icons-material/Download';
 import SchoolIcon from '@mui/icons-material/School';
 import { admissionsApi, uploadsApi, paymentAccountsApi, publicReceiptsApi } from '../../lib/endpoints';
-import { buildReceiptHtml } from '../../lib/receiptTemplate';
+import { buildReceiptHtml, receiptFileName } from '../../lib/receiptTemplate';
 import { downloadHtmlAsPdf } from '../../lib/htmlToPdf';
 import { fullName, fmtDate, fmtMoney } from './utils';
 import StatusPill from './StatusPill';
@@ -154,8 +154,10 @@ const AdmissionDetail = () => {
       const payload = res?.data;
       if (!payload) throw new Error('Receipt not found');
       const html = buildReceiptHtml(payload);
-      const safeNo = String(r.receipt_no || 'receipt').replace(/[^a-z0-9_\-]/gi, '_');
-      await downloadHtmlAsPdf(html, `Receipt_${safeNo}.pdf`);
+      // Name the file after the student, from the same payload the receipt
+      // body is built from — so the filename can never disagree with what is
+      // printed on the page.
+      await downloadHtmlAsPdf(html, receiptFileName(payload));
     } catch (e) {
       setToast({ severity: 'error', text: e?.message || 'Failed to generate the PDF.' });
     } finally {

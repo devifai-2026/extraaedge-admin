@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { studentApi } from '../../lib/studentApi';
 import { publicReceiptsApi } from '../../lib/endpoints';
-import { buildReceiptHtml } from '../../lib/receiptTemplate';
+import { buildReceiptHtml, receiptFileName } from '../../lib/receiptTemplate';
 import { PageHeader, Card, EmptyState, Badge, Btn, Skeleton, Toast } from '../../lib/lmsUi';
 import PaymentsIcon from '@mui/icons-material/PaymentsOutlined';
 
@@ -32,7 +32,7 @@ export default function StudentPayments() {
       const payload = res?.data ?? res;
       const html = buildReceiptHtml(payload);
       const { downloadHtmlAsPdf } = await import('../../lib/htmlToPdf');
-      await downloadHtmlAsPdf(html, `receipt-${rcpt.receipt_no || rcpt.id}.pdf`);
+      await downloadHtmlAsPdf(html, receiptFileName(payload));
     } catch (e) { setToast(e.message || 'Could not download the receipt.'); }
     finally { setBusy(''); }
   };
