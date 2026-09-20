@@ -1,15 +1,18 @@
 import { useCallback } from 'react';
 import { Box } from '@mui/material';
 import { auth } from '../../lib/endpoints';
-import Watermark from './Watermark';
 import { useLeadDataProtection } from './useLeadDataProtection';
 import { logSecurityEvent } from './securityEvents';
 
 // Wraps any surface that renders lead data (LeadsTable, LeadList, LeadCard,
-// LeadPool, FailedLeads) with the shared deterrence/traceability layer:
-// blocks copy/cut/right-click, disables text selection, watermarks with the
-// viewer's identity, and blurs while the window is unfocused or devtools is
-// suspected open. super_admin is fully exempt — this exists to slow down and
+// LeadPool, FailedLeads) with the shared deterrence layer: blocks
+// copy/cut/right-click, disables text selection, and blurs while the window
+// is unfocused or devtools is suspected open.
+//
+// The watermark is NO LONGER rendered here. It moved to <GlobalWatermark/> in
+// Layout, which covers every page and every modal instead of only the four
+// tables this wrapper happens to be used on. Rendering it here too would
+// stack a second, differently-positioned copy on those tables. super_admin is fully exempt — this exists to slow down and
 // trace staff we don't fully trust, not the person who already sees
 // everything unmasked from the API.
 export default function ProtectedLeadData({ children, sx, component = 'div' }) {
@@ -44,7 +47,6 @@ export default function ProtectedLeadData({ children, sx, component = 'div' }) {
       }}
     >
       {children}
-      <Watermark />
     </Box>
   );
 }

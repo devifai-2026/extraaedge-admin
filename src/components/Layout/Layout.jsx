@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Header from './Header';
+import GlobalWatermark from '../DataProtection/GlobalWatermark';
 import Sidebar from './Sidebar';
 import BranchSetupDialog from '../BranchSetupDialog/BranchSetupDialog';
 import PhoneCaptureDialog from '../PhoneCaptureDialog/PhoneCaptureDialog';
 import ClockInGate from './ClockInGate';
 import LocationGate from './LocationGate';
 import FeedbackPopup from '../FeedbackPopup/FeedbackPopup';
+import GlobalErrorToast from './GlobalErrorToast';
 import { auth } from '../../lib/api';
 import { authApi } from '../../lib/endpoints';
 import { ROLES } from '../../lib/rbac';
@@ -80,6 +82,10 @@ function Layout({ children }) {
 
   return (
     <div className="layout-wrapper">
+      {/* Identity watermark over every authenticated staff page AND every
+          modal. Self-gating: renders nothing for super_admin, the trainer
+          tiers, or the student portal. */}
+      <GlobalWatermark />
       <Header />
       <div className="layout-container">
         <Sidebar
@@ -114,6 +120,9 @@ function Layout({ children }) {
       {/* Recurring feedback popup — only once the blocking gates are cleared,
           so it never stacks on top of branch/phone/location/clock-in setup. */}
       {!needsBranchSetup && !needsPhone && locationResolved ? <FeedbackPopup /> : null}
+      {/* App-wide "you're not allowed to do that" toast. Unconditional and
+          last: a 403 can fire during setup gates too, and it never blocks. */}
+      <GlobalErrorToast />
     </div>
   );
 }
