@@ -551,20 +551,33 @@ const AdmissionDetail = () => {
         </Section>
       )}
 
-      {/* Receipts are the full payment history — every installment and misc
-          payment, not just registration. Withheld entirely from roles without
-          money access (the server sends an empty array regardless). */}
-      {canSeeMoney && (
+      {/* Receipts. A role without money access still sees the REGISTRATION
+          receipts — collecting that amount is their approval, so they need
+          the proof it was collected. The server filters the array to
+          registration-only for them (stripAdmissionMoney), so this renders
+          whatever it is allowed to see; the heading says which. Adding a
+          receipt stays with the accounts team.
+
+          The receipt itself — view, download, share link — is deliberately
+          NOT reduced. It renders from the public /r/:token payload, which
+          carries course fees and the installment schedule, because that is
+          the document as issued to the student. A branch manager sharing a
+          registration receipt has to be able to share the real thing, so the
+          money rules on this page stop at the table. Do not "fix" this by
+          stripping the receipt payload: it would change what the student
+          receives. */}
       <Section
-        title="Receipts"
-        right={
+        title={canSeeMoney ? 'Receipts' : 'Registration receipts'}
+        right={canSeeMoney ? (
           <Button startIcon={<AddIcon />} onClick={() => setReceiptOpen({ kind: 'misc' })} variant="outlined" sx={{ textTransform: 'none' }}>
             Add receipt
           </Button>
-        }
+        ) : null}
       >
         {(!data.receipts || data.receipts.length === 0) ? (
-          <div className="accounts-empty">No receipts yet.</div>
+          <div className="accounts-empty">
+            {canSeeMoney ? 'No receipts yet.' : 'No registration receipt yet.'}
+          </div>
         ) : (
           <table className="accounts-table">
             <thead><tr>
@@ -641,7 +654,6 @@ const AdmissionDetail = () => {
           </table>
         )}
       </Section>
-      )}
 
       <AddReceiptDialog
         open={Boolean(receiptOpen)}
