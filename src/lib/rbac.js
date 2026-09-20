@@ -152,8 +152,6 @@ const ROLE_BRANCH_MANAGER_TABS = [
   'advanced.dropdowns', 'advanced.users_roles', 'advanced.communications',
   'reports', 'analytics', 'lead_transfer_report', 'stale_handovers',
   'missed_leads', 'unmatched_recordings', 'qa.feedback', 'lms.analytics',
-  // Post-conversion pipeline — status counts + student names, no money.
-  'admissions.pipeline',
   // Admission approvals + the admission detail page behind it, which is the
   // only route to a student's registration receipt. Money on both surfaces is
   // withheld per-field, not by hiding the route.
