@@ -14,6 +14,7 @@ import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import { admissionsApi, programsApi, usersApi } from '../../lib/endpoints';
 import { fullName, fmtDate, fmtMoney } from './utils';
+import { isRole, ROLES } from '../../lib/rbac';
 import StatusPill from './StatusPill';
 import './Accounts.css';
 
@@ -49,8 +50,14 @@ const ymd = (d) => {
 //   actions     — array of { label, color, icon, when(row), onClick(row) }
 //   showFees    — adds Fees / Paid / Pending columns (used on Break)
 const AdmissionsList = ({
-  title, subtitle, statusFilter, monthScope, showCreate, actions, showFees,
+  title, subtitle, statusFilter, monthScope, showCreate, actions,
+  showFees: showFeesProp,
 }) => {
+  // The fee columns are course money, not registration, so they are withheld
+  // from roles without money access however the caller sets the prop. The
+  // server nulls the values for them too — this stops three columns of
+  // em-dashes, and stops the per-row detail fetch that backs them.
+  const showFees = showFeesProp && isRole(ROLES.SUPER_ADMIN, ROLES.ACCOUNT_MANAGER);
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);

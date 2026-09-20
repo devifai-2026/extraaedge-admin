@@ -33,6 +33,7 @@ import { admissionsApi, uploadsApi, paymentAccountsApi, publicReceiptsApi } from
 import { buildReceiptHtml, receiptFileName } from '../../lib/receiptTemplate';
 import { downloadHtmlAsPdf } from '../../lib/htmlToPdf';
 import { fullName, fmtDate, fmtMoney } from './utils';
+import { isRole, ROLES } from '../../lib/rbac';
 import StatusPill from './StatusPill';
 import VerifyAdmissionDialog from '../../components/VerifyAdmissionDialog/VerifyAdmissionDialog';
 import './Accounts.css';
@@ -51,6 +52,10 @@ const credentialMessage = (c) => [
 const AdmissionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  // Who may see real amounts. Everyone else gets the registration figures
+  // only — the server already nulls the rest (stripAdmissionMoney), this just
+  // avoids rendering tiles and tables full of em-dashes.
+  const canSeeMoney = isRole(ROLES.SUPER_ADMIN, ROLES.ACCOUNT_MANAGER);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -217,9 +222,13 @@ const AdmissionDetail = () => {
   // the Full-mode course balance. Without this, Full-mode admissions
   // had no surface to tag the registration receipt (the section was
   // hidden entirely).
-  const showFeeSchedule = isInstallmentMode
-    || offerRegistration != null
-    || fullModeCourseBalance != null;
+  // A role without money access sees the schedule ONLY when there is a
+  // registration line on it — that single row is their carve-out. The
+  // installment slots and the Full-mode course balance are course fees, and
+  // the server has already emptied fee_schedule for them anyway.
+  const showFeeSchedule = canSeeMoney
+    ? (isInstallmentMode || offerRegistration != null || fullModeCourseBalance != null)
+    : offerRegistration != null;
 
   return (
     <div className="accounts-page">
@@ -310,6 +319,11 @@ const AdmissionDetail = () => {
         </Alert>
       )}
 
+      {/* Course-fee tiles. Hidden from roles that may not see amounts — the
+          server nulls these fields for them (admissions/service.stripAdmissionMoney),
+          so the tiles would render three em-dashes. The registration balance
+          chip above stays: that one figure IS theirs. */}
+      {canSeeMoney && (
       <div className="accounts-kpi-row">
         <div className="accounts-kpi-card" style={{ '--kpi-accent': '#4f46e5' }}>
           <div className="accounts-kpi-label">Total Fees</div>
@@ -324,6 +338,7 @@ const AdmissionDetail = () => {
           <div className="accounts-kpi-value">₹ {fmtMoney(data.pending_fees)}</div>
         </div>
       </div>
+      )}
 
       {/* Identity card — photo on the left, KV grid on the right. */}
       <div className="accounts-table-card" style={{ marginBottom: 16, padding: 16 }}>
@@ -536,6 +551,10 @@ const AdmissionDetail = () => {
         </Section>
       )}
 
+      {/* Receipts are the full payment history — every installment and misc
+          payment, not just registration. Withheld entirely from roles without
+          money access (the server sends an empty array regardless). */}
+      {canSeeMoney && (
       <Section
         title="Receipts"
         right={
@@ -622,6 +641,7 @@ const AdmissionDetail = () => {
           </table>
         )}
       </Section>
+      )}
 
       <AddReceiptDialog
         open={Boolean(receiptOpen)}
