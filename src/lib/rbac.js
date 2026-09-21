@@ -67,6 +67,9 @@ const ROLE_MANAGER_TABS = [
   'missed_leads',
 ];
 const ROLE_COUNSELLOR_TABS = [
+  // Duplicate finder. Scoped server-side to groups where they own EVERY lead,
+  // so they tidy their own list and can never merge a colleague's lead away.
+  'duplicates',
   'dashboard', 'leads', 'lead_pool', 'raw_data', 'failed_leads', 'followups', 'whatsapp',
   'admissions.my_students',
   // Their own broken follow-up promises — the surface is scoped server-side,

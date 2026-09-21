@@ -1,4 +1,10 @@
-// Duplicate leads — find and merge. super_admin + branch_manager.
+// Duplicate leads — find and merge.
+//
+// super_admin / branch_manager see the whole tenant / their branch.
+// counsellor / telecaller see ONLY groups where they own every lead — merging
+// someone else's lead into your own would be a silent reassignment the other
+// owner never sees, so those groups are withheld and left to a manager. The
+// server enforces that on the merge endpoint too, not just in the scan filter.
 //
 // Two ways in:
 //   • Scan — group live leads by contact (phone AND whatsapp, normalised) or
@@ -20,6 +26,7 @@ import MergeTypeIcon from '@mui/icons-material/MergeTypeOutlined';
 import SearchIcon from '@mui/icons-material/Search';
 import { duplicatesApi, leadsApi } from '../../lib/endpoints';
 import { PageHeader, Card, EmptyState, lmsTokens } from '../../lib/lmsUi';
+import { isLeadOwnerRole } from '../../lib/rbac';
 
 const { INK, MUTE, FAINT, LINE } = lmsTokens;
 
@@ -79,6 +86,9 @@ const LeadRow = ({ lead, survivorId, onPick, showPick = true }) => (
 );
 
 export default function Duplicates() {
+  // Front line sees a narrower page: the server only returns groups where they
+  // own EVERY lead. Saying so up front stops an empty result reading as a bug.
+  const ownerScoped = isLeadOwnerRole();
   const [tab, setTab] = useState('scan');
   const [mode, setMode] = useState('contact');
   const [groups, setGroups] = useState([]);
@@ -169,9 +179,19 @@ export default function Duplicates() {
     <Box sx={{ p: 3, maxWidth: 1080, mx: 'auto' }}>
       <PageHeader
         title="Duplicate leads"
-        subtitle="Find the same person filed twice, and merge them into one record."
+        subtitle={ownerScoped
+          ? 'Find the same person filed twice in your own leads, and merge them.'
+          : 'Find the same person filed twice, and merge them into one record.'}
         icon={MergeTypeIcon}
       />
+
+      {ownerScoped && (
+        <Alert severity="info" sx={{ mb: 2, fontSize: 13 }}>
+          You can merge duplicates where <strong>you own every lead in the group</strong>.
+          If one of them belongs to someone else it is not shown here — ask a
+          manager, who can merge across owners.
+        </Alert>
+      )}
 
       <Tabs value={tab} onChange={(_e, v) => setTab(v)} sx={{ mb: 2 }}>
         <Tab value="scan" label="Scan" sx={{ textTransform: 'none' }} />
@@ -206,7 +226,15 @@ export default function Duplicates() {
           {loading && <Box sx={{ textAlign: 'center', py: 5 }}><CircularProgress size={26} /></Box>}
 
           {scanned && !loading && groups.length === 0 && (
-            <Card><EmptyState icon="✅" title="No duplicates found" text="Nothing matched on that rule." /></Card>
+            <Card>
+              <EmptyState
+                icon="✅"
+                title="No duplicates found"
+                text={ownerScoped
+                  ? 'Nothing matched among the leads you own. Duplicates shared with another owner are handled by a manager.'
+                  : 'Nothing matched on that rule.'}
+              />
+            </Card>
           )}
 
           {!loading && groups.length > 0 && (
