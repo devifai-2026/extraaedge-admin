@@ -5,6 +5,7 @@ import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import WorkOutlineIcon from '@mui/icons-material/WorkOutlineOutlined';
 import EventAvailableIcon from '@mui/icons-material/EventAvailableOutlined';
 import TuneIcon from '@mui/icons-material/TuneOutlined';
+import MergeTypeIcon from '@mui/icons-material/MergeTypeOutlined';
 import FolderIcon from '@mui/icons-material/Folder';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -123,6 +124,7 @@ const menuSections = [
       // it too (they're the ones notified on day 6), each within their scope.
       { id: 26, label: 'Stale Leads', icon: HourglassBottomIcon, path: '/reports/stale-leads', tab: 'stale_handovers' },
       { id: 21, label: 'Discount Approvals', icon: ChecklistIcon, path: '/discount-approvals', tab: 'lead_transfer_report', badgeKey: 'discount_approvals' },
+      { id: 29, label: 'Duplicate Leads', icon: MergeTypeIcon, path: '/duplicates', tab: 'duplicates' },
       { id: 22, label: 'Call Recordings', icon: GraphicEqIcon, path: '/unmatched-recordings', tab: 'unmatched_recordings' },
       // QA: the review queue is the reviewer's surface, the feedback report is
       // the manager read-back. Each is gated by its own tab key.

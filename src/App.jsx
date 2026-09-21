@@ -39,6 +39,7 @@ import WhatsAppSettings from './pages/AdvancedSettings/WhatsAppSettings'
 import JustDialAssignment from './pages/AdvancedSettings/JustDialAssignment'
 import LeadDistribution from './pages/AdvancedSettings/LeadDistribution'
 import DiscountApprovals from './pages/DiscountApprovals/DiscountApprovals'
+import Duplicates from './pages/Duplicates/Duplicates'
 import TemplatesHub from './pages/AdvancedSettings/TemplatesHub'
 import SubscriptionPage from './pages/AdvancedSettings/SubscriptionPage'
 import AssignmentRules from './components/AssignmentRules/AssignmentRules'
@@ -229,6 +230,8 @@ function App() {
         <Route path="/advancedsettings/users" element={<ProtectedRoute tab="advanced.users_roles"><Layout><UsersAndRoles /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/branches" element={<ProtectedRoute tab="advanced.users_roles"><Layout><Branches /></Layout></ProtectedRoute>} />
         <Route path="/discount-approvals" element={<ProtectedRoute tab="lead_transfer_report"><Layout><DiscountApprovals /></Layout></ProtectedRoute>} />
+        {/* Duplicate lead finder + merge — super_admin / branch_manager. */}
+        <Route path="/duplicates" element={<ProtectedRoute tab="duplicates"><Layout><Duplicates /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/templates" element={<ProtectedRoute tab="advanced.communications"><Layout><TemplatesHub /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/assignment-rules" element={<ProtectedRoute tab="settings.assignment_rules"><Layout><AssignmentRules /></Layout></ProtectedRoute>} />
         <Route path="/advancedsettings/justdial-assignment" element={<ProtectedRoute><Layout><JustDialAssignment /></Layout></ProtectedRoute>} />

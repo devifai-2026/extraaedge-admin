@@ -1172,3 +1172,15 @@ export const hiringApi = {
   // outcome: 'failed' | 'duplicate'
   importRows: (id, outcome) => api.get(`/hiring/imports/${id}/rows`, outcome ? { outcome } : {}),
 };
+
+// ---- Duplicate lead finder + merge (super_admin / branch_manager) ----
+// Distinct from the import-time duplicate checks on bulk upload: this scans
+// leads ALREADY in the system, which the unique index cannot catch when the
+// same number sits in `phone` on one row and `whatsapp_number` on another.
+export const duplicatesApi = {
+  // mode: 'contact' (phone + whatsapp, normalised) | 'name' (suggestion only)
+  scan: (params) => api.get('/duplicates/scan', params),
+  // Merge several leads into one survivor. Losers are soft-deleted with
+  // merged_into_id; all history moves to the survivor.
+  mergeMany: (body) => api.post('/duplicates/merge-many', body),
+};
