@@ -1,0 +1,8 @@
+{
+  "name": "extraedge-admin-build-shim",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "build": "cd .. && npm install && npm run build && rm -rf extraedge-admin/dist && cp -r dist extraedge-admin/dist"
+  }
+}
