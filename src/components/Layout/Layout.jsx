@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Header from './Header';
+import UnendedClassPrompt from '../../pages/Trainer/UnendedClassPrompt';
+import BatchDatesPrompt from '../../pages/Trainer/BatchDatesPrompt';
 import GlobalWatermark from '../DataProtection/GlobalWatermark';
 import Sidebar from './Sidebar';
 import BranchSetupDialog from '../BranchSetupDialog/BranchSetupDialog';
@@ -86,6 +88,13 @@ function Layout({ children }) {
           modal. Self-gating: renders nothing for super_admin, the trainer
           tiers, or the student portal. */}
       <GlobalWatermark />
+      {/* Nags the trainer about classes they started and never ended. Gated to
+          the teaching roles: the endpoint 403s for everyone else, and polling
+          it from a sales user's session would be noise. */}
+      {['trainer', 'head_trainer'].includes(auth.getUser()?.role) && <UnendedClassPrompt />}
+      {/* Backfill prompt for batches created before dates were used. Only the
+          people who own the course calendar are asked. */}
+      {['head_trainer', 'super_admin', 'branch_manager'].includes(auth.getUser()?.role) && <BatchDatesPrompt />}
       <Header />
       <div className="layout-container">
         <Sidebar

@@ -880,6 +880,10 @@ export const studentProfileApi = {
 // ---- LMS: courses / modules / trainers / batches (trainer + head + admin) ----
 // Module on-time delivery. A trainer is confined to their own rows server-side,
 // so the filters here only do anything for the manager tier.
+export const batchesApi = {
+  update: (programId, batchId, body) => api.put(`/courses/${programId}/batches/${batchId}`, body),
+};
+
 export const trainerPerformanceApi = {
   report: (params) => api.get('/trainer-performance', params),
   summary: (params) => api.get('/trainer-performance/summary', params),
@@ -943,6 +947,8 @@ export const classesApi = {
   // fire + attendance
   fireQuestion: (id, body) => api.post(`/classes/${id}/fire-question`, body),
   listQuestions: (id) => api.get(`/classes/${id}/questions`),
+  // Started but never ended, past their finish time.
+  unended: () => api.get('/classes/unended'),
   // Per-question results: who answered what, and who was right, by name.
   questionAnalytics: (id) => api.get(`/classes/${id}/question-analytics`),
   // Trainer marks one long-text answer right/wrong (choice kinds auto-grade).

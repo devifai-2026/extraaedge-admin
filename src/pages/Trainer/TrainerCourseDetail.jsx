@@ -8,7 +8,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Box, Tabs, Tab, Button, TextField, Alert, Snackbar, Chip,
+  Box, Tabs, Tab, Button, TextField, Alert, Snackbar, Chip, LinearProgress,
   CircularProgress, IconButton, Dialog, DialogTitle, DialogContent,
   DialogActions, MenuItem, FormControlLabel, Checkbox, Table, TableHead, TableRow, TableCell, TableBody, Tooltip,
 } from '@mui/material';
@@ -21,6 +21,29 @@ import { PageHeader, Card, EmptyState, Badge, Btn, Progress, ACCENT } from '../.
 import { coursesApi, classesApi, learningApi, capstoneApi } from '../../lib/endpoints';
 import { isRole } from '../../lib/rbac';
 import { fmtDate } from '../Accounts/utils';
+
+// "3 weeks" / "4 wk 2d" — the planned span of a batch or module, shown so the
+// commitment is legible without subtracting two dates by hand.
+const spanLabel = (start, end) => {
+  if (!start || !end || end < start) return '';
+  const days = Math.round((new Date(end) - new Date(start)) / 86400000) + 1;
+  if (days <= 0) return '';
+  const w = Math.floor(days / 7);
+  const d = days % 7;
+  if (!w) return `${d} day${d === 1 ? '' : 's'}`;
+  return d ? `${w} wk ${d}d` : `${w} week${w === 1 ? '' : 's'}`;
+};
+
+// How far through its dates a batch is, 0..100. Returned as null (not 0) when
+// undated, so the caller can hide the line instead of showing a misleading
+// "0% elapsed" for a batch that simply has no schedule.
+const elapsedPct = (start, end) => {
+  if (!start || !end) return null;
+  const s = new Date(start).getTime();
+  const e = new Date(end).getTime();
+  if (!(e > s)) return null;
+  return Math.max(0, Math.min(100, Math.round(((Date.now() - s) / (e - s)) * 100)));
+};
 import StudentProfileDialog from '../../components/StudentProfileDialog/StudentProfileDialog';
 
 const TAB_INDEX = { modules: 0, trainers: 1, batches: 2, attendance: 3, capstone: 4 };
@@ -446,6 +469,7 @@ function BatchesTab({ programId, notify, canManage }) {
   const [unassigned, setUnassigned] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newBatch, setNewBatch] = useState('');
+  const [batchDates, setBatchDates] = useState({ start_date: '', end_date: '' });
   const [placeDlg, setPlaceDlg] = useState(null); // { students: [...] }
   const [mergeDlg, setMergeDlg] = useState(false);
   const [profileId, setProfileId] = useState(null);
@@ -460,7 +484,17 @@ function BatchesTab({ programId, notify, canManage }) {
 
   const createBatch = async () => {
     if (!newBatch.trim()) return;
-    try { await coursesApi.createBatch(programId, { name: newBatch.trim() }); setNewBatch(''); load(); notify('success', 'Batch created'); }
+    if (batchDates.start_date && batchDates.end_date && batchDates.end_date < batchDates.start_date) {
+      notify('error', 'End date cannot be before the start date'); return;
+    }
+    try {
+      await coursesApi.createBatch(programId, {
+        name: newBatch.trim(),
+        start_date: batchDates.start_date || null,
+        end_date: batchDates.end_date || null,
+      });
+      setNewBatch(''); setBatchDates({ start_date: '', end_date: '' }); load(); notify('success', 'Batch created');
+    }
     catch (e) { notify('error', e.message); }
   };
   const complete = async (b) => {
@@ -486,19 +520,53 @@ function BatchesTab({ programId, notify, canManage }) {
     <div style={{ display: 'grid', gap: 16 }}>
       <Card title="Batches" right={<Button size="small" startIcon={<MergeIcon />} variant="outlined" disabled={activeBatches.length < 2} onClick={() => setMergeDlg(true)} sx={{ textTransform: 'none' }}>Merge</Button>}>
         {canManage && (
-          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-            <TextField size="small" label="New batch (e.g. MERN-Aug)" value={newBatch} onChange={(e) => setNewBatch(e.target.value)} sx={{ flex: 1 }} onKeyDown={(e) => { if (e.key === 'Enter') createBatch(); }} />
+          <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+            <TextField size="small" label="New batch (e.g. MERN-Aug)" value={newBatch} onChange={(e) => setNewBatch(e.target.value)} sx={{ flex: 1, minWidth: 180 }} onKeyDown={(e) => { if (e.key === 'Enter') createBatch(); }} />
+            <TextField size="small" type="date" label="Start date" value={batchDates.start_date}
+              onChange={(e) => setBatchDates((d) => ({ ...d, start_date: e.target.value }))}
+              InputLabelProps={{ shrink: true }} sx={{ width: 160 }} />
+            <TextField size="small" type="date" label="End date" value={batchDates.end_date}
+              onChange={(e) => setBatchDates((d) => ({ ...d, end_date: e.target.value }))}
+              InputLabelProps={{ shrink: true }} sx={{ width: 160 }}
+              inputProps={{ min: batchDates.start_date || undefined }} />
+            {spanLabel(batchDates.start_date, batchDates.end_date) && <Chip size="small" label={spanLabel(batchDates.start_date, batchDates.end_date)} sx={{ height: 24 }} />}
             <Button variant="contained" startIcon={<AddIcon />} onClick={createBatch} sx={{ textTransform: 'none', bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' } }}>Create</Button>
           </Box>
         )}
         {nonMerged.length === 0 ? <EmptyState icon="👥" title="No batches yet" text="Create a batch (a cohort) — classes are scheduled into a batch." /> : (
           <Table size="small">
-            <TableHead><TableRow sx={{ background: '#fafbfc', '& th': { color: '#64748b', fontWeight: 700, fontSize: 12 } }}><TableCell>Batch</TableCell><TableCell align="center">Students</TableCell><TableCell>Started</TableCell><TableCell align="center">Status</TableCell><TableCell align="right" /></TableRow></TableHead>
+            <TableHead><TableRow sx={{ background: '#fafbfc', '& th': { color: '#64748b', fontWeight: 700, fontSize: 12 } }}><TableCell>Batch</TableCell><TableCell align="center">Students</TableCell><TableCell>Schedule</TableCell><TableCell sx={{ minWidth: 130 }}>Progress</TableCell><TableCell align="center">Status</TableCell><TableCell align="right" /></TableRow></TableHead>
             <TableBody>{nonMerged.map((b) => (
               <TableRow key={b.id} hover>
                 <TableCell>{b.name}</TableCell>
                 <TableCell align="center">{b.student_count}</TableCell>
-                <TableCell sx={{ color: '#64748b' }}>{b.start_date ? fmtDate(b.start_date) : '—'}</TableCell>
+                <TableCell sx={{ color: '#64748b', fontSize: 12 }}>
+                  {b.start_date || b.end_date ? (
+                    <>
+                      <div>{b.start_date ? fmtDate(b.start_date) : '—'} → {b.end_date ? fmtDate(b.end_date) : '—'}</div>
+                      {spanLabel(b.start_date, b.end_date) && <div style={{ color: '#94a3b8', marginTop: 2 }}>{spanLabel(b.start_date, b.end_date)}</div>}
+                    </>
+                  ) : <span style={{ color: '#cbd5e1' }}>no dates</span>}
+                </TableCell>
+                <TableCell>
+                  {/* Two different truths, so both are shown: classes measures
+                      delivery, the date bar measures the calendar. A batch can
+                      be 90% through its dates with 40% of classes done — which
+                      is exactly the case worth seeing. */}
+                  {b.classes_planned > 0 ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                      <LinearProgress
+                        variant="determinate"
+                        value={Math.round((b.classes_completed / b.classes_planned) * 100)}
+                        sx={{ flex: 1, height: 5, borderRadius: 3 }}
+                      />
+                      <span style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap' }}>{b.classes_completed}/{b.classes_planned}</span>
+                    </Box>
+                  ) : <span style={{ fontSize: 11, color: '#cbd5e1' }}>no classes</span>}
+                  {elapsedPct(b.start_date, b.end_date) !== null && (
+                    <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{elapsedPct(b.start_date, b.end_date)}% of time elapsed</div>
+                  )}
+                </TableCell>
                 <TableCell align="center">{b.status === 'completed' ? <Badge tone="neutral">Completed</Badge> : <Badge tone="success">Active</Badge>}</TableCell>
                 <TableCell align="right">
                   {canManage && b.status !== 'completed' && <Button size="small" onClick={() => complete(b)} sx={{ textTransform: 'none' }}>Mark complete</Button>}
