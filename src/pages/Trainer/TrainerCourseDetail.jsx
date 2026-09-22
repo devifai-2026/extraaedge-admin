@@ -81,6 +81,7 @@ function ModulesTab({ programId, notify, canManage }) {
   const [trainers, setTrainers] = useState([]); // course roster (for per-topic trainer picker)
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
+  const [modDates, setModDates] = useState({ start_date: '', end_date: '' });
   const [open, setOpen] = useState({}); // moduleId → expanded
   const [topicInput, setTopicInput] = useState({});
   // Which topic title is being edited inline: { moduleId, idx, value }.
@@ -139,10 +140,33 @@ function ModulesTab({ programId, notify, canManage }) {
     saveTopics(m, syllabus);
   };
 
+  // "3 weeks" / "4 wk 2d" — shows the planned span as the trainer picks dates,
+  // so the commitment is legible before the module is created.
+  const moduleWeeks = (() => {
+    const { start_date: sd, end_date: ed } = modDates;
+    if (!sd || !ed || ed < sd) return '';
+    const days = Math.round((new Date(ed) - new Date(sd)) / 86400000) + 1;
+    const w = Math.floor(days / 7);
+    const d = days % 7;
+    if (!w) return `${d} day${d === 1 ? '' : 's'}`;
+    return d ? `${w} wk ${d}d` : `${w} week${w === 1 ? '' : 's'}`;
+  })();
+
   const add = async () => {
     if (!name.trim()) return;
-    try { await coursesApi.createModule(programId, { name: name.trim(), order_index: rows.length }); setName(''); load(); notify('success', 'Module added'); }
-    catch (e) { notify('error', e.message); }
+    // Dates are REQUIRED by the API: the trainer performance report measures
+    // on-time delivery against end_date, and a module with no deadline can
+    // never be judged. Checked here too so the user gets a useful message
+    // instead of a 400.
+    if (!modDates.start_date || !modDates.end_date) { notify('error', 'Set a start and end date for the module'); return; }
+    if (modDates.end_date < modDates.start_date) { notify('error', 'End date cannot be before the start date'); return; }
+    try {
+      await coursesApi.createModule(programId, {
+        name: name.trim(), order_index: rows.length,
+        start_date: modDates.start_date, end_date: modDates.end_date,
+      });
+      setName(''); setModDates({ start_date: '', end_date: '' }); load(); notify('success', 'Module added');
+    } catch (e) { notify('error', e.message); }
   };
   const remove = async (id) => {
     if (!window.confirm('Delete this module?')) return;
@@ -157,8 +181,16 @@ function ModulesTab({ programId, notify, canManage }) {
     <div>
       {canManage && (
         <Card style={{ marginBottom: 14 }}>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <TextField size="small" label="New module (e.g. HTML)" value={name} onChange={(e) => setName(e.target.value)} sx={{ flex: 1 }} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+            <TextField size="small" label="New module (e.g. HTML)" value={name} onChange={(e) => setName(e.target.value)} sx={{ flex: 1, minWidth: 190 }} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
+            <TextField size="small" type="date" label="Start date" required value={modDates.start_date}
+              onChange={(e) => setModDates((d) => ({ ...d, start_date: e.target.value }))}
+              InputLabelProps={{ shrink: true }} sx={{ width: 160 }} />
+            <TextField size="small" type="date" label="End date" required value={modDates.end_date}
+              onChange={(e) => setModDates((d) => ({ ...d, end_date: e.target.value }))}
+              InputLabelProps={{ shrink: true }} sx={{ width: 160 }}
+              inputProps={{ min: modDates.start_date || undefined }} />
+            {moduleWeeks && <Chip size="small" label={moduleWeeks} sx={{ height: 24 }} />}
             <Button variant="contained" startIcon={<AddIcon />} onClick={add} sx={{ textTransform: 'none', bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' } }}>Add module</Button>
           </Box>
         </Card>

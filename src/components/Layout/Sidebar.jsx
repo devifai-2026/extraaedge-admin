@@ -206,6 +206,7 @@ const menuSections = [
       { id: 200, label: 'My Courses',    icon: SchoolIcon,          path: '/trainer/courses',       tab: 'trainer.classes' },
       { id: 212, label: 'Students',      icon: PeopleAltIcon,       path: '/trainer/students',      tab: 'trainer.classes' },
       { id: 201, label: 'Classes',       icon: CalendarTodayIcon,   path: '/trainer/classes',       tab: 'trainer.classes' },
+      { id: 213, label: 'Performance',   icon: AssessmentIcon,      path: '/trainer/performance',   tab: 'trainer.performance' },
       { id: 202, label: 'Attendance',    icon: HowToRegIcon,        path: '/trainer/attendance',    tab: 'trainer.attendance' },
       { id: 203, label: 'Recordings',    icon: GraphicEqIcon,       path: '/trainer/recordings',    tab: 'trainer.recordings' },
       { id: 204, label: 'Announcements', icon: CampaignIcon,        path: '/trainer/announcements', tab: 'trainer.announcements' },

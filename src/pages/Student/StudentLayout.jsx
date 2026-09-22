@@ -31,6 +31,7 @@ import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import AttendanceQuestionHost from './AttendanceQuestionHost';
+import FeedbackHost from './FeedbackHost';
 import { disconnectStudentSocket } from '../../lib/studentSocket';
 
 const GROUPS = [
@@ -227,6 +228,9 @@ export default function StudentLayout() {
       {/* Global live-attendance popup — connects the student socket + joins
           batch rooms, pops a timed modal when a trainer fires a question. */}
       <AttendanceQuestionHost />
+      {/* Lower z-index than the attendance modal: a live question is urgent and
+          time-boxed, feedback on a finished class can wait behind it. */}
+      <FeedbackHost />
 
       <StudentTour steps={TOUR_STEPS} open={tourOpen} onClose={closeTour} />
     </div>

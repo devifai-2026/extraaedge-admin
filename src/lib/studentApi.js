@@ -82,6 +82,13 @@ export const studentApi = {
   answer: (classId, body) => doFetch(`/classes/student/${classId}/answer`, { method: 'POST', body: JSON.stringify(body) }),
   preNotifyAbsence: (classId, reason) => doFetch(`/classes/student/${classId}/pre-notify-absence`, { method: 'POST', body: JSON.stringify({ reason: reason || undefined }) }),
   setJoinMode: (classId, join_mode, reason) => doFetch(`/classes/student/${classId}/join-mode`, { method: 'POST', body: JSON.stringify({ join_mode, reason: reason || undefined }) }),
+  // Records that the student actually opened the class; refused before start
+  // and after the trainer ends it. Returns the meeting_url to open.
+  joinClass: (classId) => doFetch(`/classes/student/${classId}/join`, { method: 'POST' }),
+  // End-of-class / end-of-module feedback.
+  pendingFeedback: () => doFetch('/lms-feedback/pending', { method: 'GET' }),
+  submitFeedback: (body) => doFetch('/lms-feedback', { method: 'POST', body: JSON.stringify(body) }),
+  dismissFeedback: (body) => doFetch('/lms-feedback/dismiss', { method: 'POST', body: JSON.stringify(body) }),
   // Recordings + announcements.
   recordings: () => doFetch('/community/student/recordings', { method: 'GET' }),
   recordingUrl: (id) => doFetch(`/community/student/recordings/${id}/url`, { method: 'GET' }),

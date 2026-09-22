@@ -91,6 +91,7 @@ import LmsAnalytics from './pages/LMS/LmsAnalytics'
 import TrainerCourses from './pages/Trainer/TrainerCourses'
 import TrainerCourseDetail from './pages/Trainer/TrainerCourseDetail'
 import TrainerClasses from './pages/Trainer/TrainerClasses'
+import TrainerPerformance from './pages/Trainer/TrainerPerformance'
 import TrainerRecordings from './pages/Trainer/TrainerRecordings'
 import TrainerAnnouncements from './pages/Trainer/TrainerAnnouncements'
 import TrainerForum from './pages/Trainer/TrainerForum'
@@ -284,6 +285,7 @@ function App() {
         <Route path="/trainer/courses/:programId" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerCourseDetail /></Layout></ProtectedRoute>} />
         <Route path="/trainer/classes" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />
         <Route path="/trainer/attendance" element={<ProtectedRoute tab="trainer.attendance"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/performance" element={<ProtectedRoute tab="trainer.performance"><Layout><TrainerPerformance /></Layout></ProtectedRoute>} />
         <Route path="/trainer/recordings" element={<ProtectedRoute tab="trainer.recordings"><Layout><TrainerRecordings /></Layout></ProtectedRoute>} />
         <Route path="/trainer/announcements" element={<ProtectedRoute tab="trainer.announcements"><Layout><TrainerAnnouncements /></Layout></ProtectedRoute>} />
         <Route path="/trainer/forum" element={<ProtectedRoute tab="trainer.forum"><Layout><TrainerForum /></Layout></ProtectedRoute>} />

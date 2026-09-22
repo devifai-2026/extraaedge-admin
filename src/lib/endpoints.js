@@ -878,6 +878,18 @@ export const studentProfileApi = {
 };
 
 // ---- LMS: courses / modules / trainers / batches (trainer + head + admin) ----
+// Module on-time delivery. A trainer is confined to their own rows server-side,
+// so the filters here only do anything for the manager tier.
+export const trainerPerformanceApi = {
+  report: (params) => api.get('/trainer-performance', params),
+  summary: (params) => api.get('/trainer-performance/summary', params),
+};
+
+// Staff view of submitted student feedback (trainers see only their own).
+export const lmsFeedbackApi = {
+  staffList: (params) => api.get('/lms-feedback/staff', params),
+};
+
 export const coursesApi = {
   list: () => api.get('/courses'),
   get: (programId) => api.get(`/courses/${programId}`),
