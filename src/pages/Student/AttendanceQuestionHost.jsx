@@ -20,6 +20,7 @@ export default function AttendanceQuestionHost() {
   const [left, setLeft] = useState(0);
   const [busy, setBusy] = useState(false);
   const [answered, setAnswered] = useState(false);
+  const [text, setText] = useState(''); // long_text draft
   const tick = useRef(null);
 
   // Connect + join batch rooms from the student's classes.
@@ -39,6 +40,7 @@ export default function AttendanceQuestionHost() {
     if (!question?.id) return;
     setQ({ ...question, class_id: payload.class_id });
     setAnswered(false);
+    setText('');
     setLeft(remainingMs(question.closes_at));
   }, []);
 
@@ -57,11 +59,18 @@ export default function AttendanceQuestionHost() {
     return () => { if (tick.current) clearInterval(tick.current); };
   }, [q]);
 
+  // A long_text question sends answer_text and no option; every other kind
+  // sends option_index. The server validates the pairing against the question.
   const submit = async (optionIndex) => {
     if (!q || busy) return;
+    const isLongText = q.question_type === 'long_text';
+    const body = isLongText
+      ? { question_id: q.id, answer_text: text.trim() }
+      : { question_id: q.id, option_index: optionIndex };
+    if (isLongText && !body.answer_text) return;
     setBusy(true);
     try {
-      await studentApi.answer(q.class_id, { question_id: q.id, option_index: optionIndex });
+      await studentApi.answer(q.class_id, body);
       setAnswered(true);
       setTimeout(() => setQ(null), 900);
     } catch (e) {
@@ -98,14 +107,31 @@ export default function AttendanceQuestionHost() {
         ) : (
           <>
             <div style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', marginBottom: 14, lineHeight: 1.4 }}>{q.question}</div>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {options.map((opt, i) => (
-                <button key={i} onClick={() => submit(i)} disabled={busy} style={optBtn}>
-                  <span style={optIndex}>{String.fromCharCode(65 + i)}</span>
-                  <span>{typeof opt === 'string' ? opt : opt?.text ?? String(opt)}</span>
+            {q.question_type === 'long_text' ? (
+              <div style={{ display: 'grid', gap: 10 }}>
+                <textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Type your answer…"
+                  rows={5}
+                  maxLength={5000}
+                  autoFocus
+                  style={textArea}
+                />
+                <button onClick={() => submit(null)} disabled={busy || !text.trim()} style={{ ...submitBtn, opacity: busy || !text.trim() ? 0.5 : 1 }}>
+                  Submit answer
                 </button>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {options.map((opt, i) => (
+                  <button key={i} onClick={() => submit(i)} disabled={busy} style={optBtn}>
+                    <span style={optIndex}>{String.fromCharCode(65 + i)}</span>
+                    <span>{typeof opt === 'string' ? opt : opt?.text ?? String(opt)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 14, textAlign: 'center' }}>Answer before the timer runs out to be marked present.</div>
           </>
         )}
@@ -117,4 +143,6 @@ export default function AttendanceQuestionHost() {
 const overlay = { position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(2px)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 };
 const card = { background: '#fff', borderRadius: 18, padding: 24, width: '100%', maxWidth: 440, boxShadow: '0 40px 90px -40px rgba(0,0,0,.5)' };
 const optBtn = { display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', padding: '13px 14px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: 14.5, color: '#0f172a', width: '100%', transition: 'border-color .12s, background .12s' };
+const textArea = { width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 14.5, fontFamily: 'inherit', color: '#0f172a', resize: 'vertical', outline: 'none' };
+const submitBtn = { padding: '12px 14px', borderRadius: 12, border: 'none', background: ACCENT, color: '#fff', fontWeight: 700, fontSize: 14.5, cursor: 'pointer', width: '100%' };
 const optIndex = { width: 26, height: 26, borderRadius: '50%', background: '#f1f5f9', color: '#475569', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 };

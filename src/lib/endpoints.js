@@ -931,6 +931,10 @@ export const classesApi = {
   // fire + attendance
   fireQuestion: (id, body) => api.post(`/classes/${id}/fire-question`, body),
   listQuestions: (id) => api.get(`/classes/${id}/questions`),
+  // Per-question results: who answered what, and who was right, by name.
+  questionAnalytics: (id) => api.get(`/classes/${id}/question-analytics`),
+  // Trainer marks one long-text answer right/wrong (choice kinds auto-grade).
+  gradeAnswer: (id, body) => api.post(`/classes/${id}/grade-answer`, body),
   attendance: (id) => api.get(`/classes/${id}/attendance`),
   editAttendance: (id, body) => api.post(`/classes/${id}/attendance/edit`, body),
 };
