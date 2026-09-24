@@ -116,8 +116,24 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // perspective: force a full reload so they land on a fresh boot instead of
 // staring at a stale UI under a red error banner.
 let reloadingForNetworkError = false;
+
+// The login page must NEVER be force-reloaded. It calls /auth/login-methods on
+// every keystroke of the tenant slug, and if the API is unreachable the reload
+// re-mounts the page, which calls it again — a loop that reloads every few
+// seconds and makes signing in impossible. Nobody can escape it either, since
+// the reload discards whatever they had typed.
+//
+// A reload only helps a SIGNED-IN user whose app is wedged mid-session. On the
+// login screen the component's own catch already handles the failure and shows
+// the form, which is the correct outcome.
+const isAuthScreen = () => {
+  if (typeof window === 'undefined') return true;
+  const p = window.location.pathname;
+  return p === '/' || p.startsWith('/student/login') || p.startsWith('/login');
+};
+
 const forceReload = () => {
-  if (reloadingForNetworkError) return;
+  if (reloadingForNetworkError || isAuthScreen()) return;
   reloadingForNetworkError = true;
   if (typeof window !== 'undefined') window.location.reload();
 };
@@ -152,7 +168,10 @@ const doFetch = async (path, init = {}, retried = false) => {
     const newToken = await tryRefresh();
     if (newToken) return doFetch(path, init, true);
     auth.clear();
-    if (typeof window !== 'undefined') window.location.href = '/';
+    // Same reasoning: bouncing to '/' FROM '/' is a reload of the login page,
+    // and a 401 there is the normal answer to bad credentials rather than an
+    // expired session.
+    if (typeof window !== 'undefined' && !isAuthScreen()) window.location.href = '/';
     throw new ApiError('Session expired', 401);
   }
   let data = null;
