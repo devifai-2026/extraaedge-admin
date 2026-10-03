@@ -159,7 +159,7 @@ export const TEAM_SCOPED_MANAGER_ROLES = [
 
 // Branch manager: lead/CRM oversight, no money. Mirrors the server's
 // BRANCH_MANAGER_TAB_KEYS — keep the two in step. Deliberately omits every
-// accounts.* key, 'payments', 'admissions.pipeline' and the payroll group.
+// accounts.* key except approvals, 'payments' and the payroll group.
 const ROLE_BRANCH_MANAGER_TABS = [
   'dashboard', 'leads', 'lead_pool', 'raw_data', 'failed_leads', 'bulk_upload',
   'followups', 'whatsapp', 'bulk_marketing', 'drip_marketing', 'remarketing',
@@ -175,6 +175,13 @@ const ROLE_BRANCH_MANAGER_TABS = [
   // only route to a student's registration receipt. Money on both surfaces is
   // withheld per-field, not by hiding the route.
   'accounts.approvals',
+  // Admissions pipeline — read-back on what the branch converted. Money is
+  // stripped per-field server-side (stripMoney / stripAdmissionMoney), so the
+  // page shows the registration figures only.
+  'admissions.pipeline',
+  // Course + batch management. Create/edit only; DELETE /classes is blocked
+  // by branchManagerReadOnly on the server.
+  'courses.manage',
   'hr.dashboard', 'hr.interviews', 'hr.certificates',
   'hr.my_leave', 'hr.leave_calendar', 'hr.leave_approvals',
   'placement.dashboard', 'placement.companies', 'placement.openings',
