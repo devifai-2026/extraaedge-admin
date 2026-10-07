@@ -221,6 +221,14 @@ const menuSections = [
       { id: 208, label: 'Mock Interviews', icon: HowToRegIcon,      path: '/trainer/interviews',    tab: 'trainer.interviews' },
       { id: 209, label: 'Leaderboard',   icon: AssessmentIcon,      path: '/trainer/leaderboard',   tab: 'trainer.leaderboard' },
       { id: 211, label: 'Materials',     icon: FolderIcon,          path: '/trainer/materials',     tab: 'trainer.materials' },
+      // Course + batch management. Keyed to 'courses.manage', NOT
+      // 'trainer.classes': head_trainer holds both, but a branch_manager holds
+      // only courses.manage (batch scheduling is theirs; the trainer working
+      // surfaces are not). Keying this off trainer.classes left the role with
+      // the tab granted and no way to reach the page.
+      // `hideWhenTab` keeps a head_trainer (who holds BOTH keys) from seeing
+      // two links to the same page — they already have 'My Courses' above.
+      { id: 214, label: 'Courses & Batches', icon: SchoolIcon,      path: '/trainer/courses',       tab: 'courses.manage', hideWhenTab: 'trainer.classes' },
       // Admin/branch-manager only (gated by the lms.analytics tab).
       { id: 210, label: 'LMS Analytics', icon: AssessmentIcon,      path: '/lms/analytics',         tab: 'lms.analytics' },
     ],
@@ -390,7 +398,13 @@ function Sidebar({ collapsed = false, canToggle = true, onToggle }) {
     if (item.hideForRoles?.includes(role)) return false;
     return !item.roles || item.roles.includes(role);
   };
-  const tabOk = (item) => !item.tab || hasTab(item.tab);
+  // `hideWhenTab` suppresses an item for anyone who ALSO holds that other key
+  // — for one page reachable by two roles under different tab keys, where the
+  // role holding both already has its own entry. Mirrors hideForRoles above.
+  const tabOk = (item) => {
+    if (item.hideWhenTab && hasTab(item.hideWhenTab)) return false;
+    return !item.tab || hasTab(item.tab);
+  };
   const visibleItems = (items) =>
     items
       .map((item) => {

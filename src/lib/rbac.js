@@ -299,6 +299,11 @@ export const isLeadOwnerRole = () => {
 // dashboard" choice for a counsellor with all tabs hidden.
 export const hasTab = (tabKey) => {
   if (!tabKey) return true;
+  // An ARRAY means "any of these grants access". Used where one page is
+  // reachable by two different roles holding different keys — /trainer/courses
+  // is both the head_trainer's course home (trainer.classes) and the branch
+  // manager's batch scheduling (courses.manage).
+  if (Array.isArray(tabKey)) return tabKey.some((k) => hasTab(k));
   const allowed = auth.getAllowedTabs();
   if (Array.isArray(allowed)) {
     // `'*'` is a wildcard the backend may return for super_admin. Honor
@@ -423,8 +428,18 @@ export const firstAllowedRoute = () => {
 
   // 1. A dedicated trainer/head_trainer (explicit trainer tab, no wildcard)
   //    lands on their own home.
+  //
+  // 'courses.manage' is deliberately NOT a landing key on its own. It used to
+  // be first in this list, back when head_trainer was the only role that held
+  // it. A branch_manager now holds it too (batch scheduling) while holding no
+  // other trainer tab, and a branch manager has no '*' — so matching on it
+  // alone sent them to /trainer/courses on every login instead of their own
+  // dashboard. It still lands a head_trainer there, but only alongside a real
+  // trainer tab, which is what actually identifies a trainer-shaped user.
   if (!candidates.includes('*')) {
+    const isTrainerShaped = ['trainer.classes', 'trainer.attendance'].some(has);
     for (const key of ['courses.manage', 'trainer.classes', 'trainer.attendance', 'hr.dashboard', 'placement.dashboard']) {
+      if (key === 'courses.manage' && !isTrainerShaped) continue;
       if (has(key)) return TAB_TO_ROUTE[key];
     }
   }

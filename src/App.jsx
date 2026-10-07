@@ -281,8 +281,13 @@ function App() {
         <Route path="/placement/stages" element={<ProtectedRoute tab="placement.applications"><Layout><PlacementStages /></Layout></ProtectedRoute>} />
         <Route path="/placement/students/:id" element={<ProtectedRoute tab="placement.applications"><Layout><PlacementStudentReport /></Layout></ProtectedRoute>} />
         <Route path="/placement/analytics" element={<ProtectedRoute tab="placement.dashboard"><Layout><PlacementAnalytics /></Layout></ProtectedRoute>} />
-        <Route path="/trainer/courses" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerCourses /></Layout></ProtectedRoute>} />
-        <Route path="/trainer/courses/:programId" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerCourseDetail /></Layout></ProtectedRoute>} />
+        {/* Reachable two ways: a head_trainer's course home (trainer.classes)
+            and a branch manager's batch scheduling (courses.manage). Gating on
+            trainer.classes alone granted the BM the tab and then denied the
+            page. Writes are still server-gated — branchManagerReadOnly allows
+            POST/PUT /classes but no DELETE. */}
+        <Route path="/trainer/courses" element={<ProtectedRoute tab={['trainer.classes', 'courses.manage']}><Layout><TrainerCourses /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/courses/:programId" element={<ProtectedRoute tab={['trainer.classes', 'courses.manage']}><Layout><TrainerCourseDetail /></Layout></ProtectedRoute>} />
         <Route path="/trainer/classes" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />
         <Route path="/trainer/attendance" element={<ProtectedRoute tab="trainer.attendance"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />
         <Route path="/trainer/performance" element={<ProtectedRoute tab="trainer.performance"><Layout><TrainerPerformance /></Layout></ProtectedRoute>} />
