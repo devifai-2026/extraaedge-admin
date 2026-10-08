@@ -181,10 +181,19 @@ const menuSections = [
     label: 'Configuration',
     icon: SettingsSuggestIcon,
     section: true,
-    // Branch managers are read-only (server: middleware/
-    // branchManagerReadOnly.js) — every screen in here exists to CHANGE
-    // tenant configuration, so the whole section is noise they cannot act on.
-    hideForRoles: [ROLES.BRANCH_MANAGER],
+    // NOTE: this section used to carry hideForRoles: [BRANCH_MANAGER], on the
+    // reasoning that the role was read-only so every screen here was noise it
+    // could not act on. That is no longer true — a branch manager now creates
+    // and edits USERS and lead STAGES, both of which live under Advanced
+    // Settings. The blanket hide made the server-side grant unreachable: the
+    // tab was held, the route guard passed, and there was simply no link.
+    //
+    // Per-item `tab` gating is left to do the work instead, which is what the
+    // rest of the sidebar relies on. The role holds advanced.users_roles,
+    // advanced.dropdowns, advanced.communications, connected_accounts,
+    // third_party_integration and the settings.*_templates keys, so it sees
+    // the items behind those and nothing else. Screens it still cannot change
+    // are gated server-side by branchManagerReadOnly regardless.
     children: [
       { id: 12, label: 'Connected Accounts', icon: AccountTreeIcon, path: '/connectedaccounts', tab: 'connected_accounts' },
       { id: 13, label: 'Basic Settings', icon: SettingsIcon, path: '/settings', tab: 'settings.email_templates' },

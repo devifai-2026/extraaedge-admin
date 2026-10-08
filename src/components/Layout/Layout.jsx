@@ -11,6 +11,7 @@ import ClockInGate from './ClockInGate';
 import LocationGate from './LocationGate';
 import FeedbackPopup from '../FeedbackPopup/FeedbackPopup';
 import GlobalErrorToast from './GlobalErrorToast';
+import ViewAsBanner from '../ViewAsBanner/ViewAsBanner';
 import { auth } from '../../lib/api';
 import { authApi } from '../../lib/endpoints';
 import { ROLES } from '../../lib/rbac';
@@ -65,6 +66,13 @@ function Layout({ children }) {
         const me = res?.data ?? res;
         // Cache the fresh user (carries branch_name, branch_id) + allowed_tabs
         // so the navbar / role checks reflect the latest server state.
+        // During a view-as session the token still identifies the BRANCH
+        // MANAGER (only a viewAsUserId claim is added), so /auth/me returns
+        // their own user and their own allowed_tabs — caching it is correct
+        // and the banner keeps saying whose screens are on display. The guard
+        // is on the phone/branch-setup gates further down instead: nagging
+        // someone to set a phone number mid-look is noise, and they cannot
+        // act on it without leaving the session.
         if (me?.user) auth.setSession({ user: me.user });
         if (me?.tenant) auth.setSession({ tenant: me.tenant });
         if (me?.allowed_tabs) auth.setSession({ allowed_tabs: me.allowed_tabs });
@@ -72,7 +80,7 @@ function Layout({ children }) {
         if (me?.tenant_setup?.needs_branch_setup) { if (!timer) reveal(true); }
         else setNeedsBranchSetup(false);
         // Confirm the phone gate against the freshest user record.
-        if (me?.user) setNeedsPhone(!me.user.phone);
+        if (me?.user) setNeedsPhone(!auth.isViewingAs() && !me.user.phone);
         // Let the navbar re-read the cached user without a reload.
         try { window.dispatchEvent(new CustomEvent('ee:user-updated')); } catch { /* no-op */ }
       })
@@ -95,6 +103,10 @@ function Layout({ children }) {
       {/* Backfill prompt for batches created before dates were used. Only the
           people who own the course calendar are asked. */}
       {['head_trainer', 'super_admin', 'branch_manager'].includes(auth.getUser()?.role) && <BatchDatesPrompt />}
+      {/* Sticky bar while a branch manager is looking at a staff member's
+          screens. Renders nothing otherwise. Above <Header /> so it is the
+          first thing on the page and cannot be scrolled past. */}
+      <ViewAsBanner />
       <Header />
       <div className="layout-container">
         <Sidebar

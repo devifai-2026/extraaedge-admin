@@ -16,6 +16,8 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import LoginIcon from '@mui/icons-material/Login';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import ViewAsDialog from '../../components/ViewAsDialog/ViewAsDialog';
 import { usersApi, customRolesApi, programsApi, authApi, branchesApi, coursesApi } from '../../lib/endpoints';
 import { auth } from '../../lib/api';
 import { isRole, ROLES, LEAD_OWNER_ROLES } from '../../lib/rbac';
@@ -231,11 +233,17 @@ function UsersTab() {
   // telecaller (or any other bucket). Separate from the edit dialog because
   // the server may demand a lead handover first.
   const [switchUser, setSwitchUser] = useState(null);
+  // Row whose 'view as' button was clicked; opens the launcher pre-filled.
+  const [viewAsUser, setViewAsUser] = useState(null);
   // Branch managers CAN manage users — the backend scopes them to their branch
   // subtree and blocks admin/branch-manager targets (assertBranchManagerScope).
   // Sudo-login ("Login as user") stays super_admin-only.
   const canManage = isRole(ROLES.SUPER_ADMIN, ROLES.BRANCH_MANAGER);
   const canSudo = isRole(ROLES.SUPER_ADMIN);
+  // Branch managers get "view as" instead: a read-only look at a team member's
+  // screens. Distinct from sudo-login above, which hands over a full writable
+  // session and stays super_admin-only.
+  const canViewAs = isRole(ROLES.BRANCH_MANAGER);
 
   const allUsers = data?.data || [];
   const filteredUsers = useMemo(() => {
@@ -429,6 +437,23 @@ function UsersTab() {
                     </span>
                   </Tooltip>
                   )}
+                  {/* View as — branch manager only, read-only, audited. Not
+                      offered for their own row or an inactive user, and the
+                      server refuses an admin / another branch manager. */}
+                  {canViewAs && u.is_active && u.id !== auth.getUser()?.id
+                    && u.role !== 'super_admin' && u.role !== 'branch_manager' && (
+                    <Tooltip title="View as this user (read-only)">
+                      <span>
+                        <IconButton
+                          size="small"
+                          onClick={() => setViewAsUser(u)}
+                          sx={{ color: '#92400e' }}
+                        >
+                          <VisibilityIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  )}
                   <Tooltip title="Delete user">
                     <span>
                       <IconButton
@@ -478,6 +503,13 @@ function UsersTab() {
         open={resetOpen}
         user={activeUser}
         onClose={() => { setResetOpen(false); setActiveUser(null); }}
+      />
+
+      {/* Read-only "view as" launcher — branch manager only. */}
+      <ViewAsDialog
+        open={Boolean(viewAsUser)}
+        presetUser={viewAsUser}
+        onClose={() => setViewAsUser(null)}
       />
 
       <SwitchRoleDialog

@@ -1206,3 +1206,19 @@ export const duplicatesApi = {
   // merged_into_id; all history moves to the survivor.
   mergeMany: (body) => api.post('/duplicates/merge-many', body),
 };
+
+// Branch-manager "view as" — look at a staff member's screens, read-only.
+//
+// NOT usersApi.sudoLogin, which is super_admin-only and hands back a FULL
+// writable session as the target. This returns a token that still carries
+// role: branch_manager (so the server's read-only gate keeps applying) plus a
+// viewAsUserId claim that narrows what the viewer sees. It is a 30-minute
+// look with no refresh token, and every session is audited server-side.
+export const viewAsApi = {
+  // { target_user_id, reason } -> { access_token, expires_in, target_user, session }
+  start: (body) => api.post('/view-as/start', body),
+  stop: () => api.post('/view-as/stop'),
+  // Audit read-back: a branch manager's own history, or the tenant's for a
+  // super_admin.
+  sessions: (params) => api.get('/view-as/sessions', params),
+};

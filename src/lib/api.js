@@ -12,6 +12,12 @@ const STORAGE = {
   ALLOWED_TABS: 'ee_allowed_tabs',
   TENANT_SETUP: 'ee_tenant_setup',
   ACTIVE_BRANCH: 'ee_active_branch',
+  // Branch-manager "view as": the viewer's OWN session, parked while they look
+  // at a staff member's screens. The view-as token deliberately has no refresh
+  // token (it is a 30-minute look, not a login), so without stashing this,
+  // exiting would drop them at the login screen.
+  VIEW_AS_PARKED: 'ee_view_as_parked',
+  VIEW_AS_TARGET: 'ee_view_as_target',
 };
 
 export const auth = {
@@ -66,6 +72,55 @@ export const auth = {
     Object.values(STORAGE).forEach((k) => localStorage.removeItem(k));
   },
   isAuthed: () => !!localStorage.getItem(STORAGE.ACCESS),
+
+  // ---- Branch-manager "view as" ----------------------------------------
+  // Who is being viewed right now, or null. Drives the banner and the
+  // read-only affordances; the server is the real enforcer either way.
+  getViewAsTarget: () => {
+    const raw = localStorage.getItem(STORAGE.VIEW_AS_TARGET);
+    return raw ? JSON.parse(raw) : null;
+  },
+  isViewingAs: () => !!localStorage.getItem(STORAGE.VIEW_AS_PARKED),
+  // Park the viewer's own session and swap in the view-as token. Only the
+  // access token changes: the parked blob holds everything needed to put the
+  // original session back, including the refresh token the view-as session
+  // does not have.
+  startViewAs: ({ access_token, target_user }) => {
+    // Already viewing (e.g. a double-click) → keep the ORIGINAL parked session
+    // rather than parking the view-as one over it, which would strand the
+    // branch manager in a session they cannot exit.
+    if (!localStorage.getItem(STORAGE.VIEW_AS_PARKED)) {
+      localStorage.setItem(STORAGE.VIEW_AS_PARKED, JSON.stringify({
+        access: localStorage.getItem(STORAGE.ACCESS),
+        refresh: localStorage.getItem(STORAGE.REFRESH),
+        user: localStorage.getItem(STORAGE.USER),
+        allowed_tabs: localStorage.getItem(STORAGE.ALLOWED_TABS),
+      }));
+    }
+    localStorage.setItem(STORAGE.VIEW_AS_TARGET, JSON.stringify(target_user));
+    localStorage.setItem(STORAGE.ACCESS, access_token);
+    // The view-as token has no refresh counterpart. Removing the viewer's own
+    // refresh token from the live slot stops the 401 path silently refreshing
+    // BACK into the branch manager's full session mid-look.
+    localStorage.removeItem(STORAGE.REFRESH);
+  },
+  // Put the viewer's own session back. Safe to call when not viewing.
+  stopViewAs: () => {
+    const raw = localStorage.getItem(STORAGE.VIEW_AS_PARKED);
+    localStorage.removeItem(STORAGE.VIEW_AS_PARKED);
+    localStorage.removeItem(STORAGE.VIEW_AS_TARGET);
+    if (!raw) return false;
+    try {
+      const p = JSON.parse(raw);
+      if (p.access) localStorage.setItem(STORAGE.ACCESS, p.access);
+      if (p.refresh) localStorage.setItem(STORAGE.REFRESH, p.refresh);
+      if (p.user) localStorage.setItem(STORAGE.USER, p.user);
+      if (p.allowed_tabs) localStorage.setItem(STORAGE.ALLOWED_TABS, p.allowed_tabs);
+      return true;
+    } catch {
+      return false;
+    }
+  },
 };
 
 class ApiError extends Error {
