@@ -33,6 +33,7 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { followUpsApi, usersApi, leadsApi } from '../../lib/endpoints';
 import AddNewLead from '../../components/AddNewLead/AddNewLead';
 import ViewTimelineModal from '../../components/ViewTimelineModal/ViewTimelineModal';
+import OpenLeadChooser from '../../components/OpenLeadChooser/OpenLeadChooser';
 import { auth } from '../../lib/endpoints';
 import { isRole, ROLES, LEAD_OWNER_ROLES, LEAD_OWNER_ROLES_PARAM } from '../../lib/rbac';
 import { useDropdown } from '../../lib/useDropdowns';
@@ -204,16 +205,32 @@ export default function FollowUpManager() {
   const [openLead, setOpenLead] = useState(null);
   const [openingLeadId, setOpeningLeadId] = useState(null);
   const [highlightLeadId, setHighlightLeadId] = useState(null);
-  // Clicking a follow-up opens the TIMELINE first, not the edit form. On this
-  // page the counsellor is about to make a call, so what they need is context
-  // — previous attempts, notes, stage changes — not 40 editable fields. The
-  // timeline header carries a "Lead details" button for the cases where they
-  // do need to edit, so nothing is lost and there's no extra chooser step.
+  // Clicking a follow-up asks which view to open, the same two-way chooser the
+  // Lead Pool uses — the counsellor sometimes wants the history and sometimes
+  // the details, and the page cannot know which. One shared component
+  // (OpenLeadChooser) rather than a second copy, so wording and the
+  // editable/read-only caption can't drift between the two pages.
   const [timelineLead, setTimelineLead] = useState(null);
+  const [chooserLead, setChooserLead] = useState(null);
 
-  const openTimeline = (f) => {
+  // Row click → ask. Holds the follow-up's lead identity so the chooser title
+  // and the timeline header render without waiting on a fetch.
+  const askWhatToOpen = (f) => {
     if (!f?.lead_id) return;
-    setTimelineLead({ id: f.lead_id, name: f.lead_name, phone: f.lead_phone });
+    setChooserLead({
+      id: f.lead_id,
+      name: f.lead_name,
+      phone: f.lead_phone,
+      // canEditLead reads assigned_to; without it a counsellor would be told
+      // their OWN lead opens read-only.
+      assigned_to: f.lead_assigned_to,
+    });
+  };
+
+  const openTimeline = (lead) => {
+    if (!lead?.id) return;
+    setChooserLead(null);
+    setTimelineLead(lead);
   };
 
   const openLeadDialog = async (leadId) => {
@@ -221,7 +238,12 @@ export default function FollowUpManager() {
     setOpeningLeadId(leadId);
     try {
       const r = await leadsApi.get(leadId);
-      if (r?.data) setOpenLead(r.data);
+      if (r?.data) {
+        setOpenLead(r.data);
+        // Dismiss the chooser only once the form is actually loaded, so a
+        // failed fetch leaves the user back at the choice instead of nothing.
+        setChooserLead(null);
+      }
     } catch {
       /* lead may be out of scope or deleted — leave the page as-is */
     } finally {
@@ -701,7 +723,7 @@ export default function FollowUpManager() {
               f={g.primary}
               others={g.others}
               onChanged={() => { reloadList(); reloadCalendar(); }}
-              onOpenLead={openTimeline}
+              onOpenLead={askWhatToOpen}
               highlighted={!!highlightLeadId && g.primary.lead_id === highlightLeadId}
             />
           ))}
@@ -720,8 +742,19 @@ export default function FollowUpManager() {
       {/* Lead dialog, opened inline from a follow-up row or the by-lead table.
           Same editability rule as the Lead Pool: managers/admins edit any
           lead, everyone else only the leads they own. */}
-      {/* Timeline first — the default destination for a row click here.
-          "Lead details" inside it hands off to the full form below. */}
+      {/* Row click → "What would you like to open?" — the same chooser the
+          Lead Pool shows. Both destinations are mounted below. */}
+      <OpenLeadChooser
+        lead={chooserLead}
+        loading={!!openingLeadId}
+        canEdit={canEditLead(chooserLead)}
+        onTimeline={openTimeline}
+        onDetails={(l) => openLeadDialog(l.id)}
+        onCancel={() => setChooserLead(null)}
+      />
+
+      {/* "Lead details" inside the timeline header still hands off to the
+          full form, so the two views reach each other without reopening. */}
       <ViewTimelineModal
         open={!!timelineLead}
         lead={timelineLead}

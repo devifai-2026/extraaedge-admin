@@ -30,6 +30,7 @@ import { isRole, ROLES } from '../../lib/rbac';
 import { auth } from '../../lib/api';
 import AddNewLead from '../../components/AddNewLead/AddNewLead';
 import ViewTimelineModal from '../../components/ViewTimelineModal/ViewTimelineModal';
+import OpenLeadChooser from '../../components/OpenLeadChooser/OpenLeadChooser';
 import ProtectedLeadData from '../../components/DataProtection/ProtectedLeadData';
 import MaskedPhone from '../../components/DataProtection/MaskedPhone';
 
@@ -352,60 +353,14 @@ export default function LeadPool() {
 
       {/* Row click → pick a view. Two large targets rather than a menu, since
           this is a deliberate choice and both options are equally likely. */}
-      <Dialog
-        open={!!chooserRow}
-        onClose={() => { if (!rowLoadingId) setChooserRow(null); }}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle sx={{ pb: 0.5 }}>
-          <Typography component="div" sx={{ fontWeight: 700, fontSize: 17 }}>
-            {chooserRow?.name || 'Lead'}
-          </Typography>
-          <Typography variant="caption" sx={{ color: '#6b7280' }}>
-            What would you like to open?
-          </Typography>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, mt: 1 }}>
-            <Button
-              variant="outlined"
-              size="large"
-              startIcon={<TimelineIcon />}
-              disabled={!!rowLoadingId}
-              onClick={() => openTimeline(chooserRow)}
-              sx={{ justifyContent: 'flex-start', textTransform: 'none', py: 1.25 }}
-            >
-              <Box sx={{ textAlign: 'left' }}>
-                <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }}>Lead timeline</Typography>
-                <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                  Activities, notes, calls and stage changes
-                </Typography>
-              </Box>
-            </Button>
-            <Button
-              variant="outlined"
-              size="large"
-              startIcon={rowLoadingId ? <CircularProgress size={18} /> : <DescriptionOutlinedIcon />}
-              disabled={!!rowLoadingId}
-              onClick={() => openLeadForm(chooserRow)}
-              sx={{ justifyContent: 'flex-start', textTransform: 'none', py: 1.25 }}
-            >
-              <Box sx={{ textAlign: 'left' }}>
-                <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }}>Lead details</Typography>
-                <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                  {chooserRow && canEditLead(chooserRow)
-                    ? 'Open the full lead form — editable'
-                    : 'Open the full lead form — read-only'}
-                </Typography>
-              </Box>
-            </Button>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setChooserRow(null)} disabled={!!rowLoadingId}>Cancel</Button>
-        </DialogActions>
-      </Dialog>
+      <OpenLeadChooser
+        lead={chooserRow}
+        loading={!!rowLoadingId}
+        canEdit={canEditLead(chooserRow)}
+        onTimeline={openTimeline}
+        onDetails={openLeadForm}
+        onCancel={() => setChooserRow(null)}
+      />
 
       {/* Lead timeline. Read-only by nature, so no permission branch here. */}
       <ViewTimelineModal
