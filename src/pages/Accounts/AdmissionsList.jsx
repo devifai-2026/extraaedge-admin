@@ -49,9 +49,10 @@ const ymd = (d) => {
 //   showCreate  — adds an "Add Admission" button → /accounts/new-admission
 //   actions     — array of { label, color, icon, when(row), onClick(row) }
 //   showFees    — adds Fees / Paid / Pending columns (used on Break)
+//   showOnboarding — adds the LMS "Onboarding" column (used on Attendings)
 const AdmissionsList = ({
   title, subtitle, statusFilter, monthScope, showCreate, actions,
-  showFees: showFeesProp,
+  showFees: showFeesProp, showOnboarding,
 }) => {
   // The fee columns are course money, not registration, so they are withheld
   // from roles without money access however the caller sets the prop. The
@@ -65,6 +66,8 @@ const AdmissionsList = ({
   // Filters (server-side via the existing /admissions list params).
   const [programId, setProgramId] = useState('');
   const [centerId, setCenterId] = useState('');
+  // LMS onboarding filter — only offered on pages showing the column.
+  const [onboarding, setOnboarding] = useState('');
   const [counsellorId, setCounsellorId] = useState('');
   const [status, setStatus] = useState('');   // only used when the page isn't status-locked
   const [dateFrom, setDateFrom] = useState(''); // admission_date >=
@@ -76,8 +79,8 @@ const AdmissionsList = ({
   const [users, setUsers] = useState([]);
 
   const activeFilterCount = useMemo(
-    () => [programId, centerId, counsellorId, status, dateFrom, dateTo, q].filter(Boolean).length,
-    [programId, centerId, counsellorId, status, dateFrom, dateTo, q],
+    () => [programId, centerId, counsellorId, status, dateFrom, dateTo, q, onboarding].filter(Boolean).length,
+    [programId, centerId, counsellorId, status, dateFrom, dateTo, q, onboarding],
   );
 
   const reload = useCallback(async () => {
@@ -90,6 +93,7 @@ const AdmissionsList = ({
       if (q) params.q = q;
       if (programId) params.program_id = programId;
       if (centerId) params.center_id = centerId;
+      if (onboarding) params.onboarding = onboarding;
       if (counsellorId) params.guided_by_counsellor_id = counsellorId;
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
@@ -104,7 +108,7 @@ const AdmissionsList = ({
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, status, q, monthScope, programId, centerId, counsellorId, dateFrom, dateTo]);
+  }, [statusFilter, status, q, monthScope, programId, centerId, counsellorId, dateFrom, dateTo, onboarding]);
 
   // Debounce so typing search / rapid filter changes don't fire per keystroke.
   useEffect(() => {
@@ -129,7 +133,7 @@ const AdmissionsList = ({
   }, []);
 
   const clearAll = () => {
-    setQ(''); setProgramId(''); setCenterId(''); setCounsellorId('');
+    setQ(''); setProgramId(''); setCenterId(''); setCounsellorId(''); setOnboarding('');
     setStatus(''); setDateFrom(''); setDateTo('');
   };
 
@@ -214,6 +218,22 @@ const AdmissionsList = ({
           </TextField>
         )}
 
+        {/* LMS onboarding state. Only on pages that show the column — this is
+            the control that turns "1,061 students are Attending" into the two
+            actionable lists: who still needs credentials issued, and who has
+            them but has never signed in. */}
+        {showOnboarding && (
+          <TextField
+            select size="small" label="Onboarding" value={onboarding}
+            onChange={(e) => setOnboarding(e.target.value)} sx={{ minWidth: 190 }}
+          >
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="no_account">No login issued</MenuItem>
+            <MenuItem value="never_used">Never signed in</MenuItem>
+            <MenuItem value="using">Using platform</MenuItem>
+          </TextField>
+        )}
+
         {/* Admission-date range. Disabled when the page is month-scoped
             (This Month page already restricts to the current month). */}
         <TextField
@@ -260,6 +280,7 @@ const AdmissionsList = ({
                 <th>Center</th>
                 <th>Mode</th>
                 <th>Status</th>
+                {showOnboarding && <th>Onboarding</th>}
                 {showFees && <th style={{ textAlign: 'right' }}>Fees</th>}
                 {showFees && <th style={{ textAlign: 'right' }}>Paid</th>}
                 {showFees && <th style={{ textAlign: 'right' }}>Pending</th>}
@@ -274,6 +295,7 @@ const AdmissionsList = ({
                   row={r}
                   actions={actions}
                   showFees={showFees}
+                  showOnboarding={showOnboarding}
                   onChanged={reload}
                 />
               ))}
@@ -285,7 +307,52 @@ const AdmissionsList = ({
   );
 };
 
-const AdmissionRow = ({ row, actions, showFees, onChanged }) => {
+// Is this student REALLY onboarded?
+//
+// Three distinct states, because the two that existed before were routinely
+// confused and the screen showed neither:
+//
+//   No login    — course-confirm has not been run. There is no LMS account at
+//                 all, so nothing was ever handed to the student.
+//   Not used    — an account exists (status flips to 'active' the moment a
+//                 temp password is generated) but last_login_at is NULL: the
+//                 student has NEVER signed in. This is the state that silently
+//                 passed as "activated" in the LMS funnel, and it is exactly
+//                 the student someone needs to call.
+//   Using it    — last_login_at is set. Stamped only by a real password login,
+//                 never by sudo or a read-only view-as, so it is trustworthy.
+//
+// Deliberately shows the date rather than just a tick: "logged in once in
+// August" and "logged in yesterday" are different situations, and whoever is
+// chasing onboarding needs to tell them apart.
+const OnboardingCell = ({ row }) => {
+  const created = row.student_account_created_at;
+  const lastLogin = row.student_last_login_at;
+
+  const state = !created
+    ? { label: 'No login', tint: '#dc2626', bg: '#fef2f2', hint: 'No LMS account yet — run Confirm Course' }
+    : !lastLogin
+      ? { label: 'Never signed in', tint: '#d97706', bg: '#fffbeb', hint: 'Account created but the student has never logged in' }
+      : { label: 'Using platform', tint: '#059669', bg: '#ecfdf5', hint: `Last signed in ${fmtDate(lastLogin)}` };
+
+  return (
+    <div title={state.hint}>
+      <span style={{
+        display: 'inline-block', padding: '2px 8px', borderRadius: 999,
+        fontSize: 11, fontWeight: 700, color: state.tint, background: state.bg,
+        whiteSpace: 'nowrap',
+      }}
+      >
+        {state.label}
+      </span>
+      {lastLogin && (
+        <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{fmtDate(lastLogin)}</div>
+      )}
+    </div>
+  );
+};
+
+const AdmissionRow = ({ row, actions, showFees, showOnboarding, onChanged }) => {
   const navigate = useNavigate();
   const [detail, setDetail] = useState(null);
 
@@ -318,6 +385,7 @@ const AdmissionRow = ({ row, actions, showFees, onChanged }) => {
       <td style={{ fontSize: 12, color: '#6b7280' }}>{row.center_name || '—'}</td>
       <td>{row.mode_of_training || '—'}</td>
       <td><StatusPill status={row.status} /></td>
+      {showOnboarding && <td><OnboardingCell row={row} /></td>}
       {showFees && <td style={{ textAlign: 'right' }}>₹ {fmtMoney(row.total_fees)}</td>}
       {showFees && <td style={{ textAlign: 'right' }}>₹ {fmtMoney(paid)}</td>}
       {showFees && <td style={{ textAlign: 'right' }}>₹ {fmtMoney(pending)}</td>}
@@ -392,6 +460,7 @@ export const AttendingsPage = () => (
     title="Attendings"
     subtitle="Active students currently in session."
     statusFilter="attending"
+    showOnboarding
     actions={[
       {
         label: 'Move to Break',

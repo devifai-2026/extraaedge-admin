@@ -119,28 +119,43 @@ export default function LmsAnalytics() {
   const [sudoId, setSudoId] = useState('');
   const [toast, setToast] = useState('');
 
+  // Full student session — super_admin only, unchanged.
   const canSudo = isRole(ROLES.SUPER_ADMIN);
+  // READ-ONLY student view-as. A branch manager supporting a student needs to
+  // see what the student sees; the server mints a token that denies every
+  // write, so this is a look, not an impersonation.
+  const canViewAsStudent = isRole(ROLES.BRANCH_MANAGER) || isRole(ROLES.HEAD_TRAINER);
+  const canOpenStudent = canSudo || canViewAsStudent;
 
   useEffect(() => {
     lmsAnalyticsApi.dashboard().then((r) => setData(r?.data || null)).catch((e) => setErr(e.message));
-    // Only fetched to populate the sudo-login picker, which is super_admin
-    // only — no reason to pull a list of student names and emails for a role
-    // that cannot use it.
-    if (canSudo) {
+    // Only fetched to populate the picker — no reason to pull a list of
+    // student names and emails for a role that cannot open one. The list the
+    // server returns is already branch-scoped for a branch manager.
+    if (canOpenStudent) {
       lmsAnalyticsApi.students().then((r) => setStudents(r?.data || [])).catch(() => {});
     }
-  }, [canSudo]);
+  }, [canOpenStudent]);
 
-  // Sudo-login as a student: mint a student token, stash it in the student
-  // session storage, and open the student panel in a new tab.
+  // Open the student panel as that student: mint a student token, stash it in
+  // the student session storage, and open the panel in a new tab.
+  //
+  // Which token depends on the role. super_admin gets the full session it
+  // always had; a branch manager / head trainer gets the read-only one, where
+  // the server denies every write made with it. The role check is a UI
+  // convenience — the server gates both endpoints independently.
   const sudo = async () => {
     if (!sudoId) return;
     try {
-      const r = await lmsAnalyticsApi.sudoStudent(sudoId);
+      const r = canSudo
+        ? await lmsAnalyticsApi.sudoStudent(sudoId)
+        : await lmsAnalyticsApi.viewAsStudent(sudoId);
       const d = r?.data ?? r;
       studentAuth.setSession({ access_token: d.access_token, student: d.student, tenantSlug: d.tenantSlug });
       window.open('/student/home', '_blank');
-      setToast(`Opened student panel as ${d.student?.name}`);
+      setToast(d.read_only
+        ? `Opened ${d.student?.name}'s panel — read-only`
+        : `Opened student panel as ${d.student?.name}`);
     } catch (e) { setToast(e.message); }
   };
 
@@ -346,16 +361,20 @@ export default function LmsAnalytics() {
         )}
       </Card>
 
-      {/* Sudo-login as a student — super_admin only. The endpoint already
-          rejects everyone else (lms-analytics/routes.js gates it to
-          SUPER_ADMIN), so rendering the card for a branch manager only
-          offered a button guaranteed to 403. Opening the student portal as
-          someone else is an impersonation tool, not branch oversight. */}
-      {canSudo && (
-        <Card title="Sudo-login as a student" icon={LoginIcon}>
+      {/* Open the student panel as a student. Two different powers behind one
+          card: super_admin gets a full session (troubleshooting, can act), a
+          branch manager / head trainer gets a READ-ONLY look at their own
+          branch's students. Each role's button calls its own endpoint and the
+          server gates both, so neither can reach the other's. */}
+      {canOpenStudent && (
+        <Card
+          title={canSudo ? 'Sudo-login as a student' : 'View a student\u2019s panel'}
+          icon={LoginIcon}
+        >
           <div style={{ fontSize: 12.5, color: MUTE, marginBottom: 14 }}>
-            Open the student portal as any student (troubleshooting). Opens in a new tab;
-            every session is logged.
+            {canSudo
+              ? 'Open the student portal as any student (troubleshooting). Opens in a new tab; every session is logged.'
+              : 'See exactly what a student sees — classes, tests, projects and results. Read-only: you cannot submit, post or change anything on their behalf. Opens in a new tab; every session is logged.'}
           </div>
           <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
             <TextField
@@ -378,7 +397,7 @@ export default function LmsAnalytics() {
               disabled={!sudoId}
               sx={{ textTransform: 'none', bgcolor: '#E53935', borderRadius: 2.5, px: 2.5 }}
             >
-              Open as student
+              {canSudo ? 'Open as student' : 'View student panel'}
             </Button>
           </Box>
         </Card>

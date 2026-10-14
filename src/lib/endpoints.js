@@ -1067,6 +1067,11 @@ export const lmsAnalyticsApi = {
   dashboard: () => api.get('/lms-analytics/dashboard', withBranch()),
   students: () => api.get('/lms-analytics/students', withBranch()),
   sudoStudent: (id) => api.post(`/lms-analytics/students/${id}/sudo-login`),
+  // READ-ONLY student view-as, for a branch manager / head trainer. Mints a
+  // student token carrying readOnly:true; the server denies every write made
+  // with it. Distinct from sudoStudent above, which is super_admin's full
+  // student session.
+  viewAsStudent: (id) => api.post(`/lms-analytics/students/${id}/view-as`),
 };
 
 // ---- LMS: learning layer (materials, progress, certificates) — trainer/admin ----

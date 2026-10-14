@@ -316,6 +316,15 @@ const AdmissionDetail = () => {
           <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
             Won’t be shown again — copy it now. The student can change their password after logging in.
           </div>
+          {/* Whether the welcome email actually went out. Email is best-effort
+              (it must never block course-confirm), so staff need to know
+              explicitly when it failed — otherwise they assume the student was
+              told and nobody follows up. */}
+          <div style={{ fontSize: 12, marginTop: 8, fontWeight: 600 }}>
+            {confirmResult.welcome_emailed
+              ? <span style={{ color: '#047857' }}>✓ Welcome email with these details sent to {confirmResult.credentials.email}</span>
+              : <span style={{ color: '#b45309' }}>⚠ Welcome email could not be sent — share these details with the student yourself.</span>}
+          </div>
         </Alert>
       )}
 

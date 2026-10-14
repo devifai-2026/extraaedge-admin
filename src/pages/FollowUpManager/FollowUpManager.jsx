@@ -32,6 +32,7 @@ import ScheduleIcon from '@mui/icons-material/Schedule';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { followUpsApi, usersApi, leadsApi } from '../../lib/endpoints';
 import AddNewLead from '../../components/AddNewLead/AddNewLead';
+import ViewTimelineModal from '../../components/ViewTimelineModal/ViewTimelineModal';
 import { auth } from '../../lib/endpoints';
 import { isRole, ROLES, LEAD_OWNER_ROLES, LEAD_OWNER_ROLES_PARAM } from '../../lib/rbac';
 import { useDropdown } from '../../lib/useDropdowns';
@@ -203,6 +204,17 @@ export default function FollowUpManager() {
   const [openLead, setOpenLead] = useState(null);
   const [openingLeadId, setOpeningLeadId] = useState(null);
   const [highlightLeadId, setHighlightLeadId] = useState(null);
+  // Clicking a follow-up opens the TIMELINE first, not the edit form. On this
+  // page the counsellor is about to make a call, so what they need is context
+  // — previous attempts, notes, stage changes — not 40 editable fields. The
+  // timeline header carries a "Lead details" button for the cases where they
+  // do need to edit, so nothing is lost and there's no extra chooser step.
+  const [timelineLead, setTimelineLead] = useState(null);
+
+  const openTimeline = (f) => {
+    if (!f?.lead_id) return;
+    setTimelineLead({ id: f.lead_id, name: f.lead_name, phone: f.lead_phone });
+  };
 
   const openLeadDialog = async (leadId) => {
     if (!leadId || openingLeadId) return;
@@ -387,6 +399,63 @@ export default function FollowUpManager() {
   useEffect(() => { reloadAnalytics(); }, [reloadAnalytics]);
 
   // Bucket lookup by YYYY-MM-DD
+  // Collapse the flat follow-up list into one entry per lead.
+  //
+  // Two separate write paths create rows in lead_followups: the 5-slot grid on
+  // the edit form (slot_index 1..5) and the ad-hoc "Followup Scheduled On"
+  // field / this manager (slot_index NULL). The same real-world call logged
+  // through both paths — or a double-submit — produces multiple rows that are
+  // indistinguishable to the user: same lead, same time, same comment, same
+  // owner. Rendered flat, that reads as "the system created duplicate
+  // follow-ups" and makes the history ambiguous.
+  //
+  // So: (1) de-duplicate rows that are identical on (lead, minute, status,
+  // comment) — these are genuinely the same attempt stored twice; (2) group
+  // what remains by lead, newest first, so one lead is always ONE card.
+  // The card acts on its primary (most relevant) attempt and discloses the
+  // rest on demand instead of repeating full-width rows.
+  const leadGroups = useMemo(() => {
+    // Rank used to pick which attempt a card represents: an actionable row
+    // (planned/missed) outranks a closed one, so the card's buttons always
+    // drive the attempt the user actually needs to act on.
+    const actionRank = (s) => (s === 'planned' ? 0 : s === 'missed' ? 1 : s === 'done' ? 2 : 3);
+    const ts = (f) => new Date(f.next_action_datetime || 0).getTime();
+
+    // (1) de-dupe identical attempts. Minute precision: the duplicate rows we
+    // see in the wild share an exact timestamp, and nobody logs two distinct
+    // attempts on one lead inside the same minute.
+    const seen = new Map();
+    for (const f of followups) {
+      const minute = f.next_action_datetime ? String(f.next_action_datetime).slice(0, 16) : '';
+      const key = [f.lead_id, minute, f.status, (f.comment || '').trim()].join('|');
+      const prev = seen.get(key);
+      // Keep the row with a slot_index when one exists — it's the row the edit
+      // form's grid also shows, so acting on it keeps both views consistent.
+      if (!prev || (!Number.isInteger(prev.slot_index) && Number.isInteger(f.slot_index))) {
+        seen.set(key, f);
+      }
+    }
+
+    // (2) group by lead.
+    const byLead = new Map();
+    for (const f of seen.values()) {
+      const k = f.lead_id || `__orphan_${f.id}`;
+      if (!byLead.has(k)) byLead.set(k, []);
+      byLead.get(k).push(f);
+    }
+
+    const groups = [];
+    for (const [leadId, items] of byLead) {
+      items.sort((a, b) => actionRank(a.status) - actionRank(b.status) || ts(b) - ts(a));
+      groups.push({ leadId, primary: items[0], others: items.slice(1) });
+    }
+    // Preserve the server's ordering (which honours the sort dropdown) by
+    // keying off where each lead's primary sat in the original list.
+    const orderOf = new Map(followups.map((f, i) => [f.id, i]));
+    groups.sort((a, b) => (orderOf.get(a.primary.id) ?? 0) - (orderOf.get(b.primary.id) ?? 0));
+    return groups;
+  }, [followups]);
+
   const dayBuckets = useMemo(() => {
     const m = new Map();
     for (const r of calendarData) m.set(r.day, r);
@@ -626,13 +695,14 @@ export default function FollowUpManager() {
               </p>
             </div>
           )}
-          {!loading && followups.map((f) => (
+          {!loading && leadGroups.map((g) => (
             <FollowupRow
-              key={f.id}
-              f={f}
+              key={g.primary.id}
+              f={g.primary}
+              others={g.others}
               onChanged={() => { reloadList(); reloadCalendar(); }}
-              onOpenLead={openLeadDialog}
-              highlighted={!!highlightLeadId && f.lead_id === highlightLeadId}
+              onOpenLead={openTimeline}
+              highlighted={!!highlightLeadId && g.primary.lead_id === highlightLeadId}
             />
           ))}
         </div>
@@ -650,6 +720,15 @@ export default function FollowUpManager() {
       {/* Lead dialog, opened inline from a follow-up row or the by-lead table.
           Same editability rule as the Lead Pool: managers/admins edit any
           lead, everyone else only the leads they own. */}
+      {/* Timeline first — the default destination for a row click here.
+          "Lead details" inside it hands off to the full form below. */}
+      <ViewTimelineModal
+        open={!!timelineLead}
+        lead={timelineLead}
+        onClose={() => setTimelineLead(null)}
+        onOpenDetails={(l) => { setTimelineLead(null); openLeadDialog(l.id); }}
+      />
+
       <AddNewLead
         open={!!openLead}
         leadData={openLead}
@@ -673,8 +752,11 @@ export default function FollowUpManager() {
 //   • missed  (red)     → reschedule, mark done, cancel
 //   • done    (green)   → locked, no actions
 //   • cancelled (grey)  → locked, no actions
-function FollowupRow({ f, onChanged, onOpenLead, highlighted }) {
+function FollowupRow({ f, others = [], onChanged, onOpenLead, highlighted }) {
   const [busy, setBusy] = useState(false);
+  // Other attempts on the SAME lead for this day/filter. Collapsed by default
+  // so one lead always reads as one card; expanded on demand for the history.
+  const [showOthers, setShowOthers] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleAt, setRescheduleAt] = useState('');
   const [rescheduleReason, setRescheduleReason] = useState('');
@@ -753,10 +835,14 @@ function FollowupRow({ f, onChanged, onOpenLead, highlighted }) {
     setCancelReason('');
   };
 
-  // Open the lead's edit dialog inline on this page (the parent owns the
-  // dialog). Previously this deep-linked to /leadlist?focus=<id>.
+  // Open the lead's TIMELINE inline on this page (the parent owns the modal).
+  // Context-first: on this page the counsellor is about to call, so previous
+  // attempts and notes matter more than editable fields. The timeline's
+  // "Lead details" button is the route on to the full form.
   const openLead = () => {
-    if (f.lead_id) onOpenLead?.(f.lead_id);
+    // Pass the whole follow-up: the timeline header shows name/phone, so the
+    // modal can render immediately without a second fetch.
+    if (f.lead_id) onOpenLead?.(f);
   };
 
   return (
@@ -792,6 +878,44 @@ function FollowupRow({ f, onChanged, onOpenLead, highlighted }) {
               <span style={{ fontSize: 12, color: '#444', fontStyle: 'italic', marginLeft: 8 }}>&quot;{f.comment}&quot;</span>
             )}
           </div>
+          {/* One lead = one card. Any further attempts on this lead collapse
+              into a single affordance rather than repeating full-width rows
+              that look like duplicate follow-ups. */}
+          {others.length > 0 && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowOthers((v) => !v); }}
+              style={{
+                marginTop: 6, padding: 0, border: 'none', background: 'none',
+                color: '#1976d2', fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', textAlign: 'left',
+              }}
+            >
+              {showOthers ? 'Hide' : 'Show'} {others.length} more attempt{others.length > 1 ? 's' : ''} on this lead
+            </button>
+          )}
+          {showOthers && others.length > 0 && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4,
+                borderLeft: '2px solid #e0e0e0', paddingLeft: 10,
+              }}
+            >
+              {others.map((o) => {
+                const om = STATUS_META[o.status] || { color: '#9E9E9E', label: o.status };
+                return (
+                  <div key={o.id} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 12 }}>
+                    <span style={{ color: '#666', minWidth: 62 }}>{fmtTime(o.next_action_datetime)}</span>
+                    <span style={{ color: om.color, fontWeight: 700, minWidth: 62 }}>{om.label}</span>
+                    {o.comment && (
+                      <span style={{ color: '#555', fontStyle: 'italic' }}>&quot;{o.comment}&quot;</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
         <div className="followup-row-actions" onClick={(e) => e.stopPropagation()}>
           {/* Coloured dot + label badge */}

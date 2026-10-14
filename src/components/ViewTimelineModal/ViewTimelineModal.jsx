@@ -17,6 +17,7 @@ import {
   Button,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import FlagIcon from "@mui/icons-material/Flag";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import HistoryIcon from "@mui/icons-material/History";
@@ -166,7 +167,12 @@ const labelWithCount = (rows, cat) => `${cat} (${rows.filter((r) => categoryOf(r
 
 const CATEGORIES = ["Lead Activity", "Counselor Activity", "Lead History", "Lead Status Journey", "Accounts Activity"];
 
-const ViewTimelineModal = ({ open, onClose, lead }) => {
+// `onOpenDetails` is optional. When provided, the header grows a "Lead details"
+// button so a surface that opens the timeline FIRST (e.g. the Follow-up
+// Manager, where the counsellor wants context before acting) still gives a
+// one-click route into the full lead form. Surfaces that already let the user
+// choose up front (Lead Pool) can omit it.
+const ViewTimelineModal = ({ open, onClose, lead, onOpenDetails }) => {
   const [activeFilters, setActiveFilters] = useState([...CATEGORIES]);
   const [sortOrder, setSortOrder] = useState("newest");
   const [rows, setRows] = useState([]);
@@ -273,7 +279,20 @@ const ViewTimelineModal = ({ open, onClose, lead }) => {
         {/* Header */}
         <div className="timeline-header">
           <div className="timeline-title">{lead.name || lead.phone || 'Lead'}</div>
-          <IconButton onClick={onClose}><CloseIcon /></IconButton>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {onOpenDetails && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<DescriptionOutlinedIcon fontSize="small" />}
+                onClick={() => onOpenDetails(lead)}
+                sx={{ textTransform: 'none', fontSize: 12, fontWeight: 600 }}
+              >
+                Lead details
+              </Button>
+            )}
+            <IconButton onClick={onClose}><CloseIcon /></IconButton>
+          </div>
         </div>
 
         <div className="timeline-body">
