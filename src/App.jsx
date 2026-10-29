@@ -126,6 +126,7 @@ import HiringDashboard from './pages/Hiring/HiringDashboard'
 import HiringPositions from './pages/Hiring/HiringPositions'
 import HiringCandidates from './pages/Hiring/HiringCandidates'
 import HiringInterviews from './pages/Hiring/HiringInterviews'
+import MyInterviews from './pages/Hiring/MyInterviews'
 import HiringStatuses from './pages/Hiring/HiringStatuses'
 import HiringImports from './pages/Hiring/HiringImports'
 import HrCertificates from './pages/Hr/HrCertificates'
@@ -259,6 +260,7 @@ function App() {
         <Route path="/hiring/positions" element={<ProtectedRoute tab="hiring.positions"><Layout><HiringPositions /></Layout></ProtectedRoute>} />
         <Route path="/hiring/candidates" element={<ProtectedRoute tab="hiring.candidates"><Layout><HiringCandidates /></Layout></ProtectedRoute>} />
         <Route path="/hiring/interviews" element={<ProtectedRoute tab="hiring.interviews"><Layout><HiringInterviews /></Layout></ProtectedRoute>} />
+        <Route path="/hiring/my-interviews" element={<ProtectedRoute tab="hiring.my_interviews"><Layout><MyInterviews /></Layout></ProtectedRoute>} />
         <Route path="/hiring/statuses" element={<ProtectedRoute tab="hiring.statuses"><Layout><HiringStatuses /></Layout></ProtectedRoute>} />
         <Route path="/hiring/imports" element={<ProtectedRoute tab="hiring.imports"><Layout><HiringImports /></Layout></ProtectedRoute>} />
         <Route path="/hr/certificates" element={<ProtectedRoute tab="hr.certificates"><Layout><HrCertificates /></Layout></ProtectedRoute>} />

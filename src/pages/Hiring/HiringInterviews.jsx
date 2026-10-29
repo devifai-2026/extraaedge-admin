@@ -7,13 +7,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Box, Button, TextField, MenuItem, IconButton, Tooltip, Snackbar, Alert,
-  Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Autocomplete,
+  Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Autocomplete, Chip,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import UploadFileIcon from '@mui/icons-material/UploadFileOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import EventIcon from '@mui/icons-material/EventAvailableOutlined';
-import { hiringApi } from '../../lib/endpoints';
+import { hiringApi, usersApi } from '../../lib/endpoints';
 import { PageHeader, Card, EmptyState, lmsTokens } from '../../lib/lmsUi';
 import HiringImportDialog from './HiringImportDialog';
 
@@ -85,6 +85,9 @@ export default function HiringInterviews() {
   const [statuses, setStatuses] = useState([]);
   const [positions, setPositions] = useState([]);
   const [candidates, setCandidates] = useState([]);
+  const [rounds, setRounds] = useState([]);
+  // Everyone in the tenant — anyone can be invited onto a panel, not just HR.
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -106,18 +109,49 @@ export default function HiringInterviews() {
     hiringApi.statuses().then((r) => setStatuses(r?.data || [])).catch(() => {});
     hiringApi.positions().then((r) => setPositions(r?.data || [])).catch(() => {});
     hiringApi.candidates({ limit: 200 }).then((r) => setCandidates(r?.data || [])).catch(() => {});
+    hiringApi.rounds().then((r) => setRounds(r?.data || [])).catch(() => {});
+    usersApi.options().then((r) => setUsers(r?.data || [])).catch(() => {});
   }, []);
 
   // Interview-applicable statuses only — a candidate-only outcome like
   // "Location issue" is not an interview result.
   const interviewStatuses = statuses.filter((s) => s.applies_to !== 'candidate');
 
+  // Open the edit form and pull in the existing panel.
+  //
+  // The panel MUST be loaded before the form renders: the save path sends
+  // panel_user_ids and the server replaces the panel wholesale, so opening an
+  // interview with an empty picker and saving would silently un-invite
+  // everyone on it.
+  const openEdit = async (r) => {
+    setForm({ ...r, scheduled_at: toLocalInput(r.scheduled_at), panel_user_ids: [] });
+    try {
+      const p = await hiringApi.panel(r.id);
+      const ids = (p?.data || []).map((m) => m.user_id);
+      setForm((f) => (f && f.id === r.id ? { ...f, panel_user_ids: ids } : f));
+    } catch { /* leave the picker empty; the user can re-pick */ }
+  };
+
   const save = async () => {
     if (!form?.candidate_id) { setToast({ severity: 'error', text: 'Pick a candidate' }); return; }
     setSaving(true);
     try {
-      const body = { ...form, scheduled_at: fromLocalInput(form.scheduled_at) };
-      for (const k of Object.keys(body)) if (body[k] === '') delete body[k];
+      // Send only the fields the API accepts. `form` is spread from a LIST
+      // row, which also carries display-only columns (candidate_name,
+      // status_name, round_name, panel_count, legacy_remark…) that the strict
+      // zod body schema would reject outright.
+      const SENDABLE = [
+        'candidate_id', 'scheduled_at', 'mode', 'status_id', 'interviewer_id',
+        'remark_1', 'remark_2', 'round_id', 'meeting_link', 'panel_user_ids',
+      ];
+      const body = {};
+      for (const k of SENDABLE) if (form[k] !== undefined) body[k] = form[k];
+      body.scheduled_at = fromLocalInput(form.scheduled_at);
+      // An empty string is not null to the API; drop unset optionals. The
+      // panel array is exempt — [] is a real instruction ("nobody on it").
+      for (const k of Object.keys(body)) {
+        if (body[k] === '' || body[k] === undefined) delete body[k];
+      }
       if (form.id) {
         const { candidate_id: _drop, id: _id, ...rest } = body;
         await hiringApi.updateInterview(form.id, rest);
@@ -180,8 +214,8 @@ export default function HiringInterviews() {
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
               <thead>
                 <tr>
-                  <TH>Candidate</TH><TH>Position</TH><TH>When</TH><TH>Mode</TH>
-                  <TH>Status</TH><TH>Remarks</TH><TH aria-label="actions" />
+                  <TH>Candidate</TH><TH>Position</TH><TH>Round</TH><TH>When</TH><TH>Mode</TH>
+                  <TH>Status</TH><TH>Panel</TH><TH>Remarks</TH><TH aria-label="actions" />
                 </tr>
               </thead>
               <tbody>
@@ -189,7 +223,7 @@ export default function HiringInterviews() {
                   <tr key={r.id}>
                     <TD style={{ fontWeight: 600 }}>
                       <button
-                        type="button" onClick={() => setForm({ ...r, scheduled_at: toLocalInput(r.scheduled_at) })}
+                        type="button" onClick={() => openEdit(r)}
                         style={{
                           background: 'none', border: 0, padding: 0, font: 'inherit',
                           fontWeight: 600, color: INK, cursor: 'pointer', textAlign: 'left',
@@ -200,12 +234,44 @@ export default function HiringInterviews() {
                       {r.candidate_phone && <div style={{ fontSize: 11.5, color: FAINT, fontWeight: 400 }}>{r.candidate_phone}</div>}
                     </TD>
                     <TD>{r.position_title || <span style={{ color: FAINT }}>—</span>}</TD>
-                    <TD>{fmtWhen(r.scheduled_at)}</TD>
+                    <TD>
+                      {r.round_name
+                        ? <Chip size="small" label={r.round_name} sx={{ height: 20, fontSize: 11, fontWeight: 700 }} />
+                        : <span style={{ color: FAINT }}>—</span>}
+                    </TD>
+                    <TD>
+                      {fmtWhen(r.scheduled_at)}
+                      {r.meeting_link && (
+                        <div>
+                          <a
+                            href={r.meeting_link} target="_blank" rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ fontSize: 11.5, color: '#1976d2' }}
+                          >
+                            Join link ↗
+                          </a>
+                        </div>
+                      )}
+                    </TD>
                     <TD>{MODES.find((m) => m.v === r.mode)?.l || <span style={{ color: FAINT }}>—</span>}</TD>
                     <TD>{r.status_name || <span style={{ color: FAINT }}>—</span>}</TD>
+                    <TD>
+                      {r.panel_count
+                        ? (
+                          <span style={{ fontSize: 12 }}>
+                            {r.panel_count} invited
+                            <div style={{ fontSize: 11, color: r.feedback_count ? '#15803d' : FAINT }}>
+                              {r.feedback_count}/{r.panel_count} gave feedback
+                            </div>
+                          </span>
+                        )
+                        : <span style={{ color: FAINT }}>—</span>}
+                    </TD>
                     <TD style={{ maxWidth: 260, whiteSpace: 'normal' }}>
-                      {r.remark_1 || <span style={{ color: FAINT }}>—</span>}
-                      {r.remark_2 && <div style={{ fontSize: 12, color: FAINT }}>{r.remark_2}</div>}
+                      {/* legacy_remark is the pre-panel remark_1/remark_2 pair.
+                          Those rows have no author, so they are shown as-is
+                          rather than being dropped from the new panel view. */}
+                      {r.legacy_remark || <span style={{ color: FAINT }}>—</span>}
                     </TD>
                     <TD align="right">
                       <Tooltip title="Delete">
@@ -248,10 +314,33 @@ export default function HiringInterviews() {
               <MenuItem value="">—</MenuItem>
               {MODES.map((m) => <MenuItem key={m.v} value={m.v}>{m.l}</MenuItem>)}
             </TextField>
+            <TextField select size="small" label="Round" value={form?.round_id ?? ''} onChange={(e) => setForm({ ...form, round_id: e.target.value })}>
+              <MenuItem value="">—</MenuItem>
+              {rounds.map((r) => <MenuItem key={r.id} value={r.id}>{r.name}</MenuItem>)}
+            </TextField>
+            {/* Optional: an interview is often booked before the link exists,
+                and an in-person round never needs one. */}
+            <TextField
+              size="small" label="Meeting link" placeholder="Meet / Teams / Zoom — optional"
+              value={form?.meeting_link ?? ''}
+              onChange={(e) => setForm({ ...form, meeting_link: e.target.value })}
+            />
             <TextField select size="small" label="Status" value={form?.status_id ?? ''} onChange={(e) => setForm({ ...form, status_id: e.target.value })}>
               <MenuItem value="">—</MenuItem>
               {interviewStatuses.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
             </TextField>
+            {/* Panel. Anyone in the tenant can be invited; each gets their own
+                feedback box and sees this interview under My Interviews. */}
+            <Autocomplete
+              multiple size="small" options={users}
+              getOptionLabel={(o) => `${o.name}${o.role ? ` · ${String(o.role).replace(/_/g, ' ')}` : ''}`}
+              isOptionEqualToValue={(o, v) => o.id === v.id}
+              value={users.filter((u) => (form?.panel_user_ids || []).includes(u.id))}
+              onChange={(_e, v) => setForm({ ...form, panel_user_ids: v.map((u) => u.id) })}
+              renderInput={(p) => (
+                <TextField {...p} label="Interview panel" placeholder="Invite interviewers" />
+              )}
+            />
             <TextField size="small" label="1st remark" multiline rows={2}
               value={form?.remark_1 ?? ''} onChange={(e) => setForm({ ...form, remark_1: e.target.value })} />
             <TextField size="small" label="2nd remark" multiline rows={2}

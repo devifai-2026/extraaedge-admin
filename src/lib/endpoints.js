@@ -1189,6 +1189,21 @@ export const hiringApi = {
   updateInterview: (id, body) => api.put(`/hiring/interviews/${id}`, body),
   deleteInterview: (id) => api.delete(`/hiring/interviews/${id}`),
 
+  // Rounds (L1 / L2 / HR / ...) — tenant-configurable, like statuses.
+  rounds: () => api.get('/hiring/rounds'),
+
+  // Panel: who is invited to sit on an interview.
+  panel: (id) => api.get(`/hiring/interviews/${id}/panel`),
+  setPanel: (id, userIds) => api.put(`/hiring/interviews/${id}/panel`, { user_ids: userIds }),
+
+  // Interviews the CURRENT user sits on. Scoped server-side to the caller, so
+  // this is safe for people who must not see the whole candidate pipeline.
+  myInterviews: (params) => api.get('/hiring/interviews/mine', params),
+
+  // Per-panellist feedback. The author is taken from the token, never sent.
+  feedback: (id) => api.get(`/hiring/interviews/${id}/feedback`),
+  submitFeedback: (id, body) => api.put(`/hiring/interviews/${id}/feedback`, body),
+
   // Which tabs does this uploaded workbook have?
   workbookSheets: (body) => api.post('/hiring/workbook/sheets', body),
   // Queue a background import of an already-uploaded file. Returns 202 with

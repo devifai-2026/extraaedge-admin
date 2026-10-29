@@ -94,6 +94,10 @@ const pinnedItems = [
   // filter.
   { id: 27, label: 'My Leave', icon: EventBusyIcon, path: '/hr/my-leave', tab: 'hr.my_leave', hideForRoles: [ROLES.SUPER_ADMIN] },
   { id: 28, label: 'My Payslips', icon: ReceiptLongIcon, path: '/payroll/my-payslips', tab: 'payroll.my_payslips', hideForRoles: [ROLES.SUPER_ADMIN] },
+  // Sits here, NOT inside the Hiring group: that group is HR-only, while
+  // anyone in the tenant can be invited onto an interview panel. The page
+  // itself only ever shows interviews the viewer is on.
+  { id: 29, label: 'My Interviews', icon: EventAvailableIcon, path: '/hiring/my-interviews', tab: 'hiring.my_interviews' },
 ];
 
 // Collapsible, role-named sections. Order here is the display order. New

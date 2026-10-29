@@ -119,7 +119,11 @@ const ROLE_HR_TABS = ['hr.dashboard', 'hr.interviews', 'hr.certificates'];
 // backing routes resolve the caller's own id with no role gate, so the tab is
 // navigation rather than authority. Students are excluded: they are not
 // employees and their attendance is a course record, not a staff register.
-const ROLE_SELF_SERVICE_TABS = ['hr.my_leave', 'hr.leave_calendar', 'payroll.my_payslips'];
+// Granted to essentially every staff role. 'hiring.my_interviews' belongs
+// here rather than in ROLE_HIRING_TABS: anyone can be invited onto an
+// interview panel, and the page shows ONLY the interviews the viewer sits on,
+// never the candidate pipeline that the HR-gated hiring tabs expose.
+const ROLE_SELF_SERVICE_TABS = ['hr.my_leave', 'hr.leave_calendar', 'payroll.my_payslips', 'hiring.my_interviews'];
 // Roles that can actually decide on someone else's leave.
 const ROLE_LEAVE_APPROVER_TABS = ['hr.leave_approvals'];
 // Quotas, approval chains and the holiday calendar.
@@ -379,6 +383,7 @@ const TAB_TO_ROUTE = {
   'hr.interviews':         '/hr/interviews',
   'hr.certificates':       '/hr/certificates',
   'hr.my_leave':           '/hr/my-leave',
+  'hiring.my_interviews':  '/hiring/my-interviews',
   'hr.leave_calendar':     '/hr/leave-calendar',
   'hr.leave_approvals':    '/hr/leave-approvals',
   'hr.leave_admin':        '/hr/leave-admin',
