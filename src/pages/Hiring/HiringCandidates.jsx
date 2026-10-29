@@ -26,6 +26,29 @@ const kindTint = (kind) => (kind === 'hired' ? '#059669' : kind === 'rejected' ?
 
 const money = (v) => (v == null ? '—' : `₹${Number(v).toLocaleString('en-IN')}`);
 
+// Expected salary is a range. Renders the three real shapes distinctly, since
+// "20k–25k", "from 20k" and "up to 25k" mean different things to a recruiter:
+//   both ends, equal   -> ₹20,000          (a point figure)
+//   both ends          -> ₹20,000 – ₹25,000
+//   one end only       -> From ₹20,000 / Up to ₹25,000
+// Falls back to the legacy single column for rows written before the range
+// existed and never re-saved.
+// Mirrors the server-side check so the slip is caught before a round-trip.
+const salaryRangeInvalid = (f) => {
+  const lo = f?.expected_salary_min;
+  const hi = f?.expected_salary_max;
+  if (lo === '' || lo == null || hi === '' || hi == null) return false;
+  return Number(lo) > Number(hi);
+};
+
+const salaryRange = (c) => {
+  const lo = c?.expected_salary_min ?? null;
+  const hi = c?.expected_salary_max ?? null;
+  if (lo == null && hi == null) return money(c?.expected_salary);
+  if (lo != null && hi != null) return Number(lo) === Number(hi) ? money(lo) : `${money(lo)} – ${money(hi)}`;
+  return lo != null ? `From ${money(lo)}` : `Up to ${money(hi)}`;
+};
+
 const TH = ({ children, align = 'left' }) => (
   <th style={{
     textAlign: align, padding: '10px 12px', fontSize: 11, fontWeight: 700,
@@ -47,7 +70,7 @@ const TD = ({ children, align = 'left', style }) => (
 const BLANK = {
   name: '', phone: '', email: '', position_id: '', status_id: '',
   location: '', highest_qualification: '', stream: '', experience_level: '',
-  current_area: '', current_salary: '', expected_salary: '', notice_period: '',
+  current_area: '', current_salary: '', expected_salary_min: '', expected_salary_max: '', notice_period: '',
   contacted_on: '', remark: '',
 };
 
@@ -125,6 +148,8 @@ export default function HiringCandidates() {
       for (const k of Object.keys(body)) if (body[k] === '') delete body[k];
       if (body.current_salary) body.current_salary = Number(body.current_salary);
       if (body.expected_salary) body.expected_salary = Number(body.expected_salary);
+      if (body.expected_salary_min) body.expected_salary_min = Number(body.expected_salary_min);
+      if (body.expected_salary_max) body.expected_salary_max = Number(body.expected_salary_max);
       if (form.id) await hiringApi.updateCandidate(form.id, body);
       else await hiringApi.createCandidate(body);
       setForm(null);
@@ -255,7 +280,7 @@ export default function HiringCandidates() {
                         ? <Chip size="small" label={c.experience_level} sx={{ fontSize: 11, height: 20 }} />
                         : <span style={{ color: FAINT }}>—</span>}
                     </TD>
-                    <TD align="right">{money(c.expected_salary)}</TD>
+                    <TD align="right" style={{ whiteSpace: 'nowrap' }}>{salaryRange(c)}</TD>
                     <TD>
                       <TextField
                         select size="small" variant="standard"
@@ -352,14 +377,31 @@ export default function HiringCandidates() {
             </TextField>
             <TextField size="small" label="Notice period" value={form?.notice_period ?? ''} onChange={(e) => setForm({ ...form, notice_period: e.target.value })} />
             <TextField size="small" type="number" label="Current salary" value={form?.current_salary ?? ''} onChange={(e) => setForm({ ...form, current_salary: e.target.value })} />
-            <TextField size="small" type="number" label="Expected salary" value={form?.expected_salary ?? ''} onChange={(e) => setForm({ ...form, expected_salary: e.target.value })} />
+            {/* A range, because candidates quote one ("20k to 25k"). Either end
+                may be left blank for an open-ended expectation. */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <TextField
+                size="small" type="number" label="Expected salary (min)" sx={{ flex: 1 }}
+                value={form?.expected_salary_min ?? ''}
+                onChange={(e) => setForm({ ...form, expected_salary_min: e.target.value })}
+                error={salaryRangeInvalid(form)}
+                helperText={salaryRangeInvalid(form) ? 'Min cannot exceed max' : ' '}
+              />
+              <TextField
+                size="small" type="number" label="Expected salary (max)" sx={{ flex: 1 }}
+                value={form?.expected_salary_max ?? ''}
+                onChange={(e) => setForm({ ...form, expected_salary_max: e.target.value })}
+                error={salaryRangeInvalid(form)}
+                helperText=" "
+              />
+            </div>
             <TextField size="small" label="Remark" multiline rows={2} sx={{ gridColumn: { sm: '1 / -1' } }}
               value={form?.remark ?? ''} onChange={(e) => setForm({ ...form, remark: e.target.value })} />
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={() => setForm(null)} sx={{ textTransform: 'none' }}>Cancel</Button>
-          <Button onClick={save} disabled={saving} variant="contained" sx={{ textTransform: 'none', bgcolor: '#E87B2F' }}>
+          <Button onClick={save} disabled={saving || salaryRangeInvalid(form)} variant="contained" sx={{ textTransform: 'none', bgcolor: '#E87B2F' }}>
             {saving ? 'Saving…' : 'Save'}
           </Button>
         </DialogActions>

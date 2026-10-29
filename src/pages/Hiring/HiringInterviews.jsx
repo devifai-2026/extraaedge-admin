@@ -25,6 +25,34 @@ const MODES = [
   { v: 'telephonic', l: 'Telephonic' },
 ];
 
+// A timestamptz from the API (e.g. "2026-10-30T01:00:00.000Z") rendered as the
+// value a <input type="datetime-local"> expects: LOCAL wall-clock,
+// "YYYY-MM-DDTHH:mm", with no zone suffix.
+//
+// This used to be `String(v).slice(0, 16)`, which just chopped the raw UTC
+// string. The list renders the same instant through toLocaleString (IST), so a
+// row reading "6:30 am" opened an edit form showing "01:00" — the same moment,
+// displayed in two different zones, which looks like the data changed on open.
+// Saving that form then wrote 01:00 as a local time and shifted the interview
+// 5h30m earlier each time it was edited.
+const toLocalInput = (v) => {
+  if (!v) return '';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+// The inverse: a datetime-local string is local wall-clock, so turn it into an
+// explicit instant before sending. Without this the server stores it using the
+// DATABASE's timezone, which happens to be Asia/Kolkata today — correct by
+// coincidence, and silently wrong the moment that setting changes.
+const fromLocalInput = (v) => {
+  if (!v) return v;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? v : d.toISOString();
+};
+
 const fmtWhen = (v) => {
   if (!v) return '—';
   try {
@@ -88,7 +116,7 @@ export default function HiringInterviews() {
     if (!form?.candidate_id) { setToast({ severity: 'error', text: 'Pick a candidate' }); return; }
     setSaving(true);
     try {
-      const body = { ...form };
+      const body = { ...form, scheduled_at: fromLocalInput(form.scheduled_at) };
       for (const k of Object.keys(body)) if (body[k] === '') delete body[k];
       if (form.id) {
         const { candidate_id: _drop, id: _id, ...rest } = body;
@@ -161,7 +189,7 @@ export default function HiringInterviews() {
                   <tr key={r.id}>
                     <TD style={{ fontWeight: 600 }}>
                       <button
-                        type="button" onClick={() => setForm({ ...r, scheduled_at: (r.scheduled_at || '').slice(0, 16) })}
+                        type="button" onClick={() => setForm({ ...r, scheduled_at: toLocalInput(r.scheduled_at) })}
                         style={{
                           background: 'none', border: 0, padding: 0, font: 'inherit',
                           fontWeight: 600, color: INK, cursor: 'pointer', textAlign: 'left',
