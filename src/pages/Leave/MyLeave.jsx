@@ -7,6 +7,17 @@ import { Box, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions
 import EventAvailableIcon from '@mui/icons-material/EventAvailableOutlined';
 import { leaveApi } from '../../lib/endpoints';
 import { PageHeader, Card, EmptyState, Badge, Skeleton, Btn, StatGrid, StatTile, Field, input } from '../../lib/lmsUi';
+import { isLeadOwnerRole } from '../../lib/rbac';
+
+// The server's approver_role values are internal enums. 'lead' means "your
+// reporting manager" — printed raw on a leave screen it reads as a sales
+// lead. The name is resolved server-side now; this is the fallback for when
+// an approver has been deactivated and no name comes back.
+const ROLE_LABEL = {
+  lead: 'your reporting manager',
+  hr: 'HR',
+  admin: 'the administrator',
+};
 
 const toneFor = (s) => (s === 'approved' ? 'success' : s === 'declined' ? 'danger' : s === 'cancelled' ? 'neutral' : 'info');
 const d = (v) => (v ? String(v).slice(0, 10).split('-').reverse().join('/') : '—');
@@ -103,12 +114,19 @@ export default function MyLeave() {
                 {chain.mode === 'none' ? 'Your requests are approved automatically.'
                   : (chain.steps || []).length === 0 ? 'No approver is configured yet — contact HR.'
                     : <>Needs approval from {chain.steps.map((s, i) => (
-                      <span key={i}><strong>{s.approver_name || s.approver_role}</strong>{i < chain.steps.length - 1 ? ' then ' : ''}</span>
+                      <span key={i}><strong>{s.approver_name || ROLE_LABEL[s.approver_role] || s.approver_role}</strong>{i < chain.steps.length - 1 ? ' then ' : ''}</span>
                     ))}.</>}
               </div>
-              <div style={{ fontSize: 13, color: '#64748b', marginTop: 8 }}>
-                While you are on approved leave you will not receive new auto-assigned leads. Your existing leads stay with you.
-              </div>
+              {/* Lead auto-assignment only applies to the roles that actually
+                  CARRY leads. Shown to everyone, this told trainers and HR
+                  that their leave affects a lead queue they do not have —
+                  which, next to an approver literally named "lead", read as
+                  gibberish. */}
+              {isLeadOwnerRole() && (
+                <div style={{ fontSize: 13, color: '#64748b', marginTop: 8 }}>
+                  While you are on approved leave you will not receive new auto-assigned leads. Your existing leads stay with you.
+                </div>
+              )}
             </Card>
           )}
 
