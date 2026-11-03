@@ -118,6 +118,7 @@ import StudentHowItWorks from './pages/Student/StudentHowItWorks'
 import TrainerMaterials from './pages/Trainer/TrainerMaterials'
 import TrainerDashboard from './pages/Trainer/TrainerDashboard'
 import TrainerMyDay from './pages/Trainer/TrainerMyDay'
+import TrainerBatchStudents from './pages/Trainer/TrainerBatchStudents'
 import TrainerClassConsolePage from './pages/Trainer/TrainerClassConsolePage'
 import TrainerStudents from './pages/Trainer/TrainerStudents'
 import HrDashboard from './pages/Hr/HrDashboard'
@@ -258,6 +259,10 @@ function App() {
             and a trainer can bookmark the class they teach every morning. */}
         <Route path="/trainer/classes/:classId/console" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerClassConsolePage /></Layout></ProtectedRoute>} />
         <Route path="/trainer/students" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerStudents /></Layout></ProtectedRoute>} />
+        {/* Bulk placement + movement between batches. Separate from
+            /trainer/students, which is the per-student admin view (reset
+            password, sudo login). */}
+        <Route path="/trainer/batch-students" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerBatchStudents /></Layout></ProtectedRoute>} />
         <Route path="/hr/dashboard" element={<ProtectedRoute tab="hr.dashboard"><Layout><HrDashboard /></Layout></ProtectedRoute>} />
         <Route path="/hr/interviews" element={<ProtectedRoute tab="hr.interviews"><Layout><HrInterviews /></Layout></ProtectedRoute>} />
         {/* Speedup Hiring — internal staff recruitment. Distinct from

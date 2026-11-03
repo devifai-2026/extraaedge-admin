@@ -930,6 +930,10 @@ export const coursesApi = {
   listBatchStudents: (programId, batchId) => api.get(`/courses/${programId}/batches/${batchId}/students`),
   listUnassignedStudents: (programId) => api.get(`/courses/${programId}/unassigned-students`),
   placeStudent: (programId, body) => api.post(`/courses/${programId}/batches/place`, body),
+  // Every student on the course WITH their batch (unassigned included), so one
+  // surface can both add and move. unassignedStudents only ever returns the
+  // students who have no batch.
+  studentsWithBatch: (programId) => api.get(`/courses/${programId}/students-with-batch`),
   mergeBatches: (programId, body) => api.post(`/courses/${programId}/batches/merge`, body),
 };
 
