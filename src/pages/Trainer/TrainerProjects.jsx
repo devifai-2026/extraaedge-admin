@@ -9,7 +9,7 @@ import AddIcon from '@mui/icons-material/Add';
 import AssignmentIcon from '@mui/icons-material/AssignmentOutlined';
 import { assessmentsApi } from '../../lib/endpoints';
 import { useCourseScope, CoursePicker } from './CourseScope';
-import { PageHeader, Card, EmptyState } from '../../lib/lmsUi';
+import { PageHeader, Card, EmptyState, TableWrap, TH, TD, TR, RowActions, Btn, Badge } from '../../lib/lmsUi';
 import { fmtDate } from '../Accounts/utils';
 
 export default function TrainerProjects() {
@@ -43,25 +43,39 @@ export default function TrainerProjects() {
       {!programId && <Card><EmptyState icon="🗂️" title="Pick a course" text="Choose a course above to see and assign its projects." /></Card>}
       {programId && (projects.length === 0 ? <Card><EmptyState icon="🗂️" title="No projects yet" text="Create a project brief — students submit a live link and GitHub URL for you to grade." /></Card> : (
         <Card pad={0} style={{ overflow: 'hidden' }}>
-          <Table size="small">
-            <TableHead><TableRow sx={{ background: '#fafbfc' }}><TableCell>Project</TableCell><TableCell>Deadline</TableCell><TableCell align="center">Submitted</TableCell><TableCell align="center">Graded</TableCell><TableCell align="center">To grade</TableCell><TableCell align="right" /></TableRow></TableHead>
-            <TableBody>{projects.map((p) => {
+          <TableWrap minWidth={780}>
+            <thead>
+              <tr>
+                <TH>Project</TH>
+                <TH width={120}>Deadline</TH>
+                <TH align="right" width={100}>Submitted</TH>
+                <TH align="right" width={90}>Graded</TH>
+                <TH align="right" width={100}>To grade</TH>
+                <TH align="right" width={160} />
+              </tr>
+            </thead>
+            <tbody>{projects.map((p) => {
               const pending = Math.max(0, (p.submission_count || 0) - (p.graded_count || 0));
               return (
-              <TableRow key={p.id} hover>
-                <TableCell>{p.title}</TableCell><TableCell sx={{ color: '#64748b' }}>{p.deadline ? fmtDate(p.deadline) : '—'}</TableCell>
-                <TableCell align="center">{p.submission_count}</TableCell><TableCell align="center">{p.graded_count}</TableCell>
-                <TableCell align="center">{pending > 0 ? <span style={{ background: '#fef3c7', color: '#b45309', fontWeight: 700, borderRadius: 999, padding: '2px 9px', fontSize: 12 }}>{pending}</span> : <span style={{ color: '#cbd5e1' }}>0</span>}</TableCell>
-                <TableCell align="right">
-                  <Button size="small" variant={pending > 0 ? 'contained' : 'outlined'} onClick={() => setSubsFor(p)}
-                    sx={{ textTransform: 'none', ...(pending > 0 ? { bgcolor: '#E53935' } : { color: '#E53935', borderColor: '#E53935' }) }}>
+              <TR key={p.id} onClick={() => setSubsFor(p)}>
+                <TD><span style={{ fontWeight: 650 }}>{p.title}</span></TD>
+                <TD muted>{p.deadline ? fmtDate(p.deadline) : '—'}</TD>
+                <TD align="right">{p.submission_count}</TD>
+                <TD align="right">{p.graded_count}</TD>
+                <TD align="right">
+                  {pending > 0
+                    ? <Badge tone="warning">{pending}</Badge>
+                    : <span style={{ color: '#cbd5e1' }}>0</span>}
+                </TD>
+                <RowActions>
+                  <Btn size="sm" variant={pending > 0 ? 'primary' : 'ghost'} onClick={() => setSubsFor(p)}>
                     {pending > 0 ? `Grade ${pending}` : 'Grade / view'}
-                  </Button>
-                </TableCell>
-              </TableRow>
+                  </Btn>
+                </RowActions>
+              </TR>
               );
-            })}</TableBody>
-          </Table>
+            })}</tbody>
+          </TableWrap>
         </Card>
       ))}
 

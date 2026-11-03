@@ -11,7 +11,7 @@ import EditIcon from '@mui/icons-material/EditOutlined';
 import QuizIcon from '@mui/icons-material/QuizOutlined';
 import { assessmentsApi } from '../../lib/endpoints';
 import { useCourseScope, CoursePicker } from './CourseScope';
-import { PageHeader, Card, EmptyState, Badge } from '../../lib/lmsUi';
+import { PageHeader, Card, EmptyState, Badge, TableWrap, TH, TD, TR, RowActions, Btn } from '../../lib/lmsUi';
 
 export default function TrainerTests() {
   // Course comes from the shared trainer scope: picked once, kept in the URL
@@ -59,22 +59,39 @@ export default function TrainerTests() {
       {!programId && <Card><EmptyState icon="📝" title="Pick a course" text="Choose a course above to see and create its mock tests." /></Card>}
       {programId && (tests.length === 0 ? <Card><EmptyState icon="📝" title="No tests yet" text="Create your first MCQ test — student attempts are auto-scored the moment they submit." /></Card> : (
         <Card pad={0} style={{ overflow: 'hidden' }}>
-          <Table size="small">
-            <TableHead><TableRow sx={{ background: '#fafbfc' }}><TableCell>Test</TableCell><TableCell align="center">Status</TableCell><TableCell align="center">Marks</TableCell><TableCell align="center">Attempts</TableCell><TableCell align="right" /></TableRow></TableHead>
-            <TableBody>{tests.map((t) => (
-              <TableRow key={t.id} hover>
-                <TableCell>{t.title}</TableCell>
-                <TableCell align="center"><Badge tone={t.is_published ? 'success' : 'neutral'}>{t.is_published ? 'Published' : 'Draft'}</Badge></TableCell>
-                <TableCell align="center">{t.total_marks}</TableCell><TableCell align="center">{t.attempt_count}</TableCell>
-                <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                  <Button size="small" onClick={() => togglePublish(t)} disabled={busyId === t.id} sx={{ textTransform: 'none' }}>{t.is_published ? 'Unpublish' : 'Publish'}</Button>
-                  <Button size="small" onClick={() => setResultsFor(t)} sx={{ textTransform: 'none' }}>Results</Button>
-                  <IconButton size="small" title={t.attempt_count > 0 ? 'Edit title only (students have attempted)' : 'Edit test'} onClick={() => setEditTest(t)}><EditIcon fontSize="small" /></IconButton>
-                  <IconButton size="small" title="Delete" onClick={() => removeTest(t)} disabled={busyId === t.id}><DeleteOutlineIcon fontSize="small" /></IconButton>
-                </TableCell>
-              </TableRow>
-            ))}</TableBody>
-          </Table>
+          <TableWrap minWidth={760}>
+            <thead>
+              <tr>
+                <TH>Test</TH>
+                <TH width={110}>Status</TH>
+                <TH align="right" width={80}>Marks</TH>
+                <TH align="right" width={90}>Attempts</TH>
+                <TH align="right" width={250} />
+              </tr>
+            </thead>
+            <tbody>
+              {tests.map((t) => (
+                <TR key={t.id} onClick={() => setResultsFor(t)}>
+                  <TD><span style={{ fontWeight: 650 }}>{t.title}</span></TD>
+                  <TD>
+                    <Badge tone={t.is_published ? 'success' : 'neutral'}>
+                      {t.is_published ? 'Published' : 'Draft'}
+                    </Badge>
+                  </TD>
+                  <TD align="right">{t.total_marks}</TD>
+                  <TD align="right">{t.attempt_count}</TD>
+                  <RowActions>
+                    <Btn size="sm" variant="ghost" disabled={busyId === t.id} onClick={() => togglePublish(t)}>
+                      {t.is_published ? 'Unpublish' : 'Publish'}
+                    </Btn>
+                    <Btn size="sm" variant="ghost" onClick={() => setResultsFor(t)}>Results</Btn>
+                    <IconButton size="small" title={t.attempt_count > 0 ? 'Edit title only (students have attempted)' : 'Edit test'} onClick={() => setEditTest(t)}><EditIcon fontSize="small" /></IconButton>
+                    <IconButton size="small" title="Delete" onClick={() => removeTest(t)} disabled={busyId === t.id}><DeleteOutlineIcon fontSize="small" /></IconButton>
+                  </RowActions>
+                </TR>
+              ))}
+            </tbody>
+          </TableWrap>
         </Card>
       ))}
 

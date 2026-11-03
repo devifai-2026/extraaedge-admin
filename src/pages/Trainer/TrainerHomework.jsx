@@ -9,7 +9,7 @@ import AddIcon from '@mui/icons-material/Add';
 import HomeworkIcon from '@mui/icons-material/HistoryEduOutlined';
 import { homeworkApi } from '../../lib/endpoints';
 import { useCourseScope, CoursePicker } from './CourseScope';
-import { PageHeader, Card, EmptyState } from '../../lib/lmsUi';
+import { PageHeader, Card, EmptyState, TableWrap, TH, TD, TR, RowActions, Btn, Badge } from '../../lib/lmsUi';
 import { fmtDate } from '../Accounts/utils';
 
 export default function TrainerHomework() {
@@ -39,21 +39,37 @@ export default function TrainerHomework() {
       {!programId && <Card><EmptyState icon="📚" title="Pick a course" text="Choose a course to assign homework." /></Card>}
       {programId && (items.length === 0 ? <Card><EmptyState icon="📚" title="No homework yet" text="Create a homework brief — students submit a file for you to grade." /></Card> : (
         <Card pad={0} style={{ overflow: 'hidden' }}>
-          <Table size="small">
-            <TableHead><TableRow sx={{ background: '#fafbfc', '& th': { color: '#64748b', fontWeight: 700, fontSize: 12 } }}><TableCell>Homework</TableCell><TableCell>Deadline</TableCell><TableCell align="center">Submitted</TableCell><TableCell align="center">To grade</TableCell><TableCell align="right" /></TableRow></TableHead>
-            <TableBody>{items.map((h) => {
+          <TableWrap minWidth={760}>
+            <thead>
+              <tr>
+                <TH>Homework</TH>
+                <TH width={120}>Deadline</TH>
+                <TH align="right" width={100}>Submitted</TH>
+                <TH align="right" width={100}>To grade</TH>
+                <TH align="right" width={160} />
+              </tr>
+            </thead>
+            <tbody>{items.map((h) => {
               const pending = Math.max(0, (h.submission_count || 0) - (h.graded_count || 0));
               return (
-                <TableRow key={h.id} hover>
-                  <TableCell>{h.title}</TableCell>
-                  <TableCell sx={{ color: '#64748b' }}>{h.deadline ? fmtDate(h.deadline) : '—'}</TableCell>
-                  <TableCell align="center">{h.submission_count}</TableCell>
-                  <TableCell align="center">{pending > 0 ? <span style={{ background: '#fef3c7', color: '#b45309', fontWeight: 700, borderRadius: 999, padding: '2px 9px', fontSize: 12 }}>{pending}</span> : <span style={{ color: '#cbd5e1' }}>0</span>}</TableCell>
-                  <TableCell align="right"><Button size="small" variant={pending > 0 ? 'contained' : 'outlined'} onClick={() => setSubsFor(h)} sx={{ textTransform: 'none', ...(pending > 0 ? { bgcolor: '#E53935' } : { color: '#E53935', borderColor: '#E53935' }) }}>{pending > 0 ? `Grade ${pending}` : 'Grade / view'}</Button></TableCell>
-                </TableRow>
+                <TR key={h.id} onClick={() => setSubsFor(h)}>
+                  <TD><span style={{ fontWeight: 650 }}>{h.title}</span></TD>
+                  <TD muted>{h.deadline ? fmtDate(h.deadline) : '—'}</TD>
+                  <TD align="right">{h.submission_count}</TD>
+                  <TD align="right">
+                    {pending > 0
+                      ? <Badge tone="warning">{pending}</Badge>
+                      : <span style={{ color: '#cbd5e1' }}>0</span>}
+                  </TD>
+                  <RowActions>
+                    <Btn size="sm" variant={pending > 0 ? 'primary' : 'ghost'} onClick={() => setSubsFor(h)}>
+                      {pending > 0 ? `Grade ${pending}` : 'Grade / view'}
+                    </Btn>
+                  </RowActions>
+                </TR>
               );
-            })}</TableBody>
-          </Table>
+            })}</tbody>
+          </TableWrap>
         </Card>
       ))}
 
