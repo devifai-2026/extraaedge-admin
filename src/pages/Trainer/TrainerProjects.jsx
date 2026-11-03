@@ -7,19 +7,22 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import AssignmentIcon from '@mui/icons-material/AssignmentOutlined';
-import { coursesApi, assessmentsApi } from '../../lib/endpoints';
+import { assessmentsApi } from '../../lib/endpoints';
+import { useCourseScope, CoursePicker } from './CourseScope';
 import { PageHeader, Card, EmptyState } from '../../lib/lmsUi';
 import { fmtDate } from '../Accounts/utils';
 
 export default function TrainerProjects() {
-  const [courses, setCourses] = useState([]);
-  const [programId, setProgramId] = useState('');
+  // Course comes from the shared trainer scope: picked once, kept in the URL
+  // and localStorage, so it survives navigation instead of being re-chosen on
+  // every page. Falls back to the first course so the page renders content
+  // immediately rather than gating behind a dropdown.
+  const { programId: scopedId, courses } = useCourseScope();
+  const programId = scopedId || courses[0]?.id || '';
   const [projects, setProjects] = useState([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [subsFor, setSubsFor] = useState(null);
   const [toast, setToast] = useState(null);
-
-  useEffect(() => { coursesApi.list().then((r) => setCourses(r?.data || [])).catch(() => {}); }, []);
   const load = useCallback(() => { if (programId) assessmentsApi.listProjects(programId).then((r) => setProjects(r?.data || [])).catch(() => {}); }, [programId]);
   useEffect(() => { load(); }, [load]);
 
@@ -31,9 +34,7 @@ export default function TrainerProjects() {
         icon={AssignmentIcon}
         right={(
           <>
-            <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, background: '#fff' }}>
-              {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </TextField>
+            <CoursePicker allowAll={false} width={240} />
             {programId && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>New project</Button>}
           </>
         )}

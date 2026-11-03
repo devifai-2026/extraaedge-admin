@@ -3,16 +3,19 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Box, MenuItem, TextField } from '@mui/material';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEventsOutlined';
-import { coursesApi, assessmentsApi } from '../../lib/endpoints';
+import { assessmentsApi } from '../../lib/endpoints';
+import { useCourseScope, CoursePicker } from './CourseScope';
 import { PageHeader, Card, EmptyState } from '../../lib/lmsUi';
 import LeaderboardTable from './LeaderboardTable';
 
 export default function TrainerLeaderboard() {
-  const [courses, setCourses] = useState([]);
-  const [programId, setProgramId] = useState('');
+  // Course comes from the shared trainer scope: picked once, kept in the URL
+  // and localStorage, so it survives navigation instead of being re-chosen on
+  // every page. Falls back to the first course so the page renders content
+  // immediately rather than gating behind a dropdown.
+  const { programId: scopedId, courses } = useCourseScope();
+  const programId = scopedId || courses[0]?.id || '';
   const [rows, setRows] = useState([]);
-
-  useEffect(() => { coursesApi.list().then((r) => setCourses(r?.data || [])).catch(() => {}); }, []);
   const load = useCallback(() => { if (programId) assessmentsApi.leaderboard(programId).then((r) => setRows(r?.data || [])).catch(() => {}); }, [programId]);
   useEffect(() => { load(); }, [load]);
 
@@ -23,9 +26,7 @@ export default function TrainerLeaderboard() {
         subtitle="Ranked by tests + projects + attendance + interviews."
         icon={EmojiEventsIcon}
         right={(
-          <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, background: '#fff' }}>
-            {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-          </TextField>
+          <CoursePicker allowAll={false} width={240} />
         )}
       />
       {!programId

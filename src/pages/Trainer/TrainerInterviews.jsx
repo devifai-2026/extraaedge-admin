@@ -9,19 +9,22 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOverOutlined';
-import { coursesApi, interviewsApi } from '../../lib/endpoints';
+import { interviewsApi } from '../../lib/endpoints';
+import { useCourseScope, CoursePicker } from './CourseScope';
 import { fmtDate } from '../Accounts/utils';
 import { PageHeader, Card, EmptyState } from '../../lib/lmsUi';
 
 export default function TrainerInterviews() {
-  const [courses, setCourses] = useState([]);
-  const [programId, setProgramId] = useState('');
+  // Course comes from the shared trainer scope: picked once, kept in the URL
+  // and localStorage, so it survives navigation instead of being re-chosen on
+  // every page. Falls back to the first course so the page renders content
+  // immediately rather than gating behind a dropdown.
+  const { programId: scopedId, courses } = useCourseScope();
+  const programId = scopedId || courses[0]?.id || '';
   const [items, setItems] = useState([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [slotsFor, setSlotsFor] = useState(null);
   const [toast, setToast] = useState(null);
-
-  useEffect(() => { coursesApi.list().then((r) => setCourses(r?.data || [])).catch(() => {}); }, []);
   const load = useCallback(() => { if (programId) interviewsApi.list(programId).then((r) => setItems(r?.data || [])).catch(() => {}); }, [programId]);
   useEffect(() => { load(); }, [load]);
 
@@ -33,9 +36,7 @@ export default function TrainerInterviews() {
         icon={RecordVoiceOverIcon}
         right={(
           <>
-            <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, background: '#fff' }}>
-              {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </TextField>
+            <CoursePicker allowAll={false} width={240} />
             {programId && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>New interview</Button>}
           </>
         )}

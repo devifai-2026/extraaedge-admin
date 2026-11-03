@@ -9,19 +9,22 @@ import ThumbUpOffAltIcon from '@mui/icons-material/ThumbUpOffAlt';
 import ChatBubbleOutlineIcon from '@mui/icons-material/CommentOutlined';
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
 import { PageHeader, Card, EmptyState, Badge } from '../../lib/lmsUi';
-import { coursesApi, communityApi } from '../../lib/endpoints';
+import { communityApi } from '../../lib/endpoints';
+import { useCourseScope, CoursePicker } from './CourseScope';
 
 const fmt = (v) => { try { return new Date(v).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };
 
 export default function TrainerAnnouncements() {
-  const [courses, setCourses] = useState([]);
-  const [programId, setProgramId] = useState('');
+  // Course comes from the shared trainer scope: picked once, kept in the URL
+  // and localStorage, so it survives navigation instead of being re-chosen on
+  // every page. Falls back to the first course so the page renders content
+  // immediately rather than gating behind a dropdown.
+  const { programId: scopedId, courses } = useCourseScope();
+  const programId = scopedId || courses[0]?.id || '';
   const [feed, setFeed] = useState([]);
   const [body, setBody] = useState('');
   const [title, setTitle] = useState('');
   const [toast, setToast] = useState(null);
-
-  useEffect(() => { coursesApi.list().then((r) => setCourses(r?.data || [])).catch(() => {}); }, []);
   const load = useCallback(() => { if (programId) communityApi.listAnnouncements(programId).then((r) => setFeed(r?.data || [])).catch((e) => setToast({ severity: 'error', text: e.message })); }, [programId]);
   useEffect(() => { load(); }, [load]);
 
@@ -38,9 +41,7 @@ export default function TrainerAnnouncements() {
         subtitle="Post updates to your course. Students can comment and like."
         icon={CampaignOutlinedIcon}
         right={(
-          <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, background: '#fff' }}>
-            {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-          </TextField>
+          <CoursePicker allowAll={false} width={240} />
         )}
       />
 

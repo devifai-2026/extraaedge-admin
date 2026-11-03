@@ -10,13 +10,18 @@ import AddIcon from '@mui/icons-material/Add';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import { PageHeader, Card, EmptyState, Badge, Btn } from '../../lib/lmsUi';
 import { coursesApi, classesApi } from '../../lib/endpoints';
+import { useCourseScope, CoursePicker } from './CourseScope';
 import { fmtDate } from '../Accounts/utils';
 import TrainerClassConsole from './TrainerClassConsole';
 
 export default function TrainerClasses() {
   const navigate = useNavigate();
-  const [courses, setCourses] = useState([]);
-  const [programId, setProgramId] = useState('');
+  // Course now comes from the shared scope, so it survives navigation and is
+  // deep-linkable. This page needs a CONCRETE course (it loads that course's
+  // batches and modules to schedule into), so it falls back to the first
+  // course rather than offering "All".
+  const { programId: scopedId, courses } = useCourseScope();
+  const programId = scopedId || courses[0]?.id || '';
   const [batches, setBatches] = useState([]);
   const [modules, setModules] = useState([]);
   const [trainers, setTrainers] = useState([]);
@@ -28,7 +33,6 @@ export default function TrainerClasses() {
   const [consoleClass, setConsoleClass] = useState(null);
   const [view, setView] = useState('list'); // 'list' | 'calendar'
 
-  useEffect(() => { coursesApi.list().then((r) => setCourses(r?.data || [])).catch(() => {}); }, []);
 
   const loadCourse = useCallback((pid) => {
     if (!pid) return;
@@ -39,16 +43,21 @@ export default function TrainerClasses() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { if (programId) loadCourse(programId); }, [programId, loadCourse]);
+  // Deferred a tick: loadCourse calls setLoading synchronously, and with
+  // programId now derived from shared scope that lands inside the same commit
+  // as the parent's render, which React flags as a cascading update.
+  useEffect(() => {
+    if (!programId) return undefined;
+    const t = setTimeout(() => loadCourse(programId), 0);
+    return () => clearTimeout(t);
+  }, [programId, loadCourse]);
 
   return (
     <Box sx={{ p: 3, maxWidth: 1000, mx: 'auto' }}>
       <PageHeader title="Classes" subtitle="Schedule classes for your batches and run live attendance." icon={CalendarMonthOutlinedIcon} />
 
       <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-        <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240 }}>
-          {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-        </TextField>
+        <CoursePicker allowAll={false} width={240} />
         {programId && (
           <Button variant="contained" startIcon={<AddIcon />} disabled={batches.length === 0} onClick={() => setCreateOpen(true)}
                   sx={{ textTransform: 'none', bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' } }}>Schedule class</Button>

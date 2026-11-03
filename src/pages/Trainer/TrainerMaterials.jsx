@@ -10,6 +10,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import FolderIcon from '@mui/icons-material/FolderOutlined';
 import { coursesApi, learningApi, uploadsApi } from '../../lib/endpoints';
+import { useCourseScope, CoursePicker } from './CourseScope';
 import { PageHeader, Card, EmptyState, Badge } from '../../lib/lmsUi';
 
 // XHR upload with progress (fetch has no upload progress).
@@ -26,8 +27,12 @@ function putWithProgress(url, method, headers, file, onPct) {
 }
 
 export default function TrainerMaterials() {
-  const [courses, setCourses] = useState([]);
-  const [programId, setProgramId] = useState('');
+  // Course comes from the shared trainer scope: picked once, kept in the URL
+  // and localStorage, so it survives navigation instead of being re-chosen on
+  // every page. Falls back to the first course so the page renders content
+  // immediately rather than gating behind a dropdown.
+  const { programId: scopedId, courses } = useCourseScope();
+  const programId = scopedId || courses[0]?.id || '';
   const [modules, setModules] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [kind, setKind] = useState('file');
@@ -37,18 +42,8 @@ export default function TrainerMaterials() {
   const [toast, setToast] = useState(null);
   const fileRef = useRef(null);
 
-  // Auto-select the first course so the page opens WITH data rather than a
-  // blank "pick a course" panel — a trainer almost always wants the course
-  // they teach, and an empty screen reads as "nothing here".
-  useEffect(() => {
-    coursesApi.list()
-      .then((r) => {
-        const list = r?.data || [];
-        setCourses(list);
-        setProgramId((cur) => cur || list[0]?.id || '');
-      })
-      .catch(() => {});
-  }, []);
+  // The "open with data, not a picker" behaviour this page pioneered now
+  // lives in CourseScope and applies to every trainer page.
   const load = useCallback(() => {
     if (!programId) return;
     coursesApi.listModules(programId).then((r) => setModules(r?.data || [])).catch(() => {});
@@ -99,9 +94,7 @@ export default function TrainerMaterials() {
         subtitle="Share slides, notes and resources with your students — by module or course-wide."
         icon={FolderIcon}
         right={(
-          <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, background: '#fff' }}>
-            {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-          </TextField>
+          <CoursePicker allowAll={false} width={240} />
         )}
       />
 

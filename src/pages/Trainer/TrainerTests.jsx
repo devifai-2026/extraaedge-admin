@@ -9,20 +9,23 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import EditIcon from '@mui/icons-material/EditOutlined';
 import QuizIcon from '@mui/icons-material/QuizOutlined';
-import { coursesApi, assessmentsApi } from '../../lib/endpoints';
+import { assessmentsApi } from '../../lib/endpoints';
+import { useCourseScope, CoursePicker } from './CourseScope';
 import { PageHeader, Card, EmptyState, Badge } from '../../lib/lmsUi';
 
 export default function TrainerTests() {
-  const [courses, setCourses] = useState([]);
-  const [programId, setProgramId] = useState('');
+  // Course comes from the shared trainer scope: picked once, kept in the URL
+  // and localStorage, so it survives navigation instead of being re-chosen on
+  // every page. Falls back to the first course so the page renders content
+  // immediately rather than gating behind a dropdown.
+  const { programId: scopedId, courses } = useCourseScope();
+  const programId = scopedId || courses[0]?.id || '';
   const [tests, setTests] = useState([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTest, setEditTest] = useState(null);
   const [resultsFor, setResultsFor] = useState(null);
   const [busyId, setBusyId] = useState('');
   const [toast, setToast] = useState(null);
-
-  useEffect(() => { coursesApi.list().then((r) => setCourses(r?.data || [])).catch(() => {}); }, []);
   const load = useCallback(() => { if (programId) assessmentsApi.listTests(programId).then((r) => setTests(r?.data || [])).catch(() => {}); }, [programId]);
   useEffect(() => { load(); }, [load]);
 
@@ -47,9 +50,7 @@ export default function TrainerTests() {
         icon={QuizIcon}
         right={(
           <>
-            <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, background: '#fff' }}>
-              {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </TextField>
+            <CoursePicker allowAll={false} width={240} />
             {programId && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} sx={{ textTransform: 'none', bgcolor: '#E53935' }}>New test</Button>}
           </>
         )}

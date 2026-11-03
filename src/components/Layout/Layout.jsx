@@ -4,6 +4,7 @@ import Header from './Header';
 import UnendedClassPrompt from '../../pages/Trainer/UnendedClassPrompt';
 import BatchDatesPrompt from '../../pages/Trainer/BatchDatesPrompt';
 import { LmsStyles } from '../../lib/lmsUi';
+import { CourseScopeProvider } from '../../pages/Trainer/CourseScope';
 import GlobalWatermark from '../DataProtection/GlobalWatermark';
 import Sidebar from './Sidebar';
 import BranchSetupDialog from '../BranchSetupDialog/BranchSetupDialog';
@@ -124,7 +125,11 @@ function Layout({ children }) {
           onToggle={() => setUserCollapsed((v) => !v)}
         />
         <main className={`layout-content ${collapsed ? 'sidebar-collapsed' : ''}`}>
-          {children}
+          {/* One course selection shared by every trainer page. Mounted here
+              rather than around the trainer routes because those are
+              interleaved with other modules in App.jsx; the provider is inert
+              for pages that never call useCourseScope. */}
+          <CourseScopeProvider>{children}</CourseScopeProvider>
         </main>
       </div>
       <BranchSetupDialog

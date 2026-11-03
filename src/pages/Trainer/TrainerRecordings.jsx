@@ -8,12 +8,17 @@ import {
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import VideoLibraryOutlinedIcon from '@mui/icons-material/VideoLibraryOutlined';
 import { PageHeader, Card, EmptyState } from '../../lib/lmsUi';
-import { coursesApi, classesApi, communityApi, uploadsApi } from '../../lib/endpoints';
+import { classesApi, communityApi, uploadsApi } from '../../lib/endpoints';
+import { useCourseScope, CoursePicker } from './CourseScope';
 
 export default function TrainerRecordings() {
   const [missed, setMissed] = useState([]);
-  const [courses, setCourses] = useState([]);
-  const [programId, setProgramId] = useState('');
+  // Course comes from the shared trainer scope: picked once, kept in the URL
+  // and localStorage, so it survives navigation instead of being re-chosen on
+  // every page. Falls back to the first course so the page renders content
+  // immediately rather than gating behind a dropdown.
+  const { programId: scopedId, courses } = useCourseScope();
+  const programId = scopedId || courses[0]?.id || '';
   const [classes, setClasses] = useState([]);
   const [classId, setClassId] = useState('');
   const [busy, setBusy] = useState(false);
@@ -22,7 +27,7 @@ export default function TrainerRecordings() {
   const fileRef = useRef(null);
 
   const loadMissed = useCallback(() => { communityApi.missedRecordings().then((r) => setMissed(r?.data || [])).catch(() => {}); }, []);
-  useEffect(() => { loadMissed(); coursesApi.list().then((r) => setCourses(r?.data || [])).catch(() => {}); }, [loadMissed]);
+  useEffect(() => { loadMissed(); }, [loadMissed]);
   useEffect(() => { if (programId) classesApi.list({ programId }).then((r) => setClasses(r?.data || [])).catch(() => {}); }, [programId]);
 
   const onPick = async (e) => {
@@ -61,9 +66,7 @@ export default function TrainerRecordings() {
 
       <Card title="Upload a recording">
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-          <TextField select size="small" label="Course" value={programId} onChange={(e) => { setProgramId(e.target.value); setClassId(''); }} sx={{ minWidth: 220 }}>
-            {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-          </TextField>
+          <CoursePicker allowAll={false} width={240} />
           <TextField select size="small" label="Class" value={classId} onChange={(e) => setClassId(e.target.value)} sx={{ minWidth: 240 }} disabled={!programId}>
             {classes.map((c) => <MenuItem key={c.id} value={c.id}>{c.title} · {c.batch_name}</MenuItem>)}
           </TextField>

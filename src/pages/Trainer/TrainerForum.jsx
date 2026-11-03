@@ -3,17 +3,20 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Box, MenuItem, TextField, Collapse } from '@mui/material';
 import ForumIcon from '@mui/icons-material/ForumOutlined';
-import { coursesApi, forumApi } from '../../lib/endpoints';
+import { forumApi } from '../../lib/endpoints';
+import { useCourseScope, CoursePicker } from './CourseScope';
 import { PageHeader, Card, Badge, Btn, EmptyState } from '../../lib/lmsUi';
 
 const fmt = (v) => { try { return new Date(v).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch { return ''; } };
 
 export default function TrainerForum() {
-  const [courses, setCourses] = useState([]);
-  const [programId, setProgramId] = useState('');
+  // Course comes from the shared trainer scope: picked once, kept in the URL
+  // and localStorage, so it survives navigation instead of being re-chosen on
+  // every page. Falls back to the first course so the page renders content
+  // immediately rather than gating behind a dropdown.
+  const { programId: scopedId, courses } = useCourseScope();
+  const programId = scopedId || courses[0]?.id || '';
   const [threads, setThreads] = useState([]);
-
-  useEffect(() => { coursesApi.list().then((r) => setCourses(r?.data || [])).catch(() => {}); }, []);
   const load = useCallback(() => { if (programId) forumApi.listThreads(programId).then((r) => setThreads(r?.data || [])).catch(() => {}); }, [programId]);
   useEffect(() => { load(); }, [load]);
 
@@ -28,9 +31,7 @@ export default function TrainerForum() {
         right={(
           <>
             {programId && open > 0 && <Badge tone="warning">{open} awaiting reply</Badge>}
-            <TextField select size="small" label="Course" value={programId} onChange={(e) => setProgramId(e.target.value)} sx={{ minWidth: 240, background: '#fff' }}>
-              {courses.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </TextField>
+            <CoursePicker allowAll={false} width={240} />
           </>
         )}
       />
