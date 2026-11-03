@@ -207,9 +207,17 @@ const FiltersOptions = ({ onRefresh, onDistributeSelected, selectedCount = 0, to
     return (
         <>
             <div className="raw-data-manager-bottomcontainer filters-toolbar">
-                <div className="raw-data-manager-bottomcontainer-content">
+                {/* ROW 1 — search + every ACTION.
+                    Previously this single row also held the five origin-filter
+                    pills, all under one flexWrap:'wrap'. With ~9 controls
+                    competing for one line the pills lost and wrapped into a
+                    ragged three-row block beside the buttons, so neither group
+                    read as a unit. Row 1 is now actions only and does NOT wrap
+                    (nowrap + a scrollable action cluster); the filters moved to
+                    row 2 below. */}
+                <div className="raw-data-manager-bottomcontainer-content filters-toolbar-row">
 
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', flex: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'nowrap', flex: 1, minWidth: 0 }}>
                         <IconButton
                             size="small"
                             sx={iconBtnSx}
@@ -262,60 +270,6 @@ const FiltersOptions = ({ onRefresh, onDistributeSelected, selectedCount = 0, to
                             </Box>
                         )}
 
-                        {/* Quick origin filters — one-click toggles that write
-                            lead_origin into the advanced filter so they layer
-                            with the stage tab + search. Only shown when the
-                            parent wires onApplyFilter (LeadList does). Styled
-                            as one segmented pill-group (pillFilterSx) instead
-                            of four independently-styled buttons. */}
-                        {typeof onApplyFilter === 'function' && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-                                {originFilters.map(({ key, label, icon, brand }) => {
-                                    const active = advancedFilter?.lead_origin === key;
-                                    return (
-                                        <Tooltip
-                                            key={key}
-                                            title={active ? `Showing only ${label} leads — click to clear` : `Show only leads that came in via ${label}`}
-                                        >
-                                            <Button
-                                                size="small"
-                                                startIcon={icon}
-                                                onClick={() => {
-                                                    const next = { ...(advancedFilter || {}) };
-                                                    if (next.lead_origin === key) delete next.lead_origin;
-                                                    else next.lead_origin = key;
-                                                    onApplyFilter(next);
-                                                }}
-                                                sx={pillFilterSx(active, brand)}
-                                            >
-                                                {label}
-                                            </Button>
-                                        </Tooltip>
-                                    );
-                                })}
-                            </Box>
-                        )}
-
-                        {/* "Not updated" (stale) report — super_admin/managers.
-                            Opens a dialog for a date window + counsellor scope and
-                            filters to leads with no activity/follow-up in it. */}
-                        {canStaleReport && typeof onApplyFilter === 'function' && (
-                            <Tooltip title="Find stale leads — not touched (no activity/update) since a chosen date">
-                                <Button
-                                    size="small"
-                                    startIcon={<HistoryToggleOffIcon fontSize="small" />}
-                                    onClick={() => {
-                                        // Seed dialog from any active stale filter.
-                                        setStaleSince((advancedFilter?.no_activity_from || '').slice(0, 10));
-                                        setStaleCounsellor(advancedFilter?.assigned_to || '');
-                                        setOpenStale(true);
-                                    }}
-                                    sx={pillFilterSx(Boolean(advancedFilter?.no_activity_from), colors.primary)}
-                                >
-                                    Not updated
-                                </Button>
-                            </Tooltip>
-                        )}
                     </Box>
 
                     <Box sx={{ display: "flex", alignItems: 'center', gap: 0.5 }}>
@@ -455,6 +409,68 @@ const FiltersOptions = ({ onRefresh, onDistributeSelected, selectedCount = 0, to
                         </Tooltip>
                     </Box>
                 </div>
+
+                {/* ROW 2 — the FILTERS.
+                    Their own strip, so they can never be squeezed by the
+                    action buttons again. Horizontally scrollable rather than
+                    wrapping: a wrap here would reintroduce the variable-height
+                    bar this change exists to remove. */}
+                {(typeof onApplyFilter === 'function') && (
+                    <div className="filters-toolbar-sources">
+                        <span className="filters-toolbar-sources-label">Source</span>
+                        {/* Quick origin filters — one-click toggles that write
+                            lead_origin into the advanced filter so they layer
+                            with the stage tab + search. nowrap: the strip
+                            scrolls instead, so the toolbar keeps a fixed
+                            height at every width. */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'nowrap' }}>
+                            {originFilters.map(({ key, label, icon, brand }) => {
+                                const active = advancedFilter?.lead_origin === key;
+                                return (
+                                    <Tooltip
+                                        key={key}
+                                        title={active ? `Showing only ${label} leads — click to clear` : `Show only leads that came in via ${label}`}
+                                    >
+                                        <Button
+                                            size="small"
+                                            startIcon={icon}
+                                            onClick={() => {
+                                                const next = { ...(advancedFilter || {}) };
+                                                if (next.lead_origin === key) delete next.lead_origin;
+                                                else next.lead_origin = key;
+                                                onApplyFilter(next);
+                                            }}
+                                            sx={pillFilterSx(active, brand)}
+                                        >
+                                            {label}
+                                        </Button>
+                                    </Tooltip>
+                                );
+                            })}
+                        </Box>
+
+                        {/* "Not updated" (stale) report — super_admin/managers.
+                        Opens a dialog for a date window + counsellor scope and
+                        filters to leads with no activity/follow-up in it. */}
+                        {canStaleReport && (
+                            <Tooltip title="Find stale leads — not touched (no activity/update) since a chosen date">
+                                <Button
+                                    size="small"
+                                    startIcon={<HistoryToggleOffIcon fontSize="small" />}
+                                    onClick={() => {
+                                        // Seed dialog from any active stale filter.
+                                        setStaleSince((advancedFilter?.no_activity_from || '').slice(0, 10));
+                                        setStaleCounsellor(advancedFilter?.assigned_to || '');
+                                        setOpenStale(true);
+                                    }}
+                                    sx={pillFilterSx(Boolean(advancedFilter?.no_activity_from), colors.primary)}
+                                >
+                                    Not updated
+                                </Button>
+                            </Tooltip>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* ================= ASSIGN MODAL ================= */}

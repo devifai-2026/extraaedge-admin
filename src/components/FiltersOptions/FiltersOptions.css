@@ -12,6 +12,56 @@
     justify-content: space-between;
 }
 
+/* ROW 1 (search + actions) and ROW 2 (source filters) are separate strips.
+   Each row holds ONE kind of control, which is what stops the origin pills
+   from being squeezed into a ragged block by the action buttons. */
+.filters-toolbar-row {
+    gap: 12px;
+}
+
+/* The action cluster scrolls sideways on a narrow screen instead of wrapping:
+   a wrapping row changes the toolbar's height as the window resizes, which is
+   the behaviour this layout removes. */
+.filters-toolbar-row > *:last-child {
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.filters-toolbar-row > *:last-child::-webkit-scrollbar { display: none; }
+
+.filters-toolbar-sources {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-top: 1px solid #F1F1F4;
+    /* Scroll rather than wrap, for the same reason as the action cluster. */
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.filters-toolbar-sources::-webkit-scrollbar { display: none; }
+
+/* Names the row, so four coloured pills read as "filter by source" rather
+   than as four unexplained buttons. */
+.filters-toolbar-sources-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #9A97A6;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Pills keep their intrinsic width while the strip scrolls. */
+.filters-toolbar-sources .MuiBox-root,
+.filters-toolbar-sources .MuiButtonBase-root {
+    flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+    .filters-toolbar-sources { padding: 7px 12px; }
+}
+
 .sort-modal {
   width: 280px;
   padding: 10px;
