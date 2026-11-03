@@ -207,7 +207,17 @@ export default function TrainerDashboard() {
               {upcoming.length === 0 ? <EmptyState icon="📅" title="Nothing scheduled" text="Schedule a class from the Classes tab (a batch is needed first)." /> : (
                 <div style={{ display: 'grid', gap: 10 }}>
                   {upcoming.map((c) => (
-                    <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', borderLeft: `3px solid ${c.started_at && !c.ended_at ? '#dc2626' : ACCENT}`, paddingLeft: 10 }}>
+                    // Clickable. These rows already knew which class was live
+                    // and rendered a plain div, so the one place that had the
+                    // answer could not act on it.
+                    <div
+                      key={c.id}
+                      onClick={() => navigate(`/trainer/classes/${c.id}/console`)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/trainer/classes/${c.id}/console`); }}
+                      style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', borderLeft: `3px solid ${c.started_at && !c.ended_at ? '#dc2626' : ACCENT}`, paddingLeft: 10, cursor: 'pointer' }}
+                    >
                       <div>
                         <div style={{ fontSize: 13.5, fontWeight: 600, color: '#0f172a' }}>{c.title}</div>
                         <div style={{ fontSize: 12, color: '#64748b' }}>{c.batch_name ? `${c.batch_name} · ` : ''}{fmt(c.starts_at)}</div>

@@ -219,35 +219,38 @@ const menuSections = [
     children: [
       // Today first: it is the page a trainer should land on and the only one
       // that answers "what now". Dashboard stays as the analytics view.
-      { id: 198, label: 'Today',         icon: CalendarTodayIcon,   path: '/trainer/today',         tab: 'trainer.classes' },
-      { id: 199, label: 'Dashboard',     icon: AssessmentIcon,      path: '/trainer/dashboard',     tab: 'trainer.classes' },
-      { id: 200, label: 'My Courses',    icon: SchoolIcon,          path: '/trainer/courses',       tab: 'trainer.classes' },
-      { id: 212, label: 'Students',      icon: PeopleAltIcon,       path: '/trainer/students',      tab: 'trainer.classes' },
-      { id: 216, label: 'Batches',       icon: GroupsIcon,          path: '/trainer/batch-students', tab: 'trainer.classes' },
-      { id: 201, label: 'Classes',       icon: CalendarTodayIcon,   path: '/trainer/classes',       tab: 'trainer.classes' },
-      { id: 217, label: 'Roster',        icon: CalendarViewWeekIcon, path: '/trainer/roster',       tab: 'trainer.classes' },
-      { id: 213, label: 'Performance',   icon: AssessmentIcon,      path: '/trainer/performance',   tab: 'trainer.performance' },
-      { id: 202, label: 'Attendance',    icon: HowToRegIcon,        path: '/trainer/attendance',    tab: 'trainer.attendance' },
-      { id: 203, label: 'Recordings',    icon: GraphicEqIcon,       path: '/trainer/recordings',    tab: 'trainer.recordings' },
-      { id: 204, label: 'Announcements', icon: CampaignIcon,        path: '/trainer/announcements', tab: 'trainer.announcements' },
-      { id: 205, label: 'Student Forum', icon: PeopleAltIcon,       path: '/trainer/forum',         tab: 'trainer.forum' },
-      { id: 206, label: 'Mock Tests',    icon: ChecklistIcon,       path: '/trainer/tests',         tab: 'trainer.tests' },
-      { id: 207, label: 'Projects',      icon: AssessmentIcon,      path: '/trainer/projects',      tab: 'trainer.projects' },
-      { id: 215, label: 'Homework',      icon: HistoryEduIcon,      path: '/trainer/homework',      tab: 'trainer.projects' },
-      // Removed: a second 'My Leave' pointing at the legacy /courses/leaves
-      // page. It duplicated the pinned entry for trainers AND bypassed the
-      // approval chain — that page marked leave approved on submit. Trainers
-      // now use the same self-service panel as everyone else.
-      { id: 208, label: 'Mock Interviews', icon: HowToRegIcon,      path: '/trainer/interviews',    tab: 'trainer.interviews' },
-      { id: 209, label: 'Leaderboard',   icon: AssessmentIcon,      path: '/trainer/leaderboard',   tab: 'trainer.leaderboard' },
-      { id: 211, label: 'Materials',     icon: FolderIcon,          path: '/trainer/materials',     tab: 'trainer.materials' },
-      // Course + batch management. Keyed to 'courses.manage', NOT
-      // 'trainer.classes': head_trainer holds both, but a branch_manager holds
-      // only courses.manage (batch scheduling is theirs; the trainer working
-      // surfaces are not). Keying this off trainer.classes left the role with
-      // the tab granted and no way to reach the page.
-      // `hideWhenTab` keeps a head_trainer (who holds BOTH keys) from seeing
-      // two links to the same page — they already have 'My Courses' above.
+      // Ordered by how often a trainer touches it, not by when it was built.
+      // TEACH (daily) -> PEOPLE -> CONTENT -> COURSEWORK -> reference.
+      // Everything keeps its route and tab, so bookmarks and grants survive.
+
+      // -- Teach: the daily loop --
+      { id: 198, label: 'Today',         icon: CalendarTodayIcon,    path: '/trainer/today',          tab: 'trainer.classes' },
+      { id: 201, label: 'Classes',       icon: CalendarTodayIcon,    path: '/trainer/classes',        tab: 'trainer.classes' },
+      { id: 217, label: 'Roster',        icon: CalendarViewWeekIcon, path: '/trainer/roster',         tab: 'trainer.classes' },
+      // Was a second link to the class list; it is the attendance register now.
+      { id: 202, label: 'Attendance',    icon: HowToRegIcon,         path: '/trainer/attendance',     tab: 'trainer.attendance' },
+
+      // -- People --
+      { id: 212, label: 'Students',      icon: PeopleAltIcon,        path: '/trainer/students',       tab: 'trainer.classes' },
+      { id: 216, label: 'Batches',       icon: GroupsIcon,           path: '/trainer/batch-students', tab: 'trainer.classes' },
+      { id: 200, label: 'My Courses',    icon: SchoolIcon,           path: '/trainer/courses',        tab: 'trainer.classes' },
+
+      // -- Content a trainer publishes --
+      { id: 203, label: 'Recordings',    icon: GraphicEqIcon,        path: '/trainer/recordings',     tab: 'trainer.recordings' },
+      { id: 211, label: 'Materials',     icon: FolderIcon,           path: '/trainer/materials',      tab: 'trainer.materials' },
+      { id: 204, label: 'Announcements', icon: CampaignIcon,         path: '/trainer/announcements',  tab: 'trainer.announcements' },
+      { id: 205, label: 'Student Forum', icon: PeopleAltIcon,        path: '/trainer/forum',          tab: 'trainer.forum' },
+
+      // -- Coursework --
+      { id: 206, label: 'Mock Tests',    icon: ChecklistIcon,        path: '/trainer/tests',          tab: 'trainer.tests' },
+      { id: 207, label: 'Projects',      icon: AssessmentIcon,       path: '/trainer/projects',       tab: 'trainer.projects' },
+      { id: 215, label: 'Homework',      icon: HistoryEduIcon,       path: '/trainer/homework',       tab: 'trainer.projects' },
+      { id: 208, label: 'Mock Interviews', icon: HowToRegIcon,       path: '/trainer/interviews',     tab: 'trainer.interviews' },
+
+      // -- Reference: looked at occasionally, not worked in --
+      { id: 209, label: 'Leaderboard',   icon: AssessmentIcon,       path: '/trainer/leaderboard',    tab: 'trainer.leaderboard' },
+      { id: 213, label: 'Performance',   icon: AssessmentIcon,       path: '/trainer/performance',    tab: 'trainer.performance' },
+      { id: 199, label: 'Dashboard',     icon: AssessmentIcon,       path: '/trainer/dashboard',      tab: 'trainer.classes' },
       { id: 214, label: 'Courses & Batches', icon: SchoolIcon,      path: '/trainer/courses',       tab: 'courses.manage', hideWhenTab: 'trainer.classes' },
       // Admin/branch-manager only (gated by the lms.analytics tab).
       { id: 210, label: 'LMS Analytics', icon: AssessmentIcon,      path: '/lms/analytics',         tab: 'lms.analytics' },

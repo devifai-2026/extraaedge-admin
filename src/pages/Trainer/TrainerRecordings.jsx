@@ -58,7 +58,30 @@ export default function TrainerRecordings() {
             <span style={{ fontSize: 26, lineHeight: 1.2 }}>🎬</span>
             <div>
               <div style={{ fontWeight: 700, color: '#854d0e', fontSize: 13.5 }}>{missed.length} ended class{missed.length > 1 ? 'es' : ''} still need{missed.length > 1 ? '' : 's'} a recording</div>
-              <div style={{ fontSize: 12.5, color: '#a16207', marginTop: 2 }}>{missed.slice(0, 5).map((m) => `${m.title} (${m.batch_name})`).join(', ')}{missed.length > 5 ? '…' : ''}</div>
+              {/* Each class is a BUTTON, not text. This banner used to name
+                  the classes you owed a recording for and then make you find
+                  the same class again in two dropdowns — it knew the answer
+                  and refused to act on it. */}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
+                {missed.slice(0, 8).map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setClassId(m.id)}
+                    title="Select this class to upload its recording"
+                    style={{
+                      border: `1px solid ${classId === m.id ? '#854d0e' : '#fcd34d'}`,
+                      background: classId === m.id ? '#854d0e' : '#fffbeb',
+                      color: classId === m.id ? '#fff' : '#854d0e',
+                      borderRadius: 999, padding: '4px 10px', fontSize: 12,
+                      fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    {m.title} · {m.batch_name}
+                  </button>
+                ))}
+                {missed.length > 8 && <span style={{ fontSize: 12, color: '#a16207', alignSelf: 'center' }}>+{missed.length - 8} more</span>}
+              </div>
             </div>
           </div>
         </Card>

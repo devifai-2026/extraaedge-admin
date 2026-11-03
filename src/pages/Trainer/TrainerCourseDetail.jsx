@@ -51,8 +51,21 @@ const TAB_INDEX = { modules: 0, trainers: 1, batches: 2, attendance: 3, capstone
 export default function TrainerCourseDetail() {
   const { programId } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState(TAB_INDEX[searchParams.get('tab')] ?? 0);
+  // The tab lives in the URL, not in state. It was read once on mount and
+  // never written back, so a tab change produced no history entry: deep links
+  // pointed at the wrong panel and Back exited the whole course instead of
+  // returning to the previous tab.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = TAB_INDEX[searchParams.get('tab')] ?? 0;
+  const setTab = (v) => {
+    const name = Object.keys(TAB_INDEX).find((k) => TAB_INDEX[k] === v) || 'modules';
+    // replace: switching panels is not a navigation worth stacking.
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set('tab', name);
+      return p;
+    }, { replace: true });
+  };
   const [course, setCourse] = useState(null);
   const [error, setError] = useState('');
   const [toast, setToast] = useState(null);
