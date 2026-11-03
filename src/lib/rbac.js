@@ -102,7 +102,11 @@ const ROLE_ACCOUNT_MANAGER_TABS = [
 
 // LMS trainer surfaces (head_trainer additionally gets courses.manage).
 const ROLE_TRAINER_TABS = [
-  'trainer.classes', 'trainer.attendance', 'trainer.recordings',
+  // 'trainer.performance' is granted by the SERVER (TRAINER_TAB_KEYS) and seeded
+  // into every tenant's role rows, but was missing here — so this fallback list
+  // disagreed with the authority. Sidebar.jsx and App.jsx both reference the
+  // key, so the drift would have hidden a page the role is entitled to.
+  'trainer.classes', 'trainer.performance', 'trainer.attendance', 'trainer.recordings',
   'trainer.announcements', 'trainer.forum', 'trainer.tests',
   'trainer.projects', 'trainer.interviews', 'trainer.leaderboard',
   'trainer.materials',

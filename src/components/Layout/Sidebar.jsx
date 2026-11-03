@@ -128,7 +128,7 @@ const menuSections = [
       // it too (they're the ones notified on day 6), each within their scope.
       { id: 26, label: 'Stale Leads', icon: HourglassBottomIcon, path: '/reports/stale-leads', tab: 'stale_handovers' },
       { id: 21, label: 'Discount Approvals', icon: ChecklistIcon, path: '/discount-approvals', tab: 'lead_transfer_report', badgeKey: 'discount_approvals' },
-      { id: 29, label: 'Duplicate Leads', icon: MergeTypeIcon, path: '/duplicates', tab: 'duplicates' },
+      { id: 32, label: 'Duplicate Leads', icon: MergeTypeIcon, path: '/duplicates', tab: 'duplicates' },
       { id: 22, label: 'Call Recordings', icon: GraphicEqIcon, path: '/unmatched-recordings', tab: 'unmatched_recordings' },
       // QA: the review queue is the reviewer's surface, the feedback report is
       // the manager read-back. Each is gated by its own tab key.
@@ -226,7 +226,7 @@ const menuSections = [
       { id: 205, label: 'Student Forum', icon: PeopleAltIcon,       path: '/trainer/forum',         tab: 'trainer.forum' },
       { id: 206, label: 'Mock Tests',    icon: ChecklistIcon,       path: '/trainer/tests',         tab: 'trainer.tests' },
       { id: 207, label: 'Projects',      icon: AssessmentIcon,      path: '/trainer/projects',      tab: 'trainer.projects' },
-      { id: 213, label: 'Homework',      icon: HistoryEduIcon,      path: '/trainer/homework',      tab: 'trainer.projects' },
+      { id: 215, label: 'Homework',      icon: HistoryEduIcon,      path: '/trainer/homework',      tab: 'trainer.projects' },
       // Removed: a second 'My Leave' pointing at the legacy /courses/leaves
       // page. It duplicated the pinned entry for trainers AND bypassed the
       // approval chain — that page marked leave approved on submit. Trainers

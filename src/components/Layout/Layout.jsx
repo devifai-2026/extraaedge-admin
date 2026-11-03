@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Header from './Header';
 import UnendedClassPrompt from '../../pages/Trainer/UnendedClassPrompt';
 import BatchDatesPrompt from '../../pages/Trainer/BatchDatesPrompt';
+import { LmsStyles } from '../../lib/lmsUi';
 import GlobalWatermark from '../DataProtection/GlobalWatermark';
 import Sidebar from './Sidebar';
 import BranchSetupDialog from '../BranchSetupDialog/BranchSetupDialog';
@@ -91,7 +92,15 @@ function Layout({ children }) {
   const collapsed = forcedCollapse || userCollapsed;
 
   return (
-    <div className="layout-wrapper">
+    // --lms-accent + LmsStyles were set ONLY in StudentLayout, so every
+    // lmsUi-based page rendered inside the ADMIN layout (the whole trainer
+    // portal, Hiring, HR, Payroll) fell back to a hardcoded red and its
+    // Skeletons never shimmered — the keyframes were never injected.
+    //
+    // Sourced from the same CSS var the rest of the admin theme uses, so the
+    // tenant's theme picker now drives lmsUi too instead of only MUI.
+    <div className="layout-wrapper" style={{ '--lms-accent': 'var(--primary, #E53935)' }}>
+      <LmsStyles />
       {/* Identity watermark over every authenticated staff page AND every
           modal. Self-gating: renders nothing for super_admin, the trainer
           tiers, or the student portal. */}
