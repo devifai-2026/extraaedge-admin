@@ -117,6 +117,8 @@ import StudentPayments from './pages/Student/StudentPayments'
 import StudentHowItWorks from './pages/Student/StudentHowItWorks'
 import TrainerMaterials from './pages/Trainer/TrainerMaterials'
 import TrainerDashboard from './pages/Trainer/TrainerDashboard'
+import TrainerMyDay from './pages/Trainer/TrainerMyDay'
+import TrainerClassConsolePage from './pages/Trainer/TrainerClassConsolePage'
 import TrainerStudents from './pages/Trainer/TrainerStudents'
 import HrDashboard from './pages/Hr/HrDashboard'
 import HrInterviews from './pages/Hr/HrInterviews'
@@ -247,7 +249,14 @@ function App() {
         <Route path="/my-students" element={<ProtectedRoute tab="admissions.my_students"><Layout><MyStudents /></Layout></ProtectedRoute>} />
 
         {/* ---- LMS trainer surfaces (staff app, role-gated by trainer.* tabs) ---- */}
+        {/* Today is the trainer's landing page — the Teams-shaped answer to
+            "what am I teaching, and what is the one button I need now".
+            /trainer/dashboard stays as the analytics view. */}
+        <Route path="/trainer/today" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerMyDay /></Layout></ProtectedRoute>} />
         <Route path="/trainer/dashboard" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerDashboard /></Layout></ProtectedRoute>} />
+        {/* The live console finally has a URL, so Today can link straight in
+            and a trainer can bookmark the class they teach every morning. */}
+        <Route path="/trainer/classes/:classId/console" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerClassConsolePage /></Layout></ProtectedRoute>} />
         <Route path="/trainer/students" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerStudents /></Layout></ProtectedRoute>} />
         <Route path="/hr/dashboard" element={<ProtectedRoute tab="hr.dashboard"><Layout><HrDashboard /></Layout></ProtectedRoute>} />
         <Route path="/hr/interviews" element={<ProtectedRoute tab="hr.interviews"><Layout><HrInterviews /></Layout></ProtectedRoute>} />

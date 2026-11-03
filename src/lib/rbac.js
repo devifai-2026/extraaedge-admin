@@ -371,7 +371,9 @@ const TAB_TO_ROUTE = {
   'qa.feedback':                     '/qa/feedback',
   // ---- LMS trainer surfaces (admin app, role-gated) ----
   'courses.manage':        '/trainer/courses',
-  'trainer.classes':       '/trainer/classes',
+  // Today, not the class list: a trainer logging in wants the next thing they
+  // teach, not a course-filtered table. Both live behind the same tab.
+  'trainer.classes':       '/trainer/today',
   'trainer.attendance':    '/trainer/attendance',
   'trainer.recordings':    '/trainer/recordings',
   'trainer.announcements': '/trainer/announcements',

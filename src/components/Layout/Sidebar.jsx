@@ -215,6 +215,9 @@ const menuSections = [
     icon: SchoolIcon,
     section: true,
     children: [
+      // Today first: it is the page a trainer should land on and the only one
+      // that answers "what now". Dashboard stays as the analytics view.
+      { id: 198, label: 'Today',         icon: CalendarTodayIcon,   path: '/trainer/today',         tab: 'trainer.classes' },
       { id: 199, label: 'Dashboard',     icon: AssessmentIcon,      path: '/trainer/dashboard',     tab: 'trainer.classes' },
       { id: 200, label: 'My Courses',    icon: SchoolIcon,          path: '/trainer/courses',       tab: 'trainer.classes' },
       { id: 212, label: 'Students',      icon: PeopleAltIcon,       path: '/trainer/students',      tab: 'trainer.classes' },

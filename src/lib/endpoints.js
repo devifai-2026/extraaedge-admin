@@ -949,6 +949,9 @@ export const classesApi = {
   listQuestions: (id) => api.get(`/classes/${id}/questions`),
   // Started but never ended, past their finish time.
   unended: () => api.get('/classes/unended'),
+  // Ended classes still awaiting a completion status — drives the Today
+  // action queue alongside unended() and missedRecordings().
+  pendingCompletions: () => api.get('/classes/pending-completions'),
   // Per-question results: who answered what, and who was right, by name.
   questionAnalytics: (id) => api.get(`/classes/${id}/question-analytics`),
   // Trainer marks one long-text answer right/wrong (choice kinds auto-grade).
