@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleAltIcon from '@mui/icons-material/PeopleAlt';
 import GroupsIcon from '@mui/icons-material/GroupsOutlined';
+import CalendarViewWeekIcon from '@mui/icons-material/CalendarViewWeekOutlined';
 import WorkOutlineIcon from '@mui/icons-material/WorkOutlineOutlined';
 import EventAvailableIcon from '@mui/icons-material/EventAvailableOutlined';
 import TuneIcon from '@mui/icons-material/TuneOutlined';
@@ -224,6 +225,7 @@ const menuSections = [
       { id: 212, label: 'Students',      icon: PeopleAltIcon,       path: '/trainer/students',      tab: 'trainer.classes' },
       { id: 216, label: 'Batches',       icon: GroupsIcon,          path: '/trainer/batch-students', tab: 'trainer.classes' },
       { id: 201, label: 'Classes',       icon: CalendarTodayIcon,   path: '/trainer/classes',       tab: 'trainer.classes' },
+      { id: 217, label: 'Roster',        icon: CalendarViewWeekIcon, path: '/trainer/roster',       tab: 'trainer.classes' },
       { id: 213, label: 'Performance',   icon: AssessmentIcon,      path: '/trainer/performance',   tab: 'trainer.performance' },
       { id: 202, label: 'Attendance',    icon: HowToRegIcon,        path: '/trainer/attendance',    tab: 'trainer.attendance' },
       { id: 203, label: 'Recordings',    icon: GraphicEqIcon,       path: '/trainer/recordings',    tab: 'trainer.recordings' },

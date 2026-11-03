@@ -119,6 +119,7 @@ import TrainerMaterials from './pages/Trainer/TrainerMaterials'
 import TrainerDashboard from './pages/Trainer/TrainerDashboard'
 import TrainerMyDay from './pages/Trainer/TrainerMyDay'
 import TrainerBatchStudents from './pages/Trainer/TrainerBatchStudents'
+import TrainerRoster from './pages/Trainer/TrainerRoster'
 import TrainerClassConsolePage from './pages/Trainer/TrainerClassConsolePage'
 import TrainerStudents from './pages/Trainer/TrainerStudents'
 import HrDashboard from './pages/Hr/HrDashboard'
@@ -263,6 +264,7 @@ function App() {
             /trainer/students, which is the per-student admin view (reset
             password, sudo login). */}
         <Route path="/trainer/batch-students" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerBatchStudents /></Layout></ProtectedRoute>} />
+        <Route path="/trainer/roster" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerRoster /></Layout></ProtectedRoute>} />
         <Route path="/hr/dashboard" element={<ProtectedRoute tab="hr.dashboard"><Layout><HrDashboard /></Layout></ProtectedRoute>} />
         <Route path="/hr/interviews" element={<ProtectedRoute tab="hr.interviews"><Layout><HrInterviews /></Layout></ProtectedRoute>} />
         {/* Speedup Hiring — internal staff recruitment. Distinct from

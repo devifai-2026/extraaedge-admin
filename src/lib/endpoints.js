@@ -956,6 +956,9 @@ export const classesApi = {
   // Ended classes still awaiting a completion status — drives the Today
   // action queue alongside unended() and missedRecordings().
   pendingCompletions: () => api.get('/classes/pending-completions'),
+  // Who is teaching what, when — classes + approved/pending leave for a
+  // window, with clash and on-leave flags resolved server-side.
+  roster: (params) => api.get('/classes/roster', params),
   // Per-question results: who answered what, and who was right, by name.
   questionAnalytics: (id) => api.get(`/classes/${id}/question-analytics`),
   // Trainer marks one long-text answer right/wrong (choice kinds auto-grade).
