@@ -563,19 +563,26 @@ function BatchesTab({ programId, notify, canManage }) {
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      <Card title="Batches" right={<Button size="small" startIcon={<MergeIcon />} variant="outlined" disabled={activeBatches.length < 2} onClick={() => setMergeDlg(true)} sx={{ textTransform: 'none' }}>Merge</Button>}>
+      <Card
+        title="Batches"
+        right={(
+          // Both actions live in the header. "New batch" was sitting in the
+          // body below Merge, which read as two unrelated controls stacked by
+          // accident rather than one action row.
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Button size="small" startIcon={<MergeIcon />} variant="outlined" disabled={activeBatches.length < 2} onClick={() => setMergeDlg(true)} sx={{ textTransform: 'none' }}>Merge</Button>
+            {canManage && (
+              <Button size="small" variant="contained" startIcon={<AddIcon />} onClick={() => setBatchOpen(true)}
+                      sx={{ textTransform: 'none', bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' } }}>
+                New batch
+              </Button>
+            )}
+          </div>
+        )}
+      >
         {/* Same treatment as modules: a button and a dialog. The inline
             strip squeezed two date inputs down to 160px, where the label and
             the dd/mm/yyyy placeholder render on top of each other. */}
-        {canManage && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setBatchOpen(true)}
-                    sx={{ textTransform: 'none', bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' } }}>
-              New batch
-            </Button>
-          </div>
-        )}
-
         <Modal
           open={batchOpen}
           onClose={() => setBatchOpen(false)}

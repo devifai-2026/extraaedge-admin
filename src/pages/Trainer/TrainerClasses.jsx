@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
-import { PageHeader, Card, EmptyState, Badge, Btn } from '../../lib/lmsUi';
+import { PageHeader, Card, EmptyState, Badge, Btn, TableWrap, TH, TD, TR, RowActions } from '../../lib/lmsUi';
 import { coursesApi, classesApi } from '../../lib/endpoints';
 import { useCourseScope, CoursePicker } from './CourseScope';
 import { fmtDate } from '../Accounts/utils';
@@ -88,29 +88,49 @@ export default function TrainerClasses() {
           <Card><EmptyState icon="📅" title="No classes yet" text="Schedule your first class for this course — students see it instantly with join links." /></Card>
         ) : (
           <Card pad={0} style={{ overflow: 'hidden' }}>
-            <Table size="small">
-              <TableHead><TableRow sx={{ background: '#fafbfc', '& th': { color: '#64748b', fontWeight: 700, fontSize: 12 } }}>
-                <TableCell>Title</TableCell><TableCell>Batch</TableCell><TableCell>When</TableCell>
-                <TableCell align="center">Mode</TableCell><TableCell align="center">State</TableCell><TableCell align="right" />
-              </TableRow></TableHead>
-              <TableBody>
+            <TableWrap minWidth={880} maxHeight="calc(100vh - 340px)">
+              <thead>
+                <tr>
+                  <TH>Class</TH>
+                  <TH>Batch</TH>
+                  <TH>When</TH>
+                  <TH width={90}>Mode</TH>
+                  <TH width={110}>State</TH>
+                  <TH align="right" width={210} />
+                </tr>
+              </thead>
+              <tbody>
                 {classes.map((c) => (
-                  <TableRow key={c.id} hover>
-                    <TableCell>{c.title}{c.kind === 'mock_test' ? ' · Mock' : ''}{c.trainer_name ? <div style={{ fontSize: 11, color: '#94a3b8' }}>{c.trainer_name}</div> : null}</TableCell>
-                    <TableCell sx={{ color: '#64748b' }}>{c.batch_name}</TableCell>
-                    <TableCell sx={{ color: '#64748b' }}>{fmtDate(c.starts_at)}</TableCell>
-                    <TableCell align="center"><Badge tone="neutral">{c.mode}</Badge></TableCell>
-                    <TableCell align="center">
-                      {c.ended_at ? <Badge tone="neutral">Ended</Badge> : c.started_at ? <Badge tone="danger">● LIVE</Badge> : <Badge tone="warning">Scheduled</Badge>}
-                    </TableCell>
-                    <TableCell align="right">
-                      {!c.ended_at && <Button size="small" onClick={() => setRescheduleClass(c)} sx={{ textTransform: 'none' }}>Reschedule</Button>}
-                      <Button size="small" onClick={() => setConsoleClass(c)} sx={{ textTransform: 'none' }}>Open console</Button>
-                    </TableCell>
-                  </TableRow>
+                  // The whole row opens the console — the thing you almost
+                  // always want — instead of hiding it behind one small link.
+                  <TR key={c.id} onClick={() => navigate(`/trainer/classes/${c.id}/console`)}>
+                    <TD>
+                      <div style={{ fontWeight: 650, color: '#0f172a' }}>
+                        {c.title}{c.kind === 'mock_test' ? ' · Mock' : ''}
+                      </div>
+                      {c.trainer_name && <div style={{ fontSize: 11.5, color: '#94a3b8' }}>{c.trainer_name}</div>}
+                    </TD>
+                    <TD muted>{c.batch_name}</TD>
+                    <TD muted>{fmtDate(c.starts_at)}</TD>
+                    <TD><Badge tone="neutral">{c.mode}</Badge></TD>
+                    <TD>
+                      {c.ended_at ? <Badge tone="neutral">Ended</Badge>
+                        : c.started_at ? <Badge tone="danger">● LIVE</Badge>
+                          : <Badge tone="warning">Scheduled</Badge>}
+                    </TD>
+                    <RowActions>
+                      {c.meeting_url && (
+                        <Btn size="sm" variant="ghost" onClick={() => window.open(c.meeting_url, '_blank', 'noopener')}>Join</Btn>
+                      )}
+                      {!c.ended_at && (
+                        <Btn size="sm" variant="ghost" onClick={() => setRescheduleClass(c)}>Reschedule</Btn>
+                      )}
+                      <Btn size="sm" variant="subtle" onClick={() => navigate(`/trainer/classes/${c.id}/console`)}>Open</Btn>
+                    </RowActions>
+                  </TR>
                 ))}
-              </TableBody>
-            </Table>
+              </tbody>
+            </TableWrap>
           </Card>
         )
       )}

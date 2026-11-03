@@ -1,125 +1,217 @@
-// Students — admin & head-trainer view of the students in their courses, with
-// reset-password (returns a shareable temp password) and sudo-login (opens the
-// student portal as that student). Scoped server-side; write actions gated to
-// head/admin here too.
+// Students — everyone enrolled in the courses you teach.
+//
+// Was a bare MUI <Table> with two <TextField select> filters that only
+// appeared when there was more than one value, so the page silently changed
+// shape depending on the data. Now it is the same chrome as every other list
+// in the portal: tabs with counts, a toolbar, filter pills, a sticky-header
+// table and row actions.
 import { useEffect, useMemo, useState } from 'react';
-import { Box, TextField, MenuItem, Table, TableHead, TableRow, TableCell, TableBody, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import GroupsIcon from '@mui/icons-material/GroupsOutlined';
+import {
+  PageHeader, Card, EmptyState, Badge, Btn, Skeleton, Modal, Tabs, Toolbar,
+  SearchBox, FilterPill, TableWrap, TH, TD, TR, RowActions, lmsTokens, useToast,
+} from '../../lib/lmsUi';
 import { coursesApi } from '../../lib/endpoints';
 import { studentAuth } from '../../lib/studentApi';
 import { isRole } from '../../lib/rbac';
-import { PageHeader, Card, EmptyState, Badge, Btn, Skeleton } from '../../lib/lmsUi';
+
+const { INK, MUTE, FAINT } = lmsTokens;
 
 const statusTone = (s) => (s === 'active' ? 'success' : s === 'dropped' ? 'danger' : s === 'on_break' ? 'info' : 'warning');
 
 export default function TrainerStudents() {
+  const toast = useToast();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
-  const [program, setProgram] = useState('');
-  const [branch, setBranch] = useState('');
-  const [toast, setToast] = useState(null);
-  const [pw, setPw] = useState(null); // { name, password }
+  const [tab, setTab] = useState('all');
+  const [course, setCourse] = useState(null);
+  const [pw, setPw] = useState(null);
   const [busy, setBusy] = useState('');
   const canManage = isRole('super_admin', 'branch_manager', 'head_trainer');
 
-  const load = () => { setLoading(true); coursesApi.students().then((r) => setRows(r?.data || [])).catch((e) => setToast({ severity: 'error', text: e.message })).finally(() => setLoading(false)); };
+  const load = () => {
+    setLoading(true);
+    coursesApi.students()
+      .then((r) => setRows(r?.data || []))
+      .catch((e) => toast.show(e.message))
+      .finally(() => setLoading(false));
+  };
   useEffect(() => { load(); }, []);
 
-  const programs = useMemo(() => [...new Set(rows.map((r) => r.program_name).filter(Boolean))], [rows]);
-  const branches = useMemo(() => [...new Set(rows.map((r) => r.branch_name).filter(Boolean))], [rows]);
-  const filtered = rows.filter((r) => {
-    if (program && r.program_name !== program) return false;
-    if (branch && r.branch_name !== branch) return false;
-    if (!q.trim()) return true;
-    const s = `${r.name} ${r.email} ${r.phone || ''}`.toLowerCase();
-    return s.includes(q.trim().toLowerCase());
-  });
+  const courses = useMemo(
+    () => [...new Set(rows.map((r) => r.program_name).filter(Boolean))],
+    [rows],
+  );
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (course && r.program_name !== course) return false;
+      if (tab === 'no_batch' && r.batch_name) return false;
+      if (tab !== 'all' && tab !== 'no_batch' && r.status !== tab) return false;
+      if (needle && !`${r.name} ${r.email || ''} ${r.phone || ''}`.toLowerCase().includes(needle)) return false;
+      return true;
+    });
+  }, [rows, q, tab, course]);
+
+  // Counts ignore the tab's own predicate so each keeps reporting its bucket.
+  const counts = useMemo(() => {
+    const base = course ? rows.filter((r) => r.program_name === course) : rows;
+    return {
+      all: base.length,
+      no_batch: base.filter((r) => !r.batch_name).length,
+      active: base.filter((r) => r.status === 'active').length,
+      on_break: base.filter((r) => r.status === 'on_break').length,
+      dropped: base.filter((r) => r.status === 'dropped').length,
+    };
+  }, [rows, course]);
 
   const reset = async (s) => {
-    if (!window.confirm(`Reset password for ${s.name}? A new temporary password will be generated.`)) return;
     setBusy(s.id);
-    try { const r = await coursesApi.resetStudentPassword(s.id); const d = r?.data ?? r; setPw({ name: s.name, password: d.password }); }
-    catch (e) { setToast({ severity: 'error', text: e.message }); } finally { setBusy(''); }
+    try {
+      const r = await coursesApi.resetStudentPassword(s.id);
+      const d = r?.data ?? r;
+      setPw({ name: s.name, password: d.password });
+    } catch (e) { toast.show(e.message); } finally { setBusy(''); }
   };
+
   const sudo = async (s) => {
     setBusy(s.id);
     try {
-      const r = await coursesApi.sudoStudent(s.id); const d = r?.data ?? r;
+      const r = await coursesApi.sudoStudent(s.id);
+      const d = r?.data ?? r;
       studentAuth.setSession({ access_token: d.access_token, student: d.student, tenantSlug: d.tenantSlug });
       window.open('/student/home', '_blank');
-      setToast({ severity: 'success', text: `Opened student portal as ${s.name}` });
-    } catch (e) { setToast({ severity: 'error', text: e.message }); } finally { setBusy(''); }
+      toast.show(`Opened the student portal as ${s.name}`);
+    } catch (e) { toast.show(e.message); } finally { setBusy(''); }
   };
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1100, mx: 'auto' }}>
+    <div style={{ padding: 24, maxWidth: 1180, margin: '0 auto' }}>
       <PageHeader
         title="Students"
-        subtitle="Everyone enrolled in your courses. Reset a login or sudo-login to troubleshoot."
+        subtitle="Everyone enrolled in your courses."
         icon={GroupsIcon}
-        right={(
-          <>
-            <TextField size="small" placeholder="Search name / email / phone" value={q} onChange={(e) => setQ(e.target.value)} sx={{ minWidth: 240, background: '#fff' }} />
-            {programs.length > 1 && (
-              <TextField select size="small" label="Course" value={program} onChange={(e) => setProgram(e.target.value)} sx={{ minWidth: 180, background: '#fff' }}>
-                <MenuItem value="">All courses</MenuItem>
-                {programs.map((p) => <MenuItem key={p} value={p}>{p}</MenuItem>)}
-              </TextField>
-            )}
-            {branches.length > 1 && (
-              <TextField select size="small" label="Branch" value={branch} onChange={(e) => setBranch(e.target.value)} sx={{ minWidth: 160, background: '#fff' }}>
-                <MenuItem value="">All branches</MenuItem>
-                {branches.map((b) => <MenuItem key={b} value={b}>{b}</MenuItem>)}
-              </TextField>
-            )}
-          </>
-        )}
       />
 
-      {loading ? <Card><Skeleton h={16} w="40%" /><div style={{ height: 8 }} /><Skeleton h={12} w="70%" /></Card> : (
-        filtered.length === 0 ? <Card><EmptyState icon="👥" title="No students" text="Students appear here once they're confirmed into your courses." /></Card> : (
-          <Card pad={0} style={{ overflow: 'hidden' }}>
-            <Table size="small">
-              <TableHead><TableRow sx={{ background: '#fafbfc', '& th': { color: '#64748b', fontWeight: 700, fontSize: 12 } }}>
-                <TableCell>Student</TableCell><TableCell>Course</TableCell><TableCell>Branch</TableCell><TableCell>Batch</TableCell><TableCell align="center">Status</TableCell><TableCell align="right" />
-              </TableRow></TableHead>
-              <TableBody>
-                {filtered.map((s) => (
-                  <TableRow key={s.id} hover>
-                    <TableCell>{s.name}<div style={{ fontSize: 11.5, color: '#94a3b8' }}>{s.email}{s.phone ? ` · ${s.phone}` : ''}</div></TableCell>
-                    <TableCell sx={{ color: '#64748b' }}>{s.program_name || '—'}</TableCell>
-                    <TableCell sx={{ color: '#64748b' }}>{s.branch_name || '—'}</TableCell>
-                    <TableCell sx={{ color: '#64748b' }}>{s.batch_name || <Badge tone="warning">No batch</Badge>}</TableCell>
-                    <TableCell align="center"><Badge tone={statusTone(s.status)}>{s.status}</Badge></TableCell>
-                    <TableCell align="right">
-                      {canManage && <Button size="small" disabled={busy === s.id} onClick={() => reset(s)} sx={{ textTransform: 'none' }}>Reset password</Button>}
-                      {canManage && <Button size="small" disabled={busy === s.id} onClick={() => sudo(s)} sx={{ textTransform: 'none' }}>Sudo login</Button>}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        )
-      )}
+      <Card pad={0} style={{ overflow: 'hidden' }}>
+        <Tabs
+          value={tab}
+          onChange={setTab}
+          items={[
+            { key: 'all', label: 'All', count: counts.all },
+            { key: 'no_batch', label: 'No batch', count: counts.no_batch },
+            { key: 'active', label: 'Active', count: counts.active },
+            { key: 'on_break', label: 'On break', count: counts.on_break },
+            { key: 'dropped', label: 'Dropped', count: counts.dropped },
+          ]}
+        />
 
-      {/* Reset-password result */}
-      <Dialog open={!!pw} onClose={() => setPw(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>New password for {pw?.name}</DialogTitle>
-        <DialogContent>
-          <div style={{ fontSize: 13, color: '#64748b', marginBottom: 10 }}>Share this with the student. They can change it after logging in.</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <code style={{ flex: 1, background: '#f1f5f9', borderRadius: 8, padding: '10px 12px', fontSize: 15, fontWeight: 700, letterSpacing: 0.5 }}>{pw?.password}</code>
-            <Button variant="outlined" size="small" onClick={() => { navigator.clipboard?.writeText(pw?.password || ''); setToast({ severity: 'success', text: 'Copied' }); }} sx={{ textTransform: 'none' }}>Copy</Button>
-          </div>
-        </DialogContent>
-        <DialogActions><Button onClick={() => setPw(null)} sx={{ textTransform: 'none' }}>Done</Button></DialogActions>
-      </Dialog>
+        <Toolbar
+          left={<SearchBox value={q} onChange={setQ} placeholder="Search name, email or phone" width={300} />}
+          actions={<Btn size="sm" variant="ghost" onClick={load}>Refresh</Btn>}
+          filters={courses.length > 1 ? (
+            <>
+              <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.07, textTransform: 'uppercase', color: FAINT, whiteSpace: 'nowrap' }}>Course</span>
+              {courses.map((c) => (
+                <FilterPill key={c} active={course === c} onClick={() => setCourse(course === c ? null : c)}>
+                  {c.length > 24 ? `${c.slice(0, 23)}…` : c}
+                </FilterPill>
+              ))}
+            </>
+          ) : null}
+        />
 
-      <Snackbar open={!!toast} autoHideDuration={4000} onClose={() => setToast(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        {toast ? <Alert severity={toast.severity} onClose={() => setToast(null)}>{toast.text}</Alert> : undefined}
-      </Snackbar>
-    </Box>
+        {loading ? (
+          <div style={{ padding: 18 }}><Skeleton h={180} /></div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon="👥"
+            title={rows.length === 0 ? 'No students yet' : 'Nothing matches'}
+            text={rows.length === 0
+              ? 'Students appear here once Accounts confirms them into one of your courses.'
+              : 'Try a different filter or clear the search.'}
+          />
+        ) : (
+          <TableWrap minWidth={880} maxHeight="calc(100vh - 330px)">
+            <thead>
+              <tr>
+                <TH>Student</TH>
+                <TH>Course</TH>
+                <TH>Branch</TH>
+                <TH>Batch</TH>
+                <TH>Status</TH>
+                {canManage && <TH align="right" width={200} />}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((s) => (
+                <TR key={s.id}>
+                  <TD>
+                    <div style={{ fontWeight: 650, color: INK }}>{s.name}</div>
+                    <div style={{ fontSize: 11.5, color: FAINT }}>
+                      {[s.email, s.phone].filter(Boolean).join(' · ') || '—'}
+                    </div>
+                  </TD>
+                  <TD muted>{s.program_name || '—'}</TD>
+                  <TD muted>{s.branch_name || '—'}</TD>
+                  <TD>
+                    {s.batch_name
+                      ? <Badge tone="neutral">{s.batch_name}</Badge>
+                      : <Badge tone="warning">No batch</Badge>}
+                  </TD>
+                  <TD>
+                    <Badge tone={statusTone(s.status)}>{String(s.status || '—').replace(/_/g, ' ')}</Badge>
+                  </TD>
+                  {canManage && (
+                    <RowActions>
+                      <Btn size="sm" variant="ghost" disabled={busy === s.id} onClick={() => reset(s)}>
+                        Reset password
+                      </Btn>
+                      <Btn size="sm" variant="ghost" disabled={busy === s.id} onClick={() => sudo(s)}>
+                        Open as student
+                      </Btn>
+                    </RowActions>
+                  )}
+                </TR>
+              ))}
+            </tbody>
+          </TableWrap>
+        )}
+      </Card>
+
+      {/* The password is generated server-side and shown once — there is no
+          way to retrieve it later, so the dialog says so rather than letting
+          someone close it and come looking. */}
+      <Modal
+        open={!!pw}
+        onClose={() => setPw(null)}
+        title="Temporary password"
+        subtitle={pw ? `For ${pw.name}. Share it with them directly.` : ''}
+        actions={<Btn onClick={() => setPw(null)}>Done</Btn>}
+      >
+        <div style={{
+          fontFamily: 'ui-monospace, monospace', fontSize: 18, fontWeight: 700, color: INK,
+          background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '14px 16px', textAlign: 'center',
+        }}
+        >
+          {pw?.password}
+        </div>
+        <div style={{ fontSize: 12.5, color: MUTE, marginTop: 10 }}>
+          This is the only time it is shown. If it is lost, reset again.
+        </div>
+        <Btn
+          size="sm"
+          variant="ghost"
+          style={{ marginTop: 10 }}
+          onClick={() => { navigator.clipboard?.writeText(pw.password).then(() => toast.show('Copied')).catch(() => {}); }}
+        >
+          Copy
+        </Btn>
+      </Modal>
+
+      {toast.node}
+    </div>
   );
 }
