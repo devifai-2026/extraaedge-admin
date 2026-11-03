@@ -103,22 +103,67 @@ export const useCourseScope = () => useContext(CourseScopeContext) || {
 // Renders NOTHING when the trainer has one course or none: a select with a
 // single option is a decision the product already made, shown as if it were
 // the user's to make.
-export const CoursePicker = ({ allowAll = true, width = 220 }) => {
+// Course switcher.
+//
+// Was a native <select>, which renders as an OS dropdown that matches nothing
+// else on the page and hides every option behind a click — with five courses
+// you could not see what you were choosing between.
+//
+// Up to five courses it is a pill row: every option visible, one click to
+// switch, and it reads as part of the page. Beyond that a row would wrap and
+// become its own mess, so it falls back to a styled select.
+export const CoursePicker = ({ allowAll = true, max = 5 }) => {
   const { courseId, setCourseId, courses, loading } = useCourseScope();
+  // One course is not a choice — showing a picker implies a decision the
+  // product already made for you.
   if (loading || courses.length <= 1) return null;
+
+  const opts = allowAll ? [{ id: ALL, name: 'All courses' }, ...courses] : courses;
+
+  if (opts.length > max + 1) {
+    return (
+      <select
+        value={courseId}
+        onChange={(e) => setCourseId(e.target.value)}
+        style={{
+          height: 32, borderRadius: 9, border: '1px solid #cbd5e1', background: '#fff',
+          fontSize: 12.5, fontFamily: 'inherit', color: '#0f172a', padding: '0 10px',
+          maxWidth: 260, cursor: 'pointer',
+        }}
+      >
+        {opts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+    );
+  }
+
   return (
-    <select
-      value={courseId}
-      onChange={(e) => setCourseId(e.target.value)}
-      style={{
-        height: 31, borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff',
-        fontSize: 12.5, fontFamily: 'inherit', color: '#0f172a', padding: '0 8px',
-        maxWidth: width, cursor: 'pointer',
-      }}
-    >
-      {allowAll && <option value={ALL}>All courses</option>}
-      {courses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-    </select>
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', background: '#f1f5f9', padding: 3, borderRadius: 999 }}>
+      {opts.map((c) => {
+        const on = courseId === c.id;
+        // Long course names ("Data Analyst with AI Training and
+        // Certification") would blow the row apart, so shorten to the
+        // distinctive words and keep the full name in the tooltip.
+        const label = c.name.length > 22 ? `${c.name.slice(0, 21)}…` : c.name;
+        return (
+          <button
+            key={c.id}
+            type="button"
+            title={c.name}
+            onClick={() => setCourseId(c.id)}
+            style={{
+              border: 0, cursor: 'pointer', fontFamily: 'inherit',
+              borderRadius: 999, padding: '6px 13px', fontSize: 12.5,
+              fontWeight: on ? 700 : 550, whiteSpace: 'nowrap',
+              background: on ? '#fff' : 'transparent',
+              color: on ? 'var(--lms-accent, #E53935)' : '#64748b',
+              boxShadow: on ? '0 1px 3px rgba(15,23,42,0.12)' : 'none',
+            }}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
   );
 };
 

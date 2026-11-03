@@ -17,7 +17,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import MergeIcon from '@mui/icons-material/CallMerge';
 import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
-import { PageHeader, Card, EmptyState, Badge, Btn, Progress, ACCENT } from '../../lib/lmsUi';
+import { PageHeader, Card, EmptyState, Badge, Btn, Progress, ACCENT, Modal } from '../../lib/lmsUi';
 import { coursesApi, classesApi, learningApi, capstoneApi } from '../../lib/endpoints';
 import { isRole } from '../../lib/rbac';
 import { fmtDate } from '../Accounts/utils';
@@ -118,6 +118,7 @@ function ModulesTab({ programId, notify, canManage }) {
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [modDates, setModDates] = useState({ start_date: '', end_date: '' });
+  const [addOpen, setAddOpen] = useState(false);
   const [open, setOpen] = useState({}); // moduleId → expanded
   const [topicInput, setTopicInput] = useState({});
   // Which topic title is being edited inline: { moduleId, idx, value }.
@@ -215,22 +216,52 @@ function ModulesTab({ programId, notify, canManage }) {
   if (loading) return <CircularProgress />;
   return (
     <div>
+      {/* A button and a dialog, not four controls crammed into one strip.
+          Three fields and a chip squeezed onto a single row left the date
+          inputs too narrow to render their own label, so "Start date" and
+          "dd/mm/yyyy" drew on top of each other. A dialog gives every field
+          room and makes the required dates obvious before you commit. */}
       {canManage && (
-        <Card style={{ marginBottom: 14 }}>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-            <TextField size="small" label="New module (e.g. HTML)" value={name} onChange={(e) => setName(e.target.value)} sx={{ flex: 1, minWidth: 190 }} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
-            <TextField size="small" type="date" label="Start date" required value={modDates.start_date}
-              onChange={(e) => setModDates((d) => ({ ...d, start_date: e.target.value }))}
-              InputLabelProps={{ shrink: true }} sx={{ width: 160 }} />
-            <TextField size="small" type="date" label="End date" required value={modDates.end_date}
-              onChange={(e) => setModDates((d) => ({ ...d, end_date: e.target.value }))}
-              InputLabelProps={{ shrink: true }} sx={{ width: 160 }}
-              inputProps={{ min: modDates.start_date || undefined }} />
-            {moduleWeeks && <Chip size="small" label={moduleWeeks} sx={{ height: 24 }} />}
-            <Button variant="contained" startIcon={<AddIcon />} onClick={add} sx={{ textTransform: 'none', bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' } }}>Add module</Button>
-          </Box>
-        </Card>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAddOpen(true)}
+                  sx={{ textTransform: 'none', bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' } }}>
+            Add module
+          </Button>
+        </div>
       )}
+
+      <Modal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        title="Add a module"
+        subtitle="Modules carry the classes and materials for one part of the course."
+        actions={(
+          <>
+            <Btn variant="ghost" onClick={() => setAddOpen(false)}>Cancel</Btn>
+            <Btn onClick={async () => { await add(); setAddOpen(false); }}
+                 disabled={!name.trim() || !modDates.start_date || !modDates.end_date}>
+              Add module
+            </Btn>
+          </>
+        )}
+      >
+        <div style={{ display: 'grid', gap: 14 }}>
+          <TextField size="small" label="Module name" placeholder="e.g. HTML" fullWidth
+            value={name} onChange={(e) => setName(e.target.value)} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <TextField size="small" type="date" label="Start date" required fullWidth value={modDates.start_date}
+              onChange={(e) => setModDates((d) => ({ ...d, start_date: e.target.value }))}
+              InputLabelProps={{ shrink: true }} />
+            <TextField size="small" type="date" label="End date" required fullWidth value={modDates.end_date}
+              onChange={(e) => setModDates((d) => ({ ...d, end_date: e.target.value }))}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ min: modDates.start_date || undefined }} />
+          </div>
+          {moduleWeeks && (
+            <span style={{ fontSize: 12.5, color: '#64748b' }}>Planned length: <strong>{moduleWeeks}</strong></span>
+          )}
+        </div>
+      </Modal>
 
       {rows.length === 0 ? (
         <Card><EmptyState icon="🧩" title="No modules yet" text={canManage ? 'Add your first module above (e.g. “HTML”). Then schedule classes and upload materials into it.' : 'The head trainer hasn’t set up modules yet.'} /></Card>
@@ -483,6 +514,7 @@ function BatchesTab({ programId, notify, canManage }) {
   const [loading, setLoading] = useState(true);
   const [newBatch, setNewBatch] = useState('');
   const [batchDates, setBatchDates] = useState({ start_date: '', end_date: '' });
+  const [batchOpen, setBatchOpen] = useState(false);
   const [placeDlg, setPlaceDlg] = useState(null); // { students: [...] }
   const [mergeDlg, setMergeDlg] = useState(false);
   const [profileId, setProfileId] = useState(null);
@@ -532,20 +564,53 @@ function BatchesTab({ programId, notify, canManage }) {
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <Card title="Batches" right={<Button size="small" startIcon={<MergeIcon />} variant="outlined" disabled={activeBatches.length < 2} onClick={() => setMergeDlg(true)} sx={{ textTransform: 'none' }}>Merge</Button>}>
+        {/* Same treatment as modules: a button and a dialog. The inline
+            strip squeezed two date inputs down to 160px, where the label and
+            the dd/mm/yyyy placeholder render on top of each other. */}
         {canManage && (
-          <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-            <TextField size="small" label="New batch (e.g. MERN-Aug)" value={newBatch} onChange={(e) => setNewBatch(e.target.value)} sx={{ flex: 1, minWidth: 180 }} onKeyDown={(e) => { if (e.key === 'Enter') createBatch(); }} />
-            <TextField size="small" type="date" label="Start date" value={batchDates.start_date}
-              onChange={(e) => setBatchDates((d) => ({ ...d, start_date: e.target.value }))}
-              InputLabelProps={{ shrink: true }} sx={{ width: 160 }} />
-            <TextField size="small" type="date" label="End date" value={batchDates.end_date}
-              onChange={(e) => setBatchDates((d) => ({ ...d, end_date: e.target.value }))}
-              InputLabelProps={{ shrink: true }} sx={{ width: 160 }}
-              inputProps={{ min: batchDates.start_date || undefined }} />
-            {spanLabel(batchDates.start_date, batchDates.end_date) && <Chip size="small" label={spanLabel(batchDates.start_date, batchDates.end_date)} sx={{ height: 24 }} />}
-            <Button variant="contained" startIcon={<AddIcon />} onClick={createBatch} sx={{ textTransform: 'none', bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' } }}>Create</Button>
-          </Box>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setBatchOpen(true)}
+                    sx={{ textTransform: 'none', bgcolor: '#E53935', '&:hover': { bgcolor: '#c62828' } }}>
+              New batch
+            </Button>
+          </div>
         )}
+
+        <Modal
+          open={batchOpen}
+          onClose={() => setBatchOpen(false)}
+          title="Create a batch"
+          subtitle="A batch is a cohort of students. Classes are scheduled into a batch."
+          actions={(
+            <>
+              <Btn variant="ghost" onClick={() => setBatchOpen(false)}>Cancel</Btn>
+              <Btn onClick={async () => { await createBatch(); setBatchOpen(false); }} disabled={!newBatch.trim()}>
+                Create batch
+              </Btn>
+            </>
+          )}
+        >
+          <div style={{ display: 'grid', gap: 14 }}>
+            <TextField size="small" label="Batch name" placeholder="e.g. MERN-Aug" fullWidth
+              value={newBatch} onChange={(e) => setNewBatch(e.target.value)} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <TextField size="small" type="date" label="Start date" fullWidth value={batchDates.start_date}
+                onChange={(e) => setBatchDates((d) => ({ ...d, start_date: e.target.value }))}
+                InputLabelProps={{ shrink: true }} />
+              <TextField size="small" type="date" label="End date" fullWidth value={batchDates.end_date}
+                onChange={(e) => setBatchDates((d) => ({ ...d, end_date: e.target.value }))}
+                InputLabelProps={{ shrink: true }}
+                inputProps={{ min: batchDates.start_date || undefined }} />
+            </div>
+            <span style={{ fontSize: 12.5, color: '#64748b' }}>
+              Dates are optional, but they drive the batch progress bar.
+              {spanLabel(batchDates.start_date, batchDates.end_date)
+                ? ` Planned length: ${spanLabel(batchDates.start_date, batchDates.end_date)}.`
+                : ''}
+            </span>
+          </div>
+        </Modal>
+
         {nonMerged.length === 0 ? <EmptyState icon="👥" title="No batches yet" text="Create a batch (a cohort) — classes are scheduled into a batch." /> : (
           <Table size="small">
             <TableHead><TableRow sx={{ background: '#fafbfc', '& th': { color: '#64748b', fontWeight: 700, fontSize: 12 } }}><TableCell>Batch</TableCell><TableCell align="center">Students</TableCell><TableCell>Schedule</TableCell><TableCell sx={{ minWidth: 130 }}>Progress</TableCell><TableCell align="center">Status</TableCell><TableCell align="right" /></TableRow></TableHead>

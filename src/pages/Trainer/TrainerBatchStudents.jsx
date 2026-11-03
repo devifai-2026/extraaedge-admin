@@ -23,8 +23,13 @@ const { INK, MUTE, FAINT } = lmsTokens;
 const UNASSIGNED = '__none__';
 
 export default function TrainerBatchStudents() {
-  const { programId, courses } = useCourseScope();
-  const courseId = programId || courses[0]?.id || '';
+  // Works across EVERY course by default. Locking this to one course meant a
+  // trainer with five courses landed on whichever happened to be first — in
+  // practice an empty one — and had to hunt for the course their students are
+  // actually on. Students are people; which course they sit under is a filter,
+  // not a precondition for seeing them.
+  const { programId, courses, isAll } = useCourseScope();
+  const scope = isAll ? courses.map((c) => c.id) : [programId].filter(Boolean);
   const toast = useToast();
 
   const [rows, setRows] = useState([]);
@@ -42,26 +47,39 @@ export default function TrainerBatchStudents() {
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    if (!courseId) { setLoading(false); return; }
+    if (!scope.length) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [s, b] = await Promise.all([
-        coursesApi.studentsWithBatch(courseId).then((r) => r?.data || []).catch(() => []),
-        coursesApi.listBatches(courseId).then((r) => (r?.data || []).filter((x) => x.status !== 'merged')).catch(() => []),
-      ]);
-      setRows(s);
-      setBatches(b);
+      // One request per course in scope. At five courses this is cheap, and
+      // it keeps the server contract simple (the endpoint is per-course).
+      const perCourse = await Promise.all(scope.map(async (id) => {
+        const course = courses.find((c) => c.id === id);
+        const [s, b] = await Promise.all([
+          coursesApi.studentsWithBatch(id).then((r) => r?.data || []).catch(() => []),
+          coursesApi.listBatches(id).then((r) => (r?.data || []).filter((x) => x.status !== 'merged')).catch(() => []),
+        ]);
+        // Stamp the course on every row so a cross-course list stays
+        // readable and a move knows which course to post to.
+        return {
+          students: s.map((x) => ({ ...x, program_id: id, program_name: course?.name })),
+          batches: b.map((x) => ({ ...x, program_id: id, program_name: course?.name })),
+        };
+      }));
+      setRows(perCourse.flatMap((x) => x.students));
+      setBatches(perCourse.flatMap((x) => x.batches));
     } finally {
       setLoading(false);
     }
-  }, [courseId]);
+    // scope is derived from courses; depending on its identity would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope.join(','), courses]);
 
   useEffect(() => { load(); }, [load]);
 
   // Any change to what the list MATCHES invalidates the selection. Keeping
   // ticks across a filter change is how people accidentally move students
   // they can no longer see.
-  useEffect(() => { setSelected(new Set()); }, [courseId, tab, batchFilter, q]);
+  useEffect(() => { setSelected(new Set()); }, [scope.join(','), tab, batchFilter, q]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -119,7 +137,10 @@ export default function TrainerBatchStudents() {
     if (!targetBatch) return;
     setSaving(true);
     try {
-      await coursesApi.placeStudent(courseId, {
+      // The target batch determines the course to post to — in a
+      // cross-course list the selected students may come from several.
+      const batch = batches.find((b) => b.id === targetBatch);
+      await coursesApi.placeStudent(batch?.program_id, {
         batch_id: targetBatch,
         student_ids: [...selected],
         share_recordings: shareRecordings,
@@ -142,7 +163,7 @@ export default function TrainerBatchStudents() {
         title="Students &amp; batches"
         subtitle="Move students between batches, or place the ones who have none."
         icon={GroupsIcon}
-        right={<CoursePicker allowAll={false} />}
+        right={<CoursePicker />}
       />
 
       <Card pad={0} style={{ overflow: 'hidden' }}>
@@ -169,7 +190,7 @@ export default function TrainerBatchStudents() {
               </FilterPill>
               {batches.map((b) => (
                 <FilterPill key={b.id} active={batchFilter === b.id} onClick={() => setBatchFilter(batchFilter === b.id ? null : b.id)}>
-                  {b.name}
+                  {isAll && b.program_name ? `${b.name} · ${b.program_name.slice(0, 14)}` : b.name}
                 </FilterPill>
               ))}
             </>
@@ -194,6 +215,7 @@ export default function TrainerBatchStudents() {
                   <input type="checkbox" checked={allTicked} onChange={toggleAll} aria-label="Select all" style={{ cursor: 'pointer' }} />
                 </TH>
                 <TH>Student</TH>
+                {isAll && <TH>Course</TH>}
                 <TH>Batch</TH>
                 <TH>Status</TH>
                 <TH>Joined batch</TH>
@@ -211,6 +233,7 @@ export default function TrainerBatchStudents() {
                       <div style={{ fontWeight: 600, color: INK }}>{r.name}</div>
                       {r.email && <div style={{ fontSize: 11.5, color: FAINT }}>{r.email}</div>}
                     </TD>
+                    {isAll && <TD muted>{r.program_name || '—'}</TD>}
                     <TD>
                       {r.batch_name
                         ? <Badge tone="neutral">{r.batch_name}</Badge>
