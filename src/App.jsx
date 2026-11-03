@@ -120,6 +120,7 @@ import TrainerDashboard from './pages/Trainer/TrainerDashboard'
 import TrainerMyDay from './pages/Trainer/TrainerMyDay'
 import TrainerBatchStudents from './pages/Trainer/TrainerBatchStudents'
 import TrainerRoster from './pages/Trainer/TrainerRoster'
+import TrainerAttendanceRegister from './pages/Trainer/TrainerAttendanceRegister'
 import TrainerClassConsolePage from './pages/Trainer/TrainerClassConsolePage'
 import TrainerStudents from './pages/Trainer/TrainerStudents'
 import HrDashboard from './pages/Hr/HrDashboard'
@@ -305,7 +306,10 @@ function App() {
         <Route path="/trainer/courses" element={<ProtectedRoute tab={['trainer.classes', 'courses.manage']}><Layout><TrainerCourses /></Layout></ProtectedRoute>} />
         <Route path="/trainer/courses/:programId" element={<ProtectedRoute tab={['trainer.classes', 'courses.manage']}><Layout><TrainerCourseDetail /></Layout></ProtectedRoute>} />
         <Route path="/trainer/classes" element={<ProtectedRoute tab="trainer.classes"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />
-        <Route path="/trainer/attendance" element={<ProtectedRoute tab="trainer.attendance"><Layout><TrainerClasses /></Layout></ProtectedRoute>} />
+        {/* Was rendering the IDENTICAL TrainerClasses component as
+            /trainer/classes — "Attendance" was a duplicate nav entry pointing
+            at a scheduling screen. It is now the register. */}
+        <Route path="/trainer/attendance" element={<ProtectedRoute tab="trainer.attendance"><Layout><TrainerAttendanceRegister /></Layout></ProtectedRoute>} />
         <Route path="/trainer/performance" element={<ProtectedRoute tab="trainer.performance"><Layout><TrainerPerformance /></Layout></ProtectedRoute>} />
         <Route path="/trainer/recordings" element={<ProtectedRoute tab="trainer.recordings"><Layout><TrainerRecordings /></Layout></ProtectedRoute>} />
         <Route path="/trainer/announcements" element={<ProtectedRoute tab="trainer.announcements"><Layout><TrainerAnnouncements /></Layout></ProtectedRoute>} />
