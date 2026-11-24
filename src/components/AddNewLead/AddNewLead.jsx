@@ -745,9 +745,9 @@ const AddNewLead = ({ open, onClose, leadData, onCreated, onSaved, viewOnly = fa
                         stage_id: payload.stage_id,
                         sub_stage_id: payload.sub_stage_id,
                         remarks: payload.closure_remarks || payload.remarks,
-                        ...(formData.next_action_datetime
-                            ? { next_action_datetime: new Date(formData.next_action_datetime).toISOString() }
-                            : {}),
+                        // No next_action_datetime here: the PUT above already
+                        // saved the follow-up; sending it again makes the
+                        // server insert a duplicate planned follow-up.
                         // Discount is only honored by the backend when the
                         // destination is a CONVERSION stage; harmless otherwise.
                         ...(formData.discount_percent !== '' && formData.discount_percent != null
