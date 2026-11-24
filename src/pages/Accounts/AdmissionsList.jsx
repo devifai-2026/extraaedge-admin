@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useHref, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Button, IconButton, TextField, InputAdornment, CircularProgress, Tooltip,
-  Autocomplete, MenuItem, Chip,
+  Button, IconButton, TextField, InputAdornment, Tooltip, Autocomplete, MenuItem,
+  Chip, LinearProgress, Pagination, Skeleton,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
@@ -12,268 +12,387 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import PauseCircleIcon from '@mui/icons-material/PauseCircle';
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined';
+import FilterAltOffIcon from '@mui/icons-material/FilterAltOff';
 import { admissionsApi, programsApi, usersApi } from '../../lib/endpoints';
 import { fullName, fmtDate, fmtMoney } from './utils';
 import { isRole, ROLES } from '../../lib/rbac';
-import StatusPill from './StatusPill';
-import './Accounts.css';
+import './AdmissionsList.css';
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'All statuses' },
-  { value: 'pending_approval', label: 'Pending Approval' },
-  { value: 'attending', label: 'Attending' },
-  { value: 'on_break', label: 'On Break' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'rejected', label: 'Rejected' },
+// ── Status look & labels ────────────────────────────────────────────────────
+const STATUS_META = {
+  pending_approval: { label: 'Pending', fg: '#b45309', bg: '#fef3c7' },
+  attending:        { label: 'Attending', fg: '#15803d', bg: '#dcfce7' },
+  on_break:         { label: 'On Break', fg: '#c2410c', bg: '#ffedd5' },
+  completed:        { label: 'Completed', fg: '#1d4ed8', bg: '#dbeafe' },
+  rejected:         { label: 'Rejected', fg: '#b91c1c', bg: '#fee2e2' },
+  dropped:          { label: 'Dropped', fg: '#475569', bg: '#e2e8f0' },
+};
+const STATUS_TABS = ['', 'pending_approval', 'attending', 'on_break', 'completed', 'rejected'];
+
+const PAGE_SIZES = [25, 50, 100];
+const DEFAULT_PAGE_SIZE = 50;
+
+// Deterministic soft colour per name, so a student keeps their avatar colour.
+const AVATAR_COLORS = [
+  ['#e0e7ff', '#3730a3'], ['#dcfce7', '#166534'], ['#fef3c7', '#92400e'],
+  ['#fce7f3', '#9d174d'], ['#e0f2fe', '#075985'], ['#ede9fe', '#5b21b6'],
+  ['#ffedd5', '#9a3412'], ['#ccfbf1', '#115e59'],
 ];
-
-// Local YYYY-MM-DD helper (avoids UTC shift for Asia/Kolkata users).
-const ymd = (d) => {
-  if (!d) return '';
-  const dt = d instanceof Date ? d : new Date(d);
-  if (Number.isNaN(dt.getTime())) return '';
-  const m = String(dt.getMonth() + 1).padStart(2, '0');
-  const day = String(dt.getDate()).padStart(2, '0');
-  return `${dt.getFullYear()}-${m}-${day}`;
+const avatarFor = (name) => {
+  const s = String(name || '?');
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  const [bg, fg] = AVATAR_COLORS[h % AVATAR_COLORS.length];
+  const initials = s.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
+  return { bg, fg, initials };
+};
+const Avatar = ({ name, small }) => {
+  const a = avatarFor(name);
+  return <span className={`adm-avatar${small ? ' sm' : ''}`} style={{ background: a.bg, color: a.fg }}>{a.initials}</span>;
 };
 
-// One component, five list pages — the page-specific behavior is fully
-// driven by props (status filter, page title, action set). Keeps the
-// list code DRY across Approvals / Attendings / Break / Total / Month.
+// "Today" / "Yesterday" / "5 days ago" / weekday — the sub-line under the date.
+const relDay = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const start = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((start(new Date()) - start(d)) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  if (diff > 1 && diff <= 30) return `${diff} days ago`;
+  return d.toLocaleDateString('en-GB', { weekday: 'long' });
+};
+
+export const StatusBadge = ({ status }) => {
+  const m = STATUS_META[status] || { label: status || '—', fg: '#475569', bg: '#f1f5f9' };
+  return <span className="adm-status" style={{ color: m.fg, background: m.bg }}><i />{m.label}</span>;
+};
+
+// Filters live in the URL (so Back, refresh and shared links keep them) and are
+// mirrored per page in sessionStorage (so leaving via the sidebar and coming
+// back restores them too). Keys are short to keep the URL readable.
+const FILTER_KEYS = ['q', 'program', 'counsellor', 'center', 'status', 'onboarding', 'from', 'to'];
+const storageKey = (path) => `adm-filters:${path}`;
+const saveFilters = (path, sp) => {
+  try { sessionStorage.setItem(storageKey(path), sp.toString()); } catch { /* storage unavailable */ }
+};
+
+// One component, six list pages — page-specific behaviour is fully driven by
+// props (status lock, title, actions).
 //
 // Props:
 //   title       — page heading
 //   subtitle    — optional description under heading
-//   statusFilter— 'pending_approval' | 'attending' | 'on_break' | null (all)
-//   monthScope  — if true, restricts query to current calendar month
-//   showCreate  — adds an "Add Admission" button → /accounts/new-admission
+//   statusFilter— locks the page to one status (hides the status tabs)
+//   monthScope  — restricts to the current calendar month
+//   showCreate  — adds a "New Admission" button → /accounts/new-admission
 //   actions     — array of { label, color, icon, when(row), onClick(row) }
-//   showFees    — adds Fees / Paid / Pending columns (used on Break)
-//   showOnboarding — adds the LMS "Onboarding" column (used on Attendings)
+//   showFees    — adds Fees / Paid / Pending columns (money roles only)
+//   showOnboarding — adds the LMS "Onboarding" column + filter
 const AdmissionsList = ({
   title, subtitle, statusFilter, monthScope, showCreate, actions,
   showFees: showFeesProp, showOnboarding,
 }) => {
-  // The fee columns are course money, not registration, so they are withheld
-  // from roles without money access however the caller sets the prop. The
-  // server nulls the values for them too — this stops three columns of
-  // em-dashes, and stops the per-row detail fetch that backs them.
+  // Fee columns are course money — withheld from roles without money access
+  // whatever the caller sets. The server nulls the values for them too.
   const showFees = showFeesProp && isRole(ROLES.SUPER_ADMIN, ROLES.ACCOUNT_MANAGER);
   const navigate = useNavigate();
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [q, setQ] = useState('');
-  // Filters (server-side via the existing /admissions list params).
-  const [programId, setProgramId] = useState('');
-  const [centerId, setCenterId] = useState('');
-  // LMS onboarding filter — only offered on pages showing the column.
-  const [onboarding, setOnboarding] = useState('');
-  const [counsellorId, setCounsellorId] = useState('');
-  const [status, setStatus] = useState('');   // only used when the page isn't status-locked
-  const [dateFrom, setDateFrom] = useState(''); // admission_date >=
-  const [dateTo, setDateTo] = useState('');     // admission_date <=
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const get = (k) => searchParams.get(k) || '';
 
-  // Dropdown option sources.
+  const page = Math.max(1, Number(get('page')) || 1);
+  const size = PAGE_SIZES.includes(Number(get('size'))) ? Number(get('size')) : DEFAULT_PAGE_SIZE;
+
+  // Write a patch into the URL (replace, not push — filter tweaks shouldn't
+  // fill the Back history) and mirror it to sessionStorage.
+  const setParams = (patch, { resetPage = true } = {}) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      Object.entries(patch).forEach(([k, v]) => {
+        if (v === '' || v == null) next.delete(k); else next.set(k, String(v));
+      });
+      if (resetPage) next.delete('page');
+      saveFilters(location.pathname, next);
+      return next;
+    }, { replace: true });
+  };
+
+  // Came back via the sidebar (URL has no params)? Restore this page's filters.
+  useEffect(() => {
+    if (location.search) return;
+    let saved = '';
+    try { saved = sessionStorage.getItem(storageKey(location.pathname)) || ''; } catch { /* ignore */ }
+    if (saved) setSearchParams(new URLSearchParams(saved), { replace: true });
+    // Only on arrival at this page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  // Search box: local for instant typing, pushed to the URL after a pause.
+  const urlQ = get('q');
+  const [qInput, setQInput] = useState(urlQ);
+  const lastPushedQ = useRef(urlQ);
+  useEffect(() => {
+    if (urlQ !== lastPushedQ.current) { lastPushedQ.current = urlQ; setQInput(urlQ); }
+  }, [urlQ]);
+  useEffect(() => {
+    const v = qInput.trim();
+    if (v === urlQ) return undefined;
+    const t = setTimeout(() => { lastPushedQ.current = v; setParams({ q: v }); }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qInput]);
+
+  // Server query — built only from the URL + page props.
+  const query = useMemo(() => {
+    const p = { page, limit: size };
+    const status = statusFilter || searchParams.get('status');
+    if (status) p.status = status;
+    const map = { q: 'q', program: 'program_id', center: 'center_id', counsellor: 'guided_by_counsellor_id' };
+    Object.entries(map).forEach(([k, api]) => { const v = searchParams.get(k); if (v) p[api] = v; });
+    if (showOnboarding && searchParams.get('onboarding')) p.onboarding = searchParams.get('onboarding');
+    if (monthScope) {
+      const now = new Date();
+      p.month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    } else {
+      if (searchParams.get('from')) p.date_from = searchParams.get('from');
+      if (searchParams.get('to')) p.date_to = searchParams.get('to');
+    }
+    return p;
+  }, [searchParams, page, size, statusFilter, monthScope, showOnboarding]);
+  const queryKey = JSON.stringify(query);
+
+  const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [tick, setTick] = useState(0);
+  const reload = () => setTick((t) => t + 1);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    (async () => {
+      try {
+        const r = await admissionsApi.list(JSON.parse(queryKey));
+        if (!alive) return;
+        const data = r?.data || [];
+        setRows(data);
+        setTotal(r?.meta?.total ?? data.length);
+      } catch {
+        if (alive) { setRows([]); setTotal(0); }
+      } finally {
+        if (alive) { setLoading(false); setLoadedOnce(true); }
+      }
+    })();
+    return () => { alive = false; };
+  }, [queryKey, tick]);
+
+  // An action (approve / drop …) emptied the last page → step back one.
+  const pageCount = Math.max(1, Math.ceil(total / size));
+  useEffect(() => {
+    if (!loading && page > pageCount) setParams({ page: pageCount }, { resetPage: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, page, pageCount]);
+
+  // Dropdown sources. Failures degrade to empty dropdowns.
   const [programs, setPrograms] = useState([]);
   const [centers, setCenters] = useState([]);
   const [users, setUsers] = useState([]);
-
-  const activeFilterCount = useMemo(
-    () => [programId, centerId, counsellorId, status, dateFrom, dateTo, q, onboarding].filter(Boolean).length,
-    [programId, centerId, counsellorId, status, dateFrom, dateTo, q, onboarding],
-  );
-
-  const reload = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = { limit: 200 };
-      // statusFilter (page-locked) wins; otherwise honor the status dropdown.
-      if (statusFilter) params.status = statusFilter;
-      else if (status) params.status = status;
-      if (q) params.q = q;
-      if (programId) params.program_id = programId;
-      if (centerId) params.center_id = centerId;
-      if (onboarding) params.onboarding = onboarding;
-      if (counsellorId) params.guided_by_counsellor_id = counsellorId;
-      if (dateFrom) params.date_from = dateFrom;
-      if (dateTo) params.date_to = dateTo;
-      if (monthScope) {
-        const now = new Date();
-        params.month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      }
-      const r = await admissionsApi.list(params);
-      setRows(r?.data || []);
-    } catch {
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter, status, q, monthScope, programId, centerId, counsellorId, dateFrom, dateTo, onboarding]);
-
-  // Debounce so typing search / rapid filter changes don't fire per keystroke.
-  useEffect(() => {
-    const t = setTimeout(reload, 300);
-    return () => clearTimeout(t);
-  }, [reload]);
-
-  // Load dropdown option sources once. Failures degrade to empty dropdowns.
   useEffect(() => {
     (async () => {
-      try {
-        const [pr, ce, us] = await Promise.all([
-          programsApi.list().catch(() => ({ data: [] })),
-          admissionsApi.centers.list().catch(() => ({ data: [] })),
-          usersApi.options().catch(() => ({ data: [] })),
-        ]);
-        setPrograms(pr?.data || []);
-        setCenters(ce?.data || []);
-        setUsers((us?.data || []).filter((u) => u?.is_active !== false));
-      } catch { /* dropdowns stay empty */ }
+      const [pr, ce, us] = await Promise.all([
+        programsApi.list().catch(() => ({ data: [] })),
+        admissionsApi.centers.list().catch(() => ({ data: [] })),
+        usersApi.options().catch(() => ({ data: [] })),
+      ]);
+      setPrograms(pr?.data || []);
+      setCenters(ce?.data || []);
+      setUsers((us?.data || []).filter((u) => u?.is_active !== false));
     })();
   }, []);
 
+  const nameOf = (list, id) => list.find((x) => x.id === id)?.name || '…';
+  const ONBOARDING_LABEL = { no_account: 'No login issued', never_used: 'Never signed in', using: 'Using platform' };
+  const activeChips = [
+    get('q') && { key: 'q', label: `Search: “${get('q')}”` },
+    get('program') && { key: 'program', label: `Course: ${nameOf(programs, get('program'))}` },
+    get('counsellor') && { key: 'counsellor', label: `Counsellor: ${nameOf(users, get('counsellor'))}` },
+    get('center') && { key: 'center', label: `Center: ${nameOf(centers, get('center'))}` },
+    !statusFilter && get('status') && { key: 'status', label: `Status: ${STATUS_META[get('status')]?.label || get('status')}` },
+    showOnboarding && get('onboarding') && { key: 'onboarding', label: `Onboarding: ${ONBOARDING_LABEL[get('onboarding')]}` },
+    !monthScope && get('from') && { key: 'from', label: `From ${fmtDate(get('from'))}` },
+    !monthScope && get('to') && { key: 'to', label: `To ${fmtDate(get('to'))}` },
+  ].filter(Boolean);
+
   const clearAll = () => {
-    setQ(''); setProgramId(''); setCenterId(''); setCounsellorId(''); setOnboarding('');
-    setStatus(''); setDateFrom(''); setDateTo('');
+    const next = new URLSearchParams(searchParams);
+    FILTER_KEYS.forEach((k) => next.delete(k));
+    next.delete('page');
+    saveFilters(location.pathname, next);
+    setSearchParams(next, { replace: true });
   };
 
+  const from = total === 0 ? 0 : (page - 1) * size + 1;
+  const to = Math.min(page * size, total);
+  const colCount = 8 + (showOnboarding ? 1 : 0) + (showFees ? 3 : 0) + (actions?.length ? 1 : 0);
+
   return (
-    <div className="accounts-page">
-      <div className="accounts-page-head">
+    <div className="adm">
+      <header className="adm-head">
         <div>
-          <div className="accounts-page-title">{title}</div>
-          {subtitle && <div className="accounts-page-subtitle">{subtitle}</div>}
+          <h1 className="adm-title">{title}</h1>
+          {subtitle && <div className="adm-subtitle">{subtitle}</div>}
         </div>
-        {showCreate && (
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => navigate('/accounts/new-admission')}
-            sx={{ textTransform: 'none', bgcolor: 'var(--primary)' }}
-          >
-            New Admission
-          </Button>
-        )}
-      </div>
+        <div className="adm-head-right">
+          <div className="adm-stat">
+            <span className="adm-stat-value">
+              {loadedOnce ? total.toLocaleString('en-IN') : <Skeleton width={48} />}
+            </span>
+            <span className="adm-stat-label">{activeChips.length ? 'Matching' : 'Admissions'}</span>
+          </div>
+          {showCreate && (
+            <Button
+              variant="contained"
+              disableElevation
+              startIcon={<AddIcon />}
+              onClick={() => navigate('/accounts/new-admission')}
+              sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '10px', px: 2.2, py: 1, bgcolor: 'var(--primary)', '&:hover': { bgcolor: 'var(--primary-dark)' } }}
+            >
+              New Admission
+            </Button>
+          )}
+        </div>
+      </header>
 
-      <div
-        className="accounts-filter-bar"
-        style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}
-      >
-        <TextField
-          size="small"
-          placeholder="Name, email or contact"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          sx={{ minWidth: 240 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>
-            ),
-          }}
-        />
+      {!statusFilter && (
+        <div className="adm-tabs" role="tablist" aria-label="Filter by status">
+          {STATUS_TABS.map((s) => (
+            <button
+              key={s || 'all'}
+              type="button"
+              role="tab"
+              className="adm-tab"
+              aria-selected={get('status') === s}
+              onClick={() => setParams({ status: s })}
+            >
+              {s && <span className="adm-tab-dot" style={{ background: STATUS_META[s].fg }} />}
+              {s ? STATUS_META[s].label : 'All'}
+            </button>
+          ))}
+        </div>
+      )}
 
-        <Autocomplete
-          size="small"
-          options={programs}
-          getOptionLabel={(o) => o?.name || ''}
-          isOptionEqualToValue={(o, v) => o.id === v.id}
-          value={programs.find((p) => p.id === programId) || null}
-          onChange={(_e, opt) => setProgramId(opt?.id || '')}
-          sx={{ minWidth: 210 }}
-          renderInput={(params) => <TextField {...params} label="Course" placeholder="All courses" />}
-        />
-
-        <Autocomplete
-          size="small"
-          options={users}
-          getOptionLabel={(o) => o?.name || ''}
-          isOptionEqualToValue={(o, v) => o.id === v.id}
-          value={users.find((u) => u.id === counsellorId) || null}
-          onChange={(_e, opt) => setCounsellorId(opt?.id || '')}
-          sx={{ minWidth: 200 }}
-          renderInput={(params) => <TextField {...params} label="Counsellor" placeholder="All counsellors" />}
-        />
-
-        <Autocomplete
-          size="small"
-          options={centers}
-          getOptionLabel={(o) => o?.name || ''}
-          isOptionEqualToValue={(o, v) => o.id === v.id}
-          value={centers.find((c) => c.id === centerId) || null}
-          onChange={(_e, opt) => setCenterId(opt?.id || '')}
-          sx={{ minWidth: 180 }}
-          renderInput={(params) => <TextField {...params} label="Center" placeholder="All centers" />}
-        />
-
-        {/* Status dropdown only when the page isn't already locked to one status. */}
-        {!statusFilter && (
+      <section className="adm-filters">
+        <div className="adm-filter-grid">
           <TextField
-            select size="small" label="Status" value={status}
-            onChange={(e) => setStatus(e.target.value)} sx={{ minWidth: 170 }}
-          >
-            {STATUS_OPTIONS.map((s) => (
-              <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
+            className="adm-search"
+            size="small"
+            placeholder="Search name, email or phone"
+            value={qInput}
+            onChange={(e) => setQInput(e.target.value)}
+            slotProps={{
+              input: {
+                startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+                endAdornment: qInput ? (
+                  <InputAdornment position="end">
+                    <IconButton size="small" aria-label="Clear search" onClick={() => setQInput('')}><ClearIcon fontSize="small" /></IconButton>
+                  </InputAdornment>
+                ) : null,
+              },
+            }}
+          />
+          <Autocomplete
+            size="small"
+            options={programs}
+            getOptionLabel={(o) => o?.name || ''}
+            isOptionEqualToValue={(o, v) => o.id === v.id}
+            value={programs.find((p) => p.id === get('program')) || null}
+            onChange={(_e, opt) => setParams({ program: opt?.id || '' })}
+            renderInput={(params) => <TextField {...params} label="Course" placeholder="All courses" />}
+          />
+          <Autocomplete
+            size="small"
+            options={users}
+            getOptionLabel={(o) => o?.name || ''}
+            isOptionEqualToValue={(o, v) => o.id === v.id}
+            value={users.find((u) => u.id === get('counsellor')) || null}
+            onChange={(_e, opt) => setParams({ counsellor: opt?.id || '' })}
+            renderInput={(params) => <TextField {...params} label="Counsellor" placeholder="All counsellors" />}
+          />
+          <Autocomplete
+            size="small"
+            options={centers}
+            getOptionLabel={(o) => o?.name || ''}
+            isOptionEqualToValue={(o, v) => o.id === v.id}
+            value={centers.find((c) => c.id === get('center')) || null}
+            onChange={(_e, opt) => setParams({ center: opt?.id || '' })}
+            renderInput={(params) => <TextField {...params} label="Center" placeholder="All centers" />}
+          />
+        </div>
+
+        <div className="adm-filter-row2">
+          {!monthScope && (
+            <>
+              <TextField
+                type="date" size="small" label="Admitted from"
+                value={get('from')}
+                onChange={(e) => setParams({ from: e.target.value })}
+                slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: get('to') || undefined } }}
+                sx={{ width: 170 }}
+              />
+              <TextField
+                type="date" size="small" label="Admitted to"
+                value={get('to')}
+                onChange={(e) => setParams({ to: e.target.value })}
+                slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: get('from') || undefined } }}
+                sx={{ width: 170 }}
+              />
+            </>
+          )}
+          {showOnboarding && (
+            <TextField
+              select size="small" label="Onboarding" value={get('onboarding')}
+              onChange={(e) => setParams({ onboarding: e.target.value })} sx={{ width: 190 }}
+            >
+              <MenuItem value="">All</MenuItem>
+              <MenuItem value="no_account">No login issued</MenuItem>
+              <MenuItem value="never_used">Never signed in</MenuItem>
+              <MenuItem value="using">Using platform</MenuItem>
+            </TextField>
+          )}
+          <div className="adm-chips">
+            {activeChips.map((c) => (
+              <Chip
+                key={c.key}
+                size="small"
+                label={c.label}
+                onDelete={() => { if (c.key === 'q') setQInput(''); setParams({ [c.key]: '' }); }}
+                sx={{ fontWeight: 500, bgcolor: 'var(--adm-accent-soft)', color: 'var(--adm-ink)', borderRadius: '8px' }}
+              />
             ))}
-          </TextField>
-        )}
+          </div>
+          {activeChips.length > 0 && (
+            <Button size="small" startIcon={<FilterAltOffIcon fontSize="small" />} onClick={() => { setQInput(''); clearAll(); }}
+              sx={{ textTransform: 'none', color: 'var(--adm-muted)', fontWeight: 600 }}
+            >
+              Clear all
+            </Button>
+          )}
+        </div>
+      </section>
 
-        {/* LMS onboarding state. Only on pages that show the column — this is
-            the control that turns "1,061 students are Attending" into the two
-            actionable lists: who still needs credentials issued, and who has
-            them but has never signed in. */}
-        {showOnboarding && (
-          <TextField
-            select size="small" label="Onboarding" value={onboarding}
-            onChange={(e) => setOnboarding(e.target.value)} sx={{ minWidth: 190 }}
-          >
-            <MenuItem value="">All</MenuItem>
-            <MenuItem value="no_account">No login issued</MenuItem>
-            <MenuItem value="never_used">Never signed in</MenuItem>
-            <MenuItem value="using">Using platform</MenuItem>
-          </TextField>
-        )}
-
-        {/* Admission-date range. Disabled when the page is month-scoped
-            (This Month page already restricts to the current month). */}
-        <TextField
-          type="date" size="small" label="From"
-          InputLabelProps={{ shrink: true }}
-          value={dateFrom} onChange={(e) => setDateFrom(ymd(e.target.value))}
-          disabled={monthScope} sx={{ minWidth: 150 }}
-        />
-        <TextField
-          type="date" size="small" label="To"
-          InputLabelProps={{ shrink: true }}
-          value={dateTo} onChange={(e) => setDateTo(ymd(e.target.value))}
-          disabled={monthScope} sx={{ minWidth: 150 }}
-        />
-
-        {activeFilterCount > 0 && (
-          <Button
-            size="small" startIcon={<ClearIcon />} onClick={clearAll}
-            sx={{ textTransform: 'none', color: '#6b7280' }}
-          >
-            Clear all
-          </Button>
-        )}
-        <Chip
-          size="small"
-          label={`${rows.length} result${rows.length === 1 ? '' : 's'}`}
-          sx={{ ml: 'auto', height: 26, fontWeight: 600 }}
-        />
-      </div>
-
-      <div className="accounts-table-card">
-        {loading ? (
-          <div className="accounts-empty"><CircularProgress size={20} /></div>
-        ) : rows.length === 0 ? (
-          <div className="accounts-empty">No admissions to show.</div>
-        ) : (
-          <table className="accounts-table">
+      <section className={`adm-card${loading && loadedOnce ? ' is-loading' : ''}`}>
+        {loading && loadedOnce && <LinearProgress className="adm-progress" sx={{ height: 2 }} />}
+        <div className="adm-scroll">
+          <table className="adm-table">
             <thead>
               <tr>
-                <th>Admission Date</th>
+                <th>Admitted</th>
                 <th>Student</th>
                 <th>Course</th>
                 <th>Counsellor</th>
@@ -281,15 +400,22 @@ const AdmissionsList = ({
                 <th>Mode</th>
                 <th>Status</th>
                 {showOnboarding && <th>Onboarding</th>}
-                {showFees && <th style={{ textAlign: 'right' }}>Fees</th>}
-                {showFees && <th style={{ textAlign: 'right' }}>Paid</th>}
-                {showFees && <th style={{ textAlign: 'right' }}>Pending</th>}
+                {showFees && <th className="num">Fees</th>}
+                {showFees && <th className="num">Paid</th>}
+                {showFees && <th className="num">Pending</th>}
                 <th>Contact</th>
-                {actions?.length > 0 && <th style={{ textAlign: 'right' }}>Actions</th>}
+                {actions?.length > 0 && <th className="num">Actions</th>}
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {!loadedOnce && Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i}>
+                  {Array.from({ length: colCount }).map((__, j) => (
+                    <td key={j}><Skeleton variant="text" width={j === 1 ? 180 : 90} /></td>
+                  ))}
+                </tr>
+              ))}
+              {loadedOnce && rows.map((r) => (
                 <AdmissionRow
                   key={r.id}
                   row={r}
@@ -301,106 +427,161 @@ const AdmissionsList = ({
               ))}
             </tbody>
           </table>
+        </div>
+
+        {loadedOnce && !loading && rows.length === 0 && (
+          <div className="adm-empty">
+            <div className="adm-empty-icon"><SchoolOutlinedIcon /></div>
+            <h3>{activeChips.length ? 'No admissions match these filters' : 'No admissions yet'}</h3>
+            <p>{activeChips.length ? 'Try widening the date range or removing a filter.' : 'New admissions will show up here.'}</p>
+            {activeChips.length > 0 && (
+              <Button variant="outlined" size="small" onClick={() => { setQInput(''); clearAll(); }} sx={{ textTransform: 'none', borderRadius: '8px' }}>
+                Clear all filters
+              </Button>
+            )}
+          </div>
         )}
-      </div>
+
+        {loadedOnce && total > 0 && (
+          <footer className="adm-foot">
+            <div className="adm-foot-info">
+              <span>Showing <b>{from.toLocaleString('en-IN')}–{to.toLocaleString('en-IN')}</b> of <b>{total.toLocaleString('en-IN')}</b></span>
+              <TextField
+                select size="small" value={size}
+                onChange={(e) => setParams({ size: Number(e.target.value) === DEFAULT_PAGE_SIZE ? '' : e.target.value })}
+                sx={{ '& .MuiInputBase-input': { py: 0.6, fontSize: 13 } }}
+              >
+                {PAGE_SIZES.map((n) => <MenuItem key={n} value={n}>{n} / page</MenuItem>)}
+              </TextField>
+            </div>
+            {pageCount > 1 && (
+              <Pagination
+                count={pageCount}
+                page={Math.min(page, pageCount)}
+                onChange={(_e, p) => setParams({ page: p === 1 ? '' : p }, { resetPage: false })}
+                shape="rounded"
+                siblingCount={1}
+                boundaryCount={1}
+                sx={{ '& .Mui-selected': { bgcolor: 'var(--adm-ink) !important', color: '#fff' } }}
+              />
+            )}
+          </footer>
+        )}
+      </section>
     </div>
   );
 };
 
 // Is this student REALLY onboarded?
 //
-// Three distinct states, because the two that existed before were routinely
-// confused and the screen showed neither:
+//   No login    — course-confirm has not been run; no LMS account exists.
+//   Not used    — an account exists but last_login_at is NULL: the student has
+//                 NEVER signed in. The one someone needs to call.
+//   Using it    — last_login_at is set (only a real password login stamps it).
 //
-//   No login    — course-confirm has not been run. There is no LMS account at
-//                 all, so nothing was ever handed to the student.
-//   Not used    — an account exists (status flips to 'active' the moment a
-//                 temp password is generated) but last_login_at is NULL: the
-//                 student has NEVER signed in. This is the state that silently
-//                 passed as "activated" in the LMS funnel, and it is exactly
-//                 the student someone needs to call.
-//   Using it    — last_login_at is set. Stamped only by a real password login,
-//                 never by sudo or a read-only view-as, so it is trustworthy.
-//
-// Deliberately shows the date rather than just a tick: "logged in once in
-// August" and "logged in yesterday" are different situations, and whoever is
-// chasing onboarding needs to tell them apart.
+// Shows the date, not just a tick: "once in August" ≠ "yesterday".
 const OnboardingCell = ({ row }) => {
   const created = row.student_account_created_at;
   const lastLogin = row.student_last_login_at;
-
   const state = !created
-    ? { label: 'No login', tint: '#dc2626', bg: '#fef2f2', hint: 'No LMS account yet — run Confirm Course' }
+    ? { label: 'No login', fg: '#b91c1c', bg: '#fee2e2', hint: 'No LMS account yet — run Confirm Course' }
     : !lastLogin
-      ? { label: 'Never signed in', tint: '#d97706', bg: '#fffbeb', hint: 'Account created but the student has never logged in' }
-      : { label: 'Using platform', tint: '#059669', bg: '#ecfdf5', hint: `Last signed in ${fmtDate(lastLogin)}` };
-
+      ? { label: 'Never signed in', fg: '#b45309', bg: '#fef3c7', hint: 'Account created but the student has never logged in' }
+      : { label: 'Using platform', fg: '#15803d', bg: '#dcfce7', hint: `Last signed in ${fmtDate(lastLogin)}` };
   return (
     <div title={state.hint}>
-      <span style={{
-        display: 'inline-block', padding: '2px 8px', borderRadius: 999,
-        fontSize: 11, fontWeight: 700, color: state.tint, background: state.bg,
-        whiteSpace: 'nowrap',
-      }}
-      >
-        {state.label}
-      </span>
-      {lastLogin && (
-        <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{fmtDate(lastLogin)}</div>
-      )}
+      <span className="adm-status" style={{ color: state.fg, background: state.bg }}><i />{state.label}</span>
+      {lastLogin && <div className="adm-date-sub">{fmtDate(lastLogin)}</div>}
     </div>
   );
 };
 
 const AdmissionRow = ({ row, actions, showFees, showOnboarding, onChanged }) => {
-  const navigate = useNavigate();
+  // Basename-aware URL of the detail page; rows open it in a NEW TAB so the
+  // list (with its filters and page) stays exactly where it was.
+  const href = useHref(`/accounts/admission/${row.id}`);
+  const openDetail = () => window.open(href, '_blank', 'noopener');
   const [detail, setDetail] = useState(null);
 
-  // Lazily fetch full detail when this row is shown in "showFees" mode —
-  // the list endpoint doesn't compute paid_till_date, so we need /:id.
+  // Fees mode: the list endpoint doesn't compute paid_till_date — fetch /:id.
   useEffect(() => {
     if (!showFees) return undefined;
     let alive = true;
-    const load = async () => {
-      try {
-        const r = await admissionsApi.get(row.id);
-        if (alive) setDetail(r?.data);
-      } catch {
-        if (alive) setDetail(null);
-      }
-    };
-    load();
+    admissionsApi.get(row.id)
+      .then((r) => { if (alive) setDetail(r?.data); })
+      .catch(() => { if (alive) setDetail(null); });
     return () => { alive = false; };
   }, [showFees, row.id]);
 
   const paid = Number(detail?.paid_till_date ?? 0);
   const pending = Number(detail?.pending_fees ?? row.total_fees ?? 0);
+  const name = fullName(row);
+  const phone = row.whatsapp_number || '';
+  const waDigits = phone.replace(/\D/g, '');
+  const waLink = waDigits.length >= 10 ? `https://wa.me/${waDigits.length === 10 ? `91${waDigits}` : waDigits}` : null;
 
   return (
-    <tr style={{ cursor: 'pointer' }} onClick={() => navigate(`/accounts/admission/${row.id}`)}>
-      <td>{fmtDate(row.admission_date)}</td>
-      <td>{fullName(row)}<div style={{ fontSize: 11, color: '#9ca3af' }}>{row.email || '—'}</div></td>
-      <td>{row.program_name || '—'}</td>
-      <td style={{ fontSize: 12, color: '#6b7280' }}>{row.guided_by_counsellor_name || '—'}</td>
-      <td style={{ fontSize: 12, color: '#6b7280' }}>{row.center_name || '—'}</td>
-      <td>{row.mode_of_training || '—'}</td>
-      <td><StatusPill status={row.status} /></td>
+    <tr
+      className="adm-row"
+      tabIndex={0}
+      onClick={() => {
+        // Selecting text (to copy a phone/email) shouldn't open a tab.
+        if (window.getSelection?.().toString()) return;
+        openDetail();
+      }}
+      onKeyDown={(e) => { if (e.key === 'Enter') openDetail(); }}
+    >
+      <td>
+        <div className="adm-date">{fmtDate(row.admission_date)}</div>
+        <div className="adm-date-sub">{relDay(row.admission_date)}</div>
+      </td>
+      <td>
+        <div className="adm-student">
+          <Avatar name={name} />
+          <div style={{ minWidth: 0 }}>
+            <a className="adm-name" href={href} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+              {name}
+              <OpenInNewIcon className="adm-open" sx={{ fontSize: 13 }} />
+            </a>
+            <div className="adm-email">{row.email || '—'}</div>
+          </div>
+        </div>
+      </td>
+      <td><div className="adm-course" title={row.program_name || ''}>{row.program_name || <span className="adm-muted">—</span>}</div></td>
+      <td>
+        {row.guided_by_counsellor_name
+          ? <span className="adm-person"><Avatar name={row.guided_by_counsellor_name} small />{row.guided_by_counsellor_name}</span>
+          : <span className="adm-muted">—</span>}
+      </td>
+      <td>{row.center_name || <span className="adm-muted">—</span>}</td>
+      <td>{row.mode_of_training ? <span className="adm-mode">{row.mode_of_training}</span> : <span className="adm-muted">—</span>}</td>
+      <td><StatusBadge status={row.status} /></td>
       {showOnboarding && <td><OnboardingCell row={row} /></td>}
-      {showFees && <td style={{ textAlign: 'right' }}>₹ {fmtMoney(row.total_fees)}</td>}
-      {showFees && <td style={{ textAlign: 'right' }}>₹ {fmtMoney(paid)}</td>}
-      {showFees && <td style={{ textAlign: 'right' }}>₹ {fmtMoney(pending)}</td>}
-      <td style={{ fontSize: 12 }}>{row.whatsapp_number}</td>
+      {showFees && <td className="num">₹ {fmtMoney(row.total_fees)}</td>}
+      {showFees && <td className="num">₹ {fmtMoney(paid)}</td>}
+      {showFees && <td className="num">₹ {fmtMoney(pending)}</td>}
+      <td>
+        {phone ? (
+          <span className="adm-contact">
+            {phone}
+            {waLink && (
+              <Tooltip title="Open WhatsApp">
+                <a href={waLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label="Open WhatsApp">
+                  <WhatsAppIcon sx={{ fontSize: 16 }} />
+                </a>
+              </Tooltip>
+            )}
+          </span>
+        ) : <span className="adm-muted">—</span>}
+      </td>
       {actions?.length > 0 && (
-        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
+        <td className="num" style={{ whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
           {actions.filter((a) => !a.when || a.when(row)).map((a) => (
             <Tooltip key={a.label} title={a.label}>
               <span>
                 <IconButton
                   size="small"
-                  onClick={async () => {
-                    await a.onClick(row);
-                    onChanged?.();
-                  }}
+                  onClick={async () => { await a.onClick(row); onChanged?.(); }}
                   sx={{ color: a.color || '#374151' }}
                 >
                   {a.icon}

@@ -1,0 +1,262 @@
+/* Admissions list (Total / This Month / Approvals / Attendings / Break / Drop).
+   Scoped under .adm so nothing here leaks into the other Accounts pages. */
+
+.adm {
+  --adm-ink: #0f172a;
+  --adm-ink-2: #334155;
+  --adm-muted: #64748b;
+  --adm-faint: #94a3b8;
+  --adm-line: #e2e8f0;
+  --adm-line-soft: #f1f5f9;
+  --adm-card: #ffffff;
+  --adm-bg: #f8fafc;
+  --adm-accent: var(--primary, #e53935);
+  --adm-accent-soft: var(--primary-light, #ffebee);
+  --adm-radius: 14px;
+  --adm-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.04);
+
+  padding: 16px 12px 32px;
+  background: var(--adm-bg);
+  min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  color: var(--adm-ink);
+}
+@media (min-width: 768px) { .adm { padding: 22px 24px 36px; } }
+@media (min-width: 1280px) { .adm { padding: 26px 32px 40px; } }
+
+/* ── Header ─────────────────────────────────────────────── */
+.adm-head {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+@media (min-width: 720px) {
+  .adm-head { flex-direction: row; align-items: flex-end; justify-content: space-between; }
+}
+.adm-title {
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0;
+}
+@media (min-width: 720px) { .adm-title { font-size: 26px; } }
+.adm-subtitle { margin-top: 4px; font-size: 13.5px; color: var(--adm-muted); }
+.adm-head-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.adm-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.1;
+}
+.adm-stat-value { font-size: 22px; font-weight: 750; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.adm-stat-label { font-size: 11px; font-weight: 600; color: var(--adm-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* ── Status tabs ────────────────────────────────────────── */
+.adm-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px;
+  margin-bottom: 14px;
+  background: var(--adm-card);
+  border: 1px solid var(--adm-line);
+  border-radius: 12px;
+  width: fit-content;
+  max-width: 100%;
+  scrollbar-width: none;
+}
+.adm-tabs::-webkit-scrollbar { display: none; }
+.adm-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--adm-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: background 0.15s, color 0.15s;
+}
+.adm-tab:hover { background: var(--adm-line-soft); color: var(--adm-ink); }
+.adm-tab[aria-selected='true'] { background: var(--adm-ink); color: #fff; }
+.adm-tab-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+/* ── Filter card ────────────────────────────────────────── */
+.adm-filters {
+  background: var(--adm-card);
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-radius);
+  box-shadow: var(--adm-shadow);
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.adm-filter-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+@media (min-width: 640px) { .adm-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) {
+  .adm-filter-grid { grid-template-columns: minmax(240px, 1.6fr) repeat(3, minmax(160px, 1fr)); }
+}
+.adm-filter-grid .adm-search { grid-column: 1 / -1; }
+@media (min-width: 1100px) { .adm-filter-grid .adm-search { grid-column: auto; } }
+.adm-filter-row2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.adm-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+
+/* ── Table card ─────────────────────────────────────────── */
+.adm-card {
+  position: relative;
+  background: var(--adm-card);
+  border: 1px solid var(--adm-line);
+  border-radius: var(--adm-radius);
+  box-shadow: var(--adm-shadow);
+  overflow: hidden;
+}
+.adm-progress { position: absolute; inset: 0 0 auto 0; z-index: 3; }
+.adm-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.adm-scroll::-webkit-scrollbar { height: 8px; }
+.adm-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+.adm-table { width: 100%; min-width: 980px; border-collapse: separate; border-spacing: 0; }
+.adm-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8fafc;
+  color: var(--adm-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--adm-line);
+  white-space: nowrap;
+}
+.adm-table td {
+  padding: 13px 16px;
+  font-size: 13.5px;
+  color: var(--adm-ink-2);
+  border-bottom: 1px solid var(--adm-line-soft);
+  vertical-align: middle;
+}
+.adm-table tbody tr:last-child td { border-bottom: 0; }
+.adm-table th.num, .adm-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.adm-row { cursor: pointer; transition: background 0.12s; }
+.adm-row:hover td { background: #fafbfd; }
+.adm-row:hover .adm-open { opacity: 1; }
+.adm-row:focus-visible { outline: 2px solid var(--adm-accent); outline-offset: -2px; }
+.adm-card.is-loading tbody { opacity: 0.55; transition: opacity 0.15s; }
+
+.adm-date { font-weight: 600; color: var(--adm-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.adm-date-sub { font-size: 11.5px; color: var(--adm-faint); margin-top: 2px; }
+
+.adm-student { display: flex; align-items: center; gap: 12px; min-width: 220px; }
+.adm-avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.adm-avatar.sm { width: 24px; height: 24px; font-size: 10px; }
+.adm-name {
+  color: var(--adm-ink);
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.adm-name:hover { color: var(--adm-accent); }
+.adm-open { opacity: 0; transition: opacity 0.12s; color: var(--adm-faint); }
+.adm-email { font-size: 12px; color: var(--adm-faint); margin-top: 1px; }
+
+.adm-course {
+  max-width: 260px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.35;
+  color: var(--adm-ink);
+}
+.adm-person { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.adm-muted { color: var(--adm-faint); }
+
+.adm-mode {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--adm-line);
+  color: var(--adm-ink-2);
+  background: #fff;
+  white-space: nowrap;
+}
+
+.adm-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.adm-status i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.adm-contact { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.adm-contact a { color: #16a34a; display: inline-flex; }
+
+/* ── Footer / pagination ────────────────────────────────── */
+.adm-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--adm-line);
+  background: #fcfdfe;
+}
+.adm-foot-info { font-size: 13px; color: var(--adm-muted); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.adm-foot-info b { color: var(--adm-ink); font-variant-numeric: tabular-nums; }
+
+/* ── Empty state ────────────────────────────────────────── */
+.adm-empty { padding: 56px 20px; text-align: center; }
+.adm-empty-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: var(--adm-line-soft);
+  color: var(--adm-faint);
+}
+.adm-empty h3 { margin: 0 0 4px; font-size: 16px; font-weight: 700; color: var(--adm-ink); }
+.adm-empty p { margin: 0 0 14px; font-size: 13.5px; color: var(--adm-muted); }
