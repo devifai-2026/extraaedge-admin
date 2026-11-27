@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   TextField, MenuItem, Select, FormControl, InputLabel, Button,
   CircularProgress, Chip,
@@ -76,6 +77,7 @@ const TotalsStrip = ({ items }) => (
 // PAY SCHEDULE REPORT
 // ============================================================================
 export const PaySchedulePage = () => {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState({ date_from: '', date_to: '', program_id: '' });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -94,7 +96,7 @@ export const PaySchedulePage = () => {
         <div>
           <div className="accounts-page-title">Pay Schedule Report</div>
           <div className="accounts-page-subtitle">
-            Outstanding fees, paid till date, and dues falling in the current month.
+            Outstanding fees and dues. Pick a date range to see installments falling due in it (default: current month). Click a row to open the admission.
           </div>
         </div>
       </div>
@@ -149,7 +151,12 @@ export const PaySchedulePage = () => {
               </thead>
               <tbody>
                 {(result.rows || []).map((r) => (
-                  <tr key={r.id}>
+                  <tr
+                    key={r.id}
+                    onClick={() => navigate(`/accounts/admission/${r.id}`)}
+                    style={{ cursor: 'pointer' }}
+                    title="Open admission"
+                  >
                     <td>{fullName(r)}</td>
                     <td>{r.course || '—'}</td>
                     <td>{fmtDate(r.admission_date)}</td>
